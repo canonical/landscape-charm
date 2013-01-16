@@ -1,0 +1,5 @@
+options:
+    repository:
+        description: APT Repository to use for installing LDS.
+        default: https://landscape-builder:G7NcTVWnPwx6l9zd9wt2@private-ppa.launchpad.net/landscape/lds-trunk/ubuntu
+        type: string

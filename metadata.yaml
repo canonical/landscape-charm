@@ -1,0 +1,17 @@
+name: landscape
+summary: The Landscape charm.
+description: |
+  A multi server Landscape charm.
+requires:
+  db-admin:
+    interface: pgsql
+  db-admin-proxy:
+    interface: pgsql
+  website:
+    interface: http
+  amqp:
+    interface: rabbitmq
+
+peers:
+  landscape:
+    interface: landscape

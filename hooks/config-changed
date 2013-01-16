@@ -1,0 +1,3 @@
+#!/bin/bash
+
+juju-log "Running config-changed"
