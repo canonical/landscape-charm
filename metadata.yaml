@@ -1,17 +1,11 @@
-name: landscape
-summary: The Landscape charm.
+name: landscape-msgserver
+summary: The Landscape message service charm.
 description: |
   A multi server Landscape charm.
 requires:
-  db-admin:
+  db:
     interface: pgsql
-  db-admin-proxy:
+  db-proxy:
     interface: pgsql
-  website:
-    interface: http
   amqp:
     interface: rabbitmq
-
-peers:
-  landscape:
-    interface: landscape

@@ -110,6 +110,8 @@ get_network
 setup_local_repo || add_apt_sources
 install_landscape || die "Error installing landscape"
 
+sed -i 's/RUN_MSGSERVER=.*/RUN_MSGSERVER="yes"/g' /etc/default/landscape-server
+
 # HTTP/HTTPS
 #open-port 80/tcp
 #open-port 443/tcp

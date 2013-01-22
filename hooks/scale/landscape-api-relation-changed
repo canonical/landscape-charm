@@ -1,6 +1,0 @@
-#!/bin/bash
-
-IP=`relation-get private-address`
-UNIT_NAME=`echo $JUJU_REMOTE_UNIT | sed -e 's,/,-,'`
-sed -e "s/#api/#api\n    server $UNIT_NAME $IP:9080 check inter 5000 rise 2 fall 5 maxconn 8/" -i /etc/haproxy/haproxy.cfg
-service haproxy reload
