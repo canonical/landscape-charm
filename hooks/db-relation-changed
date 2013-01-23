@@ -8,13 +8,6 @@ from ConfigParser import RawConfigParser
 sys.path.insert(0, os.path.dirname(__file__))
 import common
 
-common.set_host("account-1")
-common.set_host("knowledge")
-common.set_host("main")
-common.set_host("package")
-common.set_host("resource-1")
-common.set_host("session")
-
 
 host = check_output(["relation-get", "host"]).strip()
 superuser = check_output(["relation-get", "user"]).strip()

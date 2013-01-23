@@ -1,0 +1,4 @@
+#!/bin/bash
+
+. /opt/canonical/landscape/scripts/landscape-env.sh
+schema_check
