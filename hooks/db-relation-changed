@@ -2,13 +2,20 @@
 
 import sys
 import os
-#import common
+import common
 from subprocess import check_output
 from ConfigParser import RawConfigParser
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-host = check_output(["relation-get", "private-address"]).strip()
+common.set_host("account-1")
+common.set_host("knowledge")
+common.set_host("main")
+common.set_host("package")
+common.set_host("resource-1")
+common.set_host("session")
+
+host = check_output(["relation-get", "host"]).strip()
 user = "landscape"
 password = "landscape"
 touch_file = "/var/tmp/landscape-msgserver-postgresql-done"
