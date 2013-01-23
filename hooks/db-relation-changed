@@ -33,3 +33,5 @@ if host:
 
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
+
+    check_output("start-services")
