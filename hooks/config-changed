@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -ex
+
+ACTION=0
+
+if [ -f "/var/tmp/landscape-msgserver-postgresql-done" ]; then
+    juju-log "Polling for database setup and updated schema"
+    . /opt/canonical/landscape/scripts/landscape-env.sh
+    while ! schema_check; do
+        juju-log "Schema still out of date."
+        sleep 5
+    done;
+    ACTION=1
+fi
+
+[ $ACTION == 1 ] && lsctl restart

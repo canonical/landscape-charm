@@ -2,18 +2,16 @@
 
 import sys
 import os
-from subprocess import (check_call, check_output)
+#import common
+from subprocess import check_output
 from ConfigParser import RawConfigParser
 
 sys.path.insert(0, os.path.dirname(__file__))
-import common
-
 
 host = check_output(["relation-get", "host"]).strip()
-superuser = check_output(["relation-get", "user"]).strip()
-database = check_output(["relation-get", "database"]).strip()
-password = check_output(["relation-get", "password"]).strip()
-user = "landscape-user"
+user = "landscape"
+password = "landscape"
+touch_file = "/var/tmp/landscape-msgserver-postgresql-done"
 
 if host:
     config_file = "/etc/landscape/service.conf"
@@ -24,14 +22,7 @@ if host:
     parser.set("stores", "host", host)
     parser.set("stores", "port", "5432")
     parser.set("stores", "user", user)
-
-    parser.set("schema", "store_user", superuser)
-    parser.set("schema", "store_password", password)
+    parser.set("stores", "password", password)
 
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
-
-    # TODO: Move this out of here...
-    check_call("setup-landscape-server")
-
-    check_call(["lsctl", "restart"])
