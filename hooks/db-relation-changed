@@ -31,8 +31,11 @@ if host:
     parser.set("stores", "port", "5432")
     parser.set("stores", "user", user)
     parser.set("stores", "password", password)
+    parser.set("schema", "store_user", user)
+    parser.set("schema", "store_password", password)
+    parser.set("schema", "host", host)
 
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
 
-    check_output([HOOKS + "start-services"])
+    check_output([os.path.join(HOOKS, "start-services")])
