@@ -3,9 +3,9 @@ summary: The Landscape message service charm.
 description: |
   A multi server Landscape charm.
 requires:
-  db:
+  db-admin:
     interface: pgsql
-  db-proxy:
+  db-admin-proxy:
     interface: pgsql
   amqp:
     interface: rabbitmq
