@@ -9,3 +9,5 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
+  landscape-msgserver:
+    interface: landscape
