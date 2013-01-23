@@ -6,7 +6,8 @@ import common
 from subprocess import check_output
 from ConfigParser import RawConfigParser
 
-sys.path.insert(0, os.path.dirname(__file__))
+HOOKS = os.path.dirname(__file__)
+sys.path.insert(0, HOOKS)
 
 common.set_host("account-1")
 common.set_host("knowledge")
@@ -34,4 +35,4 @@ if host:
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
 
-    check_output("start-services")
+    check_output([HOOKS + "start-services"])
