@@ -8,7 +8,7 @@ from ConfigParser import RawConfigParser
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-host = check_output(["relation-get", "host"]).strip()
+host = check_output(["relation-get", "private-address"]).strip()
 user = "landscape"
 password = "landscape"
 touch_file = "/var/tmp/landscape-msgserver-postgresql-done"
