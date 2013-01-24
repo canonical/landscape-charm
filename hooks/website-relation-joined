@@ -1,5 +1,0 @@
-#!/bin/bash -x
-
-relation-set hostname=`unit-get private-address` \
-             port=80 \
-             https-port=443
