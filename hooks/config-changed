@@ -1,6 +1,7 @@
 #!/bin/bash -xe
 
 ROOT="$( cd "$( dirname "$0" )" && pwd )"
+
 LS_LICENSE_FILE=`config-get license-file`
 LICENSE_FILE_DEST=/etc/landscape/license.txt
 LICENSE_FILE_RE='^`(.*)`$'

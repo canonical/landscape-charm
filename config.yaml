@@ -5,3 +5,11 @@ options:
     license-file:
         description: License file for LDS
         type: string
+    services:
+        description: |
+            Landscape services listed as space-separated entries.  Valid
+            services are: appserver, msgserver, pingserver, combo-loader,
+            async-frontend, apiserver, package-upload, package-search.  This
+            field is effecitvely immutable.  If not set before the charm is
+            installed, changes to it will be ignored.
+        type: string

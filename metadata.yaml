@@ -1,5 +1,5 @@
-name: landscape-appserver
-summary: The Landscape application service charm.
+name: landscape-service
+summary: Landscape charm for starting up landscape services.
 description: |
   A multi server Landscape charm.
 requires:
@@ -9,5 +9,5 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
-  landscape-appserver:
+  landscape:
     interface: landscape

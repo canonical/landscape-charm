@@ -1,20 +1,31 @@
-#!/bin/bash
+#!/bin/bash -xe
 
-set -x
-
-export LC_ALL=C
-
+ROOT="$( cd "$( dirname "$0" )" && pwd )"
+SERVICES=$(config-get services)
 LS_PPA=`config-get repository`
-
 LS_PACKAGE="landscape-server_*.tar.gz"
-
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
+
+# Provides $DEFAULT_VAR map
+source $ROOT/services.sh
 
 die() {
     STATUS=$?
     echo "ERROR: $1"
     exit $STATUS 
+}
+
+# Save the services in /etc/landscape/services so that if someone runs
+# juju set it will be ignored in the landscape-relation-part
+enable_services() {
+    juju-log "Selected services: $SERVICES"
+    echo $SERVICES > /etc/landscape/services
+    for i in $SERVICES; do
+        juju-log "Enabling: $i"
+        $var=${DEFAULT_VAR[$i]}
+        sed -i "s/${var}=.*/${var}=\"yes\"/g" /etc/default/landscape-server
+    done
 }
 
 setup_local_repo () {
@@ -86,6 +97,7 @@ apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
 setup_local_repo || add_apt_sources
 install_landscape || die "Error installing landscape"
 
-sed -i 's/RUN_APPSERVER=.*/RUN_APPSERVER="yes"/g' /etc/default/landscape-server
+# Enable all services that the were requested in the config
+enable_services
 
 exit 0
