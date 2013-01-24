@@ -1,0 +1,4 @@
+#!/bin/bash
+
+services=$(cat /etc/landscape/services)
+relation-set "services=$services"
