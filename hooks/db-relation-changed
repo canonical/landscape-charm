@@ -2,19 +2,12 @@
 
 import sys
 import os
-import common
+#import common
 from subprocess import check_output
 from ConfigParser import RawConfigParser
 
 HOOKS = os.path.dirname(__file__)
 sys.path.insert(0, HOOKS)
-
-common.set_host("account-1")
-common.set_host("knowledge")
-common.set_host("main")
-common.set_host("package")
-common.set_host("resource-1")
-common.set_host("session")
 
 host = check_output(["relation-get", "host"]).strip()
 user = "landscape"
