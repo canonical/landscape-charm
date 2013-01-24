@@ -23,7 +23,7 @@ enable_services() {
     echo $SERVICES > /etc/landscape/services
     for i in $SERVICES; do
         juju-log "Enabling: $i"
-        $var=${DEFAULT_VAR[$i]}
+        var=${DEFAULT_VAR[$i]}
         sed -i "s/${var}=.*/${var}=\"yes\"/g" /etc/default/landscape-server
     done
 }
