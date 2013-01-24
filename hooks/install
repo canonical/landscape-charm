@@ -53,15 +53,6 @@ setup_local_repo () {
     cd $PWD
 }
 
-
-get_private_ip () {
-    # Make sure that we use the resolvable private address
-    # dig deals with both hostnames and ip addresses in a nice
-    # way - this has been tested in local and ec2 providers
-    # with ec2 and openstack
-    dig +short `unit-get private-address`
-}
-
 install_landscape() {
     apt_get update;
     apt_get install landscape-server
@@ -84,19 +75,6 @@ function apt_get() {
         -o Dpkg::Options::='--force-confold' $*;
 }
 
-get_network() {
-    API_VERSION="2008-02-01"
-    METADATA_URL="http://169.254.169.254/$API_VERSION/meta-data"
-
-    #FQDN=`hostname -f`
-    FQDN=`unit-get public-address`
-    PRIVATE=`unit-get private-address`
-    PUBLIC=$FQDN
-    HOSTNAME=`dig +short $PUBLIC`
-
-    echo network data: $FQDN $PUBLIC $PRIVATE
-}
-
 # Workaround for: https://bugs.launchpad.net/juju/+bug/993034
 echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-proxy
 
@@ -104,16 +82,10 @@ apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
                 python-support wget pwgen
 
-get_network
-
 # Setup a local repository and build the server if supplied in the charm
 setup_local_repo || add_apt_sources
 install_landscape || die "Error installing landscape"
 
-sed -i 's/RUN_MSGSERVER=.*/RUN_MSGSERVER="yes"/g' /etc/default/landscape-server
-
-# HTTP/HTTPS
-#open-port 80/tcp
-#open-port 443/tcp
+sed -i 's/RUN_APPSERVER=.*/RUN_APPSERVER="yes"/g' /etc/default/landscape-server
 
 exit 0

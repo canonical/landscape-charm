@@ -12,7 +12,6 @@ sys.path.insert(0, HOOKS)
 host = check_output(["relation-get", "host"]).strip()
 user = "landscape"
 password = "landscape"
-touch_file = "/var/tmp/landscape-msgserver-postgresql-done"
 
 if host:
     config_file = "/etc/landscape/service.conf"
