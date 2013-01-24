@@ -1,0 +1,30 @@
+#!/bin/bash -xe
+
+ROOT="$( cd "$( dirname "$0" )" && pwd )"
+LS_LICENSE_FILE=`config-get license-file`
+LICENSE_FILE_DEST=/etc/landscape/license.txt
+LICENSE_FILE_RE='^`(.*)`$'
+
+install_license() {
+    [ -z $LS_LICENSE_FILE ] && return
+    echo "$LS_LICENSE_FILE" > /var/tmp/ls-license-file.1
+    if [ -f /var/tmp/ls-license-file ]; then
+        if diff /var/tmp/ls-license-file /var/tmp/ls-license-file.1; then
+            return
+        fi
+    fi
+
+    # Save for comparison next time
+    echo "$LS_LICENSE_FILE" > /var/tmp/ls-license-file
+
+    if [[ $LS_LICENSE_FILE =~ $LICENSE_FILE_RE ]]; then
+        LS_LICENSE_FILE=$(${BASH_REMATCH[1]})
+    fi
+    echo "$LS_LICENSE_FILE" > $LICENSE_FILE_DEST
+    lsctl restart || /bin/true
+}
+
+# Put the license file in place.
+install_license
+
+exit 0
