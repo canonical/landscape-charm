@@ -3,6 +3,8 @@
 
 # Definition of available services in landscape, and mapping to the 
 # variable in /etc/default/landcape
+unset DEFAULT_VAR
+declare -A DEFAULT_VAR
 DEFAULT_VAR=(
     [appserver]="RUN_APPSERVER"
     [msgserver]="RUN_MSGSERVER"
