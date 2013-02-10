@@ -7,13 +7,15 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from lib import util
-from lib.juju.Juju import (relation_set, unit_get, juju_log, config_get)
+from lib.juju import Juju
 
 import os
 import sys
 import yaml
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
+
+juju = Juju()
 
 def _format_service(name, port,
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
@@ -29,7 +31,7 @@ def _format_service(name, port,
     @param server_options override the server_options (String)
     @param service_options override the service_options (Array of strings)
     """
-    host = unit_get("private-address")
+    host = juju.unit_get("private-address")
     server_options = "check inter 2000 rise 2 fall 5 maxconn 50"
     result = {
         "service_name": name, 
@@ -38,11 +40,11 @@ def _format_service(name, port,
     return result
 
 def _get_services():
-    config = config_get()
+    config = juju.config_get()
     services = []
     if "services" in config:
         for service in config["services"].split():
-            juju_log("service: %s" % service)
+            juju.juju_log("service: %s" % service)
             # TODO: need the port
             services.append(_format_service(service, "80"))
     services.append(_format_service("async", "10005"))
@@ -51,9 +53,10 @@ def _get_services():
     return services
 
 def service_relation_joined():
-    host = unit_get("private-address")
+    host = juju.unit_get("private-address")
     services = _get_services()
-    relation_set(services=yaml.dump(services), hostname=host, port=80)
+    # N.B.: Port setting necessary do to limitations with haproxy charm
+    juju.relation_set(services=yaml.dump(services), hostname=host, port=80)
 
 def db_admin_relation_joined():
     db_admin_relation_changed()
@@ -124,14 +127,14 @@ def db_relation_changed():
         check_output([os.path.join(hook_dir, "start-services")])
 
 def amqp_relation_joined():
-    relation_set("username=landscape")
-    relation_set("vhost=landscape")
+    juju.relation_set("username=landscape")
+    juju.relation_set("vhost=landscape")
 
 def amqp_relation_changed():
     password = check_output(["relation-get", "password"]).strip()
     host = check_output(["relation-get", "hostname"]).strip()
 
-    juju_log("Using AMPQ server at %s" % host)
+    juju.juju_log("Using AMPQ server at %s" % host)
 
     if password == "":
         sys.exit(0)
