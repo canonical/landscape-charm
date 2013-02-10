@@ -26,15 +26,15 @@ class Juju(object):
         get_args.extend(args)
         return subprocess.check_output(get_args).rstrip()
 
-    def juju_log(self, level=None, *args):
+    def juju_log(self, *args, **kwargs):
         """
         Simple wrapper around juju-log, args are passed untouched.
 
         @param level CRITICAL | DEBUG | INFO | WARNING | ERROR
         """
         log_args = ["juju-log"]
-        if level is not None:
-            log_args.extend(["--log-level", level])
+        if "level" in kwargs:
+            log_args.extend(["--log-level", kwargs["level"]])
         log_args.extend(args)
         subprocess.call(log_args)
 
