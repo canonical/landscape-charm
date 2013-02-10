@@ -8,7 +8,7 @@ import subprocess
 
 class Juju(object):
 
-    def relation_set(*args, **kwargs):
+    def relation_set(self, *args, **kwargs):
         """
         Simple wrapper around relation-set, all arguments passed through.
         kwargs are also supported.  args are provided in case the key
@@ -20,13 +20,13 @@ class Juju(object):
         set_args.extend(args)
         subprocess.call(set_args)
 
-    def unit_get(*args):
+    def unit_get(self, *args):
         """Simple wrapper around unit-get, all arguments passed untouched"""
         get_args = ["unit-get"]
         get_args.extend(args)
         return subprocess.check_output(get_args).rstrip()
 
-    def juju_log(level=None, *args):
+    def juju_log(self, level=None, *args):
         """
         Simple wrapper around juju-log, args are passed untouched.
 
@@ -38,7 +38,7 @@ class Juju(object):
         log_args.extend(args)
         subprocess.call(log_args)
 
-    def config_get(scope=None):
+    def config_get(self, scope=None):
         """
         Returns a dictionary containing all of the config information
         Optional parameter: scope
@@ -58,7 +58,7 @@ class Juju(object):
             return(config_data)
 
 
-    def relation_get(scope=None, unit_name=None, relation_id=None):
+    def relation_get(self, scope=None, unit_name=None, relation_id=None):
         """
         Returns a dictionary containing the relation information
         @param scope: limits the scope of the returned data to the
