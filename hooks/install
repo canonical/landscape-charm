@@ -6,6 +6,7 @@ LS_PPA=`config-get repository`
 LS_PACKAGE="landscape-server_*.tar.gz"
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
+PUBLIC=`unit-get public-address`
 
 # Provides $DEFAULT_VAR map
 source $ROOT/services.sh
@@ -26,6 +27,19 @@ enable_services() {
         var=${DEFAULT_VAR[$i]}
         sed -i "s/${var}=.*/${var}=\"yes\"/g" /etc/default/landscape-server
     done
+}
+
+setup_apache() {
+    a2enmod rewrite
+    a2enmod proxy_http
+    a2enmod ssl
+    a2enmod headers
+    a2enmod expires
+    a2dissite default
+    cp $ROOT/conf/site-definition /etc/apache2/sites-available/landscape
+    sed -e "s/@local@/localhost/;s/@hostname@/$PUBLIC/" -i /etc/apache2/sites-available/landscape
+    a2ensite landscape
+    service apache2 restart
 }
 
 setup_local_repo () {

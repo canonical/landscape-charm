@@ -1,0 +1,16 @@
+#!/bin/bash
+
+relation-set port=443
+
+relation-set "all_services=
+    - {service_name: core, service_port: 80}
+    - {service_name: app, service_port: 10001}
+    - {service_name: msg, service_port: 10002}
+    - {service_name: ping, service_port: 10003}
+    - {service_name: combo, service_port: 10004}
+    - {service_name: async, service_port: 10005}
+    - {service_name: api, service_port: 10006}
+    - {service_name: upload, service_port: 10008}
+"
+
+exit 0

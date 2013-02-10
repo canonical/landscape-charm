@@ -1,0 +1,136 @@
+NameVirtualHost *:80
+<VirtualHost *:80>
+   ServerName 10.55.63.169
+   ServerAdmin webmaster@10.55.63.169
+
+   ErrorLog /var/log/apache2/landscape_error.log
+   CustomLog /var/log/apache2/landscape_access.log combined
+   DocumentRoot /opt/canonical/landscape/canonical/landscape
+
+   # Set a Via header in outbound requests to the proxy, so proxied apps can
+   # know who the actual client is
+   ProxyVia on
+   ProxyTimeout 305
+
+   <Directory "/">
+     Options +Indexes
+     Order deny,allow
+     Allow from all
+     ErrorDocument 403 /static/offline/unauthorized.html
+     ErrorDocument 404 /static/offline/notfound.html
+   </Directory>
+
+   Alias /packages /opt/canonical/landscape/packages
+   Alias /static /opt/canonical/landscape/canonical/static
+   Alias /repository /var/lib/landscape/landscape-repository
+   Alias /config /opt/canonical/landscape/apacheroot
+   Alias /hash-id-databases /var/lib/landscape/hash-id-databases
+
+   <Directory "/opt/canonical/landscape/packages">
+     Order allow,deny
+     Allow from all
+   </Directory>
+   <Location "/packages">
+     Order allow,deny
+     Allow from all
+   </Location>
+   <Location "/repository">
+     Order deny,allow
+     Deny from all
+     ErrorDocument 403 default
+     ErrorDocument 404 default
+   </Location>
+   <LocationMatch "/repository/[^/]+/[^/]+/(dists|pool)/.*">
+     Allow from all
+   </LocationMatch>
+   <Location "/icons">
+     Order allow,deny
+     Allow from all
+   </Location>
+   <Location "/ping">
+     Order allow,deny
+     Allow from all
+   </Location>
+
+   <Location "/ajax">
+     Order allow,deny
+     Allow from all
+   </Location>
+
+   <Location "/message-system">
+     Order allow,deny
+     Allow from all
+   </Location>
+
+   <Location />
+     # Insert filter
+     SetOutputFilter DEFLATE
+
+     # Don't compress images or .debs
+     SetEnvIfNoCase Request_URI \
+     \.(?:gif|jpe?g|png|deb)$ no-gzip dont-vary
+
+     # Make sure proxies don't deliver the wrong content
+     Header append Vary User-Agent env=!dont-vary
+   </Location>
+
+
+   <Location "/r">
+     FileETag none
+     ExpiresActive on
+     ExpiresDefault "access plus 10 years"
+     Header append Cache-Control "public"
+   </Location>
+
+   RewriteEngine On
+
+   RewriteRule ^/.*\+\+.* / [F]
+   RewriteRule ^/r/([^/]+)/(.*) /$2
+
+   RewriteRule ^/ping$ http://localhost:10003/ping [P]
+   RewriteRule ^/combo http://localhost:10004/ [P,L]
+   RewriteRule ^/api http://localhost:10006/ [P,L]
+   RewriteRule ^/attachment/(.*) http://localhost:10002/attachment/$1 [P,L]
+   RewriteRule ^/cloud/(.*) http://localhost:10007/$1 [P,L]
+   RewriteRule ^/upload/(.*) http://localhost:10008/$1 [P,L]
+   RewriteRule ^/ajax http://localhost:10005/ [P,L]
+   #RewriteRule ^/(.*) http://localhost:10001/$1 [P]
+   RewriteRule ^/(.*) http://localhost:10001/++vh++https:%{REMOTE_HOST}:443/++/$1 [P]
+
+
+   RewriteCond %{REQUEST_URI} !/server-status
+   RewriteCond %{REQUEST_URI} !/icons
+   RewriteCond %{REQUEST_URI} !/static
+   RewriteCond %{REQUEST_URI} !/packages
+   RewriteCond %{REQUEST_URI} !/repository
+   RewriteCond %{REQUEST_URI} !/message-system
+   RewriteCond %{REQUEST_URI} !/robots.txt
+   RewriteCond %{REQUEST_URI} !/favicon.ico
+   RewriteCond %{REQUEST_URI} !/static
+   RewriteCond %{REQUEST_URI} !/config
+   RewriteCond %{REQUEST_URI} !/hash-id-databases
+
+</VirtualHost>
+
+#<VirtualHost *:443>
+
+#    ProxyRequests off
+#    <Proxy *>
+#       Order deny,allow
+#       Allow from all
+#       ErrorDocument 403 /static/offline/unauthorized.html
+#       ErrorDocument 500 /static/offline/exception.html
+#       ErrorDocument 502 /static/offline/unplanned-offline.html
+#       ErrorDocument 503 /static/offline/unplanned-offline.html
+#    </Proxy>
+#
+#    ProxyPass /robots.txt !
+#    ProxyPass /favicon.ico !
+#    ProxyPass /static !
+#
+#    ProxyPreserveHost on
+
+
+#    RewriteRule ^/(.*) http://localhost:10001/++vh++https:10.55.63.169:443/++/$1 [P]
+
+#</VirtualHost>

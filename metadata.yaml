@@ -1,5 +1,5 @@
-name: landscape-service
-summary: Landscape charm for starting up landscape services.
+name: landscape
+summary: Charm for installing and using Landscape.
 maintainer: Landscape Team <landscape-team@canonical.com>
 description: A multi server Landscape charm.
 requires:
@@ -9,5 +9,9 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
-  landscape:
-    interface: landscape
+  website:
+    interface: http
+
+provides:
+  service:
+    interface: http

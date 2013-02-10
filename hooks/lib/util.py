@@ -1,10 +1,14 @@
+"""
+Utility library for juju hooks
+"""
+
 from hashlib import md5
 from subprocess import check_output
 from ConfigParser import RawConfigParser
-from subprocess import check_call
+import psycopg2
+import sys
 
 config_file = "/etc/landscape/service.conf"
-
 
 def get_passwords():
     parser = RawConfigParser()
@@ -24,6 +28,29 @@ def get_passwords():
         passwords.append(parser.get("maintenance", "store_password"))
 
     return passwords
+
+def create_user(host, admin_user, admin_password, user, password):
+    """
+    Create a user in the database.  Attempts to connect to the database
+    first as the admin user just to check
+    """
+    try:
+        conn = psycopg2.connect(database='postgres', host=host,
+                user=admin_user, password=admin_password)
+    except Exception:
+        print "Error connecting to database as %s" % admin_user
+        sys.exit(1)
+
+    try:
+        cur = conn.cursor()
+        cur.execute("select usename from pg_user where usename='%s'" % user)
+        result = cur.fetchall()
+        if not result:
+            print "Creating landscape user"
+            cur.execute("create user %s with password '%s'" % (user, password))
+            conn.commit()
+    finally:
+        conn.close()
 
 
 def get_users():
@@ -59,9 +86,6 @@ def set_host(store):
         if len(databases) == len(stores):
             users = get_users()
             configure_pgbouncer(databases, users)
-
-def juju_log(message):
-    check_call(["juju-log", message])
 
 def configure_pgbouncer(databases, users):
 

@@ -1,6 +1,6 @@
 options:
     repository:
-        description: APT Repository to use for installing LDS.
+        description: APT Repository to use for installing Landscape.
         type: string
     license-file:
         description: License file for LDS
