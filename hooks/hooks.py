@@ -66,7 +66,7 @@ def _get_services():
             services.append(_format_service(service, port))
     return services
 
-def service_relation_joined():
+def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary do to limitations with haproxy charm
     juju.relation_set(
