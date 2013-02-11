@@ -1,7 +1,6 @@
 #!/bin/bash -xe
 
 ROOT="$( cd "$( dirname "$0" )" && pwd )"
-SERVICES=$(config-get services)
 LS_PPA=`config-get repository`
 LS_PACKAGE="landscape-server_*.tar.gz"
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list

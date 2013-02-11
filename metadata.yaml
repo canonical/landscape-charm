@@ -9,9 +9,7 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
-  website:
-    interface: http
 
 provides:
-  service:
+  website:
     interface: http

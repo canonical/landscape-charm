@@ -17,6 +17,16 @@ from ConfigParser import RawConfigParser
 
 juju = Juju()
 
+SERVICE = {"static": {"port": "80"},
+           "appserver": {"port": "8080"},
+           "msgserver": {"port": "8090"},
+           "pingserver": {"port": "8070"},
+           "combo-loader": {"port": "9070"},
+           "async-frontend": {"port": "9090"},
+           "apiserver": {"port": "9080"},
+           "package-upload": {"port": "9100"},
+           "package-search": {"port": "9090"}}
+
 def _format_service(name, port,
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
         service_options=["mode http", "balance leastconn",
@@ -40,23 +50,27 @@ def _format_service(name, port,
     return result
 
 def _get_services():
+    """
+    Get the services that were configured to run.  Return in a format
+    understood by haproxy.
+    """
     config = juju.config_get()
     services = []
     if "services" in config:
         for service in config["services"].split():
+            if service not in SERVICE:
+                juju.juju_log("Invalid Service: %s" % service)
+                continue
             juju.juju_log("service: %s" % service)
-            # TODO: need the port
-            services.append(_format_service(service, "80"))
-    services.append(_format_service("async", "10005"))
-    services.append(_format_service("api", "10006"))
-    services.append(_format_service("upload", "10008"))
+            port = SERVICE[service]['port']
+            services.append(_format_service(service, port))
     return services
 
 def service_relation_joined():
     host = juju.unit_get("private-address")
-    services = _get_services()
     # N.B.: Port setting necessary do to limitations with haproxy charm
-    juju.relation_set(services=yaml.dump(services), hostname=host, port=80)
+    juju.relation_set(
+            services=yaml.dump(_get_services()), hostname=host, port=80)
 
 def db_admin_relation_joined():
     db_admin_relation_changed()
