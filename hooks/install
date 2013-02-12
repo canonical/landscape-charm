@@ -5,44 +5,11 @@ LS_PPA=`config-get repository`
 LS_PACKAGE="landscape-server_*.tar.gz"
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
-PUBLIC=`unit-get public-address`
-
-# Provides $DEFAULT_VAR map
-source $ROOT/services.sh
 
 die() {
     STATUS=$?
     echo "ERROR: $1"
     exit $STATUS 
-}
-
-# Save the services in /etc/landscape/services so that if someone runs
-# juju set it will be ignored in the landscape-relation-part
-enable_services() {
-    juju-log "Selected services: $SERVICES"
-    echo $SERVICES > /etc/landscape/services
-    for i in $SERVICES; do
-        juju-log "Enabling: $i"
-        if [ $i == "static" ]; then
-            setup_apache
-        else
-            var=${DEFAULT_VAR[$i]}
-            sed -i "s/${var}=.*/${var}=\"yes\"/g" /etc/default/landscape-server
-        fi
-    done
-}
-
-setup_apache() {
-    a2enmod rewrite
-    a2enmod proxy_http
-    a2enmod ssl
-    a2enmod headers
-    a2enmod expires
-    a2dissite default
-    cp $ROOT/conf/site-definition /etc/apache2/sites-available/landscape
-    sed -e "s/@hostname@/$PUBLIC/" -i /etc/apache2/sites-available/landscape
-    a2ensite landscape
-    service apache2 restart
 }
 
 setup_local_repo () {
@@ -113,8 +80,5 @@ apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
 # Setup a local repository and build the server if supplied in the charm
 setup_local_repo || add_apt_sources
 install_landscape || die "Error installing landscape"
-
-# Enable all services that the were requested in the config
-enable_services
 
 exit 0
