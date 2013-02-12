@@ -31,10 +31,9 @@ SERVICE = {"static": {"port": "80"},
            "package-upload": {"port": "9100"},
            "package-search": {"port": "9090"}}
 
-def _format_service(name, port=None,
+def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
-        httpchk="GET / HTTP/1.0",
-        service_options=["mode http", "balance leastconn"]):
+        service_options=None):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a
@@ -47,10 +46,13 @@ def _format_service(name, port=None,
     @param httpchk The httpchk option, will be appeneded to service_options
     @param service_options override the service_options (Array of strings)
     """
+    if service_options is None:
+        service_options = ["mode http", "balance leastconn"]
+    if httpchk is not None:
+        httpchk_option = "option httpchk %s" % httpchk
+        service_options.append(httpchk_option)
+
     host = juju.unit_get("private-address")
-    httpchk_option = "option httpchk %s" % httpchk
-    service_options.append(httpchk_option)
-    server_options = "check inter 2000 rise 2 fall 5 maxconn 50"
     result = {
         "service_name": name, 
         "service_options": service_options,
