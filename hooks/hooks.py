@@ -19,29 +19,37 @@ juju = Juju()
 
 SERVICE = {"static": {"port": "80"},
            "appserver": {"port": "8080"},
-           "msgserver": {"port": "8090"},
-           "pingserver": {"port": "8070"},
-           "combo-loader": {"port": "9070"},
+           "msgserver": {
+               "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
+           "pingserver": {
+               "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
+           "combo-loader": {
+               "port": "9070",
+               "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
            "async-frontend": {"port": "9090"},
            "apiserver": {"port": "9080"},
            "package-upload": {"port": "9100"},
            "package-search": {"port": "9090"}}
 
-def _format_service(name, port,
+def _format_service(name, port=None,
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
-        service_options=["mode http", "balance leastconn",
-            "option httpchk GET / HTTP/1.0"]):
+        httpchk="GET / HTTP/1.0",
+        service_options=["mode http", "balance leastconn"]):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a
-    relation variable.
+    relation variable.  Override options by altering the SERVICE
+    hash aboe.
 
     @param name Name of the service (letters, numbers, underscores)
     @param port Port this service will be running on
     @param server_options override the server_options (String)
+    @param httpchk The httpchk option, will be appeneded to service_options
     @param service_options override the service_options (Array of strings)
     """
     host = juju.unit_get("private-address")
+    httpchk_option = "option httpchk %s" % httpchk
+    service_options.append(httpchk_option)
     server_options = "check inter 2000 rise 2 fall 5 maxconn 50"
     result = {
         "service_name": name, 
@@ -62,8 +70,7 @@ def _get_services():
                 juju.juju_log("Invalid Service: %s" % service)
                 continue
             juju.juju_log("service: %s" % service)
-            port = SERVICE[service]['port']
-            services.append(_format_service(service, port))
+            services.append(_format_service(service, **SERVICE[service]))
     return services
 
 def website_relation_joined():

@@ -21,25 +21,26 @@
     </Proxy>
 
     ProxyPreserveHost On
-    ProxyPassReverse / http://{{ landscapecore_core }}/
+    ProxyPassReverse / http://{{ haproxy_static }}/
 
     RewriteEngine On
 
     RewriteRule ^/.*\+\+.* / [F]
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
-    RewriteRule ^/message-system http://{{ landscapecore_core }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
+    RewriteRule ^/message-system http://{{ haproxy_msgserver }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
 
-    RewriteRule ^/ajax http://{{ landscapecore_async }}/ [P,L]
-    RewriteRule ^/combo http://{{ landscapecore_combo }}/ [P,L]
-    RewriteRule ^/api http://{{ landscapecore_api }}/ [P,L]
-    RewriteRule ^/attachment/(.*) http://{{ landscapecore_core }}/attachment/$1 [P,L]
-    RewriteRule ^/upload/(.*) http://{{ landscapecore_upload }}/$1 [P,L]
-    RewriteRule ^/(.*) http://{{ landscapecore_app }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
+    RewriteRule ^/ajax http://{{ haproxy_asyncfrontend }}/ [P,L]
+    RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]
+    RewriteRule ^/api http://{{ haproxy_apiserver }}/ [P,L]
+    RewriteRule ^/attachment/(.*) http://{{ haproxy_static }}/attachment/$1 [P,L]
+    RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
 
-    RewriteCond ^/(robots.txt.*) http://{{ landscapecore_core }}/$1
-    RewriteCond ^/(favicon.ico.*) http://{{ landscapecore_core }}/$1
-    RewriteCond ^/(static.*) http://{{ landscapecore_core }}/$1
-    RewriteCond ^/(config.*) http://{{ landscapecore_core }}/$1
-    RewriteCond ^/(hash-id-databases.*) http://{{ landscapecore_core }}/$1
+    RewriteRule ^/(robots.txt.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(favicon.ico.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
+
+    RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
 </VirtualHost>
