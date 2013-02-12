@@ -3,6 +3,10 @@ summary: Charm for installing and using Landscape.
 maintainer: Landscape Team <landscape-team@canonical.com>
 description: A multi server Landscape charm.
 requires:
+  db:
+    interface: pgsql
+  db-proxy:
+    interface: pgsql
   db-admin:
     interface: pgsql
   db-admin-proxy:
