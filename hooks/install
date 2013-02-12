@@ -36,7 +36,7 @@ setup_apache() {
     a2enmod expires
     a2dissite default
     cp $ROOT/conf/site-definition /etc/apache2/sites-available/landscape
-    sed -e "s/@local@/localhost/;s/@hostname@/$PUBLIC/" -i /etc/apache2/sites-available/landscape
+    sed -e "s/@hostname@/$PUBLIC/" -i /etc/apache2/sites-available/landscape
     a2ensite landscape
     service apache2 restart
 }
@@ -104,11 +104,13 @@ echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-prox
 
 apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
-                python-support wget pwgen
+                python-support wget pwgen apache2-mpm-worker
 
 # Setup a local repository and build the server if supplied in the charm
 setup_local_repo || add_apt_sources
 install_landscape || die "Error installing landscape"
+
+setup_apache
 
 # Enable all services that the were requested in the config
 enable_services

@@ -1,7 +1,7 @@
 NameVirtualHost *:80
 <VirtualHost *:80>
-   ServerName 10.55.63.169
-   ServerAdmin webmaster@10.55.63.169
+   ServerName @hostname@
+   ServerAdmin webmaster@@hostname@
 
    ErrorLog /var/log/apache2/landscape_error.log
    CustomLog /var/log/apache2/landscape_access.log combined
