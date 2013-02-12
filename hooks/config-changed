@@ -6,6 +6,7 @@ LS_LICENSE_FILE=`config-get license-file`
 LICENSE_FILE_DEST=/etc/landscape/license.txt
 LICENSE_FILE_RE='^`(.*)`$'
 PUBLIC=`unit-get public-address`
+SERVICES=$(config-get services)
 
 # Provides $DEFAULT_VAR map
 source $ROOT/services.sh
@@ -41,7 +42,7 @@ enable_services() {
 }
 
 install_license() {
-    [ -z $LS_LICENSE_FILE ] && return
+    [ -z "$LS_LICENSE_FILE" ] && return
     echo "$LS_LICENSE_FILE" > /var/tmp/ls-license-file.1
     if [ -f /var/tmp/ls-license-file ]; then
         if diff /var/tmp/ls-license-file /var/tmp/ls-license-file.1; then
