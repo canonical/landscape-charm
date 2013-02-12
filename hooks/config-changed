@@ -25,11 +25,8 @@ setup_apache() {
     service apache2 restart
 }
 
-# Save the services in /etc/landscape/services so that if someone runs
-# juju set it will be ignored in the landscape-relation-part
 enable_services() {
     juju-log "Selected services: $SERVICES"
-    echo $SERVICES > /etc/landscape/services
     for i in $SERVICES; do
         juju-log "Enabling: $i"
         if [ $i == "static" ]; then
@@ -43,21 +40,10 @@ enable_services() {
 
 install_license() {
     [ -z "$LS_LICENSE_FILE" ] && return
-    echo "$LS_LICENSE_FILE" > /var/tmp/ls-license-file.1
-    if [ -f /var/tmp/ls-license-file ]; then
-        if diff /var/tmp/ls-license-file /var/tmp/ls-license-file.1; then
-            return
-        fi
-    fi
-
-    # Save for comparison next time
-    echo "$LS_LICENSE_FILE" > /var/tmp/ls-license-file
-
     if [[ $LS_LICENSE_FILE =~ $LICENSE_FILE_RE ]]; then
         LS_LICENSE_FILE=$(${BASH_REMATCH[1]})
     fi
     echo "$LS_LICENSE_FILE" > $LICENSE_FILE_DEST
-    lsctl restart || /bin/true
 }
 
 # Put the license file in place.
@@ -65,5 +51,8 @@ install_license
 
 # Enable all services that the were requested in the config
 enable_services
+
+# Restart landscape services
+lsctl restart || /bin/true
 
 exit 0
