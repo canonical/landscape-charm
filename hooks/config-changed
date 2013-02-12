@@ -5,6 +5,40 @@ ROOT="$( cd "$( dirname "$0" )" && pwd )"
 LS_LICENSE_FILE=`config-get license-file`
 LICENSE_FILE_DEST=/etc/landscape/license.txt
 LICENSE_FILE_RE='^`(.*)`$'
+PUBLIC=`unit-get public-address`
+
+# Provides $DEFAULT_VAR map
+source $ROOT/services.sh
+
+# For now, this will just enable http
+setup_apache() {
+    a2enmod rewrite
+    a2enmod proxy_http
+    a2enmod ssl
+    a2enmod headers
+    a2enmod expires
+    a2dissite default
+    cp $ROOT/conf/landscape-http /etc/apache2/sites-available/landscape
+    sed -e "s/@hostname@/$PUBLIC/" -i /etc/apache2/sites-available/landscape
+    a2ensite landscape
+    service apache2 restart
+}
+
+# Save the services in /etc/landscape/services so that if someone runs
+# juju set it will be ignored in the landscape-relation-part
+enable_services() {
+    juju-log "Selected services: $SERVICES"
+    echo $SERVICES > /etc/landscape/services
+    for i in $SERVICES; do
+        juju-log "Enabling: $i"
+        if [ $i == "static" ]; then
+            setup_apache
+        else
+            var=${DEFAULT_VAR[$i]}
+            sed -i "s/${var}=.*/${var}=\"yes\"/g" /etc/default/landscape-server
+        fi
+    done
+}
 
 install_license() {
     [ -z $LS_LICENSE_FILE ] && return
@@ -27,5 +61,8 @@ install_license() {
 
 # Put the license file in place.
 install_license
+
+# Enable all services that the were requested in the config
+enable_services
 
 exit 0
