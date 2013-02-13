@@ -92,7 +92,6 @@ def db_admin_relation_changed():
     util.set_host("resource-1")
     util.set_host("session")
 
-
     host = check_output(["relation-get", "host"]).strip()
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
@@ -115,39 +114,11 @@ def db_admin_relation_changed():
         # Create the inital landscape user (to have a known password)
         util.create_user(host, admin, admin_password, user, password)
 
-        # TODO: Move this out of here...
-        check_call("setup-landscape-server")
-
+        # Setup the landscape server and restart services.  The method
+        # is smart enough to skip if nothing needs to be done, and 
+        # protect against concurrent access to the database.
+        util.setup_landscape_server()
         check_call(["lsctl", "restart"])
-
-def db_proxy_relation_changed():
-    db_relation_changed()
-
-def db_relation_changed():
-    host = check_output(["relation-get", "host"]).strip()
-    user = "landscape"
-    password = "landscape"
-    hook_dir = os.path.dirname(__file__)
-    sys.path.insert(0, hook_dir)
-
-    if host:
-        config_file = "/etc/landscape/service.conf"
-
-        parser = RawConfigParser()
-        parser.read([config_file])
-
-        parser.set("stores", "host", host)
-        parser.set("stores", "port", "5432")
-        parser.set("stores", "user", user)
-        parser.set("stores", "password", password)
-        parser.set("schema", "store_user", user)
-        parser.set("schema", "store_password", password)
-        parser.set("schema", "host", host)
-
-        with open(config_file, "w+") as output_file:
-            parser.write(output_file)
-
-        check_output([os.path.join(hook_dir, "start-services")])
 
 def amqp_relation_joined():
     juju.relation_set("username=landscape")

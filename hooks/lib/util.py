@@ -3,12 +3,13 @@ Utility library for juju hooks
 """
 
 from hashlib import md5
-from subprocess import check_output
+from subprocess import check_output, call, check_call
 from ConfigParser import RawConfigParser
-import psycopg2
+from psycopg2 import connect
 import sys
 
 config_file = "/etc/landscape/service.conf"
+landscape_env = "/opt/canonical/landscape/scripts/landscape-env.sh"
 
 def get_passwords():
     parser = RawConfigParser()
@@ -29,14 +30,59 @@ def get_passwords():
 
     return passwords
 
+def setup_landscape_server(host, admin_user, admin_password):
+    """
+    Wrapper around setup-landscape-server.  I need to do this in a safe way in
+    a distributed environment since multiple landscape servers could be
+    accessing the database at the same time.  Similarly, we want to make sure
+    we don't run this again if it's not needed (if the schema check passes)
+    """
+    conn = connect(database='postgres', host=host, user=admin_user,
+                   password=admin_password)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+                "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
+        cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
+        print "Mutex acquired on landscape_install_lock, Proceeding"
+        if call(". %s; schema-check", shell=True) == 0:
+            print "Landscape database already configured/updated"
+            return
+        check_call("setup-landscape-server")
+    finally:
+        conn.close()
+
+def lock_install(host, admin_user, admin_password, user, password):
+    """
+    A simple mutex for installing and prepping the database.
+    """
+    try:
+        conn = connect(database='postgres', host=host, user=admin_user,
+                       password=admin_password)
+    except Exception:
+        print "Error connecting to database as %s" % admin_user
+        sys.exit(1)
+
+    try:
+        cur = conn.cursor()
+        cur.execute("select usename from pg_user where usename='%s'" % user)
+        result = cur.fetchall()
+        if not result:
+            print "Creating landscape user"
+            cur.execute("create user %s with password '%s'" % (user, password))
+            conn.commit()
+    finally:
+        conn.close()
+
+
 def create_user(host, admin_user, admin_password, user, password):
     """
     Create a user in the database.  Attempts to connect to the database
     first as the admin user just to check
     """
     try:
-        conn = psycopg2.connect(database='postgres', host=host,
-                user=admin_user, password=admin_password)
+        conn = connect(database='postgres', host=host, user=admin_user,
+                       password=admin_password)
     except Exception:
         print "Error connecting to database as %s" % admin_user
         sys.exit(1)
