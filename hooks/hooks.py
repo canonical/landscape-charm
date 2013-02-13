@@ -117,7 +117,7 @@ def db_admin_relation_changed():
         # Setup the landscape server and restart services.  The method
         # is smart enough to skip if nothing needs to be done, and 
         # protect against concurrent access to the database.
-        util.setup_landscape_server()
+        util.setup_landscape_server(host, admin, admin_password)
         check_call(["lsctl", "restart"])
 
 def amqp_relation_joined():
