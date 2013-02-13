@@ -52,29 +52,6 @@ def setup_landscape_server(host, admin_user, admin_password):
     finally:
         conn.close()
 
-def lock_install(host, admin_user, admin_password, user, password):
-    """
-    A simple mutex for installing and prepping the database.
-    """
-    try:
-        conn = connect(database='postgres', host=host, user=admin_user,
-                       password=admin_password)
-    except Exception:
-        print "Error connecting to database as %s" % admin_user
-        sys.exit(1)
-
-    try:
-        cur = conn.cursor()
-        cur.execute("select usename from pg_user where usename='%s'" % user)
-        result = cur.fetchall()
-        if not result:
-            print "Creating landscape user"
-            cur.execute("create user %s with password '%s'" % (user, password))
-            conn.commit()
-    finally:
-        conn.close()
-
-
 def create_user(host, admin_user, admin_password, user, password):
     """
     Create a user in the database.  Attempts to connect to the database
