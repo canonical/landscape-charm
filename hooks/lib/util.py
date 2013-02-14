@@ -3,13 +3,14 @@ Utility library for juju hooks
 """
 
 from hashlib import md5
-from subprocess import check_output, call, check_call
+from subprocess import check_output, check_call
 from ConfigParser import RawConfigParser
 from psycopg2 import connect
 import sys
+from juju import Juju
 
 config_file = "/etc/landscape/service.conf"
-landscape_env = "/opt/canonical/landscape/scripts/landscape-env.sh"
+juju = Juju()
 
 def get_passwords():
     parser = RawConfigParser()
@@ -34,8 +35,7 @@ def setup_landscape_server(host, admin_user, admin_password):
     """
     Wrapper around setup-landscape-server.  I need to do this in a safe way in
     a distributed environment since multiple landscape servers could be
-    accessing the database at the same time.  Similarly, we want to make sure
-    we don't run this again if it's not needed (if the schema check passes)
+    accessing the database at the same time.
     """
     conn = connect(database='postgres', host=host, user=admin_user,
                    password=admin_password)
@@ -44,10 +44,7 @@ def setup_landscape_server(host, admin_user, admin_password):
         cur.execute(
                 "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
         cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
-        print "Mutex acquired on landscape_install_lock, Proceeding"
-        if call(". %s; schema-check", shell=True) == 0:
-            print "Landscape database already configured/updated"
-            return
+        juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
         check_call("setup-landscape-server")
     finally:
         conn.close()
