@@ -21,7 +21,7 @@ NameVirtualHost *:80
    </Directory>
 
    Alias /packages /opt/canonical/landscape/packages
-   Alias /static /opt/canonical/landscape/canonical/static
+   Alias /static /opt/canonical/landscape/canonical/landscape/static
    Alias /repository /var/lib/landscape/landscape-repository
    Alias /config /opt/canonical/landscape/apacheroot
    Alias /hash-id-databases /var/lib/landscape/hash-id-databases
