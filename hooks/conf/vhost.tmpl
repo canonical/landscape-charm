@@ -1,0 +1,69 @@
+<VirtualHost *:80>
+    ServerName {{ servername }}
+    ServerAdmin webmaster@%{SERVER_NAME}
+
+    ErrorLog /var/log/apache2/vhost_http_error.log
+    CustomLog /var/log/apache2/vhost_http_access.log combined
+
+    # Set a Via header in outbound requests to the proxy, so proxied apps can
+    # know who the actual client is
+    ProxyVia on
+    ProxyTimeout 10
+
+    #Alias /packages /srv/staging.landscape.canonical.com/packages
+
+    <Location "/">
+        Order deny,allow
+        Deny from all
+    </Location>
+    <Location "/ping">
+        Order allow,deny
+        Allow from all
+    </Location>
+    <Location "/r">
+        FileETag none
+        ExpiresActive on
+        ExpiresDefault "access plus 10 years"
+        Header append Cache-Control "public"
+    </Location>
+    <Location "/packages">
+        Order allow,deny
+        Allow from all
+    </Location>
+    <Location "/static">
+        Options -Indexes
+    </Location>
+
+    RewriteEngine On
+
+    # Pings can always go unencrypted
+    RewriteRule ^/ping$ http://localhost:10003/ping [P]
+
+    RewriteRule ^/r/([^/]+)/(.*) /$2 [L]
+
+    # Temp fix for favicon issue: RT# 42990, bug #685958
+
+    # Map the internal lowercase function so we can use it below.
+    RewriteMap lowercase int:tolower
+    # Only lookup skin name in cookie value for the favicon.
+    RewriteCond %{REQUEST_URI} ^/favicon.ico$
+    # If there's a 'skin' selected in the cookie...
+    RewriteCond %{HTTP_COOKIE} skin=([^;\ ]+) [OR]
+    # Else, use the default skin.
+    RewriteCond basic ^(.+)$
+    # If the skin name is a valid one...
+    RewriteCond ${lowercase:%1} ^(basic|manx)$
+    # Then rewrite the url to be relative to the specified skin.
+    RewriteRule ^/(.*) /static/skin/%1/$1 [L]
+
+    # The following resources are fine to come over http
+    RewriteRule ^/(server-status.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(packages.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(message-system.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(robots.txt) http://{{ haproxy_static }}/$1 [P,L]
+
+    # Everything else needs to go over https
+    RewriteRule ^/(.*) https://{{ servername }}/$1 [R=permanent]
+</VirtualHost>
