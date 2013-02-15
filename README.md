@@ -6,7 +6,7 @@ entire Ubuntu infrastructure from a single interface. Part of Canonical’s
 Ubuntu Advantage support service, Landscape brings you intuitive systems
 management tools combined with world-class support.
 
-This charm will deploy the dedicated version of landsacpe (LDS), and needs to be
+This charm will deploy the dedicated version of Landsacpe (LDS), and needs to be
 connected to other charms to be fully functional.  Example deployments are given
 below.
 
@@ -31,7 +31,7 @@ has enabled the feature on your account.
         landscape:
             repository: https://user:pass@ppa-server/ppa-path/
             license-file: |
-              <license file here>
+                <license file here>
             services: static appserver msgserver pingserver combo-loader
                       async-frontend apiserver package-upload jobhandler
                       package-search
@@ -41,7 +41,13 @@ has enabled the feature on your account.
             enable-modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
             ssl_cert: SELFSIGNED
             ssl_certlocation: apache2.cert
-            vhost_https_template: <insert template here>
+            vhost_https_template: <base64 encoded template>
+            vhost_http_template: <base64 encoded template>
+        haproxy:
+            default_timeouts: queue 60000, connect 5000, client 120000, server 120000
+            monitoring_allowed_cidr: 0.0.0.0/0
+            monitoring_password: haproxy
+            default_timeouts: queue 60000, connect 5000, client 120000, server 120000
     EOF
 
 Deployment
