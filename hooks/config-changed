@@ -4,7 +4,7 @@ ROOT="$( cd "$( dirname "$0" )" && pwd )"
 
 LS_LICENSE_FILE=`config-get license-file`
 LICENSE_FILE_DEST=/etc/landscape/license.txt
-LICENSE_FILE_RE='^`(.*)`$'
+LICENSE_FILE_RE='^(http://|https://).*$'
 PUBLIC=`unit-get public-address`
 SERVICES=$(config-get services)
 
@@ -54,7 +54,7 @@ enable_services() {
 install_license() {
     [ -z "$LS_LICENSE_FILE" ] && return
     if [[ $LS_LICENSE_FILE =~ $LICENSE_FILE_RE ]]; then
-        LS_LICENSE_FILE=$(${BASH_REMATCH[1]})
+        LS_LICENSE_FILE=$(wget --quiet -O - $LS_LICENSE_FILE)
     fi
     echo "$LS_LICENSE_FILE" > $LICENSE_FILE_DEST
 }
