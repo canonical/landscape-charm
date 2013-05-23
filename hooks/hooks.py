@@ -79,7 +79,7 @@ def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary do to limitations with haproxy charm
     juju.relation_set(
-            services=yaml.dump(_get_services()), hostname=host, port=80)
+            services=yaml.safe_dump(_get_services()), hostname=host, port=80)
 
 def db_admin_relation_joined():
     db_admin_relation_changed()
