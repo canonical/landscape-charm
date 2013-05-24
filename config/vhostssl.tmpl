@@ -1,0 +1,45 @@
+<VirtualHost *:443>
+    ServerName {{ servername }}
+    ServerAdmin webmaster@%{SERVER_NAME}
+
+    ErrorLog /var/log/apache2/vhost_error.log
+    CustomLog /var/log/apache2/vhost_access.log combined
+
+    SSLEngine On
+    SSLProxyEngine On
+    SSLCertificateFile /etc/ssl/certs/apache2.cert
+    SSLCertificateKeyFile /etc/ssl/private/apache2.key
+
+    ProxyRequests off
+    <Proxy *>
+        Order Allow,Deny
+        Allow from All
+        #ErrorDocument 403 /offline.html
+        #ErrorDocument 500 /offline.html
+        #ErrorDocument 502 /offline.html
+        #ErrorDocument 503 /offline.html
+    </Proxy>
+
+    ProxyPreserveHost On
+    ProxyPassReverse / http://{{ landscape_core }}/
+
+    RewriteEngine On
+
+    RewriteRule ^/.*\+\+.* / [F]
+    RewriteRule ^/r/([^/]+)/(.*) /$2
+
+    RewriteRule ^/message-system http://{{ landscape_core }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
+
+    RewriteRule ^/ajax http://{{ landscape_async }}/ [P,L]
+    RewriteRule ^/combo http://{{ landscape_combo }}/ [P,L]
+    RewriteRule ^/api http://{{ landscape_api }}/ [P,L]
+    RewriteRule ^/attachment/(.*) http://{{ landscape_core }}/attachment/$1 [P,L]
+    RewriteRule ^/upload/(.*) http://{{ landscape_upload }}/$1 [P,L]
+    RewriteRule ^/(.*) http://{{ landscape_app }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
+
+    RewriteCond ^/(robots.txt.*) http://{{ landscape_core }}/$1
+    RewriteCond ^/(favicon.ico.*) http://{{ landscape_core }}/$1
+    RewriteCond ^/(static.*) http://{{ landscape_core }}/$1
+    RewriteCond ^/(config.*) http://{{ landscape_core }}/$1
+    RewriteCond ^/(hash-id-databases.*) http://{{ landscape_core }}/$1
+</VirtualHost>

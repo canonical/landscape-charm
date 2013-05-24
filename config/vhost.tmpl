@@ -1,0 +1,28 @@
+<VirtualHost *:80>
+    ServerName {{ servername }}
+
+    #CustomLog /var/log/apache2/radiotiptop-access.log combined
+    #ErrorLog /var/log/apache2/radiotiptop-error.log
+
+    ProxyRequests off
+    <Proxy *>
+        Order Allow,Deny
+        Allow from All
+        #ErrorDocument 403 /offline.html
+        #ErrorDocument 500 /offline.html
+        #ErrorDocument 502 /offline.html
+        #ErrorDocument 503 /offline.html
+    </Proxy>
+
+    ProxyPreserveHost off
+    ProxyPassReverse / balancer://landscape_core
+
+    RewriteEngine on
+    RewriteCond %{REQUEST_METHOD} ^HEAD
+    RewriteRule ^/$ balancer://landscape_core/ [P,L]
+    RewriteRule ^/(.*) balancer://landscape_core/$1 [P,L]
+
+    #RewriteRule ^/$ /index.html [L]
+    #RewriteRule ^/(.*)$ http://{{ landscape_core }}/$1 [P,L]
+
+</VirtualHost>
