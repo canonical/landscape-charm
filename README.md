@@ -89,7 +89,7 @@ files that should allow interaction with the tool.
 First branch juju-deployer and the landscape charm.  Note this will be changed
 when things find official homes:
 
-    $ bzr branch lp~hazmat/juju-deployer/darwin juju-deployer
+    $ bzr branch lp:juju-deployer/darwin juju-deployer
     $ cd juju-deployer
     $ sudo python setup.py develop
     $ cd ..
