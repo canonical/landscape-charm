@@ -77,4 +77,30 @@ so configuration is taken care of automatically for load-balancing.
 Customized Deployment
 ---------------------
 
-TODO: describe multi-service deployment here
+`TODO: describe multi-service deployment here`
+
+Juju-Deployer
+-------------
+
+You can use juju-deployer to greatly simplify the deployment of Landscape to a
+real cloud.  Inside the charm, there is a "config" directory that contains skeleton
+files that should allow interaction with the tool.
+
+First branch juju-deployer and the landscape charm.  Note this will be changed
+when things find official homes:
+
+    $ bzr branch lp~hazmat/juju-deployer/darwin juju-deployer
+    $ cd juju-deployer
+    $ sudo python setup.py develop
+    $ cd ..
+    $ bzr branch lp:~landscape/landscape/landscape-charm
+    $ cd landscape-charm/config
+
+Next, you will need to add in a repository and license file to use:
+
+    $ vim license-file               # Insert your license text here
+    $ vim landscape-deployments.cfg  # edit key "repository"
+
+Then, one command to deploy.  (-v, -d, -W are optional, but nice):
+
+    $ juju-deployer -vdW -c landscape-deployments.cfg landscape
