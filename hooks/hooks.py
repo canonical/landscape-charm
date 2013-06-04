@@ -82,7 +82,7 @@ def website_relation_joined():
             services=yaml.safe_dump(_get_services()), hostname=host, port=80)
 
 def db_admin_relation_joined():
-    db_admin_relation_changed()
+    pass
 
 def db_admin_relation_changed():
     util.set_host("account-1")
