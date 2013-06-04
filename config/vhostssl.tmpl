@@ -21,25 +21,46 @@
     </Proxy>
 
     ProxyPreserveHost On
-    ProxyPassReverse / http://{{ landscape_core }}/
+    ProxyPassReverse / http://{{ haproxy_static }}/
 
     RewriteEngine On
 
     RewriteRule ^/.*\+\+.* / [F]
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
-    RewriteRule ^/message-system http://{{ landscape_core }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
+    RewriteRule ^/message-system http://{{ haproxy_msgserver }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
 
-    RewriteRule ^/ajax http://{{ landscape_async }}/ [P,L]
-    RewriteRule ^/combo http://{{ landscape_combo }}/ [P,L]
-    RewriteRule ^/api http://{{ landscape_api }}/ [P,L]
-    RewriteRule ^/attachment/(.*) http://{{ landscape_core }}/attachment/$1 [P,L]
-    RewriteRule ^/upload/(.*) http://{{ landscape_upload }}/$1 [P,L]
-    RewriteRule ^/(.*) http://{{ landscape_app }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
+    RewriteRule ^/ajax http://{{ haproxy_asyncfrontend }}/ [P,L]
+    RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]
+    RewriteRule ^/api http://{{ haproxy_apiserver }}/ [P,L]
+    RewriteRule ^/attachment/(.*) http://{{ haproxy_static }}/attachment/$1 [P,L]
+    RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
 
-    RewriteCond ^/(robots.txt.*) http://{{ landscape_core }}/$1
-    RewriteCond ^/(favicon.ico.*) http://{{ landscape_core }}/$1
-    RewriteCond ^/(static.*) http://{{ landscape_core }}/$1
-    RewriteCond ^/(config.*) http://{{ landscape_core }}/$1
-    RewriteCond ^/(hash-id-databases.*) http://{{ landscape_core }}/$1
+    RewriteRule ^/(robots.txt.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(favicon.ico.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
+
+    RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
+
+# TODO: put in some place?
+#    Alias /packages /srv/staging.landscape.canonical.com/packages
+#    <Directory "/srv/landscape.canonical.com/packages">
+#        Order allow,deny
+#        Allow from all
+#    </Directory>
+#    <Location "/packages">
+#       Order allow,deny
+#       Allow from all
+#    </Location>
+#    <Location "/static">
+#       Options -Indexes
+#    </Location>
+#    <Files "*.woff">
+#       FileETag None
+#       Header append Cache-Control "max-age=2592000,public"
+#       Header unset Last-Modified
+#    </Files>
+
 </VirtualHost>
