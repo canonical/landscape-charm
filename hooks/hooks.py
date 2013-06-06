@@ -95,7 +95,7 @@ def db_admin_relation_changed():
     host = check_output(["relation-get", "host"]).strip()
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
-    allowed_hosts = check_output(["relation-get", "allowed_hosts"]).strip()
+    allowed_hosts = check_output(["relation-get", "allowed-hosts"]).strip()
     private_address = juju.unit_get("private-address")
     user = "landscape"
     password = "landscape"
