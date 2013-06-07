@@ -100,27 +100,36 @@ def db_admin_relation_changed():
     user = "landscape"
     password = "landscape"
 
-    if allowed_hosts and private_address in allowed_hosts:
-        config_file = "/etc/landscape/service.conf"
-        parser = RawConfigParser()
-        parser.read([config_file])
-        parser.set("stores", "host", host)
-        parser.set("stores", "port", "5432")
-        parser.set("stores", "user", user)
-        parser.set("stores", "password", password)
-        parser.set("schema", "store_user", admin)
-        parser.set("schema", "store_password", admin_password)
-        with open(config_file, "w+") as output_file:
-            parser.write(output_file)
+    if not host or not admin or not admin_password:
+        juju.juju_log("Need host, user and password in relation"
+            " before proceeding")
+        return
 
-        # Create the inital landscape user (to have a known password)
-        util.create_user(host, admin, admin_password, user, password)
+    if not allowed_hosts or private_address not in allowed_hosts:
+        juju.juju_log("%s not in allowed_hosts yet (%s)" % (
+            private_address, allowed_hosts))
+        return
 
-        # Setup the landscape server and restart services.  The method
-        # is smart enough to skip if nothing needs to be done, and 
-        # protect against concurrent access to the database.
-        util.setup_landscape_server(host, admin, admin_password)
-        check_call(["lsctl", "restart"])
+    config_file = "/etc/landscape/service.conf"
+    parser = RawConfigParser()
+    parser.read([config_file])
+    parser.set("stores", "host", host)
+    parser.set("stores", "port", "5432")
+    parser.set("stores", "user", user)
+    parser.set("stores", "password", password)
+    parser.set("schema", "store_user", admin)
+    parser.set("schema", "store_password", admin_password)
+    with open(config_file, "w+") as output_file:
+        parser.write(output_file)
+
+    # Create the inital landscape user (to have a known password)
+    util.create_user(host, admin, admin_password, user, password)
+
+    # Setup the landscape server and restart services.  The method
+    # is smart enough to skip if nothing needs to be done, and 
+    # protect against concurrent access to the database.
+    util.setup_landscape_server(host, admin, admin_password)
+    check_call(["lsctl", "restart"])
 
 def amqp_relation_joined():
     juju.relation_set("username=landscape")
