@@ -37,7 +37,7 @@
     RewriteEngine On
 
     # Pings can always go unencrypted
-    RewriteRule ^/ping$ http://localhost:10003/ping [P]
+    RewriteRule ^/ping$ http://{{ haproxy_pingserver }}/ping [P]
 
     RewriteRule ^/r/([^/]+)/(.*) /$2 [L]
 
