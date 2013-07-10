@@ -96,7 +96,7 @@ def db_admin_relation_changed():
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
     allowed_hosts = check_output(["relation-get", "allowed-hosts"]).strip()
-    private_address = juju.unit_get("private-address")
+    unit_name = os.environ['JUJU_UNIT_NAME']
     user = "landscape"
     password = "landscape"
 
@@ -105,9 +105,9 @@ def db_admin_relation_changed():
             " before proceeding")
         return
 
-    if not allowed_hosts or private_address not in allowed_hosts:
+    if not allowed_hosts or unit_name not in allowed_hosts:
         juju.juju_log("%s not in allowed_hosts yet (%s)" % (
-            private_address, allowed_hosts))
+            unit_name, allowed_hosts))
         return
 
     config_file = "/etc/landscape/service.conf"
