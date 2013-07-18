@@ -22,6 +22,8 @@ DEFAULT_VAR=(
     [package-upload]="RUN_PACKAGEUPLOADSERVER"
     [jobhandler]="RUN_JOBHANDLER"
     [package-search]="RUN_PACKAGESEARCH"
+    [juju-sync]="RUN_JUJU_SYNC"
+    [cron]="RUN_CRON"
 )
 
 # For now, this will just enable http
