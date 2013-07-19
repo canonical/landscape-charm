@@ -85,13 +85,6 @@ def db_admin_relation_joined():
     pass
 
 def db_admin_relation_changed():
-    util.set_host("account-1")
-    util.set_host("knowledge")
-    util.set_host("main")
-    util.set_host("package")
-    util.set_host("resource-1")
-    util.set_host("session")
-
     host = check_output(["relation-get", "host"]).strip()
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
