@@ -2,33 +2,12 @@
 Utility library for juju hooks
 """
 
-from subprocess import check_output, check_call
-from ConfigParser import RawConfigParser
+from subprocess import check_call
 from psycopg2 import connect
 import sys
 from juju import Juju
 
-config_file = "/etc/landscape/service.conf"
 juju = Juju()
-
-def get_passwords():
-    parser = RawConfigParser()
-    parser.read([config_file])
-
-    if not parser.has_option("schema", "store_password"):
-        passwords = check_output(["pwgen", "-s", "16", "4"]).splitlines()
-        parser.set("schema", "store_password", passwords[0])
-        parser.set("stores", "password", passwords[1])
-        parser.set("maintenance", "store_password", passwords[2])
-        with open(config_file, "w+") as output_file:
-            parser.write(output_file)
-    else:
-        passwords = []
-        passwords.append(parser.get("schema", "store_password"))
-        passwords.append(parser.get("stores", "password"))
-        passwords.append(parser.get("maintenance", "store_password"))
-
-    return passwords
 
 def setup_landscape_server(host, admin_user, admin_password):
     """
@@ -70,12 +49,3 @@ def create_user(host, admin_user, admin_password, user, password):
             conn.commit()
     finally:
         conn.close()
-
-
-def get_users():
-    passwords = get_passwords()
-
-    users = {"landscape_superuser": ("admin", passwords[0]),
-             "landscape": ("user", passwords[1]),
-             "landscape_maintenance": ("user", passwords[2])}
-    return users
