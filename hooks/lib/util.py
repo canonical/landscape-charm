@@ -2,7 +2,6 @@
 Utility library for juju hooks
 """
 
-from hashlib import md5
 from subprocess import check_output, check_call
 from ConfigParser import RawConfigParser
 from psycopg2 import connect
