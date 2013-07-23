@@ -261,10 +261,14 @@ def config_changed():
     check_call(["lsctl", "restart"])
     _enable_services(_get_services.keys())
 
-
-###############################################################################
-# Main section
-###############################################################################
 if __name__ == "__main__":
-    hook = os.path.basename(sys.argv[0]).replace("-", "_")
-    eval("%s()" % hook)
+    hooks = {
+        "config-changed": config_changed,
+        "amqp-relation-joined": amqp_relation_joined,
+        "amqp-relation-changed": amqp_relation_changed,
+        "db-admin-relation-joined": db_admin_relation_joined,
+        "db-admin-relation-changed": db_admin_relation_changed,
+        "website-relation-joined": website_relation_joined}
+    hook = os.path.basename(sys.argv[0])
+    # If the hook is unsupported, let it raise a KeyError and exit with error.
+    hooks[hook]()

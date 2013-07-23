@@ -76,6 +76,17 @@ class TestHooks(unittest.TestCase):
             contents2 = fp2.read()
         self.assertEqual(contents1, contents2)
 
+        for hook in ["config-changed", "amqp-relation-changed", "amqp-relation-joined",
+                  "db-admin-relation-changed", "db-admin-relation-joined",
+                  "website-relation-joined"]:
+            symbol = hook.replace("-", "_")
+            for member in inspect.getmembers(hooks):
+                if member[0] == symbol:
+                    self.assertTrue(inspect.isfunction(member[1]))
+                    break
+            else:
+                self.assertTrue(False, "didn't find function for %s" % hook)
+
     def test_format_service(self):
         """
         Check that _format_service is sending back service data
