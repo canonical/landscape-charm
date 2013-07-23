@@ -25,7 +25,7 @@ class TestJuju(object):
 
     def config_get(self, scope=None):
         if scope is None:
-            return {"services": "foo bar baz buz"}
+            return {"services": "foo bar baz"}
         elif scope == "license-file":
             return self.license_file
         pass
@@ -63,11 +63,13 @@ class TestHooks(unittest.TestCase):
         hooks.juju = TestJuju()
 
     def assertFileContains(self, filename, text):
+        """ Make sure a string exists in a file """
         with open(filename, 'r') as fp:
             contents = fp.read()
         self.assertTrue(text in contents)
 
     def assertFilesEqual(self, file1, file2):
+        """ Given two filenames, compare them """
         with open(file1, 'r') as fp1:
             contents1 = fp1.read()
         with open(file2, 'r') as fp2:
@@ -75,6 +77,10 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(contents1, contents2)
 
     def test_format_service(self):
+        """
+        Check that _format_service is sending back service data
+        in a form haproxy expects
+        """
         result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
         baseline = {"service_name": "bar",
                     "servers": [[
@@ -86,6 +92,10 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_options(self):
+        """
+        Check that _format_service sets things up as haproxy expects
+        when one option is specified
+        """
         result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
         baseline = {"service_name": "foo",
                     "servers": [[
@@ -96,6 +106,10 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
+        """
+        Check that _format_service sets things up as haproxy expects
+        when many options are specified
+        """
         result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
         baseline = {"service_name": "baz",
                     "servers": [["baz", "localhost", "82", "server"]],
@@ -103,11 +117,18 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_get_services(self):
+        """
+        Check the helper method get_services that bulk_gets data in a format
+        that haproxy expects.
+        """
         result = hooks._get_services()
         baseline = self.all_services
         self.assertEqual(baseline, result)
 
     def test_website_relation_joined(self):
+        """
+        Ensure the website relation joined hook spits out settings when run
+        """
         hooks.website_relation_joined()
         baseline = {
             "services": yaml.safe_dump(self.all_services),
@@ -116,6 +137,9 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, hooks.juju._relation_data)
 
     def test_amqp_relation_joined(self):
+        """
+        Ensure the amqp relation joined hook spits out settings when run
+        """
         hooks.amqp_relation_joined()
         baseline = {
             "username": "landscape",
@@ -123,6 +147,9 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, hooks.juju._relation_data)
 
     def test__download_file_success(self):
+        """
+        Make sure the happy path of download file works
+        """
         tmp = tempfile.NamedTemporaryFile(delete=False)
         with tmp as fp:
             fp.write("foobar")
@@ -132,12 +159,17 @@ class TestHooks(unittest.TestCase):
         self.assertTrue("foobar" in output)
 
     def test__download_file_failure(self):
+        """ The fail path of download file raises an exception """
         self.assertRaises(pycurl.error, hooks._download_file, "file://FOO/NO/EXIST")
 
     def test__replace_in_file(self):
+        """
+        Test for replace_in_file to change some lines in a file, but not
+        others
+        """
         tmp = tempfile.NamedTemporaryFile(delete=False)
         with tmp as fp:
-            fp.write("foo\nbar\nbaz\n")
+            fp.write("foo\nfoo\nbar\nbaz\n")
             fp.flush()
 
         hooks._replace_in_file(tmp.name, r'^f..$', "REPLACED")
@@ -145,7 +177,7 @@ class TestHooks(unittest.TestCase):
         with open(tmp.name, 'r') as fp:
             content = fp.read()
         os.unlink(tmp.name)
-        self.assertEquals("REPLACED\nbar\nbaz\n", content)
+        self.assertEquals("REPLACED\nREPLACED\nbar\nbaz\n", content)
 
     def test__enable_service(self):
         """ Create a simple service enablement of a file with comments """
