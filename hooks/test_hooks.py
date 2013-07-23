@@ -19,7 +19,7 @@ class TestJuju(object):
         pass
 
     def config_get(self, scope=None):
-        return {"services": "foo bar baz buz"}
+        return {"services": "foo bar baz"}
         pass
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
@@ -54,6 +54,10 @@ class TestHooks(unittest.TestCase):
         hooks.juju = TestJuju()
 
     def test_format_service(self):
+        """
+        Check that _format_service is sending back service data
+        in a form haproxy expects
+        """
         result = hooks._format_service("bar", **hooks.SERVICE["bar"])
         baseline = {"service_name": "bar",
                     "servers": [[
@@ -65,6 +69,10 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_options(self):
+        """
+        Check that _format_service sets things up as haproxy expects
+        when one option is specified
+        """
         result = hooks._format_service("foo", **hooks.SERVICE["foo"])
         baseline = {"service_name": "foo",
                     "servers": [[
@@ -75,6 +83,10 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
+        """
+        Check that _format_service sets things up as haproxy expects
+        when many options are specified
+        """
         result = hooks._format_service("baz", **hooks.SERVICE["baz"])
         baseline = {"service_name": "baz",
                     "servers": [["baz", "localhost", "82", "server"]],
@@ -82,11 +94,18 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_get_services(self):
+        """
+        Check the helper method get_services that bulk_gets data in a format
+        that haproxy expects.
+        """
         result = hooks._get_services()
         baseline = self.all_services
         self.assertEqual(baseline, result)
 
     def test_website_relation_joined(self):
+        """
+        Ensure the website relation joined hook spits out settings when run
+        """
         hooks.website_relation_joined()
         baseline = {
             "services": yaml.safe_dump(self.all_services),
@@ -95,9 +114,11 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, hooks.juju._relation_data)
 
     def test_amqp_relation_joined(self):
+        """
+        Ensure the amqp relation joined hook spits out settings when run
+        """
         hooks.amqp_relation_joined()
         baseline = {
             "username": "landscape",
             "vhost": "landscape"}
         self.assertEqual(baseline, hooks.juju._relation_data)
-
