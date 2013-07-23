@@ -37,13 +37,13 @@ SERVICE_PROXY = {
         "package-search": {"port": "9090"}}
 
 SERVICE_COUNT = {
-        "appserver": 1,
-        "msgserver": 2,
-        "pingserver": 1,
-        "combo-loader": 1,
-        "async-frontend": 1,
-        "apiserver": 1,
-        "package-upload": 1}
+        "appserver": [calc_servers, 1, None],
+        "msgserver": [calc_servers, 2, None],
+        "pingserver": [calc_servers, 1, None],
+        "combo-loader": [calc_servers, 1, 2],
+        "async-frontend": [calc_servers, 1, 2],
+        "apiserver": [calc_servers, 1, 2],
+        "package-upload": [calc_servers, 1, 1]}
 
 SERVICE_DEFAULT = {
         "appserver": "RUN_APPSERVER",         
@@ -86,8 +86,10 @@ def _a2ensite(site):
 def _service(service, action):
     check_call(["service", service, action])
 
-# For now, this will just enable http
 def _setup_apache():
+    """
+    Setup apache2 to serve static landscape content
+    """
     public = juju.unit_get("public_address")
     _a2enmod(["rewrite", "proxy_http", "ssl", "headers", "expires"])
     _a2dissite("default")
@@ -126,7 +128,63 @@ def _replace_in_file(filename, regex, replacement):
         for line in lines:
             default.write(re.sub(regex, replacement, line))
 
+def _get_system_numcpu():
+    return 2
+
+def _get_system_ram():
+    return 2
+
+def _calc_daemon_count(service, minimum=1, maximum=None, requested=None):
+    """
+    Calculate the appropriate number of daemons to spawn
+
+    @param service name of the service
+    @minimum minimum number of daemons to spawn
+    @maximum maximum number of daemons to spawn
+    @requested The user requested number, if formatted correcly, it wins
+    """
+    if requested is not None:
+        if re.matches(r'\d+', requested):
+            return requested
+    ram = _get_system_ram()
+    numcpu = _get_system_numcpu()
+    numdaemons = 1 + numcpu + ram - 2
+    return max(minimum, min(maximum, numdaemons))
+
+def _get_service_count_dict():
+    """
+    Parse the service_count config setting, and return how many of each service
+    should actually be started.  If setting is 'AUTO' we will try to guess
+    the number for the user.  If the setting is not understood in some manner,
+    we will assume it to be AUTO
+    """
+    final_count = {}
+
+    # First, set all requested services to run
+    for service in _get_requested_services():
+        final_count[service] = 1
+
+    # now, traverse special service, compare what they told me, and adjust
+    # accordingly.
+    service_counts = juju.config_get("service-count").split()
+    for service_count in service_counts:
+        count = service_count
+        if re.matches(r'.*:.*', service_count):
+            (service, count) = service_count.split(":")
+            final_count[service] = count 
+        else:    
+            # TODO: finish
+            pass
+
+    
+
 def _enable_services(services):
+    """
+    Given a list of services, enable them!  The service_count setting is
+    consulted to determine how many services to start.
+
+    @param services list of services to start
+    """
     juju.juju_log("Selected Services: %s" % services)
     for service in services:
         juju.juju_log("Enabling: %s" % service)
@@ -166,27 +224,33 @@ def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         "servers": [[name, host, port, server_options]]}
     return result
 
-def _get_services():
+def _get_requested_services():
+    services = []
+    if "services" in config:
+        for service in config["services"].split():
+            if service not in SERVICE_DEFAULT:
+                juju.juju_log("Invalid Service: %s" % service)
+                continue
+            services.append(service)
+    return services
+
+def _get_services_haproxy():
     """
     Get the services that were configured to run.  Return in a format
     understood by haproxy.
     """
     config = juju.config_get()
     services = []
-    if "services" in config:
-        for service in config["services"].split():
-            if service not in SERVICE_PROXY:
-                juju.juju_log("Invalid Service: %s" % service)
-                continue
-            juju.juju_log("service: %s" % service)
-            services.append(_format_service(service, **SERVICE_PROXY[service]))
+    for service in _get_requested_services():
+        juju.juju_log("service: %s" % service)
+        services.append(_format_service(service, **SERVICE_PROXY[service]))
     return services
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary due to limitations with haproxy charm
     juju.relation_set(
-            services=yaml.safe_dump(_get_services()), hostname=host, port=80)
+            services=yaml.safe_dump(_get_services_haproxy()), hostname=host, port=80)
 
 def db_admin_relation_joined():
     pass
@@ -259,7 +323,7 @@ def amqp_relation_changed():
 def config_changed():
     _install_license()
     check_call(["lsctl", "restart"])
-    _enable_services(_get_services.keys())
+    _enable_services(_get_services_haproxy.keys())
 
 if __name__ == "__main__":
     hooks = {

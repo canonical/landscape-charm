@@ -14,7 +14,7 @@ options:
             not set before the charm is installed, changes to it will be
             ignored.
         type: string
-    service_count:
+    service-count:
         type: string
         default: AUTO
         description: |
