@@ -101,3 +101,9 @@ class TestHooks(unittest.TestCase):
             "vhost": "landscape"}
         self.assertEqual(baseline, hooks.juju._relation_data)
 
+    def test_download_file_success(self):
+        #import tempfile
+        #tmp = tempfile.mkstemp()
+        #hooks._download_file("http://www.google.com", tmp)
+        #import subprocess; subprocess.call("cat %s" % tempfile)
+        pass

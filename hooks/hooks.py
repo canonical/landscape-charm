@@ -12,24 +12,131 @@ from lib.juju import Juju
 import os
 import sys
 import yaml
+import shutil
+import re
+import pycurl
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
 juju = Juju()
 
-SERVICE = {"static": {"port": "80"},
-           "appserver": {"port": "8080"},
-           "msgserver": {
-               "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
-           "pingserver": {
-               "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
-           "combo-loader": {
-               "port": "9070",
-               "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
-           "async-frontend": {"port": "9090"},
-           "apiserver": {"port": "9080"},
-           "package-upload": {"port": "9100"},
-           "package-search": {"port": "9090"}}
+SERVICE_PROXY = {
+        "static": {"port": "80"},
+        "appserver": {"port": "8080"},
+        "msgserver": {
+            "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
+        "pingserver": {
+            "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
+        "combo-loader": {
+            "port": "9070",
+            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
+        "async-frontend": {"port": "9090"},
+        "apiserver": {"port": "9080"},
+        "package-upload": {"port": "9100"},
+        "package-search": {"port": "9090"}}
+
+SERVICE_COUNT = {
+        "appserver": 1,
+        "msgserver": 2,
+        "pingserver": 1,
+        "combo-loader": 1,
+        "async-frontend": 1,
+        "apiserver": 1,
+        "package-upload": 1}
+
+SERVICE_DEFAULT = {
+        "appserver": "RUN_APPSERVER",         
+        "msgserver": "RUN_MSGSERVER",
+        "pingserver": "RUN_PINGSERVER",
+        "combo-loader": "RUN_COMBO_LOADER",
+        "async-frontend": "RUN_ASYNC_FRONTEND",
+        "apiserver": "RUN_APISERVER",
+        "package-upload": "RUN_PACKAGEUPLOADSERVER",
+        "jobhandler": "RUN_JOBHANDLER",
+        "package-search": "RUN_PACKAGESEARCH",
+        "juju-sync": "RUN_JUJU_SYNC",
+        "cron": "RUN_CRON"}
+
+LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape"
+LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
+LANDSCAPE_LICENSE_DEST = "/etc/landcape/license.txt"
+ROOT = os.path.abspath(os.path.curdir)
+
+def _download_file(url, filename):
+    """ Download from a url and save to the filename given """
+    with open(filename, "wb") as fp:
+        with pycurl.Curl() as curl:
+            curl.setopt(pycurl.URL, url)
+            curl.setopt(pycurl.WRITEDATA, fp)
+            curl.perform()
+
+def _a2enmod(modules):
+    for module in modules:
+        check_call(["a2enmod", module])
+
+def _a2dissite(site):
+    check_call(["a2dissite", site])
+
+def _a2ensite(site):
+    check_call(["a2ensite", site])
+
+def _service(service, action):
+    check_call(["service", service, action])
+
+# For now, this will just enable http
+def _setup_apache():
+    public = juju.unit_get("public_address")
+    _a2enmod(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+    _a2dissite("default")
+    shutil.copy("%s/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
+    _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
+    _a2ensite("landscape")
+    _service("apache2", "restart")
+
+def _install_license():
+    """
+    Read the license from the config.  It can either be just the data
+    as plain text, or it can be a URL.  In either case, save it to the
+    global LANDSCAPE_LICENSE_DEST
+    """
+    license_file_re = r"^(http://|https://).*$"
+    license_file = juju.config_get("license-file")
+    if license_file == "":
+        juju.juju_log("license file not set, skipping")
+        return
+    if re.match(license_file_re, license_file):
+        _download_file(license_file, LANDSCAPE_LICENSE_DEST)
+    else:
+        with open(LANDSCAPE_LICENSE_DEST, 'wb') as fp:
+            fp.write(license_file)
+
+
+def _replace_in_file(filename, regex, replacement):
+    """
+    Operate on a file like sed.
+    @param file - filename of file to operate on
+    @param regex - regular expression to pass to re.sub() eg:. r'^foo'
+    @param replacement - replacement text to substitute over the matched regex
+    """
+    with open(filename, "r") as default:
+        lines = default.readlines()
+    with open(filename, "w") as default:
+        for line in lines:
+            default.write(re.sub(regex, replacement, line))
+
+def _enable_services(services):
+    juju.juju_log("Selected Services: %s" % services)
+    for service in services:
+        juju.juju_log("Enabling: %s" % service)
+        if service == "static":
+            _setup_apache()
+        else:
+            var = SERVICE_DEFAULT[service]
+            _replace_in_file(LANDSCAPE_DEFAULT_FILE,
+                             r"^%s=.*$" % var,
+                             "%s=%s" % (var, "yes"))
+
+
 
 def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
@@ -68,11 +175,11 @@ def _get_services():
     services = []
     if "services" in config:
         for service in config["services"].split():
-            if service not in SERVICE:
+            if service not in SERVICE_PROXY:
                 juju.juju_log("Invalid Service: %s" % service)
                 continue
             juju.juju_log("service: %s" % service)
-            services.append(_format_service(service, **SERVICE[service]))
+            services.append(_format_service(service, **SERVICE_PROXY[service]))
     return services
 
 def website_relation_joined():
@@ -148,6 +255,11 @@ def amqp_relation_changed():
 
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
+
+def config_changed():
+    _install_license()
+    check_call(["lsctl", "restart"])
+    _enable_services(_get_services.keys())
 
 
 ###############################################################################
