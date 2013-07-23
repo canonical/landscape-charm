@@ -102,7 +102,7 @@ def _install_license():
     as plain text, or it can be a URL.  In either case, save it to the
     global LANDSCAPE_LICENSE_DEST
     """
-    license_file_re = r"^(http://|https://).*$"
+    license_file_re = r"^(file://|http://|https://).*$"
     license_file = juju.config_get("license-file")
     if license_file == "":
         juju.juju_log("license file not set, skipping")
