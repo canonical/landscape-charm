@@ -1,7 +1,9 @@
 import hooks
 import unittest
 import yaml
-
+import tempfile
+import os
+import pycurl
 
 class TestJuju(object):
     _relation_data = {}
@@ -46,7 +48,7 @@ class TestHooks(unittest.TestCase):
              "service_options": ["options"]}]
  
     def setUp(self):
-        hooks.SERVICE = {"foo": {"port": "80", "httpchk": "foo"},
+        hooks.SERVICE_PROXY = {"foo": {"port": "80", "httpchk": "foo"},
                          "bar": {"port": "81"},
                          "baz": {"port": "82", "httpchk": None,
                                  "server_options": "server",
@@ -54,7 +56,7 @@ class TestHooks(unittest.TestCase):
         hooks.juju = TestJuju()
 
     def test_format_service(self):
-        result = hooks._format_service("bar", **hooks.SERVICE["bar"])
+        result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
         baseline = {"service_name": "bar",
                     "servers": [[
                         "bar", "localhost", "81",
@@ -65,7 +67,7 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_options(self):
-        result = hooks._format_service("foo", **hooks.SERVICE["foo"])
+        result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
         baseline = {"service_name": "foo",
                     "servers": [[
                         "foo", "localhost", "80",
@@ -75,7 +77,7 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
-        result = hooks._format_service("baz", **hooks.SERVICE["baz"])
+        result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
         baseline = {"service_name": "baz",
                     "servers": [["baz", "localhost", "82", "server"]],
                     "service_options": ["options"]}
@@ -102,8 +104,28 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(baseline, hooks.juju._relation_data)
 
     def test_download_file_success(self):
-        #import tempfile
-        #tmp = tempfile.mkstemp()
-        #hooks._download_file("http://www.google.com", tmp)
-        #import subprocess; subprocess.call("cat %s" % tempfile)
-        pass
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        with tmp as fp:
+            fp.write("foobar")
+            fp.flush()
+        output = hooks._download_file("file://%s" % tmp.name)
+        os.unlink(tmp.name)
+        self.assertTrue("foobar" in output)
+
+    def test_download_file_failure(self):
+        self.assertRaises(pycurl.error, hooks._download_file, "file://FOO/NO/EXIST")
+
+    def test_replace_in_file(self):
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        with tmp as fp:
+            fp.write("foo\nbar\nbaz\n")
+            fp.flush()
+
+        hooks._replace_in_file(tmp.name, r'^f..$', "REPLACED")
+
+        with open(tmp.name, 'r') as fp:
+            content = fp.read()
+        os.unlink(tmp.name)
+        self.assertIn("REPLACED", content)
+
+

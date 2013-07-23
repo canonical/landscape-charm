@@ -15,6 +15,7 @@ import yaml
 import shutil
 import re
 import pycurl
+import cStringIO
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
@@ -62,13 +63,15 @@ LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landcape/license.txt"
 ROOT = os.path.abspath(os.path.curdir)
 
-def _download_file(url, filename):
+def _download_file(url):
     """ Download from a url and save to the filename given """
-    with open(filename, "wb") as fp:
-        with pycurl.Curl() as curl:
-            curl.setopt(pycurl.URL, url)
-            curl.setopt(pycurl.WRITEDATA, fp)
-            curl.perform()
+    buf = cStringIO.StringIO()
+    curl = pycurl.Curl()
+    curl.setopt(pycurl.URL, url)
+    curl.setopt(pycurl.WRITEFUNCTION, buf.write)
+    curl.perform()
+    curl.close()
+    return buf.getvalue()
 
 def _a2enmod(modules):
     for module in modules:
@@ -105,11 +108,10 @@ def _install_license():
         juju.juju_log("license file not set, skipping")
         return
     if re.match(license_file_re, license_file):
-        _download_file(license_file, LANDSCAPE_LICENSE_DEST)
-    else:
-        with open(LANDSCAPE_LICENSE_DEST, 'wb') as fp:
-            fp.write(license_file)
+        license_file = _download_file(license_file)
 
+    with open(LANDSCAPE_LICENSE_DEST, 'wb') as fp:
+        fp.write(license_file)
 
 def _replace_in_file(filename, regex, replacement):
     """
@@ -135,8 +137,6 @@ def _enable_services(services):
             _replace_in_file(LANDSCAPE_DEFAULT_FILE,
                              r"^%s=.*$" % var,
                              "%s=%s" % (var, "yes"))
-
-
 
 def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
