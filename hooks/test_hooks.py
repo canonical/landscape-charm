@@ -45,27 +45,8 @@ class TestJuju(object):
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         pass
 
-
 class TestHooks(unittest.TestCase):
-    all_services = [
-            {"service_name": "foo",
-             "servers": [[
-                 "foo", "localhost", "80",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn", "option httpchk foo"]},
-            {"service_name": "bar",
-             "servers": [[
-                 "bar", "localhost", "81",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn",
-                 "option httpchk GET / HTTP/1.0"]},
-            {"service_name": "baz",
-             "servers": [["baz", "localhost", "82", "server"]],
-             "service_options": ["options"]}]
 
- 
     def setUp(self):
         hooks._lsctl_restart = lambda: True
         hooks.juju = TestJuju()
@@ -75,30 +56,6 @@ class TestHooks(unittest.TestCase):
         hooks.LANDSCAPE_DEFAULT_FILE = self._default_file.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
-
-    def tearDown(self):
-        os.unlink(self._license_dest.name)
-        os.unlink(self._default_file.name)
-
-    def seed_default_file_services_off(self):
-        with self._default_file as fp:
-            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_MSGSERVER="no"\nRUN_JUJU_SYNC="no"')
-            fp.flush()
-
-    def inject_fake_service_proxy_data(self):
-        hooks.juju._test_services = "foo bar baz"
-        hooks.juju._test_service_count = "foo:1 bar:2"
-        hooks.SERVICE_PROXY = {
-            "foo": {"port": "80", "httpchk": "foo"},
-            "bar": {"port": "81"},
-            "baz": {
-                "port": "82", "httpchk": None,
-                "server_options": "server",
-                "service_options": ["options"]}}
-        hooks.SERVICE_DEFAULT = {
-            "foo": "FOO",
-            "bar": "BAR",
-            "baz": "BAZ"}
 
     def assertFileContains(self, filename, text):
         """ Make sure a string exists in a file """
@@ -114,73 +71,27 @@ class TestHooks(unittest.TestCase):
             contents2 = fp2.read()
         self.assertEqual(contents1, contents2)
 
-    def test_format_service(self):
-        """
-        _format_service sends back data in a form haproxy expects.
-        The "bar" service (overridden above) does not have any options in
-        the definition dict..
-        """
-        self.inject_fake_service_proxy_data()
-        result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
-        baseline = {"service_name": "bar",
-                    "servers": [[
-                        "bar", "localhost", "81",
-                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                    "service_options": [
-                        "mode http", "balance leastconn",
-                        "option httpchk GET / HTTP/1.0"]}
-        self.assertEqual(baseline, result)
+    def seed_default_file_services_off(self):
+        with self._default_file as fp:
+            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_MSGSERVER="no"\nRUN_JUJU_SYNC="no"')
+            fp.flush()
 
-    def test_format_service_with_option(self):
-        """
-        _format_service sets things up as haproxy expects
-        when one option is specified.  The "foo" service (overridden above),
-        has just a single option specified
-        """
-        self.inject_fake_service_proxy_data()
-        result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
-        baseline = {"service_name": "foo",
-                    "servers": [[
-                        "foo", "localhost", "80",
-                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                    "service_options": [
-                        "mode http", "balance leastconn", "option httpchk foo"]}
-        self.assertEqual(baseline, result)
+class TestHooksService(TestHooks):
 
-    def test_format_service_with_more_options(self):
-        """
-        _format_service sets things up as haproxy expects
-        when many options are specified, the "baz" service (overridden above),
-        has multiple options specified in the dict.
-        """
-        self.inject_fake_service_proxy_data()
-        result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
-        baseline = {"service_name": "baz",
-                    "servers": [["baz", "localhost", "82", "server"]],
-                    "service_options": ["options"]}
-        self.assertEqual(baseline, result)
+    def setUp(self):
+        super(TestHooksService, self).setUp()
 
-    def test_get_services(self):
-        """
-        helper method get_services bulk-gets data in a format that haproxy
-        expects.
-        """
-        self.inject_fake_service_proxy_data()
-        result = hooks._get_services_haproxy()
-        baseline = self.all_services
-        self.assertEqual(baseline, result)
+    def tearDown(self):
+        super(TestHooksService, self).tearDown()
 
-    def test_website_relation_joined(self):
+    def test_get_services_non_proxied(self):
         """
-        Ensure the website relation joined hook spits out settings when run
+        helper method should not break if non-proxied services are called for
+        (e.g.: jobhandler)
         """
-        self.inject_fake_service_proxy_data()
-        hooks.website_relation_joined()
-        baseline = {
-            "services": yaml.safe_dump(self.all_services),
-            "hostname": "localhost",
-            "port": 80}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        #hooks.juju._test_services = "jobhandler"
+        #hooks._get_services_haproxy()
+        pass
 
     def test_amqp_relation_joined(self):
         """
@@ -322,3 +233,120 @@ class TestHooks(unittest.TestCase):
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+
+class TestHooksServiceMock(TestHooks):
+    all_services = [
+            {"service_name": "foo",
+             "servers": [[
+                 "foo", "localhost", "80",
+                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
+             "service_options": [
+                 "mode http", "balance leastconn", "option httpchk foo"]},
+            {"service_name": "bar",
+             "servers": [[
+                 "bar", "localhost", "81",
+                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
+             "service_options": [
+                 "mode http", "balance leastconn",
+                 "option httpchk GET / HTTP/1.0"]},
+            {"service_name": "baz",
+             "servers": [["baz", "localhost", "82", "server"]],
+             "service_options": ["options"]}]
+
+    def setUp(self):
+        super(TestHooksServiceMock, self).setUp()
+        self.mock_service_data()
+
+    def tearDown(self):
+        self.restore_service_data()
+        super(TestHooksServiceMock, self).tearDown()
+
+    def restore_service_data(self):
+        hooks.juju._test_services = self._test_services
+        hooks.juju._test_service_count = self._test_service_count
+        hooks.SERVICE_PROXY = self._SERVICE_PROXY
+        hooks.SERVICE_DEFAULT = self._SERVICE_DEFAULT
+
+    def mock_service_data(self):
+        self._test_services = hooks.juju._test_services
+        self._test_service_count = hooks.juju._test_service_count
+        self._SERVICE_PROXY = hooks.SERVICE_PROXY
+        self._SERVICE_DEFAULT = hooks.SERVICE_DEFAULT
+
+        hooks.juju._test_services = "foo bar baz"
+        hooks.juju._test_service_count = "foo:1 bar:2"
+        hooks.SERVICE_PROXY = {
+            "foo": {"port": "80", "httpchk": "foo"},
+            "bar": {"port": "81"},
+            "baz": {
+                "port": "82", "httpchk": None,
+                "server_options": "server",
+                "service_options": ["options"]}}
+        hooks.SERVICE_DEFAULT = {
+            "foo": "FOO",
+            "bar": "BAR",
+            "baz": "BAZ"}
+
+    def test_format_service(self):
+        """
+        _format_service sends back data in a form haproxy expects.
+        The "bar" service (overridden above) does not have any options in
+        the definition dict..
+        """
+        result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
+        baseline = {"service_name": "bar",
+                    "servers": [[
+                        "bar", "localhost", "81",
+                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                    "service_options": [
+                        "mode http", "balance leastconn",
+                        "option httpchk GET / HTTP/1.0"]}
+        self.assertEqual(baseline, result)
+
+    def test_format_service_with_option(self):
+        """
+        _format_service sets things up as haproxy expects
+        when one option is specified.  The "foo" service (overridden above),
+        has just a single option specified
+        """
+        result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
+        baseline = {"service_name": "foo",
+                    "servers": [[
+                        "foo", "localhost", "80",
+                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                    "service_options": [
+                        "mode http", "balance leastconn", "option httpchk foo"]}
+        self.assertEqual(baseline, result)
+
+    def test_format_service_with_more_options(self):
+        """
+        _format_service sets things up as haproxy expects
+        when many options are specified, the "baz" service (overridden above),
+        has multiple options specified in the dict.
+        """
+        result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
+        baseline = {"service_name": "baz",
+                    "servers": [["baz", "localhost", "82", "server"]],
+                    "service_options": ["options"]}
+        self.assertEqual(baseline, result)
+
+    def test_get_services(self):
+        """
+        helper method get_services bulk-gets data in a format that haproxy
+        expects.
+        """
+        result = hooks._get_services_haproxy()
+        baseline = self.all_services
+        self.assertEqual(baseline, result)
+
+    def test_website_relation_joined(self):
+        """
+        Ensure the website relation joined hook spits out settings when run
+        """
+        hooks.website_relation_joined()
+        baseline = {
+            "services": yaml.safe_dump(self.all_services),
+            "hostname": "localhost",
+            "port": 80}
+        self.assertEqual(baseline, hooks.juju._relation_data)
+

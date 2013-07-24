@@ -230,7 +230,8 @@ def _get_services_haproxy():
     result = []
     for service in _get_requested_services():
         juju.juju_log("service: %s" % service)
-        result.append(_format_service(service, **SERVICE_PROXY[service]))
+        if service in SERVICE_PROXY:
+            result.append(_format_service(service, **SERVICE_PROXY[service]))
     return result
 
 def _lsctl_restart():
