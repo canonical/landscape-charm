@@ -214,11 +214,11 @@ class TestHooksService(TestHooks):
         lower maximums ignore it.
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "10"
+        hooks.juju._test_service_count = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
-        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=10")
-        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=10")
+        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=2")
+        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=2")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
 
     def test_config_changed_service_count_labeled(self):

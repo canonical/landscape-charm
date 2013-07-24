@@ -104,18 +104,18 @@ def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
     @param service name of the service
     @param minimum minimum number of daemons to spawn
     @param auto_maximum maximum number of daemons to spawn with the AUTO
-        setting (None == 1024)
-    @param maximum maximum number of daemons to spawn (None == 1024)
+        setting (None == 9)
+    @param maximum maximum number of daemons to spawn (None == 9)
     @param requested The user requested number, if formatted correctly > 0,
        it wins (up to max)
     """
     if auto_maximum is None:
-        auto_maximum = 1024
+        auto_maximum = 9
     if maximum is None:
-        maximum = 1024
+        maximum = 9
     if requested is not None:
         if re.match(r'\d+', requested) and int(requested) > 0:
-            return min(requested, maximum)
+            return min(int(requested), maximum)
     ram = _get_system_ram()
     numcpu = _get_system_numcpu()
     numdaemons = 1 + numcpu + ram - 2
@@ -142,7 +142,7 @@ def _get_requested_service_count():
         count = service_count
         if re.match(r'^.*:\d+$', service_count):
             (service, count) = service_count.split(":")
-            result[service] = count 
+            result[service] = count
     for service in SERVICE_COUNT:
         if service not in result:
             result[service] = "AUTO"
