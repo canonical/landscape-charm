@@ -19,49 +19,6 @@ import cStringIO
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
-juju = Juju()
-
-SERVICE_PROXY = {
-        "static": {"port": "80"},
-        "appserver": {"port": "8080"},
-        "msgserver": {
-            "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
-        "pingserver": {
-            "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
-        "combo-loader": {
-            "port": "9070",
-            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
-        "async-frontend": {"port": "9090"},
-        "apiserver": {"port": "9080"},
-        "package-upload": {"port": "9100"},
-        "package-search": {"port": "9090"}}
-
-SERVICE_COUNT = {
-        "appserver": [calc_servers, 1, None],
-        "msgserver": [calc_servers, 2, None],
-        "pingserver": [calc_servers, 1, None],
-        "combo-loader": [calc_servers, 1, 2],
-        "async-frontend": [calc_servers, 1, 2],
-        "apiserver": [calc_servers, 1, 2],
-        "package-upload": [calc_servers, 1, 1]}
-
-SERVICE_DEFAULT = {
-        "appserver": "RUN_APPSERVER",         
-        "msgserver": "RUN_MSGSERVER",
-        "pingserver": "RUN_PINGSERVER",
-        "combo-loader": "RUN_COMBO_LOADER",
-        "async-frontend": "RUN_ASYNC_FRONTEND",
-        "apiserver": "RUN_APISERVER",
-        "package-upload": "RUN_PACKAGEUPLOADSERVER",
-        "jobhandler": "RUN_JOBHANDLER",
-        "package-search": "RUN_PACKAGESEARCH",
-        "juju-sync": "RUN_JUJU_SYNC",
-        "cron": "RUN_CRON"}
-
-LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape"
-LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
-LANDSCAPE_LICENSE_DEST = "/etc/landcape/license.txt"
-ROOT = os.path.abspath(os.path.curdir)
 
 def _download_file(url):
     """ Download from a url and save to the filename given """
@@ -141,7 +98,7 @@ def _calc_daemon_count(service, minimum=1, maximum=None, requested=None):
     @param service name of the service
     @minimum minimum number of daemons to spawn
     @maximum maximum number of daemons to spawn
-    @requested The user requested number, if formatted correcly, it wins
+    @requested The user requested number, if formatted correctly, it wins
     """
     if requested is not None:
         if re.matches(r'\d+', requested):
@@ -151,41 +108,46 @@ def _calc_daemon_count(service, minimum=1, maximum=None, requested=None):
     numdaemons = 1 + numcpu + ram - 2
     return max(minimum, min(maximum, numdaemons))
 
-def _get_service_count_dict():
+def _get_requested_service_count():
     """
-    Parse the service_count config setting, and return how many of each service
-    should actually be started.  If setting is 'AUTO' we will try to guess
-    the number for the user.  If the setting is not understood in some manner,
-    we will assume it to be AUTO
+    Parse and return the requested service count as a dict,
+    anything not set, default it to AUTO here
     """
-    final_count = {}
-
-    # First, set all requested services to run
-    for service in _get_requested_services():
-        final_count[service] = 1
-
-    # now, traverse special service, compare what they told me, and adjust
-    # accordingly.
+    count = {}
     service_counts = juju.config_get("service-count").split()
     for service_count in service_counts:
         count = service_count
         if re.matches(r'.*:.*', service_count):
             (service, count) = service_count.split(":")
-            final_count[service] = count 
-        else:    
-            # TODO: finish
-            pass
+            count[service] = count 
+    for service in SERVICE_COUNT:
+        if service not in count:
+            count[service] = "AUTO"
+    return count
 
-    
-
-def _enable_services(services):
+def _get_services_dict():
     """
-    Given a list of services, enable them!  The service_count setting is
-    consulted to determine how many services to start.
-
-    @param services list of services to start
+    Parse the services and service-count config setting, and return how many
+    of each service should actually be started.  If setting is 'AUTO' we will
+    try to guess the number for the user.  If the setting is not understood
+    in some manner, assume it to be AUTO
     """
-    juju.juju_log("Selected Services: %s" % services)
+    result = {}
+    requested = _get_requested_service_count()
+
+    # First, set all requested services to run
+    for service in _get_requested_services():
+        args = [SERVICE_COUNT[service][1:], requested[service]]
+        result[service] = SERVICE_COUNT[service][0](*args)
+    return result
+
+def _enable_services():
+    """
+    Enabled services requested by user through services and service-count
+    config settings.
+    """
+    services = _get_services_dict()
+    juju.juju_log("Selected Services: %s" % services.keys())
     for service in services:
         juju.juju_log("Enabling: %s" % service)
         if service == "static":
@@ -194,7 +156,7 @@ def _enable_services(services):
             var = SERVICE_DEFAULT[service]
             _replace_in_file(LANDSCAPE_DEFAULT_FILE,
                              r"^%s=.*$" % var,
-                             "%s=%s" % (var, "yes"))
+                             "%s=%s" % (var, services[service]))
 
 def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
@@ -324,6 +286,54 @@ def config_changed():
     _install_license()
     check_call(["lsctl", "restart"])
     _enable_services(_get_services_haproxy.keys())
+
+SERVICE_PROXY = {
+        "static": {"port": "80"},
+        "appserver": {"port": "8080"},
+        "msgserver": {
+            "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
+        "pingserver": {
+            "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
+        "combo-loader": {
+            "port": "9070",
+            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
+        "async-frontend": {"port": "9090"},
+        "apiserver": {"port": "9080"},
+        "package-upload": {"port": "9100"},
+        "package-search": {"port": "9090"}}
+
+SERVICE_COUNT = {
+        "appserver": [_calc_daemon_count, 1, None],
+        "msgserver": [_calc_daemon_count, 2, None],
+        "pingserver": [_calc_daemon_count, 1, None],
+        "combo-loader": [_calc_daemon_count, 1, 2],
+        "async-frontend": [_calc_daemon_count, 1, 2],
+        "apiserver": [_calc_daemon_count, 1, 2],
+        "package-upload": [_calc_daemon_count, 1, 1]
+        "package-search": [lambda x return 1, None, None],
+        "juju-sync": [lambda x return 1, None, None],
+        "cron": [lambda x return 1, None, None],
+        "static": [lambda x return 1, None, None]}
+        
+
+SERVICE_DEFAULT = {
+        "appserver": "RUN_APPSERVER",         
+        "msgserver": "RUN_MSGSERVER",
+        "pingserver": "RUN_PINGSERVER",
+        "combo-loader": "RUN_COMBO_LOADER",
+        "async-frontend": "RUN_ASYNC_FRONTEND",
+        "apiserver": "RUN_APISERVER",
+        "package-upload": "RUN_PACKAGEUPLOADSERVER",
+        "jobhandler": "RUN_JOBHANDLER",
+        "package-search": "RUN_PACKAGESEARCH",
+        "juju-sync": "RUN_JUJU_SYNC",
+        "cron": "RUN_CRON"}
+
+LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape"
+LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
+LANDSCAPE_LICENSE_DEST = "/etc/landcape/license.txt"
+ROOT = os.path.abspath(os.path.curdir)
+juju = Juju()
 
 if __name__ == "__main__":
     hooks = {
