@@ -309,7 +309,7 @@ SERVICE_COUNT = {
         "combo-loader": [_calc_daemon_count, 1, 2],
         "async-frontend": [_calc_daemon_count, 1, 2],
         "apiserver": [_calc_daemon_count, 1, 2],
-        "package-upload": [_calc_daemon_count, 1, 1]
+        "package-upload": [_calc_daemon_count, 1, 1],
         "package-search": [lambda x return 1, None, None],
         "juju-sync": [lambda x return 1, None, None],
         "cron": [lambda x return 1, None, None],
