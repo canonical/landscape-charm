@@ -77,7 +77,7 @@ def _get_services():
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
-    # N.B.: Port setting necessary do to limitations with haproxy charm
+    # N.B.: Port setting necessary due to limitations with haproxy charm
     juju.relation_set(
             services=yaml.safe_dump(_get_services()), hostname=host, port=80)
 
@@ -85,13 +85,6 @@ def db_admin_relation_joined():
     pass
 
 def db_admin_relation_changed():
-    util.set_host("account-1")
-    util.set_host("knowledge")
-    util.set_host("main")
-    util.set_host("package")
-    util.set_host("resource-1")
-    util.set_host("session")
-
     host = check_output(["relation-get", "host"]).strip()
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
