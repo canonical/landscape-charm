@@ -91,6 +91,9 @@ def _get_system_numcpu():
 def _get_system_ram():
     return 2
 
+def _daemon_count_one(*args):
+    return 1
+
 def _calc_daemon_count(service, minimum=1, maximum=None, requested=None):
     """
     Calculate the appropriate number of daemons to spawn
@@ -310,10 +313,10 @@ SERVICE_COUNT = {
         "async-frontend": [_calc_daemon_count, 1, 2],
         "apiserver": [_calc_daemon_count, 1, 2],
         "package-upload": [_calc_daemon_count, 1, 1],
-        "package-search": [lambda x return 1, None, None],
-        "juju-sync": [lambda x return 1, None, None],
-        "cron": [lambda x return 1, None, None],
-        "static": [lambda x return 1, None, None]}
+        "package-search": [_daemon_count_one, None, None],
+        "juju-sync": [_daemon_count_one, None, None],
+        "cron": [_daemon_count_one, None, None],
+        "static": [_daemon_count_one, None, None]}
         
 
 SERVICE_DEFAULT = {
