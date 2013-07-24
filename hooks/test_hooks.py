@@ -4,12 +4,20 @@ import yaml
 
 
 class TestJuju(object):
+    """
+    Testing object to intercept juju calls and inject data, or make sure
+    certain data is set.
+    """
     _relation_data = {}
     def relation_set(self, *args, **kwargs):
+        """
+        Capture result of relation_set into _relation_data, which 
+        can then be checked later.
+        """
         self._relation_data = dict(self._relation_data, **kwargs)
-        for i in args:
-            (k, v) = i.split("=")
-            self._relation_data[k] = v
+        for arg in args:
+            (key, value) = arg.split("=")
+            self._relation_data[key] = value
         pass
 
     def unit_get(self, *args):
@@ -55,8 +63,9 @@ class TestHooks(unittest.TestCase):
 
     def test_format_service(self):
         """
-        Check that _format_service is sending back service data
-        in a form haproxy expects
+        _format_service sends back data in a form haproxy expects.
+        The "bar" service (overridden above) does not have any options in
+        the definition dict..
         """
         result = hooks._format_service("bar", **hooks.SERVICE["bar"])
         baseline = {"service_name": "bar",
@@ -68,10 +77,11 @@ class TestHooks(unittest.TestCase):
                         "option httpchk GET / HTTP/1.0"]}
         self.assertEqual(baseline, result)
 
-    def test_format_service_with_options(self):
+    def test_format_service_with_option(self):
         """
-        Check that _format_service sets things up as haproxy expects
-        when one option is specified
+        _format_service sets things up as haproxy expects
+        when one option is specified.  The "foo" service (overridden above),
+        has just a single option specified
         """
         result = hooks._format_service("foo", **hooks.SERVICE["foo"])
         baseline = {"service_name": "foo",
@@ -84,8 +94,9 @@ class TestHooks(unittest.TestCase):
 
     def test_format_service_with_more_options(self):
         """
-        Check that _format_service sets things up as haproxy expects
-        when many options are specified
+        _format_service sets things up as haproxy expects
+        when many options are specified, the "baz" service (overridden above),
+        has multiple options specified in the dict.
         """
         result = hooks._format_service("baz", **hooks.SERVICE["baz"])
         baseline = {"service_name": "baz",
@@ -95,8 +106,8 @@ class TestHooks(unittest.TestCase):
 
     def test_get_services(self):
         """
-        Check the helper method get_services that bulk_gets data in a format
-        that haproxy expects.
+        helper method get_services bulk-gets data in a format that haproxy
+        expects.
         """
         result = hooks._get_services()
         baseline = self.all_services
