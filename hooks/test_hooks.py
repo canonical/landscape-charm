@@ -12,7 +12,9 @@ class TestJuju(object):
     """
     _relation_data = {}
     def __init__(self):
-        self.license_file = "LICENSE_FILE_TEXT"
+        self._test_license_file = "LICENSE_FILE_TEXT"
+        self._test_services = "msgserver pingserver juju-sync"
+        self._test_service_count = "msgserver:2 pingserver:1"
 
     def relation_set(self, *args, **kwargs):
         """
@@ -33,9 +35,11 @@ class TestJuju(object):
 
     def config_get(self, scope=None):
         if scope is None:
-            return {"services": "foo bar baz"}
+            return {"services": self._test_services}
         elif scope == "license-file":
-            return self.license_file
+            return self._test_license_file
+        elif scope == "service-count":
+            return self._test_service_count
         pass
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
@@ -63,18 +67,44 @@ class TestHooks(unittest.TestCase):
 
  
     def setUp(self):
-        hooks.SERVICE_PROXY = {"foo": {"port": "80", "httpchk": "foo"},
-                         "bar": {"port": "81"},
-                         "baz": {"port": "82", "httpchk": None,
-                                 "server_options": "server",
-                                 "service_options": ["options"]}}
+        hooks._lsctl_restart = lambda: True
         hooks.juju = TestJuju()
+        self._license_dest = tempfile.NamedTemporaryFile(delete=False)
+        hooks.LANDSCAPE_LICENSE_DEST = self._license_dest.name
+        self._default_file = tempfile.NamedTemporaryFile(delete=False)
+        hooks.LANDSCAPE_DEFAULT_FILE = self._default_file.name
+        hooks._get_system_numcpu = lambda: 2
+        hooks._get_system_ram = lambda: 2
+
+    def tearDown(self):
+        os.unlink(self._license_dest.name)
+        os.unlink(self._default_file.name)
+
+    def seed_default_file_services_off(self):
+        with self._default_file as fp:
+            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_MSGSERVER="no"\nRUN_JUJU_SYNC="no"')
+            fp.flush()
+
+    def inject_fake_service_proxy_data(self):
+        hooks.juju._test_services = "foo bar baz"
+        hooks.juju._test_service_count = "foo:1 bar:2"
+        hooks.SERVICE_PROXY = {
+            "foo": {"port": "80", "httpchk": "foo"},
+            "bar": {"port": "81"},
+            "baz": {
+                "port": "82", "httpchk": None,
+                "server_options": "server",
+                "service_options": ["options"]}}
+        hooks.SERVICE_DEFAULT = {
+            "foo": "FOO",
+            "bar": "BAR",
+            "baz": "BAZ"}
 
     def assertFileContains(self, filename, text):
         """ Make sure a string exists in a file """
         with open(filename, 'r') as fp:
             contents = fp.read()
-        self.assertTrue(text in contents)
+        self.assertIn(text, contents)
 
     def assertFilesEqual(self, file1, file2):
         """ Given two filenames, compare them """
@@ -84,23 +114,13 @@ class TestHooks(unittest.TestCase):
             contents2 = fp2.read()
         self.assertEqual(contents1, contents2)
 
-        for hook in ["config-changed", "amqp-relation-changed", "amqp-relation-joined",
-                  "db-admin-relation-changed", "db-admin-relation-joined",
-                  "website-relation-joined"]:
-            symbol = hook.replace("-", "_")
-            for member in inspect.getmembers(hooks):
-                if member[0] == symbol:
-                    self.assertTrue(inspect.isfunction(member[1]))
-                    break
-            else:
-                self.assertTrue(False, "didn't find function for %s" % hook)
-
     def test_format_service(self):
         """
         _format_service sends back data in a form haproxy expects.
         The "bar" service (overridden above) does not have any options in
         the definition dict..
         """
+        self.inject_fake_service_proxy_data()
         result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
         baseline = {"service_name": "bar",
                     "servers": [[
@@ -117,6 +137,7 @@ class TestHooks(unittest.TestCase):
         when one option is specified.  The "foo" service (overridden above),
         has just a single option specified
         """
+        self.inject_fake_service_proxy_data()
         result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
         baseline = {"service_name": "foo",
                     "servers": [[
@@ -132,6 +153,7 @@ class TestHooks(unittest.TestCase):
         when many options are specified, the "baz" service (overridden above),
         has multiple options specified in the dict.
         """
+        self.inject_fake_service_proxy_data()
         result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
         baseline = {"service_name": "baz",
                     "servers": [["baz", "localhost", "82", "server"]],
@@ -143,7 +165,8 @@ class TestHooks(unittest.TestCase):
         helper method get_services bulk-gets data in a format that haproxy
         expects.
         """
-        result = hooks._get_services()
+        self.inject_fake_service_proxy_data()
+        result = hooks._get_services_haproxy()
         baseline = self.all_services
         self.assertEqual(baseline, result)
 
@@ -151,6 +174,7 @@ class TestHooks(unittest.TestCase):
         """
         Ensure the website relation joined hook spits out settings when run
         """
+        self.inject_fake_service_proxy_data()
         hooks.website_relation_joined()
         baseline = {
             "services": yaml.safe_dump(self.all_services),
@@ -203,18 +227,16 @@ class TestHooks(unittest.TestCase):
 
     def test__enable_service(self):
         """ Create a simple service enablement of a file with comments """
-        default = tempfile.NamedTemporaryFile(delete=False)
         target = tempfile.NamedTemporaryFile(delete=False)
-        with default as fp:
+        with self._default_file as fp:
             fp.write('# Comment test\nRUN_APPSERVER="no"')
             fp.flush()
         with target as fp:
-            fp.write('# Comment test\nRUN_APPSERVER=yes')
+            fp.write('# Comment test\nRUN_APPSERVER=3')
             fp.flush()
-        hooks.LANDSCAPE_DEFAULT_FILE = default.name
-        hooks._enable_services(["appserver"])
-        self.assertFilesEqual(default.name, target.name)
-        os.unlink(default.name)
+        hooks.juju._test_services = "appserver"
+        hooks._enable_services()
+        self.assertFilesEqual(self._default_file.name, target.name)
         os.unlink(target.name)
         pass
 
@@ -225,28 +247,78 @@ class TestHooks(unittest.TestCase):
             fp.write('# Comment test\nRUN_APPSERVER="no"')
             fp.flush()
         hooks.LANDSCAPE_DEFAULT_FILE = default.name
-        self.assertRaises(Exception, hooks._enable_services, ["foobar"])
+        hooks.juju._test_services = "INVALID_SERVICE_NAME"
+        self.assertRaises(Exception, hooks._enable_services)
         os.unlink(default.name)
         pass
 
     def test__install_license_text(self):
         """ Install a license with as a string """
-        license_file = tempfile.NamedTemporaryFile(delete=False)
-        hooks.LANDSCAPE_LICENSE_DEST = license_file.name
         hooks._install_license()
-        self.assertFileContains(license_file.name, "LICENSE_FILE_TEXT")
-        os.unlink(license_file.name)
+        self.assertFileContains(self._license_dest.name, "LICENSE_FILE_TEXT")
 
     def test__install_license_url(self):
         """ Install a license with as a url """
-        dest = tempfile.NamedTemporaryFile(delete=False)
         source = tempfile.NamedTemporaryFile(delete=False)
         with source as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
             fp.flush()
-        hooks.LANDSCAPE_LICENSE_DEST = dest.name
-        hooks.juju.license_file = "file://%s" % source.name
+        hooks.juju._test_license_file = "file://%s" % source.name
         hooks._install_license()
-        self.assertFileContains(dest.name, "LICENSE_FILE_TEXT from curl")
+        self.assertFileContains(
+            self._license_dest.name, "LICENSE_FILE_TEXT from curl")
         os.unlink(source.name)
-        os.unlink(dest.name)
+
+    def test_config_changed(self):
+        """
+        All defaults should apply to requested services with the default
+        service count of "AUTO" specified
+        """
+        hooks.juju._test_services = "appserver msgserver juju-sync"
+        hooks.juju._test_service_count = "AUTO"
+        self.seed_default_file_services_off()
+        hooks.config_changed()
+        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+
+    def test_config_changed_zero(self):
+        """
+        All defaults should apply to requested services with the default
+        service count of "AUTO" specified, the number zero is specially
+        recognized in the code (negative numbers and other junk will not
+        match the regular expression of integer)
+        """
+        hooks.juju._test_services = "appserver msgserver juju-sync"
+        hooks.juju._test_service_count = "0"
+        self.seed_default_file_services_off()
+        hooks.config_changed()
+        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+
+    def test_config_changed_service_count_bare(self):
+        """
+        Bare number (integer) sets all capable services to that number, ones with
+        lower maximums ignore it.
+        """
+        hooks.juju._test_services = "appserver msgserver juju-sync"
+        hooks.juju._test_service_count = "10"
+        self.seed_default_file_services_off()
+        hooks.config_changed()
+        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=10")
+        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=10")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+
+    def test_config_changed_service_count_labeled(self):
+        """
+        Multiple labeled service counts resolve correctly, missing service
+        default to auto-determined, the keyword AUTO should also be recognized
+        """
+        hooks.juju._test_services = "appserver msgserver juju-sync"
+        hooks.juju._test_service_count = "appserver:AUTO juju-sync:10"
+        self.seed_default_file_services_off()
+        hooks.config_changed()
+        self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")

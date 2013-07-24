@@ -75,7 +75,8 @@ echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-prox
 
 apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
-                python-pycurl python-support wget pwgen apache2-mpm-worker
+                python-support wget pwgen apache2-mpm-worker \
+                python-psutil python pycurl
 
 # Setup a local repository and build the server if supplied in the charm
 setup_local_repo || add_apt_sources

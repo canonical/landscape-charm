@@ -16,6 +16,7 @@ import shutil
 import re
 import pycurl
 import cStringIO
+import psutil
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
@@ -86,47 +87,65 @@ def _replace_in_file(filename, regex, replacement):
             default.write(re.sub(regex, replacement, line))
 
 def _get_system_numcpu():
-    return 2
+    """ Return the number of cores on the system """
+    return psutil.NUM_CPUS
 
 def _get_system_ram():
-    return 2
+    """ Return the system ram in Gigabytes """
+    return psutil.phymem_usage()[0] / (1024 ** 3)
 
-def _daemon_count_one(*args):
-    return 1
-
-def _calc_daemon_count(service, minimum=1, maximum=None, requested=None):
+def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
+        requested=None):
     """
-    Calculate the appropriate number of daemons to spawn
+    Calculate the appropriate number of daemons to spawn for a requested
+    service.
 
     @param service name of the service
-    @minimum minimum number of daemons to spawn
-    @maximum maximum number of daemons to spawn
-    @requested The user requested number, if formatted correctly, it wins
+    @param minimum minimum number of daemons to spawn
+    @param auto_maximum maximum number of daemons to spawn with the AUTO
+        setting (None == 1024)
+    @param maximum maximum number of daemons to spawn (None == 1024)
+    @param requested The user requested number, if formatted correctly > 0,
+       it wins (up to max)
     """
+    if auto_maximum is None:
+        auto_maximum = 1024
+    if maximum is None:
+        maximum = 1024
     if requested is not None:
-        if re.matches(r'\d+', requested):
-            return requested
+        if re.match(r'\d+', requested) and int(requested) > 0:
+            return min(requested, maximum)
     ram = _get_system_ram()
     numcpu = _get_system_numcpu()
     numdaemons = 1 + numcpu + ram - 2
-    return max(minimum, min(maximum, numdaemons))
+    return max(minimum, min(auto_maximum, numdaemons))
 
 def _get_requested_service_count():
     """
     Parse and return the requested service count as a dict,
-    anything not set, default it to AUTO here
+    anything not set, default it to AUTO here.  Expected settings:
+
+    - AUTO = all services default to AUTO
+    - <integer> = all services default requested to be this
+    - <service_name>:<integer> = service_name defaults to number set
+    - <service_name>:AUTO = service_name defaults to AUTO
     """
-    count = {}
+    result = {}
     service_counts = juju.config_get("service-count").split()
+    if len(service_counts) == 1:
+        if re.match(r'^\d+$', service_counts[0]):
+            for service in SERVICE_COUNT:
+                result[service] = service_counts[0]
+            return result
     for service_count in service_counts:
         count = service_count
-        if re.matches(r'.*:.*', service_count):
+        if re.match(r'^.*:\d+$', service_count):
             (service, count) = service_count.split(":")
-            count[service] = count 
+            result[service] = count 
     for service in SERVICE_COUNT:
-        if service not in count:
-            count[service] = "AUTO"
-    return count
+        if service not in result:
+            result[service] = "AUTO"
+    return result
 
 def _get_services_dict():
     """
@@ -140,7 +159,9 @@ def _get_services_dict():
 
     # First, set all requested services to run
     for service in _get_requested_services():
-        args = [SERVICE_COUNT[service][1:], requested[service]]
+        args = [service]
+        args.extend(SERVICE_COUNT[service][1:])
+        args.append(requested[service])
         result[service] = SERVICE_COUNT[service][0](*args)
     return result
 
@@ -190,32 +211,36 @@ def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
     return result
 
 def _get_requested_services():
-    services = []
+    result = []
+    config = juju.config_get()
     if "services" in config:
         for service in config["services"].split():
             if service not in SERVICE_DEFAULT:
                 juju.juju_log("Invalid Service: %s" % service)
-                continue
-            services.append(service)
-    return services
+                raise Exception("Invalid Service: %s" % service)
+            result.append(service)
+    return result
 
 def _get_services_haproxy():
     """
     Get the services that were configured to run.  Return in a format
     understood by haproxy.
     """
-    config = juju.config_get()
-    services = []
+    result = []
     for service in _get_requested_services():
         juju.juju_log("service: %s" % service)
-        services.append(_format_service(service, **SERVICE_PROXY[service]))
-    return services
+        result.append(_format_service(service, **SERVICE_PROXY[service]))
+    return result
+
+def _lsctl_restart():
+    check_call(["lsctl", "restart"])
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary due to limitations with haproxy charm
     juju.relation_set(
-            services=yaml.safe_dump(_get_services_haproxy()), hostname=host, port=80)
+            services=yaml.safe_dump(_get_services_haproxy()),
+            hostname=host, port=80)
 
 def db_admin_relation_joined():
     pass
@@ -285,10 +310,11 @@ def amqp_relation_changed():
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
 
+
 def config_changed():
     _install_license()
-    check_call(["lsctl", "restart"])
-    _enable_services(_get_services_haproxy.keys())
+    _lsctl_restart()
+    _enable_services()
 
 SERVICE_PROXY = {
         "static": {"port": "80"},
@@ -305,18 +331,24 @@ SERVICE_PROXY = {
         "package-upload": {"port": "9100"},
         "package-search": {"port": "9090"}}
 
+# Fomrat is:
+#   [method, min, auto_max, real_max]
+#   method = method to use to determine what the count should be
+#   min = minimum number of daemons to launch
+#   auto_max = if auto-determining, only suggest this as the max
+#   real_max = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
-        "appserver": [_calc_daemon_count, 1, None],
-        "msgserver": [_calc_daemon_count, 2, None],
-        "pingserver": [_calc_daemon_count, 1, None],
-        "combo-loader": [_calc_daemon_count, 1, 2],
-        "async-frontend": [_calc_daemon_count, 1, 2],
-        "apiserver": [_calc_daemon_count, 1, 2],
-        "package-upload": [_calc_daemon_count, 1, 1],
-        "package-search": [_daemon_count_one, None, None],
-        "juju-sync": [_daemon_count_one, None, None],
-        "cron": [_daemon_count_one, None, None],
-        "static": [_daemon_count_one, None, None]}
+        "appserver": [_calc_daemon_count, 1, 4, None],
+        "msgserver": [_calc_daemon_count, 2, 16, None],
+        "pingserver": [_calc_daemon_count, 1, 16, None],
+        "combo-loader": [_calc_daemon_count, 1, 2, None],
+        "async-frontend": [_calc_daemon_count, 1, 2, None],
+        "apiserver": [_calc_daemon_count, 1, 2, None],
+        "package-upload": [_calc_daemon_count, 1, 1, 1],
+        "package-search": [_calc_daemon_count, 1, 1, 1],
+        "juju-sync": [_calc_daemon_count, 1, 1, 1],
+        "cron": [_calc_daemon_count, 1, 1, 1],
+        "static": [_calc_daemon_count, 1, 1, 1]}
         
 
 SERVICE_DEFAULT = {

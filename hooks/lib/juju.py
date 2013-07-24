@@ -57,7 +57,6 @@ class Juju(object):
         finally:
             return(config_data)
 
-
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         """
         Returns a dictionary containing the relation information
