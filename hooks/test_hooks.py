@@ -234,6 +234,17 @@ class TestHooksService(TestHooks):
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
 
+    def test_config_changed_service_count_update_haproxy(self):
+        """
+        Bare number (integer) sets all capable services to that number, ones with
+        lower maximums ignore it.
+        """
+        hooks.juju._test_services = "appserver msgserver juju-sync"
+        hooks.juju._test_service_count = "2"
+        self.seed_default_file_services_off()
+        hooks.config_changed()
+        self.assertTrue(len(hooks.juju._relation_data) > 0)
+
 class TestHooksServiceMock(TestHooks):
     all_services = [
             {"service_name": "foo",
