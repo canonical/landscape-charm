@@ -24,8 +24,9 @@ from ConfigParser import RawConfigParser
 def _download_file(url):
     """ Download from a url and save to the filename given """
     buf = cStringIO.StringIO()
+    juju.juju_log("Fetching License: %s" % url)
     curl = pycurl.Curl()
-    curl.setopt(pycurl.URL, url)
+    curl.setopt(pycurl.URL, str(url))
     curl.setopt(pycurl.WRITEFUNCTION, buf.write)
     curl.perform()
     curl.close()
@@ -48,10 +49,10 @@ def _setup_apache():
     """
     Setup apache2 to serve static landscape content
     """
-    public = juju.unit_get("public_address")
+    public = juju.unit_get("public-address")
     _a2enmod(["rewrite", "proxy_http", "ssl", "headers", "expires"])
     _a2dissite("default")
-    shutil.copy("%s/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
+    shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
     _a2ensite("landscape")
     _service("apache2", "restart")
@@ -344,6 +345,7 @@ SERVICE_COUNT = {
         "combo-loader": [_calc_daemon_count, 1, 2, None],
         "async-frontend": [_calc_daemon_count, 1, 2, None],
         "apiserver": [_calc_daemon_count, 1, 2, None],
+        "jobhandler": [_calc_daemon_count, 1, 2, None],
         "package-upload": [_calc_daemon_count, 1, 1, 1],
         "package-search": [_calc_daemon_count, 1, 1, 1],
         "juju-sync": [_calc_daemon_count, 1, 1, 1],
@@ -362,11 +364,12 @@ SERVICE_DEFAULT = {
         "jobhandler": "RUN_JOBHANDLER",
         "package-search": "RUN_PACKAGESEARCH",
         "juju-sync": "RUN_JUJU_SYNC",
-        "cron": "RUN_CRON"}
+        "cron": "RUN_CRON",
+        "static": None}
 
-LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape"
+LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
-LANDSCAPE_LICENSE_DEST = "/etc/landcape/license.txt"
+LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
 ROOT = os.path.abspath(os.path.curdir)
 juju = Juju()
 
