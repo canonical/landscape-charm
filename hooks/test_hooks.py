@@ -148,10 +148,10 @@ class TestHooksService(TestHooks):
         """ Create a simple service enablement of a file with comments """
         target = tempfile.NamedTemporaryFile(delete=False)
         with self._default_file as fp:
-            fp.write('# Comment test\nRUN_APPSERVER="no"')
+            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_CRON="yes"')
             fp.flush()
         with target as fp:
-            fp.write('# Comment test\nRUN_APPSERVER=3')
+            fp.write('# Comment test\nRUN_APPSERVER=3\nRUN_CRON=no')
             fp.flush()
         hooks.juju._test_services = "appserver"
         hooks._enable_services()

@@ -153,7 +153,7 @@ def _get_services_dict():
     Parse the services and service-count config setting, and return how many
     of each service should actually be started.  If setting is 'AUTO' we will
     try to guess the number for the user.  If the setting is not understood
-    in some manner, assume it to be AUTO
+    in some manner, assume it to be AUTO.
     """
     result = {}
     requested = _get_requested_service_count()
@@ -167,19 +167,28 @@ def _get_services_dict():
 def _enable_services():
     """
     Enabled services requested by user through services and service-count
-    config settings.
+    config settings.  Function will also disable services that are not
+    requested by the user.
     """
     services = _get_services_dict()
     juju.juju_log("Selected Services: %s" % services.keys())
+
+    # Take an extra step to implicitly disable any service that was not
+    # specified in the "services" setting.
+    for service in SERVICE_COUNT:
+        if service not in services:
+            services[service] = 0
     for service in services:
         juju.juju_log("Enabling: %s" % service)
-        if service == "static":
+        if service == "static" and services[service] > 0:
             _setup_apache()
         else:
             variable = SERVICE_DEFAULT[service]
             value = services[service]
             if value == 1:
                 value = "yes"
+            elif value == 0:
+                value = "no"
             _replace_in_file(
                 LANDSCAPE_DEFAULT_FILE,
                 r"^%s=.*$" % variable,
