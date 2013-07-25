@@ -215,7 +215,7 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
     hash aboe.
 
     @param name Name of the service (letters, numbers, underscores)
-    @param count How many of this service will be started (positive int)
+    @param count How many instances of this service will be started (int)
     @param port Port this service will be running on
     @param server_options override the server_options (String)
     @param httpchk The httpchk option, will be appeneded to service_options
@@ -387,11 +387,11 @@ SERVICE_PROXY = {
         "package-upload": {"port": "9100"},
         "package-search": {"port": "9090"}}
 
-# Fomrat is:
+# Format is:
 #   [min, auto_max, hard_max]
 #   min = minimum number of daemons to launch
 #   auto_max = if auto-determining, only suggest this as the max
-#   hard = hard-cutoff, cannot launch more than this.
+#   hard_max = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
         "appserver": [1, 4, 9],
         "msgserver": [2, 8, 9],
