@@ -32,30 +32,36 @@ def _download_file(url):
     curl.close()
     return buf.getvalue()
 
-def _a2enmod(modules):
+
+def _a2enmods(modules):
     for module in modules:
         check_call(["a2enmod", module])
+
 
 def _a2dissite(site):
     check_call(["a2dissite", site])
 
+
 def _a2ensite(site):
     check_call(["a2ensite", site])
 
+
 def _service(service, action):
     check_call(["service", service, action])
+
 
 def _setup_apache():
     """
     Setup apache2 to serve static landscape content
     """
     public = juju.unit_get("public-address")
-    _a2enmod(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+    _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
     _a2dissite("default")
     shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
     _a2ensite("landscape")
     _service("apache2", "restart")
+
 
 def _install_license():
     """
@@ -71,14 +77,15 @@ def _install_license():
     if re.match(license_file_re, license_file):
         license_file = _download_file(license_file)
 
-    with open(LANDSCAPE_LICENSE_DEST, 'wb') as fp:
+    with open(LANDSCAPE_LICENSE_DEST, "wb") as fp:
         fp.write(license_file)
+
 
 def _replace_in_file(filename, regex, replacement):
     """
     Operate on a file like sed.
     @param file - filename of file to operate on
-    @param regex - regular expression to pass to re.sub() eg:. r'^foo'
+    @param regex - regular expression to pass to re.sub() eg:. r"^foo"
     @param replacement - replacement text to substitute over the matched regex
     """
     with open(filename, "r") as default:
@@ -87,13 +94,16 @@ def _replace_in_file(filename, regex, replacement):
         for line in lines:
             default.write(re.sub(regex, replacement, line))
 
+
 def _get_system_numcpu():
     """ Return the number of cores on the system """
     return psutil.NUM_CPUS
 
+
 def _get_system_ram():
     """ Return the system ram in Gigabytes """
     return psutil.phymem_usage()[0] / (1024 ** 3)
+
 
 def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
         requested=None):
@@ -115,12 +125,13 @@ def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
     if maximum is None:
         maximum = 9
     if requested is not None:
-        if re.match(r'\d+', requested) and int(requested) > 0:
+        if re.match(r"\d+", requested) and int(requested) > 0:
             return min(int(requested), maximum)
     ram = _get_system_ram()
     numcpu = _get_system_numcpu()
     numdaemons = 1 + numcpu + ram - 2
     return max(minimum, min(auto_maximum, numdaemons))
+
 
 def _get_requested_service_count():
     """
@@ -135,24 +146,21 @@ def _get_requested_service_count():
     result = {}
     service_counts = juju.config_get("service-count").split()
     if len(service_counts) == 1:
-        if re.match(r'^\d+$', service_counts[0]):
-            for service in SERVICE_COUNT:
-                result[service] = service_counts[0]
-            return result
+        if re.match(r"^\d+$", service_counts[0]):
+            return dict.fromkeys(SERVICE_COUNT, service_counts[0])
+    result = dict.fromkeys(SERVICE_COUNT, "AUTO")
     for service_count in service_counts:
         count = service_count
-        if re.match(r'^.*:\d+$', service_count):
+        if re.match(r"^.*:\d+$", service_count):
             (service, count) = service_count.split(":")
             result[service] = count
-    for service in SERVICE_COUNT:
-        if service not in result:
-            result[service] = "AUTO"
     return result
+
 
 def _get_services_dict():
     """
     Parse the services and service-count config setting, and return how many
-    of each service should actually be started.  If setting is 'AUTO' we will
+    of each service should actually be started.  If setting is "AUTO" we will
     try to guess the number for the user.  If the setting is not understood
     in some manner, assume it to be AUTO.
     """
@@ -160,10 +168,11 @@ def _get_services_dict():
     requested = _get_requested_service_count()
     for service in _get_requested_services():
         args = [service]
-        args.extend(SERVICE_COUNT[service][1:])
+        args.extend(SERVICE_COUNT[service])
         args.append(requested[service])
-        result[service] = SERVICE_COUNT[service][0](*args)
+        result[service] = _calc_daemon_count(*args)
     return result
+
 
 def _enable_services():
     """
@@ -195,6 +204,7 @@ def _enable_services():
                 r"^%s=.*$" % variable,
                 "%s=%s" % (variable, value))
 
+
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
         service_options=None):
@@ -219,7 +229,7 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
 
     host = juju.unit_get("private-address")
     result = {
-        "service_name": name, 
+        "service_name": name,
         "service_options": service_options,
         "servers": [[name, host, port, server_options]]}
     offset = 1
@@ -228,6 +238,7 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
             [name, host, str(int(port) + offset), server_options])
         offset += 1
     return result
+
 
 def _get_requested_services():
     result = []
@@ -239,6 +250,7 @@ def _get_requested_services():
                 raise Exception("Invalid Service: %s" % service)
             result.append(service)
     return result
+
 
 def _get_services_haproxy():
     """
@@ -255,9 +267,11 @@ def _get_services_haproxy():
                 _format_service(service, count, **SERVICE_PROXY[service]))
     return result
 
+
 def _lsctl(action):
     """ simple wrapper around lsctl, mostly to easily allow mocking"""
     check_call(["lsctl", action])
+
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
@@ -265,6 +279,7 @@ def website_relation_joined():
     juju.relation_set(
             services=yaml.safe_dump(_get_services_haproxy()),
             hostname=host, port=80)
+
 
 def notify_website_relation():
     """
@@ -277,15 +292,17 @@ def notify_website_relation():
             relation_id=id,
             services=yaml.safe_dump(_get_services_haproxy()))
 
+
 def db_admin_relation_joined():
     pass
+
 
 def db_admin_relation_changed():
     host = check_output(["relation-get", "host"]).strip()
     admin = check_output(["relation-get", "user"]).strip()
     admin_password = check_output(["relation-get", "password"]).strip()
     allowed_units = check_output(["relation-get", "allowed-units"]).strip()
-    unit_name = os.environ['JUJU_UNIT_NAME']
+    unit_name = os.environ["JUJU_UNIT_NAME"]
     user = "landscape"
     password = "landscape"
 
@@ -315,14 +332,16 @@ def db_admin_relation_changed():
     util.create_user(host, admin, admin_password, user, password)
 
     # Setup the landscape server and restart services.  The method
-    # is smart enough to skip if nothing needs to be done, and 
+    # is smart enough to skip if nothing needs to be done, and
     # protect against concurrent access to the database.
     util.setup_landscape_server(host, admin, admin_password)
     _lsctl("restart")
 
+
 def amqp_relation_joined():
     juju.relation_set("username=landscape")
     juju.relation_set("vhost=landscape")
+
 
 def amqp_relation_changed():
     password = check_output(["relation-get", "password"]).strip()
@@ -344,6 +363,7 @@ def amqp_relation_changed():
 
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
+
 
 def config_changed():
     _install_license()
@@ -368,28 +388,27 @@ SERVICE_PROXY = {
         "package-search": {"port": "9090"}}
 
 # Fomrat is:
-#   [method, min, auto_max, real_max]
-#   method = method to use to determine what the count should be
+#   [min, auto_max, hard_max]
 #   min = minimum number of daemons to launch
 #   auto_max = if auto-determining, only suggest this as the max
-#   real_max = hard-cutoff, cannot launch more than this.
+#   hard = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
-        "appserver": [_calc_daemon_count, 1, 4, 9],
-        "msgserver": [_calc_daemon_count, 2, 8, 9],
-        "pingserver": [_calc_daemon_count, 1, 4, 9],
-        "apiserver": [_calc_daemon_count, 1, 2, 9],
-        "combo-loader": [_calc_daemon_count, 1, 1, 1],
-        "async-frontend": [_calc_daemon_count, 1, 1, 1],
-        "jobhandler": [_calc_daemon_count, 1, 1, 1],
-        "package-upload": [_calc_daemon_count, 1, 1, 1],
-        "package-search": [_calc_daemon_count, 1, 1, 1],
-        "juju-sync": [_calc_daemon_count, 1, 1, 1],
-        "cron": [_calc_daemon_count, 1, 1, 1],
-        "static": [_calc_daemon_count, 1, 1, 1]}
-        
+        "appserver": [1, 4, 9],
+        "msgserver": [2, 8, 9],
+        "pingserver": [1, 4, 9],
+        "apiserver": [1, 2, 9],
+        "combo-loader": [1, 1, 1],
+        "async-frontend": [1, 1, 1],
+        "jobhandler": [1, 1, 1],
+        "package-upload": [1, 1, 1],
+        "package-search": [1, 1, 1],
+        "juju-sync": [1, 1, 1],
+        "cron": [1, 1, 1],
+        "static": [1, 1, 1]}
+
 
 SERVICE_DEFAULT = {
-        "appserver": "RUN_APPSERVER",         
+        "appserver": "RUN_APPSERVER",
         "msgserver": "RUN_MSGSERVER",
         "pingserver": "RUN_PINGSERVER",
         "combo-loader": "RUN_COMBO_LOADER",

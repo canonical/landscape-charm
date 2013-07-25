@@ -2,9 +2,9 @@
 Simple python library for juju commands in the context of an
 executing hook.  Mostly wrappers around shell commands.
 """
-
 import json
 import subprocess
+
 
 class Juju(object):
 
@@ -18,14 +18,15 @@ class Juju(object):
             context of relation).  Will be stripped from kwargs if present.
             if you need to set this, use an arg style argument "k=v"
         """
-        set_args = ["relation-set"]
+        args = ["relation-set"]
         if "relation_id" in kwargs:
-            set_args.extend(["-r", kwargs["relation_id"]])
-            del(kwargs["relation_id"])
-        for key,value in kwargs.iteritems():
-            set_args.append("%s=%s" % (key, value))
-        set_args.extend(args)
-        subprocess.call(set_args)
+            args.extend(["-r", kwargs["relation_id"]])
+            del kwargs["relation_id"]
+        args.extend("%s=%s" % (key, val) for key, val in kwargs.iteritems())
+        for key, val in kwargs.iteritems():
+            args.append("%s=%s" % (key, val))
+        args.extend(args)
+        subprocess.call(args)
 
     def relation_ids(self, relation_name=None):
         """
@@ -64,13 +65,13 @@ class Juju(object):
         desired config item.
         """
         try:
-            config_cmd_line = ['config-get']
+            config_cmd_line = ["config-get"]
             if scope is not None:
                 config_cmd_line.append(scope)
-            config_cmd_line.append('--format=json')
+            config_cmd_line.append("--format=json")
             config_data = json.loads(subprocess.check_output(config_cmd_line))
         except Exception, e:
-            subprocess.call(['juju-log', str(e)])
+            subprocess.call(["juju-log", str(e)])
             config_data = None
         finally:
             return(config_data)
@@ -85,18 +86,19 @@ class Juju(object):
         @param relation_id: specify relation id for out of context usage.
         """
         try:
-            relation_cmd_line = ['relation-get', '--format=json']
+            relation_cmd_line = ["relation-get", "--format=json"]
             if relation_id is not None:
-                relation_cmd_line.extend(('-r', relation_id))
+                relation_cmd_line.extend(("-r", relation_id))
             if scope is not None:
                 relation_cmd_line.append(scope)
             else:
-                relation_cmd_line.append('')
+                relation_cmd_line.append("")
             if unit_name is not None:
                 relation_cmd_line.append(unit_name)
-            relation_data = json.loads(subprocess.check_output(relation_cmd_line))
+            relation_data = json.loads(
+                subprocess.check_output(relation_cmd_line))
         except Exception, e:
-            subprocess.call(['juju-log', str(e)])
+            subprocess.call(["juju-log", str(e)])
             relation_data = None
         finally:
             return(relation_data)

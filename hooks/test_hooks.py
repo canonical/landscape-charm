@@ -5,12 +5,15 @@ import tempfile
 import os
 import pycurl
 
+
 class TestJuju(object):
     """
     Testing object to intercept juju calls and inject data, or make sure
     certain data is set.
     """
+
     _relation_data = {}
+
     def __init__(self):
         self._test_license_file = "LICENSE_FILE_TEXT"
         self._test_services = "msgserver pingserver juju-sync"
@@ -18,7 +21,7 @@ class TestJuju(object):
 
     def relation_set(self, *args, **kwargs):
         """
-        Capture result of relation_set into _relation_data, which 
+        Capture result of relation_set into _relation_data, which
         can then be checked later.
         """
         if "relation_id" in kwargs:
@@ -29,14 +32,12 @@ class TestJuju(object):
             self._relation_data[key] = value
         pass
 
-    def relation_ids(self, relation_name=None):
+    def relation_ids(self, relation_name="website"):
         """
         Hardcode expected relation_ids for tests.  Feel free to expand
         as more tests are added.
         """
-        if relation_name:
-            return ["%s:1" % relation_name]
-        return ["website:1"]
+        return ["%s:1" % relation_name]
 
     def unit_get(self, *args):
         """
@@ -60,6 +61,7 @@ class TestJuju(object):
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         pass
 
+
 class TestHooks(unittest.TestCase):
 
     def setUp(self):
@@ -74,16 +76,16 @@ class TestHooks(unittest.TestCase):
         self.maxDiff = None
 
     def assertFileContains(self, filename, text):
-        """ Make sure a string exists in a file """
-        with open(filename, 'r') as fp:
+        """Make sure a string exists in a file."""
+        with open(filename, "r") as fp:
             contents = fp.read()
         self.assertIn(text, contents)
 
     def assertFilesEqual(self, file1, file2):
-        """ Given two filenames, compare them """
-        with open(file1, 'r') as fp1:
+        """Given two filenames, compare them."""
+        with open(file1, "r") as fp1:
             contents1 = fp1.read()
-        with open(file2, 'r') as fp2:
+        with open(file2, "r") as fp2:
             contents2 = fp2.read()
         self.assertEqual(contents1, contents2)
 
@@ -96,28 +98,22 @@ RUN_MSGSERVER="no"
 RUN_JUJU_SYNC="no"
 RUN_PINGSERVER="yes"
             """)
-            fp.flush()
+
 
 class TestHooksService(TestHooks):
-
-    def setUp(self):
-        super(TestHooksService, self).setUp()
-
-    def tearDown(self):
-        super(TestHooksService, self).tearDown()
 
     def test_get_services_non_proxied(self):
         """
         helper method should not break if non-proxied services are called for
-        (e.g.: jobhandler)
+        (e.g.: jobhandler).
         """
-        #hooks.juju._test_services = "jobhandler"
-        #hooks._get_services_haproxy()
-        pass
+        hooks.juju._test_services = "jobhandler"
+        result = hooks._get_services_haproxy()
+        self.assertEqual(len(result), 0)
 
     def test_amqp_relation_joined(self):
         """
-        Ensure the amqp relation joined hook spits out settings when run
+        Ensure the amqp relation joined hook spits out settings when run.
         """
         hooks.amqp_relation_joined()
         baseline = {
@@ -127,46 +123,43 @@ class TestHooksService(TestHooks):
 
     def test__download_file_success(self):
         """
-        Make sure the happy path of download file works
+        Make sure the happy path of download file works.
         """
         tmp = tempfile.NamedTemporaryFile(delete=False)
         with tmp as fp:
             fp.write("foobar")
-            fp.flush()
         output = hooks._download_file("file://%s" % tmp.name)
         os.unlink(tmp.name)
         self.assertTrue("foobar" in output)
 
     def test__download_file_failure(self):
-        """ The fail path of download file raises an exception """
-        self.assertRaises(pycurl.error, hooks._download_file, "file://FOO/NO/EXIST")
+        """The fail path of download file raises an exception."""
+        self.assertRaises(
+            pycurl.error, hooks._download_file, "file://FOO/NO/EXIST")
 
     def test__replace_in_file(self):
         """
         Test for replace_in_file to change some lines in a file, but not
-        others
+        others.
         """
         tmp = tempfile.NamedTemporaryFile(delete=False)
         with tmp as fp:
             fp.write("foo\nfoo\nbar\nbaz\n")
-            fp.flush()
 
-        hooks._replace_in_file(tmp.name, r'^f..$', "REPLACED")
+        hooks._replace_in_file(tmp.name, r"^f..$", "REPLACED")
 
-        with open(tmp.name, 'r') as fp:
+        with open(tmp.name, "r") as fp:
             content = fp.read()
         os.unlink(tmp.name)
         self.assertEquals("REPLACED\nREPLACED\nbar\nbaz\n", content)
 
     def test__enable_service(self):
-        """ Create a simple service enablement of a file with comments """
+        """Create a simple service enablement of a file with comments."""
         target = tempfile.NamedTemporaryFile(delete=False)
         with self._default_file as fp:
-            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_CRON="yes"')
-            fp.flush()
+            fp.write("# Comment test\nRUN_APPSERVER=\"no\"\nRUN_CRON=\"yes\"")
         with target as fp:
-            fp.write('# Comment test\nRUN_APPSERVER=3\nRUN_CRON=no')
-            fp.flush()
+            fp.write("# Comment test\nRUN_APPSERVER=3\nRUN_CRON=no")
         hooks.juju._test_services = "appserver"
         hooks._enable_services()
         self.assertFilesEqual(self._default_file.name, target.name)
@@ -174,11 +167,10 @@ class TestHooksService(TestHooks):
         pass
 
     def test__enable_wrong_service(self):
-        """ Create a simple service enablement of a file with comments """
+        """Enable an unknown service, make sure exception is raised."""
         default = tempfile.NamedTemporaryFile(delete=False)
         with default as fp:
-            fp.write('# Comment test\nRUN_APPSERVER="no"')
-            fp.flush()
+            fp.write("# Comment test\nRUN_APPSERVER=\"no\"")
         hooks.LANDSCAPE_DEFAULT_FILE = default.name
         hooks.juju._test_services = "INVALID_SERVICE_NAME"
         self.assertRaises(Exception, hooks._enable_services)
@@ -186,16 +178,15 @@ class TestHooksService(TestHooks):
         pass
 
     def test__install_license_text(self):
-        """ Install a license with as a string """
+        """Install a license with as a string."""
         hooks._install_license()
         self.assertFileContains(self._license_dest.name, "LICENSE_FILE_TEXT")
 
     def test__install_license_url(self):
-        """ Install a license with as a url """
+        """Install a license with as a url."""
         source = tempfile.NamedTemporaryFile(delete=False)
         with source as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
-            fp.flush()
         hooks.juju._test_license_file = "file://%s" % source.name
         hooks._install_license()
         self.assertFileContains(
@@ -205,7 +196,7 @@ class TestHooksService(TestHooks):
     def test_config_changed(self):
         """
         All defaults should apply to requested services with the default
-        service count of "AUTO" specified
+        service count of "AUTO" specified.
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
         hooks.juju._test_service_count = "AUTO"
@@ -221,7 +212,7 @@ class TestHooksService(TestHooks):
         All defaults should apply to requested services with the default
         service count of "AUTO" specified, the number zero is specially
         recognized in the code (negative numbers and other junk will not
-        match the regular expression of integer)
+        match the regular expression of integer).
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
         hooks.juju._test_service_count = "0"
@@ -234,8 +225,8 @@ class TestHooksService(TestHooks):
 
     def test_config_changed_service_count_bare(self):
         """
-        Bare number (integer) sets all capable services to that number, ones with
-        lower maximums ignore it.
+        Bare number (integer) sets all capable services to that number, ones
+        with lower maximums ignore it.
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
         hooks.juju._test_service_count = "2"
@@ -249,7 +240,7 @@ class TestHooksService(TestHooks):
     def test_config_changed_service_count_labeled(self):
         """
         Multiple labeled service counts resolve correctly, missing service
-        default to auto-determined, the keyword AUTO should also be recognized
+        default to auto-determined, the keyword AUTO should also be recognized.
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
         hooks.juju._test_service_count = "appserver:AUTO juju-sync:10"
@@ -306,7 +297,7 @@ class TestHooksService(TestHooks):
           - AUTO
 
         Things not understood should fallback to AUTO.  This method
-        returns a dict with each known service as the key and the 
+        returns a dict with each known service as the key and the
         parsed requested count as a value.  If a count wasn't requested
         explicitly, it defaults to AUTO.  0 is parsed as is, but later
         on is explicitly mapped to AUTO.
@@ -371,7 +362,7 @@ class TestHooksService(TestHooks):
     def test_get_requested_services(self):
         """
         "services" config is parsed into list.  Exceptions are raised for
-        invalid requests since the user probably would not catch it otherwise
+        invalid requests since the user probably would not catch it otherwise.
         """
         hooks.juju._test_services = "appserver"
         result = hooks._get_requested_services()
@@ -444,15 +435,15 @@ class TestHooksServiceMock(TestHooks):
             "bar": "BAR",
             "baz": "BAZ"}
         hooks.SERVICE_COUNT = {
-            "foo": [hooks._calc_daemon_count, 1, 4, None],
-            "bar": [hooks._calc_daemon_count, 1, 4, None],
-            "baz": [hooks._calc_daemon_count, 1, 4, None]}
+            "foo": [1, 4, None],
+            "bar": [1, 4, None],
+            "baz": [1, 4, None]}
 
     def test_format_service(self):
         """
         _format_service sends back data in a form haproxy expects.
         The "bar" service (overridden above) does not have any options in
-        the definition dict..
+        the definition dict.
         """
         result = hooks._format_service("bar", 1, **hooks.SERVICE_PROXY["bar"])
         baseline = {"service_name": "bar",
@@ -468,23 +459,24 @@ class TestHooksServiceMock(TestHooks):
         """
         _format_service sets things up as haproxy expects
         when one option is specified.  The "foo" service (overridden above),
-        has just a single option specified
+        has just a single option specified.
         """
         result = hooks._format_service("foo", 1, **hooks.SERVICE_PROXY["foo"])
-        baseline = {"service_name": "foo",
-                    "servers": [[
-                        "foo", "localhost", "80",
-                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                    "service_options": [
-                        "mode http", "balance leastconn", "option httpchk foo"]}
+        baseline = {
+                "service_name": "foo",
+                "servers": [[
+                    "foo", "localhost", "80",
+                    "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                "service_options": [
+                    "mode http", "balance leastconn", "option httpchk foo"]}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
         """
         _format_service sets things up as haproxy expects
         when many options are specified, the "baz" service (overridden above),
-        has multiple options specified in the dict.  Also, specify a higher server
-        count and make sure servers reacts accordingly.
+        has multiple options specified in the dict.  Also, specify a higher
+        server count and make sure servers reacts accordingly.
         """
         result = hooks._format_service("baz", 2, **hooks.SERVICE_PROXY["baz"])
         baseline = {"service_name": "baz",
@@ -504,7 +496,7 @@ class TestHooksServiceMock(TestHooks):
 
     def test_website_relation_joined(self):
         """
-        Ensure the website relation joined hook spits out settings when run
+        Ensure the website relation joined hook spits out settings when run.
         """
         hooks.website_relation_joined()
         baseline = {
@@ -516,7 +508,7 @@ class TestHooksServiceMock(TestHooks):
     def test_notify_website_relation(self):
         """
         notify_website_relation actually does a relation set with
-        my correct mocked data
+        my correct mocked data.
         """
         hooks.notify_website_relation()
         baseline = {

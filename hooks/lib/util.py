@@ -9,13 +9,14 @@ from juju import Juju
 
 juju = Juju()
 
+
 def setup_landscape_server(host, admin_user, admin_password):
     """
     Wrapper around setup-landscape-server.  I need to do this in a safe way in
     a distributed environment since multiple landscape servers could be
     accessing the database at the same time.
     """
-    conn = connect(database='postgres', host=host, user=admin_user,
+    conn = connect(database="postgres", host=host, user=admin_user,
                    password=admin_password)
     try:
         cur = conn.cursor()
@@ -27,13 +28,14 @@ def setup_landscape_server(host, admin_user, admin_password):
     finally:
         conn.close()
 
+
 def create_user(host, admin_user, admin_password, user, password):
     """
     Create a user in the database.  Attempts to connect to the database
     first as the admin user just to check
     """
     try:
-        conn = connect(database='postgres', host=host, user=admin_user,
+        conn = connect(database="postgres", host=host, user=admin_user,
                        password=admin_password)
     except Exception:
         print "Error connecting to database as %s" % admin_user
