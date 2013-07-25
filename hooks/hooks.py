@@ -89,6 +89,7 @@ def _replace_in_file(filename, regex, replacement):
     @param regex - regular expression to pass to re.sub() eg:. r"^foo"
     @param replacement - replacement text to substitute over the matched regex
     """
+    juju.juju_log("Setting in file %s: %s" % (filename, replacement))
     with open(filename, "r") as default:
         lines = default.readlines()
     with open(filename, "w") as default:
@@ -282,12 +283,15 @@ def _set_maintenance():
     """
     maintenance = juju.config_get("maintenance")
     if maintenance:
+        juju.juju_log("Putting unit into maintenance mode")
         _lsctl("stop")
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
-        os.unlink(LANDSCAPE_MAINTENANCE)
-        _lsctl("start")
+        if os.path.exists(LANDSCAPE_MAINTENANCE):
+            juju.juju_log("Remove unit from maintenance mode")
+            os.unlink(LANDSCAPE_MAINTENANCE)
+            _lsctl("start")
 
 
 def _set_upgrade_schema():
@@ -403,6 +407,8 @@ def config_changed():
     _install_license()
     _lsctl("stop")
     _enable_services()
+    _set_maintenance()
+    _set_upgrade_schema()
     _lsctl("start")
     notify_website_relation()
 

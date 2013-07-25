@@ -18,6 +18,8 @@ class TestJuju(object):
         self._test_license_file = "LICENSE_FILE_TEXT"
         self._test_services = "msgserver pingserver juju-sync"
         self._test_service_count = "msgserver:2 pingserver:1"
+        self._test_upgrade_schema = False
+        self._test_maintenance = False
 
     def relation_set(self, *args, **kwargs):
         """
@@ -56,7 +58,10 @@ class TestJuju(object):
             return self._test_license_file
         elif scope == "service-count":
             return self._test_service_count
-        pass
+        elif scope == "upgrade-schema":
+            return self._test_upgrade_schema
+        elif scope == "maintenance":
+            return self._test_maintenance
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         pass
@@ -97,6 +102,7 @@ RUN_APPSERVER="no"
 RUN_MSGSERVER="no"
 RUN_JUJU_SYNC="no"
 RUN_PINGSERVER="yes"
+UPGRADE_SCHEMA="no"
             """)
 
 
@@ -374,6 +380,28 @@ class TestHooksService(TestHooks):
 
         hooks.juju._test_services = "appserver pingserver cron foo"
         self.assertRaises(Exception, hooks._get_requested_services)
+
+    def test_upgrade_schema(self):
+        """Test both the false and true case of upgrade schema."""
+        self.seed_default_file_services_off()
+        hooks.juju._test_upgrade_schema = True
+        hooks._set_upgrade_schema()
+        self.assertFileContains(self._default_file.name, "UPGRADE_SCHEMA=yes")
+        hooks.juju._test_upgrade_schema = False
+        hooks._set_upgrade_schema()
+        self.assertFileContains(self._default_file.name, "UPGRADE_SCHEMA=no")
+
+    def test_maintenance(self):
+        """When maintenance is set, a file is created on the filesystem."""
+        filename = tempfile.NamedTemporaryFile(delete=False).name
+        os.unlink(filename)
+        hooks.LANDSCAPE_MAINTENANCE = filename
+        hooks.juju._test_maintenance = True
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        hooks.juju._test_maintenance = False
+        hooks._set_maintenance()
+        self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
 
 class TestHooksServiceMock(TestHooks):
