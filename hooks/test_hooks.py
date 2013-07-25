@@ -81,7 +81,13 @@ class TestHooks(unittest.TestCase):
 
     def seed_default_file_services_off(self):
         with self._default_file as fp:
-            fp.write('# Comment test\nRUN_APPSERVER="no"\nRUN_MSGSERVER="no"\nRUN_JUJU_SYNC="no"')
+            fp.write("""
+# Comment test
+RUN_APPSERVER="no"
+RUN_MSGSERVER="no"
+RUN_JUJU_SYNC="no"
+RUN_PINGSERVER="yes"
+            """)
             fp.flush()
 
 class TestHooksService(TestHooks):
@@ -200,6 +206,7 @@ class TestHooksService(TestHooks):
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
+        self.assertFileContains(self._default_file.name, "\nRUN_PINGSERVER=no")
 
     def test_config_changed_zero(self):
         """
@@ -215,6 +222,7 @@ class TestHooksService(TestHooks):
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
+        self.assertFileContains(self._default_file.name, "\nRUN_PINGSERVER=no")
 
     def test_config_changed_service_count_bare(self):
         """
@@ -228,6 +236,7 @@ class TestHooksService(TestHooks):
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=2")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=2")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
+        self.assertFileContains(self._default_file.name, "\nRUN_PINGSERVER=no")
 
     def test_config_changed_service_count_labeled(self):
         """
@@ -241,6 +250,7 @@ class TestHooksService(TestHooks):
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
+        self.assertFileContains(self._default_file.name, "\nRUN_PINGSERVER=no")
 
     def test_config_changed_service_count_update_haproxy(self):
         """
