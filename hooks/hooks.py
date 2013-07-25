@@ -305,7 +305,7 @@ def _set_upgrade_schema():
         value = "no"
     _replace_in_file(
         LANDSCAPE_DEFAULT_FILE,
-        r"^%s=.*$" % "UPGRADE_SCHEMA",
+        r"^#*%s=.*$" % "UPGRADE_SCHEMA",
         "%s=%s" % ("UPGRADE_SCHEMA", value))
 
 
