@@ -350,6 +350,24 @@ class TestHooksServiceMock(TestHooks):
                         "option httpchk GET / HTTP/1.0"]}
         self.assertEqual(baseline, result)
 
+    def test_calc_daemon_count(self):
+        """
+        Test various interesting inputs of _calc_daemon_count.
+        """
+        calc = hooks._calc_daemon_count
+        # min/max = autogen limits, req = requested value, max2 = hard limit
+        #                       |min max max2  req|
+        #                       |---|---|----|----|
+        self.assertEqual(calc("x", 1, 4,   9, "4"), 4)
+        self.assertEqual(calc("x", 1, 3, None, "2"), 2)
+        self.assertEqual(calc("x", 1, 9,   9, "AUTO"), 3)
+        self.assertEqual(calc("x", 4, 9,   9, None), 4)
+        self.assertEqual(calc("x", 4, 9,   9, "1"), 1)
+        self.assertEqual(calc("x", 4, 9,   9, "10"), 9)
+        self.assertEqual(calc("x", 4, 9,   8, "10"), 8)
+        # 0 requested is not valid, maps to AUTO
+        self.assertEqual(calc("x", 0, 4, None, "0"), 3)
+
     def test_format_service_with_option(self):
         """
         _format_service sets things up as haproxy expects

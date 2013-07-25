@@ -106,9 +106,10 @@ def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
     @param auto_maximum maximum number of daemons to spawn with the AUTO
         setting (None == 9)
     @param maximum maximum number of daemons to spawn (None == 9)
-    @param requested The user requested number, if formatted correctly > 0,
-       it wins (up to max)
+    @param requested The user requested value (String), if formatted
+       correctly > 0, it wins (up to maximum)
     """
+    # The "9" limitation is hardcoded in landcape init scripts right now
     if auto_maximum is None:
         auto_maximum = 9
     if maximum is None:
