@@ -183,7 +183,7 @@ def _enable_services():
                              r"^%s=.*$" % var,
                              "%s=%s" % (var, services[service]))
 
-def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
+def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
         service_options=None):
     """
@@ -193,6 +193,7 @@ def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
     hash aboe.
 
     @param name Name of the service (letters, numbers, underscores)
+    @param count How many of this service will be started (positive int)
     @param port Port this service will be running on
     @param server_options override the server_options (String)
     @param httpchk The httpchk option, will be appeneded to service_options
@@ -209,6 +210,11 @@ def _format_service(name, port=None, httpchk="GET / HTTP/1.0",
         "service_name": name, 
         "service_options": service_options,
         "servers": [[name, host, port, server_options]]}
+    offset = 1
+    while count - offset >= 1:
+        result["servers"].append(
+            [name, host, str(int(port) + offset), server_options])
+        offset += 1
     return result
 
 def _get_requested_services():
@@ -228,10 +234,13 @@ def _get_services_haproxy():
     understood by haproxy.
     """
     result = []
+    service_count = _get_services_dict()
     for service in _get_requested_services():
+        count = service_count[service]
         juju.juju_log("service: %s" % service)
         if service in SERVICE_PROXY:
-            result.append(_format_service(service, **SERVICE_PROXY[service]))
+            result.append(
+                _format_service(service, count, **SERVICE_PROXY[service]))
     return result
 
 def _lsctl_restart():
@@ -243,6 +252,17 @@ def website_relation_joined():
     juju.relation_set(
             services=yaml.safe_dump(_get_services_haproxy()),
             hostname=host, port=80)
+
+def notify_website_relation():
+    """
+    Notify the website relation of changes to the services.  Juju optimizes
+    duplicate values out of this, so we don't need to worry about calling it
+    only in case of a change
+    """
+    for id in juju.relation_ids("website"):
+        juju.relation_set(
+            relation_id=id,
+            services=yaml.safe_dump(_get_services_haproxy()))
 
 def db_admin_relation_joined():
     pass
@@ -312,11 +332,11 @@ def amqp_relation_changed():
     with open(config_file, "w+") as output_file:
         parser.write(output_file)
 
-
 def config_changed():
     _install_license()
     _lsctl_restart()
     _enable_services()
+    notify_website_relation()
 
 SERVICE_PROXY = {
         "static": {"port": "80"},
@@ -340,13 +360,13 @@ SERVICE_PROXY = {
 #   auto_max = if auto-determining, only suggest this as the max
 #   real_max = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
-        "appserver": [_calc_daemon_count, 1, 4, None],
-        "msgserver": [_calc_daemon_count, 2, 16, None],
-        "pingserver": [_calc_daemon_count, 1, 16, None],
-        "combo-loader": [_calc_daemon_count, 1, 2, None],
-        "async-frontend": [_calc_daemon_count, 1, 2, None],
-        "apiserver": [_calc_daemon_count, 1, 2, None],
-        "jobhandler": [_calc_daemon_count, 1, 2, None],
+        "appserver": [_calc_daemon_count, 1, 4, 9],
+        "msgserver": [_calc_daemon_count, 2, 8, 9],
+        "pingserver": [_calc_daemon_count, 1, 4, 9],
+        "apiserver": [_calc_daemon_count, 1, 2, 9],
+        "combo-loader": [_calc_daemon_count, 1, 1, 1],
+        "async-frontend": [_calc_daemon_count, 1, 1, 1],
+        "jobhandler": [_calc_daemon_count, 1, 1, 1],
         "package-upload": [_calc_daemon_count, 1, 1, 1],
         "package-search": [_calc_daemon_count, 1, 1, 1],
         "juju-sync": [_calc_daemon_count, 1, 1, 1],

@@ -13,12 +13,30 @@ class Juju(object):
         Simple wrapper around relation-set, all arguments passed through.
         kwargs are also supported.  args are provided in case the key
         cannot be represented as a python variable.
+
+        @param relation_id relation id to use (needed if not called in
+            context of relation).  Will be stripped from kwargs if present.
+            if you need to set this, use an arg style argument "k=v"
         """
         set_args = ["relation-set"]
-        for k,v in kwargs.iteritems():
-            set_args.append("%s=%s" % (k, v))
+        if "relation_id" in kwargs:
+            set_args.extend(["-r", kwargs["relation_id"]])
+            del(kwargs["relation_id"])
+        for key,value in kwargs.iteritems():
+            set_args.append("%s=%s" % (key, value))
         set_args.extend(args)
         subprocess.call(set_args)
+
+    def relation_ids(self, relation_name=None):
+        """
+        Wrapper around relation-ids juju command.  output will be returned
+        from parsed json, which in the case of this command is a list of
+        strings.
+        """
+        args = ["relation-ids", "--format=json"]
+        if relation_name is not None:
+            args.append(relation_name)
+        return json.loads(subprocess.check_output(args))
 
     def unit_get(self, *args):
         """Simple wrapper around unit-get, all arguments passed untouched"""

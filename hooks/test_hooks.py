@@ -21,11 +21,18 @@ class TestJuju(object):
         Capture result of relation_set into _relation_data, which 
         can then be checked later.
         """
+        if "relation_id" in kwargs:
+            del kwargs["relation_id"]
         self._relation_data = dict(self._relation_data, **kwargs)
         for arg in args:
             (key, value) = arg.split("=")
             self._relation_data[key] = value
         pass
+
+    def relation_ids(self, relation_name=None):
+        if relation_name:
+            return ["%s:1" % relation_name]
+        return ["website:1"]
 
     def unit_get(self, *args):
         return "localhost"
@@ -56,6 +63,7 @@ class TestHooks(unittest.TestCase):
         hooks.LANDSCAPE_DEFAULT_FILE = self._default_file.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
+        self.maxDiff = None
 
     def assertFileContains(self, filename, text):
         """ Make sure a string exists in a file """
@@ -236,14 +244,22 @@ class TestHooksService(TestHooks):
 
     def test_config_changed_service_count_update_haproxy(self):
         """
-        Bare number (integer) sets all capable services to that number, ones with
-        lower maximums ignore it.
+        run the config_changed hook, we should emit a relation_changed
+        to haproxy giving 2 servers in the appserver service entry.
         """
         hooks.juju._test_services = "appserver msgserver juju-sync"
         hooks.juju._test_service_count = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
-        self.assertTrue(len(hooks.juju._relation_data) > 0)
+        data = hooks.juju._relation_data
+        self.assertNotEqual(len(data), 0)
+        self.assertIn("services", data)
+        for service in yaml.load(data["services"]):
+            if service["service_name"] == "appserver":
+                self.assertEquals(len(service["servers"]), 2)
+                break
+        else:
+            assert(False, "Didn't find element 'appserver'")
 
 class TestHooksServiceMock(TestHooks):
     all_services = [
@@ -254,14 +270,18 @@ class TestHooksServiceMock(TestHooks):
              "service_options": [
                  "mode http", "balance leastconn", "option httpchk foo"]},
             {"service_name": "bar",
-             "servers": [[
-                 "bar", "localhost", "81",
+             "servers":
+                [["bar", "localhost", "81",
+                 "check inter 2000 rise 2 fall 5 maxconn 50"],
+                 ["bar", "localhost", "82",
                  "check inter 2000 rise 2 fall 5 maxconn 50"]],
              "service_options": [
                  "mode http", "balance leastconn",
                  "option httpchk GET / HTTP/1.0"]},
             {"service_name": "baz",
-             "servers": [["baz", "localhost", "82", "server"]],
+             "servers": [["baz", "localhost", "82", "server"],
+                         ["baz", "localhost", "83", "server"],
+                         ["baz", "localhost", "84", "server"]],
              "service_options": ["options"]}]
 
     def setUp(self):
@@ -277,12 +297,14 @@ class TestHooksServiceMock(TestHooks):
         hooks.juju._test_service_count = self._test_service_count
         hooks.SERVICE_PROXY = self._SERVICE_PROXY
         hooks.SERVICE_DEFAULT = self._SERVICE_DEFAULT
+        hooks.SERVICE_COUNT = self._SERVICE_COUNT
 
     def mock_service_data(self):
         self._test_services = hooks.juju._test_services
         self._test_service_count = hooks.juju._test_service_count
         self._SERVICE_PROXY = hooks.SERVICE_PROXY
         self._SERVICE_DEFAULT = hooks.SERVICE_DEFAULT
+        self._SERVICE_COUNT = hooks.SERVICE_COUNT
 
         hooks.juju._test_services = "foo bar baz"
         hooks.juju._test_service_count = "foo:1 bar:2"
@@ -297,6 +319,10 @@ class TestHooksServiceMock(TestHooks):
             "foo": "FOO",
             "bar": "BAR",
             "baz": "BAZ"}
+        hooks.SERVICE_COUNT = {
+            "foo": [hooks._calc_daemon_count, 1, 4, None],
+            "bar": [hooks._calc_daemon_count, 1, 4, None],
+            "baz": [hooks._calc_daemon_count, 1, 4, None]}
 
     def test_format_service(self):
         """
@@ -304,7 +330,7 @@ class TestHooksServiceMock(TestHooks):
         The "bar" service (overridden above) does not have any options in
         the definition dict..
         """
-        result = hooks._format_service("bar", **hooks.SERVICE_PROXY["bar"])
+        result = hooks._format_service("bar", 1, **hooks.SERVICE_PROXY["bar"])
         baseline = {"service_name": "bar",
                     "servers": [[
                         "bar", "localhost", "81",
@@ -320,7 +346,7 @@ class TestHooksServiceMock(TestHooks):
         when one option is specified.  The "foo" service (overridden above),
         has just a single option specified
         """
-        result = hooks._format_service("foo", **hooks.SERVICE_PROXY["foo"])
+        result = hooks._format_service("foo", 1, **hooks.SERVICE_PROXY["foo"])
         baseline = {"service_name": "foo",
                     "servers": [[
                         "foo", "localhost", "80",
@@ -333,11 +359,13 @@ class TestHooksServiceMock(TestHooks):
         """
         _format_service sets things up as haproxy expects
         when many options are specified, the "baz" service (overridden above),
-        has multiple options specified in the dict.
+        has multiple options specified in the dict.  Also, specify a higher server
+        count and make sure servers reacts accordingly.
         """
-        result = hooks._format_service("baz", **hooks.SERVICE_PROXY["baz"])
+        result = hooks._format_service("baz", 2, **hooks.SERVICE_PROXY["baz"])
         baseline = {"service_name": "baz",
-                    "servers": [["baz", "localhost", "82", "server"]],
+                    "servers": [["baz", "localhost", "82", "server"],
+                                ["baz", "localhost", "83", "server"]],
                     "service_options": ["options"]}
         self.assertEqual(baseline, result)
 
