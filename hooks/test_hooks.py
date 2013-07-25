@@ -269,7 +269,113 @@ class TestHooksService(TestHooks):
                 self.assertEquals(len(service["servers"]), 2)
                 break
         else:
-            assert(False, "Didn't find element 'appserver'")
+            assert False, "Didn't find element 'appserver'"
+
+    def test_calc_daemon_count(self):
+        """
+        Test various interesting inputs of _calc_daemon_count.
+        """
+        calc = hooks._calc_daemon_count
+        # min/max = autogen limits, req = requested value, max2 = hard limit
+        #                       |min max max2  req|
+        #                       |---|---|----|----|
+        self.assertEqual(calc("x", 1, 4,   9, "4"), 4)
+        self.assertEqual(calc("x", 1, 3, None, "2"), 2)
+        self.assertEqual(calc("x", 1, 9,   9, "AUTO"), 3)
+        self.assertEqual(calc("x", 4, 9,   9, None), 4)
+        self.assertEqual(calc("x", 4, 9,   9, "1"), 1)
+        self.assertEqual(calc("x", 4, 9,   9, "10"), 9)
+        self.assertEqual(calc("x", 4, 9,   8, "10"), 8)
+        # 0 requested is not valid, maps to AUTO
+        self.assertEqual(calc("x", 0, 4, None, "0"), 3)
+
+    def test_get_requested_service_count(self):
+        """
+        service-count setting can look as follows:
+          - 2
+          - appserver:2 pingserver:2
+          - appserver:AUTO
+          - AUTO
+
+        Things not understood should fallback to AUTO.  This method
+        returns a dict with each known service as the key and the 
+        parsed requested count as a value.  If a count wasn't requested
+        explicitly, it defaults to AUTO.  0 is parsed as is, but later
+        on is explicitly mapped to AUTO.
+
+        Also, the length of the dict is checked to make sure it
+        contains all known services.
+        """
+        hooks.juju._test_service_count = "0"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(len(result), 12)
+        self.assertEqual(result["appserver"], "0")
+
+        hooks.juju._test_service_count = "foo"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(result["msgserver"], "AUTO")
+
+        hooks.juju._test_service_count = "AUTO"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(result["pingserver"], "AUTO")
+
+        hooks.juju._test_service_count = "8"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(result["juju-sync"], "8")
+
+        hooks.juju._test_service_count = "juju-sync:8 cron:0 appserver:AUTO"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(result["juju-sync"], "8")
+        self.assertEqual(result["cron"], "0")
+        self.assertEqual(result["appserver"], "AUTO")
+        self.assertEqual(result["pingserver"], "AUTO")
+
+        hooks.juju._test_service_count = "juju-sync:-8 cron:XYZ BLAh BLAh:X"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(len(result), 12)
+        self.assertEqual(result["juju-sync"], "AUTO")
+        self.assertEqual(result["cron"], "AUTO")
+        self.assertEqual(result["appserver"], "AUTO")
+        self.assertNotIn("BLAh", result)
+
+    def test_get_services_dict(self):
+        """
+        The services dict contains service names as keys
+        and daemon counts (int) as values.  These counts are not requested
+        but are the actual number we plan to launch. Make sure it's valid for
+        a couple combinations of "services" and "service_count".
+        """
+        hooks.juju._test_services = "appserver"
+        hooks.juju._test_service_count = "2"
+        result = hooks._get_services_dict()
+        self.assertEqual(result, {"appserver": 2})
+
+        hooks.juju._test_services = "appserver pingserver cron"
+        hooks.juju._test_service_count = "appserver:4 cron:10 pingserver:20"
+        result = hooks._get_services_dict()
+        self.assertEqual(result, {"appserver": 4, "cron": 1, "pingserver": 9})
+
+        hooks.juju._test_services = "appserver cron"
+        hooks.juju._test_service_count = "AUTO"
+        result = hooks._get_services_dict()
+        self.assertEqual(result, {"appserver": 3, "cron": 1})
+
+    def test_get_requested_services(self):
+        """
+        "services" config is parsed into list.  Exceptions are raised for
+        invalid requests since the user probably would not catch it otherwise
+        """
+        hooks.juju._test_services = "appserver"
+        result = hooks._get_requested_services()
+        self.assertEqual(["appserver"], result)
+
+        hooks.juju._test_services = "appserver pingserver cron"
+        result = hooks._get_requested_services()
+        self.assertEqual(["appserver", "pingserver", "cron"], result)
+
+        hooks.juju._test_services = "appserver pingserver cron foo"
+        self.assertRaises(Exception, hooks._get_requested_services)
+
 
 class TestHooksServiceMock(TestHooks):
     all_services = [
@@ -350,24 +456,6 @@ class TestHooksServiceMock(TestHooks):
                         "option httpchk GET / HTTP/1.0"]}
         self.assertEqual(baseline, result)
 
-    def test_calc_daemon_count(self):
-        """
-        Test various interesting inputs of _calc_daemon_count.
-        """
-        calc = hooks._calc_daemon_count
-        # min/max = autogen limits, req = requested value, max2 = hard limit
-        #                       |min max max2  req|
-        #                       |---|---|----|----|
-        self.assertEqual(calc("x", 1, 4,   9, "4"), 4)
-        self.assertEqual(calc("x", 1, 3, None, "2"), 2)
-        self.assertEqual(calc("x", 1, 9,   9, "AUTO"), 3)
-        self.assertEqual(calc("x", 4, 9,   9, None), 4)
-        self.assertEqual(calc("x", 4, 9,   9, "1"), 1)
-        self.assertEqual(calc("x", 4, 9,   9, "10"), 9)
-        self.assertEqual(calc("x", 4, 9,   8, "10"), 8)
-        # 0 requested is not valid, maps to AUTO
-        self.assertEqual(calc("x", 0, 4, None, "0"), 3)
-
     def test_format_service_with_option(self):
         """
         _format_service sets things up as haproxy expects
@@ -417,3 +505,12 @@ class TestHooksServiceMock(TestHooks):
             "port": 80}
         self.assertEqual(baseline, hooks.juju._relation_data)
 
+    def test_notify_website_relation(self):
+        """
+        notify_website_relation actually does a relation set with
+        my correct mocked data
+        """
+        hooks.notify_website_relation()
+        baseline = {
+            "services": yaml.safe_dump(self.all_services)}
+        self.assertEqual(baseline, hooks.juju._relation_data)
