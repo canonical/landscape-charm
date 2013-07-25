@@ -284,14 +284,12 @@ def _set_maintenance():
     maintenance = juju.config_get("maintenance")
     if maintenance:
         juju.juju_log("Putting unit into maintenance mode")
-        _lsctl("stop")
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
         if os.path.exists(LANDSCAPE_MAINTENANCE):
             juju.juju_log("Remove unit from maintenance mode")
             os.unlink(LANDSCAPE_MAINTENANCE)
-            _lsctl("start")
 
 
 def _set_upgrade_schema():
@@ -404,8 +402,8 @@ def amqp_relation_changed():
 
 
 def config_changed():
-    _install_license()
     _lsctl("stop")
+    _install_license()
     _enable_services()
     _set_maintenance()
     _set_upgrade_schema()
