@@ -14,3 +14,18 @@ options:
             not set before the charm is installed, changes to it will be
             ignored.
         type: string
+    service-count:
+        type: string
+        default: AUTO
+        description: |
+            Many landscape services can have multiple instances started up.  By
+            altering this setting, you can increase the launch count.  A
+            numeric value will tell all capable landscape services on this juju
+            unit to spawn that number of instances.  Leave at the default
+            of "AUTO", to let the charm determine the optimum number of
+            services given the discovered properties of the box (RAM, Disk
+            Space, CPU).  You can also supply a syntax of:
+            "<service-name>:<number> <service-name>:<number>" as a value, to
+            control the launch of individual services.  Services that cannot
+            "scale" in this way will politely ignore these settings.
+
