@@ -157,8 +157,6 @@ def _get_services_dict():
     """
     result = {}
     requested = _get_requested_service_count()
-
-    # First, set all requested services to run
     for service in _get_requested_services():
         args = [service]
         args.extend(SERVICE_COUNT[service][1:])
@@ -178,10 +176,14 @@ def _enable_services():
         if service == "static":
             _setup_apache()
         else:
-            var = SERVICE_DEFAULT[service]
-            _replace_in_file(LANDSCAPE_DEFAULT_FILE,
-                             r"^%s=.*$" % var,
-                             "%s=%s" % (var, services[service]))
+            variable = SERVICE_DEFAULT[service]
+            value = services[service]
+            if value == 1:
+                value = "yes"
+            _replace_in_file(
+                LANDSCAPE_DEFAULT_FILE,
+                r"^%s=.*$" % variable,
+                "%s=%s" % (variable, value))
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",

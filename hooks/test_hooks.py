@@ -199,7 +199,7 @@ class TestHooksService(TestHooks):
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
-        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
 
     def test_config_changed_zero(self):
         """
@@ -214,7 +214,7 @@ class TestHooksService(TestHooks):
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
-        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
 
     def test_config_changed_service_count_bare(self):
         """
@@ -227,7 +227,7 @@ class TestHooksService(TestHooks):
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=2")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=2")
-        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
 
     def test_config_changed_service_count_labeled(self):
         """
@@ -240,7 +240,7 @@ class TestHooksService(TestHooks):
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
         self.assertFileContains(self._default_file.name, "\nRUN_MSGSERVER=3")
-        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=1")
+        self.assertFileContains(self._default_file.name, "\nRUN_JUJU_SYNC=yes")
 
     def test_config_changed_service_count_update_haproxy(self):
         """
