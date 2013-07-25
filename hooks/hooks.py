@@ -243,8 +243,9 @@ def _get_services_haproxy():
                 _format_service(service, count, **SERVICE_PROXY[service]))
     return result
 
-def _lsctl_restart():
-    check_call(["lsctl", "restart"])
+def _lsctl(action):
+    """ simple wrapper around lsctl, mostly to easily allow mocking"""
+    check_call(["lsctl", action])
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
@@ -305,7 +306,7 @@ def db_admin_relation_changed():
     # is smart enough to skip if nothing needs to be done, and 
     # protect against concurrent access to the database.
     util.setup_landscape_server(host, admin, admin_password)
-    check_call(["lsctl", "restart"])
+    _lsctl("restart")
 
 def amqp_relation_joined():
     juju.relation_set("username=landscape")
@@ -334,8 +335,9 @@ def amqp_relation_changed():
 
 def config_changed():
     _install_license()
-    _lsctl_restart()
+    _lsctl("stop")
     _enable_services()
+    _lsctl("start")
     notify_website_relation()
 
 SERVICE_PROXY = {

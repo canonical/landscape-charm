@@ -55,7 +55,7 @@ class TestJuju(object):
 class TestHooks(unittest.TestCase):
 
     def setUp(self):
-        hooks._lsctl_restart = lambda: True
+        hooks._lsctl = lambda x: True
         hooks.juju = TestJuju()
         self._license_dest = tempfile.NamedTemporaryFile(delete=False)
         hooks.LANDSCAPE_LICENSE_DEST = self._license_dest.name
