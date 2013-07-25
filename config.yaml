@@ -28,4 +28,23 @@ options:
             "<service-name>:<number> <service-name>:<number>" as a value, to
             control the launch of individual services.  Services that cannot
             "scale" in this way will politely ignore these settings.
+    maintenance:
+        type: boolean
+        default: False
+        description: |
+            Put this landscape service unit into a maintenance mode.  Stop all
+            services and prevent any attempts to start them.  Cron jobs will
+            also not run.  Upgrade schema attempts will still be allowed to
+            process.
+    upgrade-schema:
+        type: boolean
+        default: False
+        description: |
+            When daemons attempt to start, they will first try to update the
+            schema (instead of just validating that it is correct).  This
+            should only typically be enabled as part of a landscape maintenance
+            cycle.
+        
+    
+
 
