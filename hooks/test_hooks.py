@@ -30,11 +30,19 @@ class TestJuju(object):
         pass
 
     def relation_ids(self, relation_name=None):
+        """
+        Hardcode expected relation_ids for tests.  Feel free to expand
+        as more tests are added.
+        """
         if relation_name:
             return ["%s:1" % relation_name]
         return ["website:1"]
 
     def unit_get(self, *args):
+        """
+        for now the only thing this is called for is "public-address",
+        so it's a simplistic return.
+        """
         return "localhost"
 
     def juju_log(self, *args, **kwargs):
