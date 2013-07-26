@@ -17,6 +17,7 @@ import re
 import pycurl
 import cStringIO
 import psutil
+import datetime
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
@@ -88,6 +89,7 @@ def _replace_in_file(filename, regex, replacement):
     @param regex - regular expression to pass to re.sub() eg:. r"^foo"
     @param replacement - replacement text to substitute over the matched regex
     """
+    juju.juju_log("Setting in file %s: %s" % (filename, replacement))
     with open(filename, "r") as default:
         lines = default.readlines()
     with open(filename, "w") as default:
@@ -273,6 +275,40 @@ def _lsctl(action):
     check_call(["lsctl", action])
 
 
+def _set_maintenance():
+    """
+    Put into maintenance mode, or take it out, depending on the read value of
+    "maintenance" from the juju settings.  Non-boolean settings will be
+    interpreted as False.
+    """
+    maintenance = juju.config_get("maintenance")
+    if maintenance:
+        juju.juju_log("Putting unit into maintenance mode")
+        with open(LANDSCAPE_MAINTENANCE, "w") as fp:
+            fp.write("%s" % datetime.datetime.now())
+    else:
+        if os.path.exists(LANDSCAPE_MAINTENANCE):
+            juju.juju_log("Remove unit from maintenance mode")
+            os.unlink(LANDSCAPE_MAINTENANCE)
+
+
+def _set_upgrade_schema():
+    """
+    Alter the state of the UPGRADE_SCHEMA flag in the landscape default file.
+    Consults the value of the "upgrade-schema" juju setting for the desired
+    state.
+    """
+    upgrade_schema = juju.config_get("upgrade-schema")
+    if upgrade_schema:
+        value = "yes"
+    else:
+        value = "no"
+    _replace_in_file(
+        LANDSCAPE_DEFAULT_FILE,
+        r"^#*%s=.*$" % "UPGRADE_SCHEMA",
+        "%s=%s" % ("UPGRADE_SCHEMA", value))
+
+
 def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary due to limitations with haproxy charm
@@ -366,9 +402,11 @@ def amqp_relation_changed():
 
 
 def config_changed():
-    _install_license()
     _lsctl("stop")
+    _install_license()
     _enable_services()
+    _set_maintenance()
+    _set_upgrade_schema()
     _lsctl("start")
     notify_website_relation()
 
@@ -424,6 +462,7 @@ SERVICE_DEFAULT = {
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
+LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 ROOT = os.path.abspath(os.path.curdir)
 juju = Juju()
 

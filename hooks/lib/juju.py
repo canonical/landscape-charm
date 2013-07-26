@@ -23,9 +23,6 @@ class Juju(object):
             args.extend(["-r", kwargs["relation_id"]])
             del kwargs["relation_id"]
         args.extend("%s=%s" % (key, val) for key, val in kwargs.iteritems())
-        for key, val in kwargs.iteritems():
-            args.append("%s=%s" % (key, val))
-        args.extend(args)
         subprocess.call(args)
 
     def relation_ids(self, relation_name=None):
