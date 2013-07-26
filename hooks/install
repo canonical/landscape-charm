@@ -18,6 +18,9 @@ setup_local_repo () {
 
     ls $LS_PACKAGE || return;
 
+    # Install needed tools for building
+    apt_get install devscripts bzr pbuilder
+
     TMP=$(mktemp -d)
     cp -f $LS_PACKAGE $TMP
 
@@ -28,6 +31,9 @@ setup_local_repo () {
     tar --strip=1 -xf $LS_PACKAGE
     ver=$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2)
     dch -v 9999:$ver development --distribution $(lsb_release -cs)
+
+    # Install dependencies for the local source.
+    /usr/lib/pbuilder/pbuilder-satisfydepends
 
     # Actually build the package.
     dpkg-buildpackage -us -uc
