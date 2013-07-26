@@ -15,11 +15,12 @@ class TestJuju(object):
     _relation_data = {}
 
     def __init__(self):
-        self._test_license_file = "LICENSE_FILE_TEXT"
-        self._test_services = "msgserver pingserver juju-sync"
-        self._test_service_count = "msgserver:2 pingserver:1"
-        self._test_upgrade_schema = False
-        self._test_maintenance = False
+        self.config = {
+            "services": "msgserver pingserver juju-sync",
+            "license-file": "LICENSE_FILE_TEXT",
+            "service-count": "msgserver:2 pingserver:1",
+            "upgrade-schema": False,
+            "maintenance": False}
 
     def relation_set(self, *args, **kwargs):
         """
@@ -52,16 +53,10 @@ class TestJuju(object):
         pass
 
     def config_get(self, scope=None):
-        config = {
-            "services": self._test_services,
-            "license-file": self._test_license_file,
-            "service-count": self._test_service_count,
-            "upgrade-schema": self._test_upgrade_schema,
-            "maintenance": self._test_maintenance}
         if scope is None:
-            return config
+            return self.config
         else:
-            return config[scope]
+            return self.config[scope]
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         pass
@@ -113,7 +108,7 @@ class TestHooksService(TestHooks):
         helper method should not break if non-proxied services are called for
         (e.g.: jobhandler).
         """
-        hooks.juju._test_services = "jobhandler"
+        hooks.juju.config["services"] = "jobhandler"
         result = hooks._get_services_haproxy()
         self.assertEqual(len(result), 0)
 
@@ -166,7 +161,7 @@ class TestHooksService(TestHooks):
             fp.write("# Comment test\nRUN_APPSERVER=\"no\"\nRUN_CRON=\"yes\"")
         with target as fp:
             fp.write("# Comment test\nRUN_APPSERVER=3\nRUN_CRON=no")
-        hooks.juju._test_services = "appserver"
+        hooks.juju.config["services"] = "appserver"
         hooks._enable_services()
         self.assertFilesEqual(self._default_file.name, target.name)
         os.unlink(target.name)
@@ -178,7 +173,7 @@ class TestHooksService(TestHooks):
         with default as fp:
             fp.write("# Comment test\nRUN_APPSERVER=\"no\"")
         hooks.LANDSCAPE_DEFAULT_FILE = default.name
-        hooks.juju._test_services = "INVALID_SERVICE_NAME"
+        hooks.juju.config["services"] = "INVALID_SERVICE_NAME"
         self.assertRaises(Exception, hooks._enable_services)
         os.unlink(default.name)
         pass
@@ -193,7 +188,7 @@ class TestHooksService(TestHooks):
         source = tempfile.NamedTemporaryFile(delete=False)
         with source as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
-        hooks.juju._test_license_file = "file://%s" % source.name
+        hooks.juju.config["license-file"] = "file://%s" % source.name
         hooks._install_license()
         self.assertFileContains(
             self._license_dest.name, "LICENSE_FILE_TEXT from curl")
@@ -204,8 +199,8 @@ class TestHooksService(TestHooks):
         All defaults should apply to requested services with the default
         service count of "AUTO" specified.
         """
-        hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "AUTO"
+        hooks.juju.config["services"] = "appserver msgserver juju-sync"
+        hooks.juju.config["service-count"] = "AUTO"
         self.seed_default_file_services_off()
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
@@ -220,8 +215,8 @@ class TestHooksService(TestHooks):
         recognized in the code (negative numbers and other junk will not
         match the regular expression of integer).
         """
-        hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "0"
+        hooks.juju.config["services"] = "appserver msgserver juju-sync"
+        hooks.juju.config["service-count"] = "0"
         self.seed_default_file_services_off()
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
@@ -234,8 +229,8 @@ class TestHooksService(TestHooks):
         Bare number (integer) sets all capable services to that number, ones
         with lower maximums ignore it.
         """
-        hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "2"
+        hooks.juju.config["services"] = "appserver msgserver juju-sync"
+        hooks.juju.config["service-count"] = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=2")
@@ -248,8 +243,8 @@ class TestHooksService(TestHooks):
         Multiple labeled service counts resolve correctly, missing service
         default to auto-determined, the keyword AUTO should also be recognized.
         """
-        hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "appserver:AUTO juju-sync:10"
+        hooks.juju.config["services"] = "appserver msgserver juju-sync"
+        hooks.juju.config["service-count"] = "appserver:AUTO juju-sync:10"
         self.seed_default_file_services_off()
         hooks.config_changed()
         self.assertFileContains(self._default_file.name, "\nRUN_APPSERVER=3")
@@ -262,8 +257,8 @@ class TestHooksService(TestHooks):
         run the config_changed hook, we should emit a relation_changed
         to haproxy giving 2 servers in the appserver service entry.
         """
-        hooks.juju._test_services = "appserver msgserver juju-sync"
-        hooks.juju._test_service_count = "2"
+        hooks.juju.config["services"] = "appserver msgserver juju-sync"
+        hooks.juju.config["service-count"] = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
         data = hooks.juju._relation_data
@@ -311,31 +306,31 @@ class TestHooksService(TestHooks):
         Also, the length of the dict is checked to make sure it
         contains all known services.
         """
-        hooks.juju._test_service_count = "0"
+        hooks.juju.config["service-count"] = "0"
         result = hooks._get_requested_service_count()
         self.assertEqual(len(result), 12)
         self.assertEqual(result["appserver"], "0")
 
-        hooks.juju._test_service_count = "foo"
+        hooks.juju.config["service-count"] = "foo"
         result = hooks._get_requested_service_count()
         self.assertEqual(result["msgserver"], "AUTO")
 
-        hooks.juju._test_service_count = "AUTO"
+        hooks.juju.config["service-count"] = "AUTO"
         result = hooks._get_requested_service_count()
         self.assertEqual(result["pingserver"], "AUTO")
 
-        hooks.juju._test_service_count = "8"
+        hooks.juju.config["service-count"] = "8"
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
 
-        hooks.juju._test_service_count = "juju-sync:8 cron:0 appserver:AUTO"
+        hooks.juju.config["service-count"] = "juju-sync:8 cron:0 appserver:AUTO"
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
         self.assertEqual(result["cron"], "0")
         self.assertEqual(result["appserver"], "AUTO")
         self.assertEqual(result["pingserver"], "AUTO")
 
-        hooks.juju._test_service_count = "juju-sync:-8 cron:XYZ BLAh BLAh:X"
+        hooks.juju.config["service-count"] = "juju-sync:-8 cron:XYZ BLAh BLAh:X"
         result = hooks._get_requested_service_count()
         self.assertEqual(len(result), 12)
         self.assertEqual(result["juju-sync"], "AUTO")
@@ -350,18 +345,18 @@ class TestHooksService(TestHooks):
         but are the actual number we plan to launch. Make sure it's valid for
         a couple combinations of "services" and "service_count".
         """
-        hooks.juju._test_services = "appserver"
-        hooks.juju._test_service_count = "2"
+        hooks.juju.config["services"] = "appserver"
+        hooks.juju.config["service-count"] = "2"
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 2})
 
-        hooks.juju._test_services = "appserver pingserver cron"
-        hooks.juju._test_service_count = "appserver:4 cron:10 pingserver:20"
+        hooks.juju.config["services"] = "appserver pingserver cron"
+        hooks.juju.config["service-count"] = "appserver:4 cron:10 pingserver:20"
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 4, "cron": 1, "pingserver": 9})
 
-        hooks.juju._test_services = "appserver cron"
-        hooks.juju._test_service_count = "AUTO"
+        hooks.juju.config["services"] = "appserver cron"
+        hooks.juju.config["service-count"] = "AUTO"
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 3, "cron": 1})
 
@@ -370,24 +365,24 @@ class TestHooksService(TestHooks):
         "services" config is parsed into list.  Exceptions are raised for
         invalid requests since the user probably would not catch it otherwise.
         """
-        hooks.juju._test_services = "appserver"
+        hooks.juju.config["services"] = "appserver"
         result = hooks._get_requested_services()
         self.assertEqual(["appserver"], result)
 
-        hooks.juju._test_services = "appserver pingserver cron"
+        hooks.juju.config["services"] = "appserver pingserver cron"
         result = hooks._get_requested_services()
         self.assertEqual(["appserver", "pingserver", "cron"], result)
 
-        hooks.juju._test_services = "appserver pingserver cron foo"
+        hooks.juju.config["services"] = "appserver pingserver cron foo"
         self.assertRaises(Exception, hooks._get_requested_services)
 
     def test_upgrade_schema(self):
         """Test both the false and true case of upgrade schema."""
         self.seed_default_file_services_off()
-        hooks.juju._test_upgrade_schema = True
+        hooks.juju.config["upgrade-schema"] = True
         hooks._set_upgrade_schema()
         self.assertFileContains(self._default_file.name, "UPGRADE_SCHEMA=yes")
-        hooks.juju._test_upgrade_schema = False
+        hooks.juju.config["upgrade-schema"] = False
         hooks._set_upgrade_schema()
         self.assertFileContains(self._default_file.name, "UPGRADE_SCHEMA=no")
 
@@ -396,10 +391,10 @@ class TestHooksService(TestHooks):
         filename = tempfile.NamedTemporaryFile(delete=False).name
         os.unlink(filename)
         hooks.LANDSCAPE_MAINTENANCE = filename
-        hooks.juju._test_maintenance = True
+        hooks.juju.config["maintenance"] = True
         hooks._set_maintenance()
         self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
-        hooks.juju._test_maintenance = False
+        hooks.juju.config["maintenance"] = False
         hooks._set_maintenance()
         self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
@@ -436,21 +431,19 @@ class TestHooksServiceMock(TestHooks):
         super(TestHooksServiceMock, self).tearDown()
 
     def restore_service_data(self):
-        hooks.juju._test_services = self._test_services
-        hooks.juju._test_service_count = self._test_service_count
+        hooks.juju.config = self.config
         hooks.SERVICE_PROXY = self._SERVICE_PROXY
         hooks.SERVICE_DEFAULT = self._SERVICE_DEFAULT
         hooks.SERVICE_COUNT = self._SERVICE_COUNT
 
     def mock_service_data(self):
-        self._test_services = hooks.juju._test_services
-        self._test_service_count = hooks.juju._test_service_count
+        self.config = hooks.juju.config
         self._SERVICE_PROXY = hooks.SERVICE_PROXY
         self._SERVICE_DEFAULT = hooks.SERVICE_DEFAULT
         self._SERVICE_COUNT = hooks.SERVICE_COUNT
 
-        hooks.juju._test_services = "foo bar baz"
-        hooks.juju._test_service_count = "foo:1 bar:2"
+        hooks.juju.config["services"] = "foo bar baz"
+        hooks.juju.config["service-count"] = "foo:1 bar:2"
         hooks.SERVICE_PROXY = {
             "foo": {"port": "80", "httpchk": "foo"},
             "bar": {"port": "81"},
