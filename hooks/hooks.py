@@ -277,9 +277,9 @@ def _lsctl(action):
 
 def _set_maintenance():
     """
-    Put this service unit into maintenance mode, or take it out, depending
-    on the read value of "maintenance" from the juju settings.  Non-boolean
-    settings will be interpreted as False.
+    Put into maintenance mode, or take it out, depending on the read value of
+    "maintenance" from the juju settings.  Non-boolean settings will be
+    interpreted as False.
     """
     maintenance = juju.config_get("maintenance")
     if maintenance:

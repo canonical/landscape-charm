@@ -52,16 +52,16 @@ class TestJuju(object):
         pass
 
     def config_get(self, scope=None):
+        config = {
+            "services": self._test_services,
+            "license-file": self._test_license_file,
+            "service-count": self._test_service_count,
+            "upgrade-schema": self._test_upgrade_schema,
+            "maintenance": self._test_maintenance}
         if scope is None:
-            return {"services": self._test_services}
-        elif scope == "license-file":
-            return self._test_license_file
-        elif scope == "service-count":
-            return self._test_service_count
-        elif scope == "upgrade-schema":
-            return self._test_upgrade_schema
-        elif scope == "maintenance":
-            return self._test_maintenance
+            return config
+        else:
+            return config[scope]
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
         pass
