@@ -233,7 +233,8 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
     if errorfiles is None:
         errorfiles = []
     for errorfile in errorfiles:
-        errorfile["content"] = b64encode(open(errorfile["path"]).read())
+        with open(errorfile["path"]) as handle:
+            errorfile["content"] = b64encode(handle.read())
 
     host = juju.unit_get("private-address")
     result = {

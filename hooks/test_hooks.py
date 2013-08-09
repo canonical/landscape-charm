@@ -435,11 +435,12 @@ class TestHooksServiceMock(TestHooks):
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
+        handle, self.filename = tempfile.mkstemp()
+        file(self.filename, "w").write("<html></html>")
         self.mock_service_data()
-        file("/tmp/404.html", "w").write("<html></html>")
 
     def tearDown(self):
-        os.remove("/tmp/404.html")
+        os.remove(self.filename)
         self.restore_service_data()
         super(TestHooksServiceMock, self).tearDown()
 
@@ -468,7 +469,7 @@ class TestHooksServiceMock(TestHooks):
                 "port": "83",
                 "errorfiles": [{
                     "http_status": 403,
-                    "path": "/tmp/404.html"}]}}
+                    "path": self.filename}]}}
         hooks.SERVICE_DEFAULT = {
             "foo": "FOO",
             "bar": "BAR",
@@ -540,7 +541,7 @@ class TestHooksServiceMock(TestHooks):
                          "check inter 2000 rise 2 fall 5 maxconn 50"]],
             "errorfiles": [{
                 "http_status": 403,
-                "path": "/tmp/404.html",
+                "path": self.filename,
                 "content": base64.b64encode("<html></html>")}],
             "service_options": [
                 "mode http", "balance leastconn",
