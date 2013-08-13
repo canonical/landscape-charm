@@ -18,6 +18,8 @@ import pycurl
 import cStringIO
 import psutil
 import datetime
+from copy import deepcopy
+from base64 import b64encode
 from subprocess import (check_call, check_output)
 from ConfigParser import RawConfigParser
 
@@ -209,12 +211,11 @@ def _enable_services():
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
         server_options="check inter 2000 rise 2 fall 5 maxconn 50",
-        service_options=None):
+        service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a
-    relation variable.  Override options by altering the SERVICE
-    hash aboe.
+    relation variable.  Override options by altering SERVICE_PROXY.
 
     @param name Name of the service (letters, numbers, underscores)
     @param count How many instances of this service will be started (int)
@@ -222,18 +223,25 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
     @param server_options override the server_options (String)
     @param httpchk The httpchk option, will be appeneded to service_options
     @param service_options override the service_options (Array of strings)
+    @param errorfiles Provide a set of errorfiles for the service
     """
     if service_options is None:
         service_options = ["mode http", "balance leastconn"]
     if httpchk is not None:
         httpchk_option = "option httpchk %s" % httpchk
         service_options.append(httpchk_option)
+    if errorfiles is None:
+        errorfiles = []
+    for errorfile in errorfiles:
+        with open(errorfile["path"]) as handle:
+            errorfile["content"] = b64encode(handle.read())
 
     host = juju.unit_get("private-address")
     result = {
         "service_name": name,
         "service_options": service_options,
-        "servers": [[name, host, port, server_options]]}
+        "servers": [[name, host, port, server_options]],
+        "errorfiles": errorfiles}
     offset = 1
     while count - offset >= 1:
         result["servers"].append(
@@ -323,6 +331,7 @@ def notify_website_relation():
     duplicate values out of this, so we don't need to worry about calling it
     only in case of a change
     """
+    juju.juju_log(yaml.safe_dump(_get_services_haproxy()))
     for id in juju.relation_ids("website"):
         juju.relation_set(
             relation_id=id,
@@ -410,20 +419,39 @@ def config_changed():
     _lsctl("start")
     notify_website_relation()
 
+
+ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
+ERROR_FILES = [
+    {"http_status": 403,
+     "path": ERROR_PATH + "unauthorized-haproxy.html"},
+    {"http_status": 500,
+     "path": ERROR_PATH + "exception-haproxy.html"},
+    {"http_status": 502,
+     "path": ERROR_PATH + "unplanned-offline-haproxy.html"},
+    {"http_status": 503,
+     "path": ERROR_PATH + "unplanned-offline-haproxy.html"},
+    {"http_status": 504,
+     "path": ERROR_PATH + "timeout-haproxy.html"}]
+
 SERVICE_PROXY = {
-        "static": {"port": "80"},
-        "appserver": {"port": "8080"},
-        "msgserver": {
-            "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"},
-        "pingserver": {
-            "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"},
-        "combo-loader": {
-            "port": "9070",
-            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"},
-        "async-frontend": {"port": "9090"},
-        "apiserver": {"port": "9080"},
-        "package-upload": {"port": "9100"},
-        "package-search": {"port": "9090"}}
+    "static": {"port": "80"},
+    "appserver": {
+        "port": "8080",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "msgserver": {
+        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "pingserver": {
+        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "combo-loader": {
+        "port": "9070",
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "async-frontend": {"port": "9090"},
+    "apiserver": {"port": "9080"},
+    "package-upload": {"port": "9100"},
+    "package-search": {"port": "9090"}}
 
 # Format is:
 #   [min, auto_max, hard_max]
@@ -431,33 +459,33 @@ SERVICE_PROXY = {
 #   auto_max = if auto-determining, only suggest this as the max
 #   hard_max = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
-        "appserver": [1, 4, 9],
-        "msgserver": [2, 8, 9],
-        "pingserver": [1, 4, 9],
-        "apiserver": [1, 2, 9],
-        "combo-loader": [1, 1, 1],
-        "async-frontend": [1, 1, 1],
-        "jobhandler": [1, 1, 1],
-        "package-upload": [1, 1, 1],
-        "package-search": [1, 1, 1],
-        "juju-sync": [1, 1, 1],
-        "cron": [1, 1, 1],
-        "static": [1, 1, 1]}
+    "appserver": [1, 4, 9],
+    "msgserver": [2, 8, 9],
+    "pingserver": [1, 4, 9],
+    "apiserver": [1, 2, 9],
+    "combo-loader": [1, 1, 1],
+    "async-frontend": [1, 1, 1],
+    "jobhandler": [1, 1, 1],
+    "package-upload": [1, 1, 1],
+    "package-search": [1, 1, 1],
+    "juju-sync": [1, 1, 1],
+    "cron": [1, 1, 1],
+    "static": [1, 1, 1]}
 
 
 SERVICE_DEFAULT = {
-        "appserver": "RUN_APPSERVER",
-        "msgserver": "RUN_MSGSERVER",
-        "pingserver": "RUN_PINGSERVER",
-        "combo-loader": "RUN_COMBO_LOADER",
-        "async-frontend": "RUN_ASYNC_FRONTEND",
-        "apiserver": "RUN_APISERVER",
-        "package-upload": "RUN_PACKAGEUPLOADSERVER",
-        "jobhandler": "RUN_JOBHANDLER",
-        "package-search": "RUN_PACKAGESEARCH",
-        "juju-sync": "RUN_JUJU_SYNC",
-        "cron": "RUN_CRON",
-        "static": None}
+    "appserver": "RUN_APPSERVER",
+    "msgserver": "RUN_MSGSERVER",
+    "pingserver": "RUN_PINGSERVER",
+    "combo-loader": "RUN_COMBO_LOADER",
+    "async-frontend": "RUN_ASYNC_FRONTEND",
+    "apiserver": "RUN_APISERVER",
+    "package-upload": "RUN_PACKAGEUPLOADSERVER",
+    "jobhandler": "RUN_JOBHANDLER",
+    "package-search": "RUN_PACKAGESEARCH",
+    "juju-sync": "RUN_JUJU_SYNC",
+    "cron": "RUN_CRON",
+    "static": None}
 
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"

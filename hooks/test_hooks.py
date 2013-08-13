@@ -4,6 +4,7 @@ import yaml
 import tempfile
 import os
 import pycurl
+import base64
 
 
 class TestJuju(object):
@@ -74,6 +75,10 @@ class TestHooks(unittest.TestCase):
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None
+        # Keep non-existent errorfiles from generating unrelated errors.
+        for value in hooks.SERVICE_PROXY.values():
+            if "errorfiles" in value.keys():
+                value["errorfiles"] = []
 
     def assertFileContains(self, filename, text):
         """Make sure a string exists in a file."""
@@ -323,14 +328,16 @@ class TestHooksService(TestHooks):
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
 
-        hooks.juju.config["service-count"] = "juju-sync:8 cron:0 appserver:AUTO"
+        hooks.juju.config["service-count"] = (
+            "juju-sync:8 cron:0 appserver:AUTO")
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
         self.assertEqual(result["cron"], "0")
         self.assertEqual(result["appserver"], "AUTO")
         self.assertEqual(result["pingserver"], "AUTO")
 
-        hooks.juju.config["service-count"] = "juju-sync:-8 cron:XYZ BLAh BLAh:X"
+        hooks.juju.config["service-count"] = (
+            "juju-sync:-8 cron:XYZ BLAh BLAh:X")
         result = hooks._get_requested_service_count()
         self.assertEqual(len(result), 12)
         self.assertEqual(result["juju-sync"], "AUTO")
@@ -351,7 +358,8 @@ class TestHooksService(TestHooks):
         self.assertEqual(result, {"appserver": 2})
 
         hooks.juju.config["services"] = "appserver pingserver cron"
-        hooks.juju.config["service-count"] = "appserver:4 cron:10 pingserver:20"
+        hooks.juju.config["service-count"] = (
+            "appserver:4 cron:10 pingserver:20")
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 4, "cron": 1, "pingserver": 9})
 
@@ -406,7 +414,8 @@ class TestHooksServiceMock(TestHooks):
                  "foo", "localhost", "80",
                  "check inter 2000 rise 2 fall 5 maxconn 50"]],
              "service_options": [
-                 "mode http", "balance leastconn", "option httpchk foo"]},
+                 "mode http", "balance leastconn", "option httpchk foo"],
+             "errorfiles": []},
             {"service_name": "bar",
              "servers":
                 [["bar", "localhost", "81",
@@ -415,18 +424,23 @@ class TestHooksServiceMock(TestHooks):
                  "check inter 2000 rise 2 fall 5 maxconn 50"]],
              "service_options": [
                  "mode http", "balance leastconn",
-                 "option httpchk GET / HTTP/1.0"]},
+                 "option httpchk GET / HTTP/1.0"],
+             "errorfiles": []},
             {"service_name": "baz",
              "servers": [["baz", "localhost", "82", "server"],
                          ["baz", "localhost", "83", "server"],
                          ["baz", "localhost", "84", "server"]],
-             "service_options": ["options"]}]
+             "service_options": ["options"],
+             "errorfiles": []}]
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
+        handle, self.filename = tempfile.mkstemp()
+        file(self.filename, "w").write("<html></html>")
         self.mock_service_data()
 
     def tearDown(self):
+        os.remove(self.filename)
         self.restore_service_data()
         super(TestHooksServiceMock, self).tearDown()
 
@@ -450,7 +464,12 @@ class TestHooksServiceMock(TestHooks):
             "baz": {
                 "port": "82", "httpchk": None,
                 "server_options": "server",
-                "service_options": ["options"]}}
+                "service_options": ["options"]},
+            "qux": {
+                "port": "83",
+                "errorfiles": [{
+                    "http_status": 403,
+                    "path": self.filename}]}}
         hooks.SERVICE_DEFAULT = {
             "foo": "FOO",
             "bar": "BAR",
@@ -473,7 +492,8 @@ class TestHooksServiceMock(TestHooks):
                         "check inter 2000 rise 2 fall 5 maxconn 50"]],
                     "service_options": [
                         "mode http", "balance leastconn",
-                        "option httpchk GET / HTTP/1.0"]}
+                        "option httpchk GET / HTTP/1.0"],
+                    "errorfiles": []}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_option(self):
@@ -489,7 +509,8 @@ class TestHooksServiceMock(TestHooks):
                     "foo", "localhost", "80",
                     "check inter 2000 rise 2 fall 5 maxconn 50"]],
                 "service_options": [
-                    "mode http", "balance leastconn", "option httpchk foo"]}
+                    "mode http", "balance leastconn", "option httpchk foo"],
+                "errorfiles": []}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
@@ -503,8 +524,38 @@ class TestHooksServiceMock(TestHooks):
         baseline = {"service_name": "baz",
                     "servers": [["baz", "localhost", "82", "server"],
                                 ["baz", "localhost", "83", "server"]],
-                    "service_options": ["options"]}
+                    "service_options": ["options"],
+                    "errorfiles": []}
         self.assertEqual(baseline, result)
+
+    def test_format_service_with_errorfiles(self):
+        """
+        When errorfiles are specified, communicate them to the relation and
+        include the file contents, base64 encoded.  Each errorfile spec
+        includes the http code, the path and the file contents.
+        """
+        result = hooks._format_service("qux", 1, **hooks.SERVICE_PROXY["qux"])
+        baseline = {
+            "service_name": "qux",
+            "servers": [["qux", "localhost", "83",
+                         "check inter 2000 rise 2 fall 5 maxconn 50"]],
+            "errorfiles": [{
+                "http_status": 403,
+                "path": self.filename,
+                "content": base64.b64encode("<html></html>")}],
+            "service_options": [
+                "mode http", "balance leastconn",
+                "option httpchk GET / HTTP/1.0"]}
+        self.assertEqual(baseline, result)
+
+    def test_format_service_with_errorfile_not_found(self):
+        """
+        A missing errorfile raises an IOError.
+        """
+        errorfiles = hooks.SERVICE_PROXY["qux"]["errorfiles"]
+        errorfiles[0]["path"] = "/does/not/exist.html"
+        self.assertRaises(IOError, hooks._format_service, "qux", 1,
+                          **hooks.SERVICE_PROXY["qux"])
 
     def test_get_services(self):
         """
