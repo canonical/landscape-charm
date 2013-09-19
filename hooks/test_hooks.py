@@ -5,6 +5,8 @@ import tempfile
 import os
 import pycurl
 import base64
+import mocker
+from ConfigParser import RawConfigParser
 
 
 class TestJuju(object):
@@ -63,7 +65,7 @@ class TestJuju(object):
         pass
 
 
-class TestHooks(unittest.TestCase):
+class TestHooks(mocker.MockerTestCase):
 
     def setUp(self):
         hooks._lsctl = lambda x: True
@@ -72,6 +74,8 @@ class TestHooks(unittest.TestCase):
         hooks.LANDSCAPE_LICENSE_DEST = self._license_dest.name
         self._default_file = tempfile.NamedTemporaryFile(delete=False)
         hooks.LANDSCAPE_DEFAULT_FILE = self._default_file.name
+        self._service_conf = tempfile.NamedTemporaryFile(delete=False)
+        hooks.LANDSCAPE_SERVICE_CONF = self._service_conf.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None
@@ -216,7 +220,7 @@ class TestHooksService(TestHooks):
     def test_config_changed_zero(self):
         """
         All defaults should apply to requested services with the default
-        service count of "AUTO" specified, the number zero is specially
+        service count of "AUTO" specified.  The number zero is specially
         recognized in the code (negative numbers and other junk will not
         match the regular expression of integer).
         """
@@ -276,6 +280,35 @@ class TestHooksService(TestHooks):
         else:
             assert False, "Didn't find element 'appserver'"
 
+    def test_config_changed_starts_landscape(self):
+        """
+        config_changed() starts services when the database is configured.
+        """
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("start")
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+
+        hooks.config_changed()
+
+    def test_config_changed_without_db_skips_start(self):
+        """
+        config_changed() does not start services when the database is not
+        configured.
+        """
+        _lsctl = self.mocker.replace(hooks._lsctl)
+        _lsctl("start")
+        self.mocker.count(0, 0)
+        _is_db_up = self.mocker.replace(hooks._is_db_up)
+        _is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks.config_changed()
+
+
     def test_calc_daemon_count(self):
         """
         Test various interesting inputs of _calc_daemon_count.
@@ -328,14 +361,16 @@ class TestHooksService(TestHooks):
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
 
-        hooks.juju.config["service-count"] = "juju-sync:8 cron:0 appserver:AUTO"
+        hooks.juju.config["service-count"] = (
+            "juju-sync:8 cron:0 appserver:AUTO")
         result = hooks._get_requested_service_count()
         self.assertEqual(result["juju-sync"], "8")
         self.assertEqual(result["cron"], "0")
         self.assertEqual(result["appserver"], "AUTO")
         self.assertEqual(result["pingserver"], "AUTO")
 
-        hooks.juju.config["service-count"] = "juju-sync:-8 cron:XYZ BLAh BLAh:X"
+        hooks.juju.config["service-count"] = (
+            "juju-sync:-8 cron:XYZ BLAh BLAh:X")
         result = hooks._get_requested_service_count()
         self.assertEqual(len(result), 12)
         self.assertEqual(result["juju-sync"], "AUTO")
@@ -356,7 +391,8 @@ class TestHooksService(TestHooks):
         self.assertEqual(result, {"appserver": 2})
 
         hooks.juju.config["services"] = "appserver pingserver cron"
-        hooks.juju.config["service-count"] = "appserver:4 cron:10 pingserver:20"
+        hooks.juju.config["service-count"] = (
+            "appserver:4 cron:10 pingserver:20")
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 4, "cron": 1, "pingserver": 9})
 
@@ -403,6 +439,66 @@ class TestHooksService(TestHooks):
         hooks._set_maintenance()
         self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
+    def test_is_db_up_with_db_configured(self):
+        """Return True when the db is configured."""
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("stores")
+        parser.set("stores", "main", "somedb")
+        parser.set("stores", "host", "somehost")
+        parser.set("stores", "user", "someuser")
+        parser.set("stores", "password", "somepassword")
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(True)
+        self.mocker.replay()
+
+        self.assertTrue(hooks._is_db_up())
+
+    def test_is_db_up_db_not_configured(self):
+        """Return False when the db is not configured."""
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("stores")
+        parser.set("stores", "main", "somedb")
+        parser.set("stores", "host", "somehost")
+        parser.set("stores", "user", "someuser")
+        parser.set("stores", "password", "somepassword")
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        self.assertFalse(hooks._is_db_up())
+
+    def test_is_db_up_no_service_config(self):
+        """Return False when the service config does not exist."""
+        hooks.LANDSCAPE_SERVICE_CONF = "/does/not/exist"
+        self.assertFalse(hooks._is_db_up())
+
+    def test_is_db_up_service_config_missing_stores(self):
+        """Return False when the service config is missing [stores]."""
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+        self.assertFalse(hooks._is_db_up())
+
+    def test_is_db_up_service_config_missing_keys(self):
+        """Return False when the [stores] section is missing db settings."""
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("stores")
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+        self.assertFalse(hooks._is_db_up())
+
 
 class TestHooksServiceMock(TestHooks):
     all_services = [
@@ -432,11 +528,12 @@ class TestHooksServiceMock(TestHooks):
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
+        handle, self.filename = tempfile.mkstemp()
+        file(self.filename, "w").write("<html></html>")
         self.mock_service_data()
-        file("/tmp/404.html", "w").write("<html></html>")
 
     def tearDown(self):
-        os.remove("/tmp/404.html")
+        os.remove(self.filename)
         self.restore_service_data()
         super(TestHooksServiceMock, self).tearDown()
 
@@ -465,7 +562,7 @@ class TestHooksServiceMock(TestHooks):
                 "port": "83",
                 "errorfiles": [{
                     "http_status": 403,
-                    "path": "/tmp/404.html"}]}}
+                    "path": self.filename}]}}
         hooks.SERVICE_DEFAULT = {
             "foo": "FOO",
             "bar": "BAR",
@@ -533,13 +630,15 @@ class TestHooksServiceMock(TestHooks):
         result = hooks._format_service("qux", 1, **hooks.SERVICE_PROXY["qux"])
         baseline = {
             "service_name": "qux",
-            "servers": [["qux", "localhost", "83", "check inter 2000 rise 2 fall 5 maxconn 50"]],
+            "servers": [["qux", "localhost", "83",
+                         "check inter 2000 rise 2 fall 5 maxconn 50"]],
             "errorfiles": [{
                 "http_status": 403,
-                "path": "/tmp/404.html",
+                "path": self.filename,
                 "content": base64.b64encode("<html></html>")}],
             "service_options": [
-                "mode http", "balance leastconn", "option httpchk GET / HTTP/1.0"]}
+                "mode http", "balance leastconn",
+                "option httpchk GET / HTTP/1.0"]}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_errorfile_not_found(self):

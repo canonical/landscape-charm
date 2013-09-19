@@ -20,8 +20,8 @@ import psutil
 import datetime
 from copy import deepcopy
 from base64 import b64encode
-from subprocess import (check_call, check_output)
-from ConfigParser import RawConfigParser
+from subprocess import (check_call, check_output, call)
+from ConfigParser import RawConfigParser, Error
 
 
 def _download_file(url):
@@ -233,7 +233,8 @@ def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
     if errorfiles is None:
         errorfiles = []
     for errorfile in errorfiles:
-        errorfile["content"] = b64encode(open(errorfile["path"]).read())
+        with open(errorfile["path"]) as handle:
+            errorfile["content"] = b64encode(handle.read())
 
     host = juju.unit_get("private-address")
     result = {
@@ -360,9 +361,8 @@ def db_admin_relation_changed():
             unit_name, allowed_units))
         return
 
-    config_file = "/etc/landscape/service.conf"
     parser = RawConfigParser()
-    parser.read([config_file])
+    parser.read([LANDSCAPE_SERVICE_CONF])
     parser.set("stores", "host", host)
     parser.set("stores", "port", "5432")
     parser.set("stores", "user", user)
@@ -396,10 +396,8 @@ def amqp_relation_changed():
     if password == "":
         sys.exit(0)
 
-    config_file = "/etc/landscape/service.conf"
-
     parser = RawConfigParser()
-    parser.read([config_file])
+    parser.read([LANDSCAPE_SERVICE_CONF])
 
     parser.set("broker", "password", password)
     parser.set("broker", "host", host)
@@ -409,47 +407,68 @@ def amqp_relation_changed():
         parser.write(output_file)
 
 
+def _is_db_up():
+    """Return True if the database is configured, False otherwise."""
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+    try:
+        database = parser.get("stores", "main")
+        host = parser.get("stores", "host")
+        user = parser.get("stores", "user")
+        password = parser.get("stores", "password")
+
+        if util.is_db_up(database, host, user, password):
+            return True
+        return False
+    except Error:
+        return False
+
+
 def config_changed():
     _lsctl("stop")
     _install_license()
     _enable_services()
     _set_maintenance()
     _set_upgrade_schema()
-    _lsctl("start")
+
+    if _is_db_up():
+        _lsctl("start")
+
     notify_website_relation()
 
+
+ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
 ERROR_FILES = [
     {"http_status": 403,
-     "path": "/opt/canonical/landscape/canonical/landscape/static/offline/unauthorized-haproxy.html"},
+     "path": ERROR_PATH + "unauthorized-haproxy.html"},
     {"http_status": 500,
-     "path": "/opt/canonical/landscape/canonical/landscape/static/offline/exception-haproxy.html"},
+     "path": ERROR_PATH + "exception-haproxy.html"},
     {"http_status": 502,
-     "path": "/opt/canonical/landscape/canonical/landscape/static/offline/unplanned-offline-haproxy.html"},
+     "path": ERROR_PATH + "unplanned-offline-haproxy.html"},
     {"http_status": 503,
-     "path": "/opt/canonical/landscape/canonical/landscape/static/offline/unplanned-offline-haproxy.html"},
+     "path": ERROR_PATH + "unplanned-offline-haproxy.html"},
     {"http_status": 504,
-     "path": "/opt/canonical/landscape/canonical/landscape/static/offline/timeout-haproxy.html"},
-]
+     "path": ERROR_PATH + "timeout-haproxy.html"}]
 
 SERVICE_PROXY = {
-        "static": {"port": "80"},
-        "appserver": {
-            "port": "8080",
-            "errorfiles": deepcopy(ERROR_FILES)},
-        "msgserver": {
-            "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
-            "errorfiles": deepcopy(ERROR_FILES)},
-        "pingserver": {
-            "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
-            "errorfiles": deepcopy(ERROR_FILES)},
-        "combo-loader": {
-            "port": "9070",
-            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
-            "errorfiles": deepcopy(ERROR_FILES)},
-        "async-frontend": {"port": "9090"},
-        "apiserver": {"port": "9080"},
-        "package-upload": {"port": "9100"},
-        "package-search": {"port": "9090"}}
+    "static": {"port": "80"},
+    "appserver": {
+        "port": "8080",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "msgserver": {
+        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "pingserver": {
+        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "combo-loader": {
+        "port": "9070",
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
+        "errorfiles": deepcopy(ERROR_FILES)},
+    "async-frontend": {"port": "9090"},
+    "apiserver": {"port": "9080"},
+    "package-upload": {"port": "9100"},
+    "package-search": {"port": "9090"}}
 
 # Format is:
 #   [min, auto_max, hard_max]
@@ -457,37 +476,38 @@ SERVICE_PROXY = {
 #   auto_max = if auto-determining, only suggest this as the max
 #   hard_max = hard-cutoff, cannot launch more than this.
 SERVICE_COUNT = {
-        "appserver": [1, 4, 9],
-        "msgserver": [2, 8, 9],
-        "pingserver": [1, 4, 9],
-        "apiserver": [1, 2, 9],
-        "combo-loader": [1, 1, 1],
-        "async-frontend": [1, 1, 1],
-        "jobhandler": [1, 1, 1],
-        "package-upload": [1, 1, 1],
-        "package-search": [1, 1, 1],
-        "juju-sync": [1, 1, 1],
-        "cron": [1, 1, 1],
-        "static": [1, 1, 1]}
+    "appserver": [1, 4, 9],
+    "msgserver": [2, 8, 9],
+    "pingserver": [1, 4, 9],
+    "apiserver": [1, 2, 9],
+    "combo-loader": [1, 1, 1],
+    "async-frontend": [1, 1, 1],
+    "jobhandler": [1, 1, 1],
+    "package-upload": [1, 1, 1],
+    "package-search": [1, 1, 1],
+    "juju-sync": [1, 1, 1],
+    "cron": [1, 1, 1],
+    "static": [1, 1, 1]}
 
 
 SERVICE_DEFAULT = {
-        "appserver": "RUN_APPSERVER",
-        "msgserver": "RUN_MSGSERVER",
-        "pingserver": "RUN_PINGSERVER",
-        "combo-loader": "RUN_COMBO_LOADER",
-        "async-frontend": "RUN_ASYNC_FRONTEND",
-        "apiserver": "RUN_APISERVER",
-        "package-upload": "RUN_PACKAGEUPLOADSERVER",
-        "jobhandler": "RUN_JOBHANDLER",
-        "package-search": "RUN_PACKAGESEARCH",
-        "juju-sync": "RUN_JUJU_SYNC",
-        "cron": "RUN_CRON",
-        "static": None}
+    "appserver": "RUN_APPSERVER",
+    "msgserver": "RUN_MSGSERVER",
+    "pingserver": "RUN_PINGSERVER",
+    "combo-loader": "RUN_COMBO_LOADER",
+    "async-frontend": "RUN_ASYNC_FRONTEND",
+    "apiserver": "RUN_APISERVER",
+    "package-upload": "RUN_PACKAGEUPLOADSERVER",
+    "jobhandler": "RUN_JOBHANDLER",
+    "package-search": "RUN_PACKAGESEARCH",
+    "juju-sync": "RUN_JUJU_SYNC",
+    "cron": "RUN_CRON",
+    "static": None}
 
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
+LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 ROOT = os.path.abspath(os.path.curdir)
 juju = Juju()
