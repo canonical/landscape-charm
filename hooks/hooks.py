@@ -20,8 +20,8 @@ import psutil
 import datetime
 from copy import deepcopy
 from base64 import b64encode
-from subprocess import (check_call, check_output)
-from ConfigParser import RawConfigParser
+from subprocess import (check_call, check_output, call)
+from ConfigParser import RawConfigParser, Error
 
 
 def _download_file(url):
@@ -361,9 +361,8 @@ def db_admin_relation_changed():
             unit_name, allowed_units))
         return
 
-    config_file = "/etc/landscape/service.conf"
     parser = RawConfigParser()
-    parser.read([config_file])
+    parser.read([LANDSCAPE_SERVICE_CONF])
     parser.set("stores", "host", host)
     parser.set("stores", "port", "5432")
     parser.set("stores", "user", user)
@@ -397,10 +396,8 @@ def amqp_relation_changed():
     if password == "":
         sys.exit(0)
 
-    config_file = "/etc/landscape/service.conf"
-
     parser = RawConfigParser()
-    parser.read([config_file])
+    parser.read([LANDSCAPE_SERVICE_CONF])
 
     parser.set("broker", "password", password)
     parser.set("broker", "host", host)
@@ -410,13 +407,33 @@ def amqp_relation_changed():
         parser.write(output_file)
 
 
+def _is_db_up():
+    """Return True if the database is configured, False otherwise."""
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+    try:
+        database = parser.get("stores", "main")
+        host = parser.get("stores", "host")
+        user = parser.get("stores", "user")
+        password = parser.get("stores", "password")
+
+        if util.is_db_up(database, host, user, password):
+            return True
+        return False
+    except Error:
+        return False
+
+
 def config_changed():
     _lsctl("stop")
     _install_license()
     _enable_services()
     _set_maintenance()
     _set_upgrade_schema()
-    _lsctl("start")
+
+    if _is_db_up():
+        _lsctl("start")
+
     notify_website_relation()
 
 
@@ -490,6 +507,7 @@ SERVICE_DEFAULT = {
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
+LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 ROOT = os.path.abspath(os.path.curdir)
 juju = Juju()
