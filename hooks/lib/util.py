@@ -58,14 +58,11 @@ def is_db_up(database, host, user, password):
     Return True if the database relation is configured, False otherwise.
     """
     try:
-        juju.juju_log("got here 10")
-        juju.juju_log("db=%s, h=%s, u=%s, p=%s" % (database, host, user, password))
         conn = connect(database="postgres", host=host, user=user,
                        password=password)
         cur = conn.cursor()
         return True
     except Exception as e:
-        juju.juju_log("got here 13")
         juju.juju_log(str(e))
         return False
     finally:
