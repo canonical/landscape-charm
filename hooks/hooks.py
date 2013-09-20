@@ -369,7 +369,7 @@ def db_admin_relation_changed():
     parser.set("stores", "password", password)
     parser.set("schema", "store_user", admin)
     parser.set("schema", "store_password", admin_password)
-    with open(config_file, "w+") as output_file:
+    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
     # Create the inital landscape user (to have a known password)
