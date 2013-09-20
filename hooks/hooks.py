@@ -20,7 +20,7 @@ import psutil
 import datetime
 from copy import deepcopy
 from base64 import b64encode
-from subprocess import (check_call, check_output, call)
+from subprocess import check_call, check_output, call
 from ConfigParser import RawConfigParser, Error
 
 
@@ -408,7 +408,7 @@ def amqp_relation_changed():
 
 
 def _is_db_up():
-    """Return True if the database is configured, False otherwise."""
+    """Return True if the database is accessible, False otherwise."""
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     try:

@@ -1,3 +1,1 @@
 #!/bin/bash
-#source /opt/canonical/landscape/scripts/landscape-env.sh
-#schema_check && lsctl start
