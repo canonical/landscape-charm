@@ -70,4 +70,3 @@ def is_db_up(database, host, user, password):
             conn.close()
         except Exception:
             pass
-
