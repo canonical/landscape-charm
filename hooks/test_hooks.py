@@ -1,7 +1,6 @@
 import hooks
 import unittest
 import yaml
-import tempfile
 import os
 import pycurl
 import base64
@@ -70,11 +69,12 @@ class TestHooks(mocker.MockerTestCase):
     def setUp(self):
         hooks._lsctl = lambda x: True
         hooks.juju = TestJuju()
-        self._license_dest = tempfile.NamedTemporaryFile(delete=False)
-        hooks.LANDSCAPE_LICENSE_DEST = self._license_dest.name
-        self._default_file = tempfile.NamedTemporaryFile(delete=False)
-        hooks.LANDSCAPE_DEFAULT_FILE = self._default_file.name
-        self._service_conf = tempfile.NamedTemporaryFile(delete=False)
+        hooks.LANDSCAPE_LICENSE_DEST = self.makeFile()
+        self._license_dest = open(hooks.LANDSCAPE_LICENSE_DEST, "w")
+        hooks.LANDSCAPE_DEFAULT_FILE = self.makeFile()
+        self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
+        hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
+        self._service_conf = open(hooks.LANDSCAPE_SERVICE_CONF, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self._service_conf.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
@@ -135,11 +135,10 @@ class TestHooksService(TestHooks):
         """
         Make sure the happy path of download file works.
         """
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        with tmp as fp:
+        filename = self.makeFile()
+        with open(filename, "w") as fp:
             fp.write("foobar")
-        output = hooks._download_file("file://%s" % tmp.name)
-        os.unlink(tmp.name)
+        output = hooks._download_file("file://%s" % filename)
         self.assertTrue("foobar" in output)
 
     def test__download_file_failure(self):
@@ -152,40 +151,35 @@ class TestHooksService(TestHooks):
         Test for replace_in_file to change some lines in a file, but not
         others.
         """
-        tmp = tempfile.NamedTemporaryFile(delete=False)
-        with tmp as fp:
+        filename = self.makeFile()
+        with open(filename, "w") as fp:
             fp.write("foo\nfoo\nbar\nbaz\n")
 
-        hooks._replace_in_file(tmp.name, r"^f..$", "REPLACED")
+        hooks._replace_in_file(filename, r"^f..$", "REPLACED")
 
-        with open(tmp.name, "r") as fp:
+        with open(filename, "r") as fp:
             content = fp.read()
-        os.unlink(tmp.name)
         self.assertEquals("REPLACED\nREPLACED\nbar\nbaz\n", content)
 
     def test__enable_service(self):
         """Create a simple service enablement of a file with comments."""
-        target = tempfile.NamedTemporaryFile(delete=False)
+        target = self.makeFile()
         with self._default_file as fp:
             fp.write("# Comment test\nRUN_APPSERVER=\"no\"\nRUN_CRON=\"yes\"")
-        with target as fp:
+        with open(target, "w") as fp:
             fp.write("# Comment test\nRUN_APPSERVER=3\nRUN_CRON=no")
         hooks.juju.config["services"] = "appserver"
         hooks._enable_services()
-        self.assertFilesEqual(self._default_file.name, target.name)
-        os.unlink(target.name)
-        pass
+        self.assertFilesEqual(self._default_file.name, target)
 
     def test__enable_wrong_service(self):
         """Enable an unknown service, make sure exception is raised."""
-        default = tempfile.NamedTemporaryFile(delete=False)
-        with default as fp:
+        default = self.makeFile()
+        with open(default, "w") as fp:
             fp.write("# Comment test\nRUN_APPSERVER=\"no\"")
-        hooks.LANDSCAPE_DEFAULT_FILE = default.name
+        hooks.LANDSCAPE_DEFAULT_FILE = default
         hooks.juju.config["services"] = "INVALID_SERVICE_NAME"
         self.assertRaises(Exception, hooks._enable_services)
-        os.unlink(default.name)
-        pass
 
     def test__install_license_text(self):
         """Install a license with as a string."""
@@ -194,14 +188,13 @@ class TestHooksService(TestHooks):
 
     def test__install_license_url(self):
         """Install a license with as a url."""
-        source = tempfile.NamedTemporaryFile(delete=False)
-        with source as fp:
+        source = self.makeFile()
+        with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
-        hooks.juju.config["license-file"] = "file://%s" % source.name
+        hooks.juju.config["license-file"] = "file://%s" % source
         hooks._install_license()
         self.assertFileContains(
             self._license_dest.name, "LICENSE_FILE_TEXT from curl")
-        os.unlink(source.name)
 
     def test_config_changed(self):
         """
@@ -429,9 +422,7 @@ class TestHooksService(TestHooks):
 
     def test_maintenance(self):
         """When maintenance is set, a file is created on the filesystem."""
-        filename = tempfile.NamedTemporaryFile(delete=False).name
-        os.unlink(filename)
-        hooks.LANDSCAPE_MAINTENANCE = filename
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
         hooks.juju.config["maintenance"] = True
         hooks._set_maintenance()
         self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
@@ -528,12 +519,11 @@ class TestHooksServiceMock(TestHooks):
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
-        handle, self.filename = tempfile.mkstemp()
+        self.filename = self.makeFile()
         file(self.filename, "w").write("<html></html>")
         self.mock_service_data()
 
     def tearDown(self):
-        os.remove(self.filename)
         self.restore_service_data()
         super(TestHooksServiceMock, self).tearDown()
 
