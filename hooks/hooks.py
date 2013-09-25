@@ -24,6 +24,109 @@ from subprocess import check_call, check_output
 from ConfigParser import RawConfigParser, Error
 
 
+def website_relation_joined():
+    host = juju.unit_get("private-address")
+    # N.B.: Port setting necessary due to limitations with haproxy charm
+    juju.relation_set(
+            services=yaml.safe_dump(_get_services_haproxy()),
+            hostname=host, port=80)
+
+
+def notify_website_relation():
+    """
+    Notify the website relation of changes to the services.  Juju optimizes
+    duplicate values out of this, so we don't need to worry about calling it
+    only in case of a change
+    """
+    juju.juju_log(yaml.safe_dump(_get_services_haproxy()))
+    for id in juju.relation_ids("website"):
+        juju.relation_set(
+            relation_id=id,
+            services=yaml.safe_dump(_get_services_haproxy()))
+
+
+def db_admin_relation_joined():
+    pass
+
+
+def db_admin_relation_changed():
+    host = check_output(["relation-get", "host"]).strip()
+    admin = check_output(["relation-get", "user"]).strip()
+    admin_password = check_output(["relation-get", "password"]).strip()
+    allowed_units = check_output(["relation-get", "allowed-units"]).strip()
+    unit_name = os.environ["JUJU_UNIT_NAME"]
+    user = "landscape"
+    password = "landscape"
+
+    if not host or not admin or not admin_password:
+        juju.juju_log("Need host, user and password in relation"
+            " before proceeding")
+        return
+
+    if not allowed_units or unit_name not in allowed_units:
+        juju.juju_log("%s not in allowed_units yet (%s)" % (
+            unit_name, allowed_units))
+        return
+
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+    parser.set("stores", "host", host)
+    parser.set("stores", "port", "5432")
+    parser.set("stores", "user", user)
+    parser.set("stores", "password", password)
+    parser.set("schema", "store_user", admin)
+    parser.set("schema", "store_password", admin_password)
+    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+        parser.write(output_file)
+
+    # Create the inital landscape user (to have a known password)
+    util.create_user(host, admin, admin_password, user, password)
+
+    # Setup the landscape server and restart services.  The method
+    # is smart enough to skip if nothing needs to be done, and
+    # protect against concurrent access to the database.
+    util.setup_landscape_server(host, admin, admin_password)
+    _lsctl("restart")
+
+
+def amqp_relation_joined():
+    juju.relation_set("username=landscape")
+    juju.relation_set("vhost=landscape")
+
+
+def amqp_relation_changed():
+    password = check_output(["relation-get", "password"]).strip()
+    host = check_output(["relation-get", "hostname"]).strip()
+
+    juju.juju_log("Using AMPQ server at %s" % host)
+
+    if password == "":
+        sys.exit(0)
+
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+
+    parser.set("broker", "password", password)
+    parser.set("broker", "host", host)
+    parser.set("broker", "user", "landscape")
+
+    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+        parser.write(output_file)
+
+
+def config_changed():
+    _lsctl("stop")
+    _install_license()
+    _enable_services()
+    _set_maintenance()
+    _set_upgrade_schema()
+
+    if _is_db_up():
+        _lsctl("start")
+
+    notify_website_relation()
+
+
 def _download_file(url):
     """ Download from a url and save to the filename given """
     buf = cStringIO.StringIO()
@@ -317,96 +420,6 @@ def _set_upgrade_schema():
         "%s=%s" % ("UPGRADE_SCHEMA", value))
 
 
-def website_relation_joined():
-    host = juju.unit_get("private-address")
-    # N.B.: Port setting necessary due to limitations with haproxy charm
-    juju.relation_set(
-            services=yaml.safe_dump(_get_services_haproxy()),
-            hostname=host, port=80)
-
-
-def notify_website_relation():
-    """
-    Notify the website relation of changes to the services.  Juju optimizes
-    duplicate values out of this, so we don't need to worry about calling it
-    only in case of a change
-    """
-    juju.juju_log(yaml.safe_dump(_get_services_haproxy()))
-    for id in juju.relation_ids("website"):
-        juju.relation_set(
-            relation_id=id,
-            services=yaml.safe_dump(_get_services_haproxy()))
-
-
-def db_admin_relation_joined():
-    pass
-
-
-def db_admin_relation_changed():
-    host = check_output(["relation-get", "host"]).strip()
-    admin = check_output(["relation-get", "user"]).strip()
-    admin_password = check_output(["relation-get", "password"]).strip()
-    allowed_units = check_output(["relation-get", "allowed-units"]).strip()
-    unit_name = os.environ["JUJU_UNIT_NAME"]
-    user = "landscape"
-    password = "landscape"
-
-    if not host or not admin or not admin_password:
-        juju.juju_log("Need host, user and password in relation"
-            " before proceeding")
-        return
-
-    if not allowed_units or unit_name not in allowed_units:
-        juju.juju_log("%s not in allowed_units yet (%s)" % (
-            unit_name, allowed_units))
-        return
-
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
-    parser.set("stores", "host", host)
-    parser.set("stores", "port", "5432")
-    parser.set("stores", "user", user)
-    parser.set("stores", "password", password)
-    parser.set("schema", "store_user", admin)
-    parser.set("schema", "store_password", admin_password)
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
-
-    # Create the inital landscape user (to have a known password)
-    util.create_user(host, admin, admin_password, user, password)
-
-    # Setup the landscape server and restart services.  The method
-    # is smart enough to skip if nothing needs to be done, and
-    # protect against concurrent access to the database.
-    util.setup_landscape_server(host, admin, admin_password)
-    _lsctl("restart")
-
-
-def amqp_relation_joined():
-    juju.relation_set("username=landscape")
-    juju.relation_set("vhost=landscape")
-
-
-def amqp_relation_changed():
-    password = check_output(["relation-get", "password"]).strip()
-    host = check_output(["relation-get", "hostname"]).strip()
-
-    juju.juju_log("Using AMPQ server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
-
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
-
-    parser.set("broker", "password", password)
-    parser.set("broker", "host", host)
-    parser.set("broker", "user", "landscape")
-
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
-
-
 def _is_db_up():
     """Return True if the database is accessible, False otherwise."""
     parser = RawConfigParser()
@@ -422,19 +435,6 @@ def _is_db_up():
         return False
     except Error:
         return False
-
-
-def config_changed():
-    _lsctl("stop")
-    _install_license()
-    _enable_services()
-    _set_maintenance()
-    _set_upgrade_schema()
-
-    if _is_db_up():
-        _lsctl("start")
-
-    notify_website_relation()
 
 
 ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
