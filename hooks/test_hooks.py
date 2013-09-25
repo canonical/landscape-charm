@@ -1,5 +1,4 @@
 import hooks
-import unittest
 import yaml
 import os
 import pycurl
@@ -300,7 +299,6 @@ class TestHooksService(TestHooks):
         self.mocker.replay()
 
         hooks.config_changed()
-
 
     def test_calc_daemon_count(self):
         """

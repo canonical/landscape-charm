@@ -60,7 +60,7 @@ def is_db_up(database, host, user, password):
     try:
         conn = connect(database="postgres", host=host, user=user,
                        password=password)
-        cur = conn.cursor()
+        conn.cursor()
         return True
     except Exception as e:
         juju.juju_log(str(e))

@@ -20,7 +20,7 @@ import psutil
 import datetime
 from copy import deepcopy
 from base64 import b64encode
-from subprocess import check_call, check_output, call
+from subprocess import check_call, check_output
 from ConfigParser import RawConfigParser, Error
 
 
@@ -403,7 +403,7 @@ def amqp_relation_changed():
     parser.set("broker", "host", host)
     parser.set("broker", "user", "landscape")
 
-    with open(config_file, "w+") as output_file:
+    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
 
