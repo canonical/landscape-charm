@@ -51,3 +51,22 @@ def create_user(host, admin_user, admin_password, user, password):
             conn.commit()
     finally:
         conn.close()
+
+
+def is_db_up(database, host, user, password):
+    """
+    Return True if the database relation is configured, False otherwise.
+    """
+    try:
+        conn = connect(database="postgres", host=host, user=user,
+                       password=password)
+        conn.cursor()
+        return True
+    except Exception as e:
+        juju.juju_log(str(e))
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
