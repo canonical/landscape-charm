@@ -18,12 +18,13 @@ class Juju(object):
             context of relation).  Will be stripped from kwargs if present.
             if you need to set this, use an arg style argument "k=v"
         """
-        args = ["relation-set"]
+        cmd = ["relation-set"]
         if "relation_id" in kwargs:
-            args.extend(["-r", kwargs["relation_id"]])
+            cmd.extend(["-r", kwargs["relation_id"]])
             del kwargs["relation_id"]
-        args.extend("%s=%s" % (key, val) for key, val in kwargs.iteritems())
-        subprocess.call(args)
+        cmd.extend("%s=%s" % (key, val) for key, val in kwargs.iteritems())
+        cmd.extend(args)
+        subprocess.call(cmd)
 
     def relation_ids(self, relation_name=None):
         """
