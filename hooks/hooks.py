@@ -50,10 +50,10 @@ def db_admin_relation_joined():
 
 
 def db_admin_relation_changed():
-    host = check_output(["relation-get", "host"]).strip()
-    admin = check_output(["relation-get", "user"]).strip()
-    admin_password = check_output(["relation-get", "password"]).strip()
-    allowed_units = check_output(["relation-get", "allowed-units"]).strip()
+    host = juju.relation_get("host")
+    admin = juju.relation_get("user")
+    admin_password = juju.relation_get("password")
+    allowed_units = juju.relation_get("allowed-units")
     unit_name = os.environ["JUJU_UNIT_NAME"]
     user = "landscape"
     password = "landscape"
@@ -95,8 +95,8 @@ def amqp_relation_joined():
 
 
 def amqp_relation_changed():
-    password = check_output(["relation-get", "password"]).strip()
-    host = check_output(["relation-get", "hostname"]).strip()
+    password = juju.relation_get("password")
+    host = juju.relation_get("hostname")
 
     juju.juju_log("Using AMPQ server at %s" % host)
 
