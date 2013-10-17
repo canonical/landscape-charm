@@ -20,7 +20,7 @@ import psutil
 import datetime
 from copy import deepcopy
 from base64 import b64encode
-from subprocess import check_call, check_output
+from subprocess import check_call
 from ConfigParser import RawConfigParser, Error
 
 
