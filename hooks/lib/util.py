@@ -2,8 +2,9 @@
 Utility library for juju hooks
 """
 
+from contextlib import closing
 from subprocess import check_call
-from psycopg2 import connect
+from psycopg2 import connect, IntegrityError
 import sys
 from juju import Juju
 
@@ -12,21 +13,29 @@ juju = Juju()
 
 def setup_landscape_server(host, admin_user, admin_password):
     """
-    Wrapper around setup-landscape-server.  I need to do this in a safe way in
+    Wrapper around setup-landscape-server.  We need to do this in a safe way in
     a distributed environment since multiple landscape servers could be
     accessing the database at the same time.
     """
-    conn = connect(database="postgres", host=host, user=admin_user,
-                   password=admin_password)
-    try:
-        cur = conn.cursor()
-        cur.execute(
-                "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
-        cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
-        juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
-        check_call("setup-landscape-server")
-    finally:
-        conn.close()
+    with closing(connect(database="postgres", host=host, user=admin_user,
+                         password=admin_password)) as conn:
+        with closing(conn.cursor()) as cursor:
+            try:
+                cursor.execute(
+                    "CREATE TABLE IF NOT EXISTS "
+                    "landscape_install_lock (id serial PRIMARY KEY)")
+            except IntegrityError:
+                # Two CREATE TABLE statements can conflict even with
+                # the IF NOT EXISTS clause
+                conn.rollback()
+            else:
+                conn.commit()
+        with closing(conn.cursor()) as cursor:
+            cursor.execute(
+                "LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE")
+            juju.juju_log(
+                "Mutex acquired on landscape_install_lock, Proceeding")
+            check_call("setup-landscape-server")
 
 
 def create_user(host, admin_user, admin_password, user, password):
@@ -43,11 +52,12 @@ def create_user(host, admin_user, admin_password, user, password):
 
     try:
         cur = conn.cursor()
-        cur.execute("select usename from pg_user where usename='%s'" % user)
+        cur.execute("SELECT usename FROM pg_user WHERE usename=%s", (user, ))
         result = cur.fetchall()
         if not result:
             print "Creating landscape user"
-            cur.execute("create user %s with password '%s'" % (user, password))
+            cur.execute(
+                "CREATE USER %s WITH PASSWORD %%s" % user, (password, ))
             conn.commit()
     finally:
         conn.close()

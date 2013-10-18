@@ -34,7 +34,6 @@ class TestJuju(object):
         for arg in args:
             (key, value) = arg.split("=")
             self._relation_data[key] = value
-        pass
 
     def relation_ids(self, relation_name="website"):
         """
@@ -138,7 +137,7 @@ class TestHooksService(TestHooks):
         with open(filename, "w") as fp:
             fp.write("foobar")
         output = hooks._download_file("file://%s" % filename)
-        self.assertTrue("foobar" in output)
+        self.assertIn("foobar", output)
 
     def test__download_file_failure(self):
         """The fail path of download file raises an exception."""
@@ -158,7 +157,7 @@ class TestHooksService(TestHooks):
 
         with open(filename, "r") as fp:
             content = fp.read()
-        self.assertEquals("REPLACED\nREPLACED\nbar\nbaz\n", content)
+        self.assertEqual("REPLACED\nREPLACED\nbar\nbaz\n", content)
 
     def test__enable_service(self):
         """Create a simple service enablement of a file with comments."""
@@ -267,7 +266,7 @@ class TestHooksService(TestHooks):
         self.assertIn("services", data)
         for service in yaml.load(data["services"]):
             if service["service_name"] == "appserver":
-                self.assertEquals(len(service["servers"]), 2)
+                self.assertEqual(len(service["servers"]), 2)
                 break
         else:
             assert False, "Didn't find element 'appserver'"
@@ -490,6 +489,7 @@ class TestHooksService(TestHooks):
 
 
 class TestHooksServiceMock(TestHooks):
+
     all_services = [
             {"service_name": "foo",
              "servers": [[
