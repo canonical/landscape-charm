@@ -10,9 +10,7 @@ options:
             Landscape services listed as space-separated entries.  Valid
             services are: appserver, msgserver, pingserver, combo-loader,
             async-frontend, apiserver, package-upload, package-search, cron,
-            juju-sync and static.  This field is effecitvely immutable.  If
-            not set before the charm is installed, changes to it will be
-            ignored.
+            juju-sync and static.
         type: string
     service-count:
         type: string
