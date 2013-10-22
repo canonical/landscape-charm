@@ -9,8 +9,8 @@ options:
         description: |
             Landscape services listed as space-separated entries.  Valid
             services are: appserver, msgserver, pingserver, combo-loader,
-            async-frontend, apiserver, package-upload, package-search, cron,
-            juju-sync and static.
+            async-frontend, apiserver, package-upload, jobhandler,
+            package-search, juju-sync, cron and static.
         type: string
     service-count:
         type: string
