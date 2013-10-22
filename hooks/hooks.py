@@ -56,7 +56,7 @@ def db_admin_relation_changed():
     allowed_units = juju.relation_get("allowed-units")
     unit_name = os.environ["JUJU_UNIT_NAME"]
     user = "landscape"
-    password = "landscape"
+    password = util.generate_password()
 
     if not host or not admin or not admin_password:
         juju.juju_log("Need host, user and password in relation"
