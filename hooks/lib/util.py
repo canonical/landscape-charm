@@ -3,6 +3,7 @@ Utility library for juju hooks
 """
 
 from contextlib import closing
+from random import choice
 from subprocess import check_call
 from psycopg2 import connect, IntegrityError
 import sys
