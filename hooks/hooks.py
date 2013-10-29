@@ -56,7 +56,7 @@ def db_admin_relation_changed():
     allowed_units = juju.relation_get("allowed-units")
     unit_name = os.environ["JUJU_UNIT_NAME"]
     user = "landscape"
-    password = util.generate_password()
+    password = juju.config_get("landscape-password")
 
     if not host or not admin or not admin_password:
         juju.juju_log("Need host, user and password in relation"
@@ -79,7 +79,7 @@ def db_admin_relation_changed():
     with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
-    # Create the inital landscape user (to have a known password)
+    # Create the inital landscape user
     util.create_user(host, admin, admin_password, user, password)
 
     # Setup the landscape server and restart services.  The method

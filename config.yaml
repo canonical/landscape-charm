@@ -5,6 +5,10 @@ options:
     license-file:
         description: License file for LDS
         type: string
+    landscape-password:
+        description: The password to use for the landscape DB user.
+        type: string
+        default: "landscape"
     services:
         description: |
             Landscape services listed as space-separated entries.  Valid
