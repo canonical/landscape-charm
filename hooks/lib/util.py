@@ -3,7 +3,6 @@ Utility library for juju hooks
 """
 
 from contextlib import closing
-from random import choice
 from subprocess import check_call
 from psycopg2 import connect, IntegrityError
 import sys
@@ -81,10 +80,4 @@ def is_db_up(database, host, user, password):
             conn.close()
         except Exception:
             pass
-
-def generate_password(length=16):
-    """Return a randomly chosen password string."""
-    allowed_characters = ("ABCDEFGHIJKLMNPQRSTUVWXYZabcdefghijkmnopqrstu"
-                          "vwxyz0123456789^_-.")
-    return ''.join([choice(allowed_characters) for i in range(length)])
 

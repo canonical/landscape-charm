@@ -5,6 +5,13 @@ options:
     license-file:
         description: License file for LDS
         type: string
+    landscape-password:
+        description: |
+            The password to use for the landscape DB user. If you change this
+            post-deployment via juju set, you will have to change the password
+            in the DB manually as the charm won't do it for you yet.
+        type: string
+        default: "landscape"
     services:
         description: |
             Landscape services listed as space-separated entries.  Valid
