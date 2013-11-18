@@ -10,8 +10,6 @@
     ProxyVia on
     ProxyTimeout 10
 
-    #Alias /packages /srv/staging.landscape.canonical.com/packages
-
     <Location "/">
         Order deny,allow
         Deny from all
@@ -26,12 +24,10 @@
         ExpiresDefault "access plus 10 years"
         Header append Cache-Control "public"
     </Location>
-    <Location "/packages">
-        Order allow,deny
-        Allow from all
-    </Location>
     <Location "/static">
         Options -Indexes
+        Order allow,deny
+        Allow from all
     </Location>
 
     RewriteEngine On
@@ -60,7 +56,6 @@
     RewriteRule ^/(server-status.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(packages.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(message-system.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(robots.txt) http://{{ haproxy_static }}/$1 [P,L]
 
