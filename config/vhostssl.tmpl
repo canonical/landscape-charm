@@ -41,6 +41,7 @@
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
 
     RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
 
