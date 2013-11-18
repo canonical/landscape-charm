@@ -29,6 +29,10 @@
         Order allow,deny
         Allow from all
     </Location>
+    <Location "/repository">
+        Order allow,deny
+        Allow from all
+    </Location>
     <Location "/icons">
         Options -Indexes
         Order allow,deny
@@ -61,6 +65,7 @@
     RewriteRule ^/(server-status.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(robots.txt) http://{{ haproxy_static }}/$1 [P,L]
 
     # Everything else needs to go over https
