@@ -42,22 +42,11 @@
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
+    RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
 
     RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
 
 # TODO: put in some place?
-#    Alias /packages /srv/staging.landscape.canonical.com/packages
-#    <Directory "/srv/landscape.canonical.com/packages">
-#        Order allow,deny
-#        Allow from all
-#    </Directory>
-#    <Location "/packages">
-#       Order allow,deny
-#       Allow from all
-#    </Location>
-#    <Location "/static">
-#       Options -Indexes
-#    </Location>
 #    <Files "*.woff">
 #       FileETag None
 #       Header append Cache-Control "max-age=2592000,public"
