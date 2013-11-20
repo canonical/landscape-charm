@@ -20,21 +20,10 @@ NameVirtualHost *:80
      ErrorDocument 404 /static/offline/notfound.html
    </Directory>
 
-   Alias /packages /opt/canonical/landscape/packages
    Alias /static /opt/canonical/landscape/canonical/landscape/static
    Alias /repository /var/lib/landscape/landscape-repository
    Alias /config /opt/canonical/landscape/apacheroot
    Alias /hash-id-databases /var/lib/landscape/hash-id-databases
-
-   <Directory "/opt/canonical/landscape/packages">
-     Order allow,deny
-     Allow from all
-   </Directory>
-
-   <Location "/packages">
-     Order allow,deny
-     Allow from all
-   </Location>
 
    <Location "/repository">
      Order deny,allow
