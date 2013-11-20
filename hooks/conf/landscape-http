@@ -52,12 +52,4 @@ NameVirtualHost *:80
      # Make sure proxies don't deliver the wrong content
      Header append Vary User-Agent env=!dont-vary
    </Location>
-
-#   <Location "/r">
-#     FileETag none
-#     ExpiresActive on
-#     ExpiresDefault "access plus 10 years"
-#     Header append Cache-Control "public"
-#   </Location>
-#
 </VirtualHost>
