@@ -11,14 +11,6 @@
     SSLCertificateKeyFile /etc/ssl/private/apache2.key
 
     ProxyRequests off
-    <Proxy *>
-        Order Allow,Deny
-        Allow from All
-        #ErrorDocument 403 /offline.html
-        #ErrorDocument 500 /offline.html
-        #ErrorDocument 502 /offline.html
-        #ErrorDocument 503 /offline.html
-    </Proxy>
 
     ProxyPreserveHost On
     ProxyPassReverse / http://{{ haproxy_static }}/
