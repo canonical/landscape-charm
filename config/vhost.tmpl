@@ -19,6 +19,8 @@
         Allow from all
     </Location>
     <Location "/r">
+        Order allow,deny
+        Allow from all
         FileETag none
         ExpiresActive on
         ExpiresDefault "access plus 10 years"
