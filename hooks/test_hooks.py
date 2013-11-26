@@ -299,6 +299,91 @@ class TestHooksService(TestHooks):
 
         hooks.config_changed()
 
+    def test_db_admin_relation_changed(self):
+        """
+        db_admin_relation_changed creates the database user and sets up
+        landscape.
+        """
+        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
+            "allowed-units": "landscape/0 landscape/1"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: "def456"
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("stores")
+        parser.add_section("schema")
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive("postgres/0", "auto_db_admin", "abc123")
+        connection = self.mocker.mock()
+        self.mocker.result(connection)
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(connection, "landscape", "def456")
+        check_call = self.mocker.replace(hooks.check_call)
+        check_call("setup-landscape-server")
+        connection.close()
+        self.mocker.replay()
+
+        hooks.db_admin_relation_changed()
+
+    def test_db_admin_relation_changed_no_user(self):
+        """
+        db_admin_relation_changed does not configure landscape when the database
+        is not yet configured.
+        """
+        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/0", "user": "", "password": "",
+            "allowed-units": "landscape/0 landscape/1"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        hooks.db_admin_relation_changed()
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual([], parser.sections())
+
+    def test_db_admin_relation_changed_not_in_allowed_units(self):
+        """
+        db_admin_relation_changed does not configure landscape when the unit is
+        not in allowed_units.  allowed_units is the postgres charm's official
+        signal that database configuration can begin.
+        """
+        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
+            "allowed-units": "landscape/0"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        hooks.db_admin_relation_changed()
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual([], parser.sections())
+
     def test_calc_daemon_count(self):
         """
         Test various interesting inputs of _calc_daemon_count.
