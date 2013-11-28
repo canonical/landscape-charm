@@ -18,6 +18,7 @@ import pycurl
 import cStringIO
 import psutil
 import datetime
+import psycopg2
 from copy import deepcopy
 from base64 import b64encode
 from subprocess import check_call
