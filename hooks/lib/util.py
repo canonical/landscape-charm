@@ -26,7 +26,7 @@ def connect_exclusive(host, admin_user, admin_password):
             "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
         cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
         juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
-    except Exception:
+    except:
         juju.juju_log("Mutex acquire on landscape_install_lock failed.")
         conn.close()
         raise
@@ -59,6 +59,6 @@ def is_db_up(database, host, user, password):
     finally:
         try:
             conn.close()
-        except Exception:
+        except:
             pass
 
