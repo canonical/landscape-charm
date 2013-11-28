@@ -36,11 +36,11 @@ def connect_exclusive(host, admin_user, admin_password):
 def create_user(conn, user, password):
     """Create a user in the database if one does not already exist."""
     cur = conn.cursor()
-    cur.execute("select usename from pg_user where usename='%s'" % user)
+    cur.execute("SELECT usename FROM pg_user WHERE usename='%s'" % user)
     result = cur.fetchall()
     if not result:
         juju.juju_log("Creating landscape db user")
-        cur.execute("create user %s with password '%s'" % (user, password))
+        cur.execute("CREATE user %s WITH PASSWORD '%s'" % (user, password))
         conn.commit()
 
 
