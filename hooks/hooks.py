@@ -18,6 +18,7 @@ import pycurl
 import cStringIO
 import psutil
 import datetime
+import psycopg2
 from copy import deepcopy
 from base64 import b64encode
 from subprocess import check_call
@@ -79,14 +80,24 @@ def db_admin_relation_changed():
     with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
-    # Create the inital landscape user
-    util.create_user(host, admin, admin_password, user, password)
+    try:
+        conn = util.connect_exclusive(host, admin, admin_password)
+    except psycopg2.Error:
+        # Another unit is performing database configuration.
+        pass
+    else:
+        try:
+            util.create_user(conn, user, password)
+            check_call("setup-landscape-server")
+        finally:
+            conn.close()
 
-    # Setup the landscape server and restart services.  The method
-    # is smart enough to skip if nothing needs to be done, and
-    # protect against concurrent access to the database.
-    util.setup_landscape_server(host, admin, admin_password)
-    _lsctl("restart")
+    try:
+        # Handle remove-relation db-admin.  This call will fail because
+        # database access has already been removed.
+        _lsctl("restart")
+    except Exception as e:
+        juju.juju_log(str(e), level="DEBUG")
 
 
 def amqp_relation_joined():

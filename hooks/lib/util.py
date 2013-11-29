@@ -11,56 +11,37 @@ from juju import Juju
 juju = Juju()
 
 
-def setup_landscape_server(host, admin_user, admin_password):
+def connect_exclusive(host, admin_user, admin_password):
     """
-    Wrapper around setup-landscape-server.  We need to do this in a safe way in
-    a distributed environment since multiple landscape servers could be
-    accessing the database at the same time.
+    database user creation and setup-landscape-server need to be done in a
+    safe way so multiple units do not try to configure landscape at the same
+    time.  This method succeeds on the first unit and fails on every other
+    unit.
     """
-    with closing(connect(database="postgres", host=host, user=admin_user,
-                         password=admin_password)) as conn:
-        with closing(conn.cursor()) as cursor:
-            try:
-                cursor.execute(
-                    "CREATE TABLE IF NOT EXISTS "
-                    "landscape_install_lock (id serial PRIMARY KEY)")
-            except IntegrityError:
-                # Two CREATE TABLE statements can conflict even with
-                # the IF NOT EXISTS clause
-                conn.rollback()
-            else:
-                conn.commit()
-        with closing(conn.cursor()) as cursor:
-            cursor.execute(
-                "LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE")
-            juju.juju_log(
-                "Mutex acquired on landscape_install_lock, Proceeding")
-            check_call("setup-landscape-server")
-
-
-def create_user(host, admin_user, admin_password, user, password):
-    """
-    Create a user in the database.  Attempts to connect to the database
-    first as the admin user just to check
-    """
-    try:
-        conn = connect(database="postgres", host=host, user=admin_user,
-                       password=admin_password)
-    except Exception:
-        print "Error connecting to database as %s" % admin_user
-        sys.exit(1)
-
+    conn = connect(database="postgres", host=host, user=admin_user,
+                   password=admin_password)
     try:
         cur = conn.cursor()
-        cur.execute("SELECT usename FROM pg_user WHERE usename=%s", (user, ))
-        result = cur.fetchall()
-        if not result:
-            print "Creating landscape user"
-            cur.execute(
-                "CREATE USER %s WITH PASSWORD %%s" % user, (password, ))
-            conn.commit()
-    finally:
+        cur.execute(
+            "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
+        cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
+        juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
+    except:
+        juju.juju_log("Mutex acquire on landscape_install_lock failed.")
         conn.close()
+        raise
+    return conn
+
+
+def create_user(conn, user, password):
+    """Create a user in the database if one does not already exist."""
+    cur = conn.cursor()
+    cur.execute("SELECT usename FROM pg_user WHERE usename='%s'" % user)
+    result = cur.fetchall()
+    if not result:
+        juju.juju_log("Creating landscape db user")
+        cur.execute("CREATE user %s WITH PASSWORD '%s'" % (user, password))
+        conn.commit()
 
 
 def is_db_up(database, host, user, password):
@@ -78,6 +59,6 @@ def is_db_up(database, host, user, password):
     finally:
         try:
             conn.close()
-        except Exception:
+        except:
             pass
 
