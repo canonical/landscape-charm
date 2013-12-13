@@ -55,7 +55,9 @@ def db_admin_relation_changed():
     admin = juju.relation_get("user")
     admin_password = juju.relation_get("password")
     allowed_units = juju.relation_get("allowed-units")
-    unit_name = os.environ["JUJU_UNIT_NAME"]
+    remote_state = juju.relation_get("state")
+    unit_name = juju.local_unit()
+
     user = "landscape"
     password = juju.config_get("landscape-password")
 
@@ -69,6 +71,25 @@ def db_admin_relation_changed():
             unit_name, allowed_units))
         return
 
+    # Cluster aware: Ignore standby, failover and transition states
+    ignored_states = ["hot standby", "failover"]
+    db_relations = juju.relation_list()
+    if len(db_relations) > 1:
+        juju.juju_log(
+            "Our database is clustered with %s units."
+            "Ignoring any intermittent 'standalone' states."
+            % len(db_relations))
+        ignored_states.append("standalone")
+      
+    if remote_state is None or remote_state in ignored_states:
+        juju.juju_log(
+            "No config changes made. Invalid state '%s' for host %s." %
+            (remote_state, host))
+        return
+
+    juju.juju_log(
+        "Updating config due to database changes.")
+    
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     parser.set("stores", "host", host)
@@ -77,8 +98,24 @@ def db_admin_relation_changed():
     parser.set("stores", "password", password)
     parser.set("schema", "store_user", admin)
     parser.set("schema", "store_password", admin_password)
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+   
+    # Write new changes to LANDSCAPE_NEW_SERVICE_CONF to test first 
+    with open(LANDSCAPE_NEW_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
+
+    try: 
+        if not util.is_db_up("postgres", host, admin, admin_password):
+            juju.juju_log(
+                "Ignoring config changes. Because new service settings don't "
+                "have proper permissions setup on the host %s." % host)
+            return
+    except Exception as e:
+        juju.juju_log("Should never get here: %s" % str(e), level="DEBUG")
+        return
+    else:
+        # Changes are validated that db is and and has write access
+        with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+            parser.write(output_file)
 
     try:
         conn = util.connect_exclusive(host, admin, admin_password)
@@ -431,10 +468,14 @@ def _set_upgrade_schema():
         "%s=%s" % ("UPGRADE_SCHEMA", value))
 
 
-def _is_db_up():
-    """Return True if the database is accessible, False otherwise."""
+def _is_db_up(conf_file=None):
+    """
+    Return True if the database is accessible and read/write, False otherwise.
+    """
+    if conf_file is None:
+        conf_file = LANDSCAPE_SERVICE_CONF
     parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+    parser.read([conf_file])
     try:
         database = parser.get("stores", "main")
         host = parser.get("stores", "host")
@@ -518,6 +559,7 @@ SERVICE_DEFAULT = {
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
+LANDSCAPE_NEW_SERVICE_CONF = "/etc/landscape/service.conf.new"
 LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 ROOT = os.path.abspath(os.path.curdir)
