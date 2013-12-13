@@ -51,7 +51,11 @@ def is_db_up(database, host, user, password):
     try:
         conn = connect(database="postgres", host=host, user=user,
                        password=password)
-        conn.cursor()
+        cur = conn.cursor()
+        # Ensure we are user with write access, to avoid hot standby dbs
+        cur.execute(
+            "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY);"
+            % juju.local_unit().replace("/","_"))
         return True
     except Exception as e:
         juju.juju_log(str(e))
