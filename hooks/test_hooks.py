@@ -1,5 +1,3 @@
-from cStringIO import StringIO
-import logging
 import hooks
 import yaml
 import os
@@ -19,11 +17,6 @@ class TestJuju(object):
     _relation_list = ["postgres/0"]
 
     def __init__(self):
-        self.logger = logging.getLogger()
-        self.logfile = StringIO()
-        self.handler = logging.StreamHandler(self.logfile)
-        format = ("%(levelname)8s: %(message)s")
-        self.handler.setFormatter(logging.Formatter(format))
         self.config = {
             "services": "msgserver pingserver juju-sync",
             "license-file": "LICENSE_FILE_TEXT",
