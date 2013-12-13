@@ -2,11 +2,17 @@
 Simple python library for juju commands in the context of an
 executing hook.  Mostly wrappers around shell commands.
 """
+import os
 import json
 import subprocess
 
 
 class Juju(object):
+
+    # XXX let's look at pulling in charmhelpers lib into Landscape soon
+    def local_unit(self):
+        "Local unit ID"
+        return os.environ['JUJU_UNIT_NAME']
 
     def relation_set(self, *args, **kwargs):
         """
@@ -35,6 +41,15 @@ class Juju(object):
         args = ["relation-ids", "--format=json"]
         if relation_name is not None:
             args.append(relation_name)
+        return json.loads(subprocess.check_output(args))
+
+    def relation_list(self):
+        """
+        Wrapper around relation-list juju command.  output will be returned
+        from parsed json, which in the case of this command is a list of
+        strings.
+        """
+        args = ["relation-list", "--format=json"]
         return json.loads(subprocess.check_output(args))
 
     def unit_get(self, *args):
