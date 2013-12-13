@@ -1,3 +1,5 @@
+from cStringIO import StringIO
+import logging
 import hooks
 import yaml
 import os
@@ -14,8 +16,14 @@ class TestJuju(object):
     """
 
     _relation_data = {}
+    _relation_list = ["postgres/0"]
 
     def __init__(self):
+        self.logger = logging.getLogger()
+        self.logfile = StringIO()
+        self.handler = logging.StreamHandler(self.logfile)
+        format = ("%(levelname)8s: %(message)s")
+        self.handler.setFormatter(logging.Formatter(format))
         self.config = {
             "services": "msgserver pingserver juju-sync",
             "license-file": "LICENSE_FILE_TEXT",
@@ -42,12 +50,22 @@ class TestJuju(object):
         """
         return ["%s:1" % relation_name]
 
+    def relation_list(self):
+        """
+        Hardcode expected relation_list for tests.  Feel free to expand
+        as more tests are added.
+        """
+        return self._relation_list
+
     def unit_get(self, *args):
         """
         for now the only thing this is called for is "public-address",
         so it's a simplistic return.
         """
         return "localhost"
+
+    def local_unit(self):
+        return hooks.os.environ["JUJU_UNIT_NAME"]
 
     def juju_log(self, *args, **kwargs):
         pass
@@ -74,6 +92,9 @@ class TestHooks(mocker.MockerTestCase):
         hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
         self._service_conf = open(hooks.LANDSCAPE_SERVICE_CONF, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self._service_conf.name
+        hooks.LANDSCAPE_NEW_SERVICE_CONF = self.makeFile()
+        self._new_service_conf = open(hooks.LANDSCAPE_NEW_SERVICE_CONF, "w")
+        hooks.LANDSCAPE_NEW_SERVICE_CONF = self._new_service_conf.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None
@@ -307,7 +328,7 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
             "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0 landscape/1"}
+            "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
         self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -323,6 +344,9 @@ class TestHooksService(TestHooks):
         parser.write(self._service_conf)
         self._service_conf.seek(0)
 
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("postgres", "postgres/0", "auto_db_admin", "abc123")
+        self.mocker.result(True)
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
         connect_exclusive("postgres/0", "auto_db_admin", "abc123")
         connection = self.mocker.mock()
@@ -344,7 +368,7 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
             "host": "postgres/0", "user": "", "password": "",
-            "allowed-units": "landscape/0 landscape/1"}
+            "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
         self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -369,7 +393,7 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
             "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0"}
+            "allowed-units": "landscape/0", "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
         self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -377,6 +401,87 @@ class TestHooksService(TestHooks):
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        hooks.db_admin_relation_changed()
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual([], parser.sections())
+
+    def test_db_admin_relation_changed_hot_standby_state_ignore(self):
+        """
+        db_admin_relation_changed does not configure landscape when the unit
+        is in a C{hot standby} state.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
+            "allowed-units": "landscape/0", "state": "hot standby"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}  # allowed-units
+
+        hooks.db_admin_relation_changed()
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual([], parser.sections())
+
+    def test_db_admin_relation_changed_failover_state_ignore(self):
+        """
+        db_admin_relation_changed does not configure landscape when the unit
+        is in a C{failover} state.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
+            "allowed-units": "landscape/0", "state": "failover"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}  # allowed-units
+
+        hooks.db_admin_relation_changed()
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual([], parser.sections())
+
+    def test_db_admin_relation_changed_standalone_state_ignore(self):
+        """
+        When landscape is related to more than 1 postgres unit,
+        C{db_admin_relation_changed} does not reconfigure landscape on
+        receiving a C{standalone} state from additional new units. This
+        occurs just after an add-unit postgresql is called as the
+        new unit is installed, but that unit has not yet run any of its
+        C{replication-relation-joined} hooks and is unaware of its clustering.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.relation_gets = {
+            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
+            "allowed-units": "landscape/0", "state": "standalone"}
+        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(
+            setattr, hooks.juju, "_relation_list", ["postgres/0"])
+        hooks.juju._relation_list = ["postgres/0", "postgres/1"]
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}  # allowed-units
 
         hooks.db_admin_relation_changed()
 
