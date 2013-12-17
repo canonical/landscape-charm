@@ -478,8 +478,8 @@ def _is_db_up(conf_file=None):
         password = parser.get("stores", "password")
     except Error:
         return False
-
-    return util.is_db_up(database, host, user, password)
+    else:
+        return util.is_db_up(database, host, user, password)
 
 
 ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
