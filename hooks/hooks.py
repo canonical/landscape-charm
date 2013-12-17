@@ -80,16 +80,15 @@ def db_admin_relation_changed():
             "Ignoring any intermittent 'standalone' states."
             % len(db_relations))
         ignored_states.append("standalone")
-      
+
     if remote_state is None or remote_state in ignored_states:
         juju.juju_log(
             "No config changes made. Invalid state '%s' for host %s." %
             (remote_state, host))
         return
 
-    juju.juju_log(
-        "Updating config due to database changes.")
-    
+    juju.juju_log("Updating config due to database changes.")
+
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     parser.set("stores", "host", host)
@@ -98,24 +97,20 @@ def db_admin_relation_changed():
     parser.set("stores", "password", password)
     parser.set("schema", "store_user", admin)
     parser.set("schema", "store_password", admin_password)
-   
-    # Write new changes to LANDSCAPE_NEW_SERVICE_CONF to test first 
-    with open(LANDSCAPE_NEW_SERVICE_CONF, "w+") as output_file:
+
+    # Write new changes to LANDSCAPE_NEW_SERVICE_CONF to test first
+    with open(LANDSCAPE_NEW_SERVICE_CONF, "w") as output_file:
         parser.write(output_file)
 
-    try: 
-        if not util.is_db_up("postgres", host, admin, admin_password):
-            juju.juju_log(
-                "Ignoring config changes. Because new service settings don't "
-                "have proper permissions setup on the host %s." % host)
-            return
-    except Exception as e:
-        juju.juju_log("Should never get here: %s" % str(e), level="DEBUG")
+    if not util.is_db_up("postgres", host, admin, admin_password):
+        juju.juju_log(
+            "Ignoring config changes. Because new service settings don't "
+            "have proper permissions setup on the host %s." % host)
         return
-    else:
-        # Changes are validated that db is and and has write access
-        with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-            parser.write(output_file)
+
+    # Changes are validated that db is and and has write access
+    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+        parser.write(output_file)
 
     try:
         conn = util.connect_exclusive(host, admin, admin_password)
@@ -481,12 +476,10 @@ def _is_db_up(conf_file=None):
         host = parser.get("stores", "host")
         user = parser.get("stores", "user")
         password = parser.get("stores", "password")
-
-        if util.is_db_up(database, host, user, password):
-            return True
-        return False
     except Error:
         return False
+
+    return util.is_db_up(database, host, user, password)
 
 
 ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"

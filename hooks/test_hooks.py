@@ -14,7 +14,7 @@ class TestJuju(object):
     """
 
     _relation_data = {}
-    _relation_list = ["postgres/0"]
+    _relation_list = ("postgres/0",)
 
     def __init__(self):
         self.config = {
@@ -48,7 +48,7 @@ class TestJuju(object):
         Hardcode expected relation_list for tests.  Feel free to expand
         as more tests are added.
         """
-        return self._relation_list
+        return list(self._relation_list)
 
     def unit_get(self, *args):
         """
@@ -318,13 +318,16 @@ class TestHooksService(TestHooks):
         db_admin_relation_changed creates the database user and sets up
         landscape.
         """
-        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
-            "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
+            "host": "postgres/0", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0 landscape/1",
+            "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
-        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
         hooks.juju.config_get = lambda x: "def456"
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
@@ -355,18 +358,19 @@ class TestHooksService(TestHooks):
 
     def test_db_admin_relation_changed_no_user(self):
         """
-        db_admin_relation_changed does not configure landscape when the database
-        is not yet configured.
+        db_admin_relation_changed does not configure landscape when the
+        database is not yet configured.
         """
-        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
             "host": "postgres/0", "user": "", "password": "",
             "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
-        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
         hooks.juju.config_get = lambda x: ""
-
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
@@ -383,13 +387,16 @@ class TestHooksService(TestHooks):
         not in allowed_units.  allowed_units is the postgres charm's official
         signal that database configuration can begin.
         """
-        self.addCleanup(setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
+        self.addCleanup(
+            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
-            "host": "postgres/0", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0", "state": "standalone"}
+            "host": "postgres/0", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
-        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
         hooks.juju.config_get = lambda x: ""
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
@@ -409,11 +416,13 @@ class TestHooksService(TestHooks):
         self.addCleanup(
             setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0", "state": "hot standby"}
+            "host": "postgres/1", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "hot standby"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
-        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
         hooks.juju.config_get = lambda x: ""
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
@@ -433,11 +442,13 @@ class TestHooksService(TestHooks):
         self.addCleanup(
             setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0", "state": "failover"}
+            "host": "postgres/1", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "failover"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
-        self.addCleanup(setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
         hooks.juju.config_get = lambda x: ""
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
@@ -461,8 +472,9 @@ class TestHooksService(TestHooks):
         self.addCleanup(
             setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
         self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin", "password": "abc123",
-            "allowed-units": "landscape/0", "state": "standalone"}
+            "host": "postgres/1", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "standalone"}
         hooks.juju.relation_get = lambda x: self.relation_gets[x]
 
         self.addCleanup(
@@ -470,8 +482,8 @@ class TestHooksService(TestHooks):
         hooks.juju.config_get = lambda x: ""
 
         self.addCleanup(
-            setattr, hooks.juju, "_relation_list", ["postgres/0"])
-        hooks.juju._relation_list = ["postgres/0", "postgres/1"]
+            setattr, hooks.juju, "_relation_list", ("postgres/0",))
+        hooks.juju._relation_list = ("postgres/0", "postgres/1")
 
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}  # allowed-units

@@ -2,10 +2,7 @@
 Utility library for juju hooks
 """
 
-from contextlib import closing
-from subprocess import check_call
-from psycopg2 import connect, IntegrityError
-import sys
+from psycopg2 import connect
 from juju import Juju
 
 juju = Juju()
@@ -46,7 +43,8 @@ def create_user(conn, user, password):
 
 def is_db_up(database, host, user, password):
     """
-    Return True if the database relation is configured, False otherwise.
+    Return True if the database relation is configured with write permission,
+    False otherwise.
     """
     try:
         conn = connect(database="postgres", host=host, user=user,
@@ -54,8 +52,9 @@ def is_db_up(database, host, user, password):
         cur = conn.cursor()
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
-            "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY);"
-            % juju.local_unit().replace("/","_"))
+            "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY) "
+            "ON COMMIT DROP;"
+            % juju.local_unit().replace("/", "_"))
         return True
     except Exception as e:
         juju.juju_log(str(e))
@@ -65,4 +64,3 @@ def is_db_up(database, host, user, password):
             conn.close()
         except:
             pass
-
