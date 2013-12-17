@@ -59,7 +59,7 @@ def is_db_up(database, host, user, password):
     except Exception as e:
         juju.juju_log(str(e))
         return False
-    finally:
+    else:
         try:
             conn.close()
         except:
