@@ -55,11 +55,12 @@ def is_db_up(database, host, user, password):
             "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY) "
             "ON COMMIT DROP;"
             % juju.local_unit().replace("/", "_"))
-        return True
     except Exception as e:
         juju.juju_log(str(e))
         return False
     else:
+        return True
+    finally:
         try:
             conn.close()
         except:
