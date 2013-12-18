@@ -72,14 +72,14 @@ def db_admin_relation_changed():
         return
 
     # Cluster aware: Ignore standby, failover and transition states
-    ignored_states = ["hot standby", "failover"]
+    ignored_states = set(["hot standby", "failover"])
     db_relations = juju.relation_list()
     if len(db_relations) > 1:
         juju.juju_log(
             "Our database is clustered with %s units."
             "Ignoring any intermittent 'standalone' states."
             % len(db_relations))
-        ignored_states.append("standalone")
+        ignored_states.add("standalone")
 
     if remote_state is None or remote_state in ignored_states:
         juju.juju_log(
