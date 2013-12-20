@@ -20,7 +20,8 @@ def connect_exclusive(host, admin_user, admin_password):
     try:
         cur = conn.cursor()
         cur.execute(
-            "CREATE TABLE landscape_install_lock (id serial PRIMARY KEY);")
+            "CREATE TABLE IF NOT EXISTS "
+            "landscape_install_lock (id serial PRIMARY KEY);")
         cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
         juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
     except:
