@@ -84,10 +84,8 @@ class TestHooks(mocker.MockerTestCase):
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
         self._service_conf = open(hooks.LANDSCAPE_SERVICE_CONF, "w")
-        hooks.LANDSCAPE_SERVICE_CONF = self._service_conf.name
         hooks.LANDSCAPE_NEW_SERVICE_CONF = self.makeFile()
         self._new_service_conf = open(hooks.LANDSCAPE_NEW_SERVICE_CONF, "w")
-        hooks.LANDSCAPE_NEW_SERVICE_CONF = self._new_service_conf.name
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None

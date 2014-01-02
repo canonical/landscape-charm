@@ -73,12 +73,12 @@ def db_admin_relation_changed():
 
     # Cluster aware: Ignore standby, failover and transition states
     ignored_states = set(["hot standby", "failover"])
-    db_relations = juju.relation_list()
-    if len(db_relations) > 1:
+    relation_count = len(juju.relation_list())
+    if relation_count > 1:
         juju.juju_log(
             "Our database is clustered with %s units."
             "Ignoring any intermittent 'standalone' states."
-            % len(db_relations))
+            % relation_count)
         ignored_states.add("standalone")
 
     if remote_state is None or remote_state in ignored_states:
@@ -108,7 +108,7 @@ def db_admin_relation_changed():
             "have proper permissions setup on the host %s." % host)
         return
 
-    # Changes are validated that db is and and has write access
+    # Changes are validated; db is up has write-accessible
     with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
@@ -463,14 +463,12 @@ def _set_upgrade_schema():
         "%s=%s" % ("UPGRADE_SCHEMA", value))
 
 
-def _is_db_up(conf_file=None):
+def _is_db_up():
     """
     Return True if the database is accessible and read/write, False otherwise.
     """
-    if conf_file is None:
-        conf_file = LANDSCAPE_SERVICE_CONF
     parser = RawConfigParser()
-    parser.read([conf_file])
+    parser.read([LANDSCAPE_SERVICE_CONF])
     try:
         database = parser.get("stores", "main")
         host = parser.get("stores", "host")

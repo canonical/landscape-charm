@@ -11,8 +11,8 @@ class Juju(object):
 
     # XXX let's look at pulling in charmhelpers lib into Landscape soon
     def local_unit(self):
-        "Local unit ID"
-        return os.environ['JUJU_UNIT_NAME']
+        """Local unit ID"""
+        return os.environ["JUJU_UNIT_NAME"]
 
     def relation_set(self, *args, **kwargs):
         """
