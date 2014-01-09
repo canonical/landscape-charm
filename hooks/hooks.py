@@ -136,6 +136,10 @@ def amqp_relation_joined():
     juju.relation_set("username=landscape")
     juju.relation_set("vhost=landscape")
 
+def data_relation_changed():
+    juju.juju_log(
+        "External storage changed: requesting mountpoint /srv/juju/vol-0001")
+    juju.relation_set("mountpoint=/srv/juju/vol-0001")
 
 def amqp_relation_changed():
     password = juju.relation_get("password")
@@ -562,7 +566,7 @@ if __name__ == "__main__":
     hooks = {
         "config-changed": config_changed,
         "amqp-relation-joined": amqp_relation_joined,
-        "amqp-relation-changed": amqp_relation_changed,
+        "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
         "website-relation-joined": website_relation_joined}
