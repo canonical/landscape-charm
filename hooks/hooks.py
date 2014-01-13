@@ -140,6 +140,51 @@ def data_relation_changed():
     juju.juju_log(
         "External storage changed: requesting mountpoint /srv/juju/vol-0001")
     juju.relation_set("mountpoint=/srv/juju/vol-0001")
+    mointpoint = juju.relation_get("mointpoint")
+    if mountpoint != "/srv/juju/vol-0001": 
+        juju.juju_log(
+            "Awating storage mountpoint availability from storage relation")
+        sys.exit(0)
+    juju.log(
+        "Mounted external volume at %s. Migrating data and updating config"
+        % mountpoint)
+
+    # Migrate existing logs
+    if not os.path.exists(mountpoint):
+        juju.log("Error: Mountpoint %s doesn't appear to exist" % mountpoint)
+        sys.exit(1)
+
+    unit_name = juju.local_unit()
+    new_log_path = "%s/%s/logs" % (mountpoint, unit_name)
+
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+    try:
+        oops_path = parser.get("global", "oops-path")
+        log_path = parser.get("global", "log-path")
+    except Error:
+        juju.log("Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
+        sys.exit(1)
+    else:
+        juju.log("Migrating existing oops and log data")
+        juju.log("mv %s/*oops %s" % (oops_path, new_log_path))
+        juju.log("mv %s/*log %s" % (log_path, new_log_path))
+
+    update_config_settings(
+        {"global": {"oops-path": new_log_path, "log-path": new_log_path}})
+
+def update_config_settings(config_settings={}):
+    parser = RawConfigParser()
+    parser.read([LANDSCAPE_SERVICE_CONF])
+    changes = False
+
+    for section in config_settings.keys():
+        for key, value in config_settings[section].iteritems():
+            changes = True
+            parser.set(section, key, value)
+    if changes:
+        with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
+            parser.write(output_file)
 
 def amqp_relation_changed():
     password = juju.relation_get("password")
@@ -150,16 +195,8 @@ def amqp_relation_changed():
     if password == "":
         sys.exit(0)
 
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
-
-    parser.set("broker", "password", password)
-    parser.set("broker", "host", host)
-    parser.set("broker", "user", "landscape")
-
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
-
+    update_config_settings(
+        {"broker": {"password": password, "host": host, "user": "landscape"}}
 
 def config_changed():
     _lsctl("stop")
