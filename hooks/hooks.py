@@ -566,6 +566,7 @@ if __name__ == "__main__":
     hooks = {
         "config-changed": config_changed,
         "amqp-relation-joined": amqp_relation_joined,
+        "amqp-relation-changed": amqp_relation_changed,
         "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
