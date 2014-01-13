@@ -140,7 +140,7 @@ def data_relation_changed():
     juju.juju_log(
         "External storage changed: requesting mountpoint /srv/juju/vol-0001")
     juju.relation_set("mountpoint=/srv/juju/vol-0001")
-    mointpoint = juju.relation_get("mointpoint")
+    mountpoint = juju.relation_get("mointpoint")
     if mountpoint != "/srv/juju/vol-0001": 
         juju.juju_log(
             "Awating storage mountpoint availability from storage relation")
@@ -196,7 +196,7 @@ def amqp_relation_changed():
         sys.exit(0)
 
     update_config_settings(
-        {"broker": {"password": password, "host": host, "user": "landscape"}}
+        {"broker": {"password": password, "host": host, "user": "landscape"}})
 
 def config_changed():
     _lsctl("stop")
