@@ -146,7 +146,7 @@ def data_relation_changed():
             "Awating storage mountpoint availability from storage relation")
         sys.exit(0)
     juju.log(
-        "Mounted external volume at %s. Migrating data and updating config"
+        "External volume mounted at %s. Migrating data and updating config"
         % mountpoint)
 
     # Migrate existing logs
@@ -155,23 +155,29 @@ def data_relation_changed():
         sys.exit(1)
 
     unit_name = juju.local_unit()
-    new_log_path = "%s/%s/logs" % (mountpoint, unit_name)
+    new_path = "%s/%s" % (mountpoint, unit_name)
 
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     try:
         oops_path = parser.get("global", "oops-path")
         log_path = parser.get("global", "log-path")
+        repository_path = parser.get("landscape", "repository-path")
     except Error:
         juju.log("Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
         sys.exit(1)
     else:
         juju.log("Migrating existing oops and log data")
+        os.makedirs("%s/logs" % new_path)
+        os.makedirs("%s/landscape-repository" % new_path)
         juju.log("mv %s/*oops %s" % (oops_path, new_log_path))
         juju.log("mv %s/*log %s" % (log_path, new_log_path))
 
+    # Change logs and repository path to our nfs mountpoint
     update_config_settings(
-        {"global": {"oops-path": new_log_path, "log-path": new_log_path}})
+        {"global": {"oops-path": "%s/logs" % new_path,
+                    "log-path": "%s/logs" % new_path},
+         "landscape": {"repository-path": "%s/landscape-repository"}})
 
 def update_config_settings(config_settings={}):
     parser = RawConfigParser()
