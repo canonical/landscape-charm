@@ -1,21 +1,27 @@
 """
 Simple python library for juju commands in the context of an
-executing hook.  Mostly wrappers around shell commands.
+executing hook. Mostly wrappers around shell commands.
 """
 import json
+import os
 import subprocess
 
 
 class Juju(object):
 
+    # XXX let's look at pulling in charmhelpers lib into Landscape soon
+    def local_unit(self):
+        """Local unit ID"""
+        return os.environ["JUJU_UNIT_NAME"]
+
     def relation_set(self, *args, **kwargs):
         """
         Simple wrapper around relation-set, all arguments passed through.
-        kwargs are also supported.  args are provided in case the key
+        kwargs are also supported. C{args} are provided in case the key
         cannot be represented as a python variable.
 
         @param relation_id relation id to use (needed if not called in
-            context of relation).  Will be stripped from kwargs if present.
+            context of relation). Will be stripped from kwargs if present.
             if you need to set this, use an arg style argument "k=v"
         """
         cmd = ["relation-set"]
@@ -28,13 +34,22 @@ class Juju(object):
 
     def relation_ids(self, relation_name=None):
         """
-        Wrapper around relation-ids juju command.  output will be returned
-        from parsed json, which in the case of this command is a list of
+        Wrapper around relation-ids Juju command. Output will be returned
+        from parsed JSON, which in the case of this command is a list of
         strings.
         """
         args = ["relation-ids", "--format=json"]
         if relation_name is not None:
             args.append(relation_name)
+        return json.loads(subprocess.check_output(args))
+
+    def relation_list(self):
+        """
+        Wrapper around relation-list Juju command. Output will be returned
+        from parsed JSON, which in the case of this command is a list of
+        strings.
+        """
+        args = ["relation-list", "--format=json"]
         return json.loads(subprocess.check_output(args))
 
     def unit_get(self, *args):
