@@ -138,9 +138,12 @@ def amqp_relation_joined():
 
 def data_relation_changed():
     juju.juju_log(
-        "External storage changed: requesting mountpoint /srv/juju/vol-0001")
+        "External storage relation changed: "
+        "requesting mountpoint /srv/juju/vol-0001 from storage charm")
     juju.relation_set("mountpoint=/srv/juju/vol-0001")
-    mountpoint = juju.relation_get("mointpoint")
+
+    # Has storage charm setup the mountpoint we requested?
+    mountpoint = juju.relation_get("mountpoint")
     if mountpoint != "/srv/juju/vol-0001": 
         juju.juju_log(
             "Awating storage mountpoint availability from storage relation")
