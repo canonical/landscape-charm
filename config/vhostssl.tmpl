@@ -1,6 +1,7 @@
 <VirtualHost *:443>
     ServerName {{ servername }}
     ServerAdmin webmaster@%{SERVER_NAME}
+    DocumentRoot /var/www
 
     ErrorLog /var/log/apache2/vhost_error.log
     CustomLog /var/log/apache2/vhost_access.log combined
