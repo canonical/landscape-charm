@@ -11,10 +11,7 @@
     ProxyTimeout 10
 
     <Location "/">
-        Order deny,allow
-        Deny from all
-    </Location>
-    <Location "/ping">
+        Options -Indexes
         Order allow,deny
         Allow from all
     </Location>
@@ -24,20 +21,8 @@
         ExpiresDefault "access plus 10 years"
         Header append Cache-Control "public"
     </Location>
-    <Location "/static">
-        Options -Indexes
-        Order allow,deny
-        Allow from all
-    </Location>
     <Location "/repository">
         Options +Indexes
-        Order allow,deny
-        Allow from all
-    </Location>
-    <Location "/icons">
-        Options -Indexes
-        Order allow,deny
-        Allow from all
     </Location>
 
     RewriteEngine On
@@ -45,6 +30,7 @@
     # Pings can always go unencrypted
     RewriteRule ^/ping$ http://{{ haproxy_pingserver }}/ping [P]
 
+    # no [L] flag, otherwise the proxy rule later on won't kick in
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
     # Temp fix for favicon issue: RT# 42990, bug #685958
