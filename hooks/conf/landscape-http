@@ -5,7 +5,7 @@ NameVirtualHost *:80
 
    ErrorLog /var/log/apache2/landscape_error.log
    CustomLog /var/log/apache2/landscape_access.log combined
-   DocumentRoot /opt/canonical/landscape/canonical/landscape
+   DocumentRoot /opt/canonical/landscape/apacheroot/
 
    # Set a Via header in outbound requests to the proxy, so proxied apps can
    # know who the actual client is
