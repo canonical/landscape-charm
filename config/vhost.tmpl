@@ -26,6 +26,12 @@
         Options +Indexes
     </Location>
 
+    <Files "*.woff">
+        FileETag None
+        Header append Cache-Control "max-age=2592000,public"
+        Header unset Last-Modified
+    </Files>
+
     RewriteEngine On
 
     # Pings can always go unencrypted

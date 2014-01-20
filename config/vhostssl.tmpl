@@ -11,6 +11,12 @@
     SSLCertificateFile /etc/ssl/certs/apache2.cert
     SSLCertificateKeyFile /etc/ssl/private/apache2.key
 
+    <Files "*.woff">
+        FileETag None
+        Header append Cache-Control "max-age=2592000,public"
+        Header unset Last-Modified
+    </Files>
+
     ProxyRequests off
 
     ProxyPreserveHost On
@@ -38,12 +44,5 @@
     RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
 
     RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
-
-# TODO: put in some place?
-#    <Files "*.woff">
-#       FileETag None
-#       Header append Cache-Control "max-age=2592000,public"
-#       Header unset Last-Modified
-#    </Files>
 
 </VirtualHost>
