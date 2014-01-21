@@ -55,13 +55,14 @@
     # Then rewrite the url to be relative to the specified skin.
     RewriteRule ^/(.*) /static/skin/%1/$1 [L]
 
-    # The following resources are fine to come over http
-    RewriteRule ^/(server-status.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
+    # The following resources are remote and fine to go over http
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(robots.txt) http://{{ haproxy_static }}/$1 [P,L]
 
+    # local resources, don't redirect anywhere not even to switch to https
+    RewriteCond %{REQUEST_URI} !/server-status
+    RewriteCond %{REQUEST_URI} !/icons
+    RewriteCond %{REQUEST_URI} !/robots.txt
     # Everything else needs to go over https
     RewriteRule ^/(.*) https://{{ servername }}/$1 [R=permanent]
 </VirtualHost>

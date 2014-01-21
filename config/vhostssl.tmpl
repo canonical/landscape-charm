@@ -28,21 +28,19 @@
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
     RewriteRule ^/message-system http://{{ haproxy_msgserver }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
-
     RewriteRule ^/ajax http://{{ haproxy_asyncfrontend }}/ [P,L]
     RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]
     RewriteRule ^/api http://{{ haproxy_apiserver }}/ [P,L]
     RewriteRule ^/attachment/(.*) http://{{ haproxy_static }}/attachment/$1 [P,L]
     RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
-
-    RewriteRule ^/(robots.txt.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(favicon.ico.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(icons.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
-
+    # The rest goes to the application server, with a few exceptions
+    RewriteCond %{REQUEST_URI} !/icons
+    RewriteCond %{REQUEST_URI} !/robots.txt
+    RewriteCond %{REQUEST_URI} !/server-status
     RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
 
 </VirtualHost>
