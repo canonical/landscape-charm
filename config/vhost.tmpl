@@ -53,7 +53,7 @@
     # If the skin name is a valid one...
     RewriteCond ${lowercase:%1} ^(basic|manx)$
     # Then rewrite the url to be relative to the specified skin.
-    RewriteRule ^/(.*) /static/skin/%1/$1 [L]
+    RewriteRule ^/(.*) /static/skin/%1/$1
 
     # The following resources are remote and fine to go over http
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
