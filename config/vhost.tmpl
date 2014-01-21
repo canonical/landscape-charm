@@ -35,7 +35,7 @@
     RewriteEngine On
 
     # Pings can always go unencrypted
-    RewriteRule ^/ping$ http://{{ haproxy_pingserver }}/ping [P]
+    RewriteRule ^/ping$ http://{{ haproxy_pingserver }}/ping [P,L]
 
     # no [L] flag, otherwise the proxy rule later on won't kick in
     RewriteRule ^/r/([^/]+)/(.*) /$2
@@ -49,9 +49,9 @@
     # If there's a 'skin' selected in the cookie...
     RewriteCond %{HTTP_COOKIE} skin=([^;\ ]+) [OR]
     # Else, use the default skin.
-    RewriteCond basic ^(.+)$
+    RewriteCond manx ^(.+)$
     # If the skin name is a valid one...
-    RewriteCond ${lowercase:%1} ^(basic|manx)$
+    RewriteCond ${lowercase:%1} ^(manx|hokan)$
     # Then rewrite the url to be relative to the specified skin.
     RewriteRule ^/(.*) /static/skin/%1/$1
 
