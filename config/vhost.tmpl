@@ -13,16 +13,28 @@
 
     <Location "/">
         Options -Indexes
-        Order allow,deny
-        Allow from all
+        Order deny,allow
+        Deny from all
     </Location>
     <Location "/r">
+        Order allow,deny
+        Allow from all
         FileETag none
         ExpiresActive on
         ExpiresDefault "access plus 10 years"
         Header append Cache-Control "public"
     </Location>
+    <Location /ping>
+        Order allow,deny
+        Allow from all
+    </Location>
+    <Location /static>
+        Order allow,deny
+        Allow from all
+    </Location>
     <Location "/repository">
+        Order allow,deny
+        Allow from all
         Options +Indexes
     </Location>
 
