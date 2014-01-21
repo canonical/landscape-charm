@@ -37,11 +37,9 @@
     # Pings can always go unencrypted
     RewriteRule ^/ping$ http://{{ haproxy_pingserver }}/ping [P,L]
 
-    # no [L] flag, otherwise the proxy rule later on won't kick in
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
-    # Temp fix for favicon issue: RT# 42990, bug #685958
-
+    # bug #685958
     # Map the internal lowercase function so we can use it below.
     RewriteMap lowercase int:tolower
     # Only lookup skin name in cookie value for the favicon.
