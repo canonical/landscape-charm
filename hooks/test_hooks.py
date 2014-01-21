@@ -1,3 +1,4 @@
+import subprocess
 import hooks
 import yaml
 import os
@@ -13,8 +14,10 @@ class TestJuju(object):
     certain data is set.
     """
 
-    _relation_data = {}
+    _outgoing_relation_data = {}
+    _incoming_relation_data = ()
     _relation_list = ("postgres/0",)
+    _logs = ()
 
     def __init__(self):
         self.config = {
@@ -26,15 +29,16 @@ class TestJuju(object):
 
     def relation_set(self, *args, **kwargs):
         """
-        Capture result of relation_set into _relation_data, which
+        Capture result of relation_set into _outgoing_relation_data, which
         can then be checked later.
         """
         if "relation_id" in kwargs:
             del kwargs["relation_id"]
-        self._relation_data = dict(self._relation_data, **kwargs)
+        self._outgoing_relation_data = dict(
+            self._outgoing_relation_data, **kwargs)
         for arg in args:
             (key, value) = arg.split("=")
-            self._relation_data[key] = value
+            self._outgoing_relation_data[key] = value
 
     def relation_ids(self, relation_name="website"):
         """
@@ -60,8 +64,8 @@ class TestJuju(object):
     def local_unit(self):
         return hooks.os.environ["JUJU_UNIT_NAME"]
 
-    def juju_log(self, *args, **kwargs):
-        pass
+    def juju_log(self, message, level="INFO"):
+        self._logs = self._logs + (message,)
 
     def config_get(self, scope=None):
         if scope is None:
@@ -70,7 +74,17 @@ class TestJuju(object):
             return self.config[scope]
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
-        pass
+        if unit_name or relation_id:
+            pass  # Not handled yet
+        if scope:
+            for key, value in self._incoming_relation_data:
+                if key == scope:
+                    return value
+            return None
+        else:
+            return dict(
+                (key, value) for key, value in self._incoming_relation_data)
+        
 
 
 class TestHooks(mocker.MockerTestCase):
@@ -141,7 +155,168 @@ class TestHooksService(TestHooks):
         baseline = {
             "username": "landscape",
             "vhost": "landscape"}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+    def test_data_relation_changed_sets_mountpoint_awaits_init(self):
+        """
+        C{data-relation-changed hook sends a requested C{mountpoint}
+        to the storage subordinate charm. It will wait for the subordinate to
+        respond with the initialized C{mountpoint} in the relation before
+        acting.
+        """
+        hooks.data_relation_changed()
+        baseline = {"mountpoint": "/srv/juju/vol-0001"}
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+        messages = ["External storage relation changed: requesting mountpoint "
+                    "%s from storage charm" % hooks.STORAGE_MOUNTPOINT,
+                    "Awaiting storage mountpoint intialization from storage "
+                    "relation"]
+        for message in messages:
+            self.assertTrue(
+                message in hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_error_on_mountpoint_from_subordinate(self):
+        """
+        C{data-relation-changed} will exit in error if the C{mountpoint} set
+        from the subordinate charm relation does not exist.
+        """
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+
+        self.assertEqual(
+            hooks.juju.relation_get("mountpoint"), hooks.STORAGE_MOUNTPOINT)
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        self.assertRaises(SystemExit, hooks.data_relation_changed)
+        message = (
+            "Error: Mountpoint %s doesn't appear to exist" % 
+             hooks.STORAGE_MOUNTPOINT)
+        self.assertTrue(
+            message in hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_success_no_repository_data(self):
+        """
+        L{data_relation_changed} will migrate existing logs to the new
+        C{mountpoint} and update paths in C{LANDSCAPE_SERVICE_CONF} for the
+        following configuration settings: C{repository-path}, C{log-path} and
+        C{oops-path}. When no repository data is discovered,
+        L{data_relation_changed} will log that info.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape/1/logs")
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape-repository")
+        self.mocker.result(True)
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs")
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result([])
+        self.mocker.replay()
+ 
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("global")
+        parser.add_section("landscape")
+        for section, key, value in data:
+            parser.set(section, key, value)
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the parser to read config changes
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual(
+            parser.get("landscape", "repository-path"),
+            "/srv/juju/vol-0001/landscape-repository")
+        self.assertEqual(parser.get("global", "log-path"), new_log_path)
+        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+
+        messages = ["Migrating logs and hosted repository data",
+                    "INFO: No repository data migrated"]
+        for message in messages:
+            self.assertTrue(
+                message in hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_success_with_repository_data(self):
+        """
+        L{data_relation_changed} will migrate existing logs and respository
+        data to the new C{mountpoint} and update paths in
+        C{LANDSCAPE_SERVICE_CONF} for the following configuration settings:
+        C{repository-path}, C{log-path} and C{oops-path}.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape/1/logs")
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape-repository")
+        self.mocker.result(True)
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs")
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result(["one-repo-dir"])
+        check_call_mock(
+            "cp -r /some/repository/path/* "
+            "/srv/juju/vol-0001/landscape-repository")
+        self.mocker.replay()
+ 
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("global")
+        parser.add_section("landscape")
+        for section, key, value in data:
+            parser.set(section, key, value)
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the parser to read config changes
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual(
+            parser.get("landscape", "repository-path"),
+            "/srv/juju/vol-0001/landscape-repository")
+        self.assertEqual(parser.get("global", "log-path"), new_log_path)
+        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+
+        message = "Migrating logs and hosted repository data"
+        self.assertTrue(
+            message in hooks.juju._logs, "Not logged- %s" % message)
 
     def test__download_file_success(self):
         """
@@ -275,7 +450,7 @@ class TestHooksService(TestHooks):
         hooks.juju.config["service-count"] = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
-        data = hooks.juju._relation_data
+        data = hooks.juju._outgoing_relation_data
         self.assertNotEqual(len(data), 0)
         self.assertIn("services", data)
         for service in yaml.load(data["services"]):
@@ -851,7 +1026,7 @@ class TestHooksServiceMock(TestHooks):
             "services": yaml.safe_dump(self.all_services),
             "hostname": "localhost",
             "port": 80}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
 
     def test_notify_website_relation(self):
         """
@@ -861,4 +1036,4 @@ class TestHooksServiceMock(TestHooks):
         hooks.notify_website_relation()
         baseline = {
             "services": yaml.safe_dump(self.all_services)}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
