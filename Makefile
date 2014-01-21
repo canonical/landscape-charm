@@ -1,5 +1,5 @@
 test:
-	cd hooks && trial test_hooks.py
+	trial hooks
 
 lint:
-	bzr ls-lint
+	@flake8 --exclude hooks/charmhelpers hooks

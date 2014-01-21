@@ -84,7 +84,6 @@ class TestJuju(object):
         else:
             return dict(
                 (key, value) for key, value in self._incoming_relation_data)
-        
 
 
 class TestHooks(mocker.MockerTestCase):
@@ -191,8 +190,8 @@ class TestHooksService(TestHooks):
 
         self.assertRaises(SystemExit, hooks.data_relation_changed)
         message = (
-            "Error: Mountpoint %s doesn't appear to exist" % 
-             hooks.STORAGE_MOUNTPOINT)
+            "Error: Mountpoint %s doesn't appear to exist" %
+            hooks.STORAGE_MOUNTPOINT)
         self.assertTrue(
             message in hooks.juju._logs, "Not logged- %s" % message)
 
@@ -224,7 +223,7 @@ class TestHooksService(TestHooks):
         listdir("/some/repository/path")
         self.mocker.result([])
         self.mocker.replay()
- 
+
         # Setup sample config file values
         data = [("global", "oops-path", "/some/oops/path"),
                 ("global", "log-path", "/some/log/path"),
@@ -286,7 +285,7 @@ class TestHooksService(TestHooks):
             "cp -r /some/repository/path/* "
             "/srv/juju/vol-0001/landscape-repository")
         self.mocker.replay()
- 
+
         # Setup sample config file values
         data = [("global", "oops-path", "/some/oops/path"),
                 ("global", "log-path", "/some/log/path"),
@@ -859,29 +858,29 @@ class TestHooksService(TestHooks):
 class TestHooksServiceMock(TestHooks):
 
     all_services = [
-            {"service_name": "foo",
-             "servers": [[
-                 "foo", "localhost", "80",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn", "option httpchk foo"],
-             "errorfiles": []},
-            {"service_name": "bar",
-             "servers":
-                [["bar", "localhost", "81",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"],
-                 ["bar", "localhost", "82",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn",
-                 "option httpchk GET / HTTP/1.0"],
-             "errorfiles": []},
-            {"service_name": "baz",
-             "servers": [["baz", "localhost", "82", "server"],
-                         ["baz", "localhost", "83", "server"],
-                         ["baz", "localhost", "84", "server"]],
-             "service_options": ["options"],
-             "errorfiles": []}]
+        {"service_name": "foo",
+         "servers": [[
+             "foo", "localhost", "80",
+             "check inter 2000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn", "option httpchk foo"],
+         "errorfiles": []},
+        {"service_name": "bar",
+         "servers":
+            [["bar", "localhost", "81",
+              "check inter 2000 rise 2 fall 5 maxconn 50"],
+             ["bar", "localhost", "82",
+              "check inter 2000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn",
+             "option httpchk GET / HTTP/1.0"],
+         "errorfiles": []},
+        {"service_name": "baz",
+         "servers": [["baz", "localhost", "82", "server"],
+                     ["baz", "localhost", "83", "server"],
+                     ["baz", "localhost", "84", "server"]],
+         "service_options": ["options"],
+         "errorfiles": []}]
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
@@ -953,13 +952,13 @@ class TestHooksServiceMock(TestHooks):
         """
         result = hooks._format_service("foo", 1, **hooks.SERVICE_PROXY["foo"])
         baseline = {
-                "service_name": "foo",
-                "servers": [[
-                    "foo", "localhost", "80",
-                    "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                "service_options": [
-                    "mode http", "balance leastconn", "option httpchk foo"],
-                "errorfiles": []}
+            "service_name": "foo",
+            "servers": [[
+                "foo", "localhost", "80",
+                "check inter 2000 rise 2 fall 5 maxconn 50"]],
+            "service_options": [
+                "mode http", "balance leastconn", "option httpchk foo"],
+            "errorfiles": []}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
