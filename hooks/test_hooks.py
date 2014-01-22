@@ -82,8 +82,7 @@ class TestJuju(object):
                     return value
             return None
         else:
-            return dict(
-                (key, value) for key, value in self._incoming_relation_data)
+            return dict(self._incoming_relation_data)
 
 
 class TestHooks(mocker.MockerTestCase):
@@ -169,8 +168,8 @@ class TestHooksService(TestHooks):
                     "Awaiting storage mountpoint intialization from storage "
                     "relation"]
         for message in messages:
-            self.assertTrue(
-                message in hooks.juju._logs, "Not logged- %s" % message)
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_data_relation_changed_error_on_mountpoint_from_subordinate(self):
         """
@@ -192,8 +191,8 @@ class TestHooksService(TestHooks):
         message = (
             "Error: Mountpoint %s doesn't appear to exist" %
             hooks.STORAGE_MOUNTPOINT)
-        self.assertTrue(
-            message in hooks.juju._logs, "Not logged- %s" % message)
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_data_relation_changed_success_no_repository_data(self):
         """
@@ -252,8 +251,8 @@ class TestHooksService(TestHooks):
         messages = ["Migrating logs and hosted repository data",
                     "INFO: No repository data migrated"]
         for message in messages:
-            self.assertTrue(
-                message in hooks.juju._logs, "Not logged- %s" % message)
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_data_relation_changed_success_with_repository_data(self):
         """
@@ -312,8 +311,8 @@ class TestHooksService(TestHooks):
         self.assertEqual(parser.get("global", "oops-path"), new_log_path)
 
         message = "Migrating logs and hosted repository data"
-        self.assertTrue(
-            message in hooks.juju._logs, "Not logged- %s" % message)
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test__download_file_success(self):
         """
