@@ -199,7 +199,7 @@ def data_relation_changed():
          "landscape": {"repository-path": new_repository_path}})
 
 
-def update_config_settings(config_settings={}):
+def update_config_settings(config_settings):
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     changes = False
