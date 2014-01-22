@@ -1,3 +1,4 @@
+.PHONY: test lint
 test:
 	trial hooks
 

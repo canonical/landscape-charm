@@ -161,7 +161,7 @@ class TestHooksService(TestHooks):
         respond with the initialized C{mountpoint} in the relation before
         acting.
         """
-        hooks.data_relation_changed()
+        self.assertRaises(SystemExit, hooks.data_relation_changed)
         baseline = {"mountpoint": "/srv/juju/vol-0001"}
         self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
         messages = ["External storage relation changed: requesting mountpoint "

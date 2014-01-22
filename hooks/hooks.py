@@ -148,7 +148,7 @@ def data_relation_changed():
     if mountpoint != STORAGE_MOUNTPOINT:
         juju.juju_log(
             "Awaiting storage mountpoint intialization from storage relation")
-        return 0
+        sys.exit(0)
 
     if not os.path.exists(mountpoint):
         juju.juju_log(
@@ -166,7 +166,6 @@ def data_relation_changed():
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
     try:
-        #oops_path = parser.get("global", "oops-path")
         log_path = parser.get("global", "log-path")
         repository_path = parser.get("landscape", "repository-path")
     except Error:
@@ -206,7 +205,7 @@ def update_config_settings(config_settings={}):
     changes = False
 
     for section in config_settings.keys():
-        for key, value in config_settings[section].iteritems():
+        for key, value in section.iteritems():
             changes = True
             parser.set(section, key, value)
     if changes:
