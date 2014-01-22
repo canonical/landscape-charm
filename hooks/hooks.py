@@ -204,10 +204,10 @@ def update_config_settings(config_settings={}):
     parser.read([LANDSCAPE_SERVICE_CONF])
     changes = False
 
-    for section in config_settings.keys():
+    for section_name, section in config_settings.iteritems():
         for key, value in section.iteritems():
             changes = True
-            parser.set(section, key, value)
+            parser.set(section_name, key, value)
     if changes:
         with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
             parser.write(output_file)
