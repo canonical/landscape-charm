@@ -1,3 +1,5 @@
+# This serves up the Landscape /static content
+
 NameVirtualHost *:80
 <VirtualHost *:80>
    ServerName @hostname@
