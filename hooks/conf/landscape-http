@@ -1,3 +1,5 @@
+# This serves up the Landscape /static content
+
 NameVirtualHost *:80
 <VirtualHost *:80>
    ServerName @hostname@
@@ -5,12 +7,7 @@ NameVirtualHost *:80
 
    ErrorLog /var/log/apache2/landscape_error.log
    CustomLog /var/log/apache2/landscape_access.log combined
-   DocumentRoot /opt/canonical/landscape/canonical/landscape
-
-   # Set a Via header in outbound requests to the proxy, so proxied apps can
-   # know who the actual client is
-   ProxyVia on
-   ProxyTimeout 305
+   DocumentRoot /opt/canonical/landscape/apacheroot/
 
    <Directory "/">
      Options +Indexes
@@ -20,21 +17,10 @@ NameVirtualHost *:80
      ErrorDocument 404 /static/offline/notfound.html
    </Directory>
 
-   Alias /packages /opt/canonical/landscape/packages
    Alias /static /opt/canonical/landscape/canonical/landscape/static
    Alias /repository /var/lib/landscape/landscape-repository
    Alias /config /opt/canonical/landscape/apacheroot
    Alias /hash-id-databases /var/lib/landscape/hash-id-databases
-
-   <Directory "/opt/canonical/landscape/packages">
-     Order allow,deny
-     Allow from all
-   </Directory>
-
-   <Location "/packages">
-     Order allow,deny
-     Allow from all
-   </Location>
 
    <Location "/repository">
      Order deny,allow
@@ -68,12 +54,7 @@ NameVirtualHost *:80
      # Make sure proxies don't deliver the wrong content
      Header append Vary User-Agent env=!dont-vary
    </Location>
-
-#   <Location "/r">
-#     FileETag none
-#     ExpiresActive on
-#     ExpiresDefault "access plus 10 years"
-#     Header append Cache-Control "public"
-#   </Location>
-#
+   <Location "/static">
+     Options -Indexes
+   </Location>
 </VirtualHost>
