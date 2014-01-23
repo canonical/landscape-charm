@@ -381,7 +381,7 @@ class TestHooksService(TestHooks):
         database is not yet configured.
         """
         self.addCleanup(
-            setattr, hooks.juju, "_incoming_relation_data",())
+            setattr, hooks.juju, "_incoming_relation_data", ())
         hooks.juju._incoming_relation_data = (
             ("host", "postgres/0"), ("user", ""), ("password", ""),
             ("allowed-units", "landscape/0 landscape/1"),
@@ -701,29 +701,29 @@ class TestHooksService(TestHooks):
 class TestHooksServiceMock(TestHooks):
 
     all_services = [
-            {"service_name": "foo",
-             "servers": [[
-                 "foo", "localhost", "80",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn", "option httpchk foo"],
-             "errorfiles": []},
-            {"service_name": "bar",
-             "servers":
-                [["bar", "localhost", "81",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"],
-                 ["bar", "localhost", "82",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn",
-                 "option httpchk GET / HTTP/1.0"],
-             "errorfiles": []},
-            {"service_name": "baz",
-             "servers": [["baz", "localhost", "82", "server"],
-                         ["baz", "localhost", "83", "server"],
-                         ["baz", "localhost", "84", "server"]],
-             "service_options": ["options"],
-             "errorfiles": []}]
+        {"service_name": "foo",
+         "servers": [[
+             "foo", "localhost", "80",
+             "check inter 2000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn", "option httpchk foo"],
+         "errorfiles": []},
+        {"service_name": "bar",
+         "servers":
+            [["bar", "localhost", "81",
+              "check inter 2000 rise 2 fall 5 maxconn 50"],
+             ["bar", "localhost", "82",
+              "check inter 2000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn",
+             "option httpchk GET / HTTP/1.0"],
+         "errorfiles": []},
+        {"service_name": "baz",
+         "servers": [["baz", "localhost", "82", "server"],
+                     ["baz", "localhost", "83", "server"],
+                     ["baz", "localhost", "84", "server"]],
+         "service_options": ["options"],
+         "errorfiles": []}]
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
@@ -795,13 +795,13 @@ class TestHooksServiceMock(TestHooks):
         """
         result = hooks._format_service("foo", 1, **hooks.SERVICE_PROXY["foo"])
         baseline = {
-                "service_name": "foo",
-                "servers": [[
-                    "foo", "localhost", "80",
-                    "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                "service_options": [
-                    "mode http", "balance leastconn", "option httpchk foo"],
-                "errorfiles": []}
+            "service_name": "foo",
+            "servers": [[
+                "foo", "localhost", "80",
+                "check inter 2000 rise 2 fall 5 maxconn 50"]],
+            "service_options": [
+                "mode http", "balance leastconn", "option httpchk foo"],
+            "errorfiles": []}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
