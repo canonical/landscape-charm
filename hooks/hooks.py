@@ -142,18 +142,18 @@ def _is_amqp_up():
     relid = juju.relation_ids("amqp")[0]         # TODO support amqp clusters?
     amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
 
-    host =  juju.relation_get(
+    host = juju.relation_get(
         "hostname", unit_name=amqp_unit, relation_id=relid)
-    password =  juju.relation_get(
+    password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
     if None in [host, password]:
         juju.juju_log(
             "Waiting for valid hostname/password values from amqp relation")
         return False
     return True
-    
+
+
 def amqp_relation_changed():
-    import pdb; pdb.set_trace()
     if not _is_amqp_up():
         sys.exit(0)
 
