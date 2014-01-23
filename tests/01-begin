@@ -1,0 +1,72 @@
+#!/usr/bin/python2.7
+import subprocess
+import amulet
+import shutil
+
+import logging
+from deployer.config import ConfigStack
+from deployer.utils import resolve_include
+from base64 import b64encode
+
+#TODO:
+# - amulet bug: juju-deployer include directives don't take path into
+#               consideration
+# - amulet bug: couldn't get sentries to work... need to retry
+# - amulet bug: juju environment is assumed from the data file.
+# - amulet bug: proper juju deployer files are assembled from multiple
+#               stanzas, amulet doesn't appear to support this.
+# - amulet bug: it chokes if the config file doesn't contain all stanzas
+
+
+def _resolve_include(k, v):
+    for include_type in ["file", "base64"]:
+        if (not isinstance(v, basestring)
+            or not v.startswith(
+                "include-%s://" % include_type)):
+            continue
+        include, fname = v.split("://", 1)
+        ip = resolve_include(fname, ".")
+        with open(ip) as fh:
+            v = fh.read()
+            if include_type == "base64":
+                v = b64encode(v)
+            return v
+
+
+def load_deployer_config(yaml_file):
+    """
+    return a deployer config file in a format that amulet expects
+    """
+    config = ConfigStack([yaml_file])
+    config.load()
+    deployment = config.get("landscape")
+    data = deployment.data
+
+    if "relations" not in data:
+        data["relations"] = {}
+
+    for service_name, service in data['services'].items():
+        if "options" in service:
+            for key, value in service["options"].items():
+                service["options"][key] = _resolve_include(key, value)
+
+    (_, _, env) = subprocess.check_output(['juju', 'env']).split()
+    env = env.strip('"')
+
+    return {env: data}
+
+print("Testing Basic Deployment of the Landscape Charm Stack")
+logging.basicConfig(
+    level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+shutil.copy2("config/vhostssl.tmpl", ".")
+shutil.copy2("config/vhost.tmpl", ".")
+shutil.copy2("config/repo-file", ".")
+shutil.copy2("config/license-file", ".")
+
+d = amulet.Deployment(sentries=False)
+config = load_deployer_config("config/landscape-deployments.cfg")
+d.load(config)
+
+d.setup(timeout=2000)
+
+print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
