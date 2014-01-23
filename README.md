@@ -99,7 +99,7 @@ when things find official homes:
 Next, you will need to add in a repository and license file to use:
 
     $ vim license-file               # Insert your license text here
-    $ vim landscape-deployments.cfg  # edit key "repository"
+    $ vim repo-file                  # Insert the URL part of an APT sources list line here
 
 Then, one command to deploy.  (-v, -d, -W are optional, but nice):
 
