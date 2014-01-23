@@ -147,9 +147,6 @@ def amqp_relation_changed():
 
     juju.juju_log("Using AMPQ server at %s" % host)
 
-    if password == "":
-        sys.exit(0)
-
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
 
