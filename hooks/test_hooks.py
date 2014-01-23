@@ -15,6 +15,7 @@ class TestJuju(object):
 
     _outgoing_relation_data = ()   # set by local juju unit
     _incoming_relation_data = ()   # set by the REMOTE_JUJU_UNIT
+    _logs = ()
     _relation_list = ("postgres/0",)
 
     def __init__(self):
@@ -64,8 +65,8 @@ class TestJuju(object):
     def local_unit(self):
         return hooks.os.environ["JUJU_UNIT_NAME"]
 
-    def juju_log(self, *args, **kwargs):
-        pass
+    def juju_log(self, message, level="INFO"):
+        self._logs = self._logs + (message,)
 
     def config_get(self, scope=None):
         if scope is None:
@@ -156,8 +157,10 @@ class TestHooksService(TestHooks):
         settings if the relation does not provide the required C{hostname} and
         C{password} relation data.
         """
-        self.assertEqual((), hooks.juju._outgoing_relation_data)
+        self.assertEqual((), hooks.juju._incoming_relation_data)
         self.assertRaises(SystemExit, hooks.amqp_relation_changed)
+        message = "Waiting for valid hostname/password values from relation"
+        self.assertIn(message, hooks.juju._logs)
 
     def test__download_file_success(self):
         """
@@ -335,12 +338,12 @@ class TestHooksService(TestHooks):
         landscape.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/0", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0 landscape/1",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/0"), ("user", "auto_db_admin"),
+            ("password", "abc123"),
+            ("allowed-units", "landscape/0 landscape/1"),
+            ("state", "standalone"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -378,11 +381,11 @@ class TestHooksService(TestHooks):
         database is not yet configured.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/0", "user": "", "password": "",
-            "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data",())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/0"), ("user", ""), ("password", ""),
+            ("allowed-units", "landscape/0 landscape/1"),
+            ("state", "standalone"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -404,12 +407,11 @@ class TestHooksService(TestHooks):
         signal that database configuration can begin.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/0", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/0"), ("user", "auto_db_admin"),
+            ("password", "abc123"), ("allowed-units", "landscape/0"),
+            ("state", "standalone"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -430,12 +432,11 @@ class TestHooksService(TestHooks):
         is in a C{hot standby} state.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0",
-            "state": "hot standby"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/1"), ("user", "auto_db_admin"),
+            ("password", "abc123"), ("allowed-units", "landscape/0"),
+            ("state", "hot standby"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -456,12 +457,11 @@ class TestHooksService(TestHooks):
         is in a C{failover} state.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0",
-            "state": "failover"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/1"), ("user", "auto_db_admin"),
+            ("password", "abc123"), ("allowed-units", "landscape/0"),
+            ("state", "failover"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -486,12 +486,11 @@ class TestHooksService(TestHooks):
         C{replication-relation-joined} hooks and is unaware of its clustering.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
-            "host": "postgres/1", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("host", "postgres/1"), ("user", "auto_db_admin"),
+            ("password", "abc123"), ("allowed-units", "landscape/0"),
+            ("state", "standalone"))
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
