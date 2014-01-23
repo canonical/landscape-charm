@@ -13,7 +13,8 @@ class TestJuju(object):
     certain data is set.
     """
 
-    _relation_data = {}
+    _outgoing_relation_data = ()   # set by local juju unit
+    _incoming_relation_data = ()   # set by the REMOTE_JUJU_UNIT
     _relation_list = ("postgres/0",)
 
     def __init__(self):
@@ -26,15 +27,18 @@ class TestJuju(object):
 
     def relation_set(self, *args, **kwargs):
         """
-        Capture result of relation_set into _relation_data, which
+        Capture result of relation_set into _outgoing_relation_data, which
         can then be checked later.
         """
         if "relation_id" in kwargs:
             del kwargs["relation_id"]
-        self._relation_data = dict(self._relation_data, **kwargs)
+        for key, value in kwargs.iteritems():
+            self._outgoing_relation_data = (
+                self._outgoing_relation_data + ((key, value),))
         for arg in args:
             (key, value) = arg.split("=")
-            self._relation_data[key] = value
+            self._outgoing_relation_data = (
+                self._outgoing_relation_data + ((key, value),))
 
     def relation_ids(self, relation_name="website"):
         """
@@ -70,7 +74,12 @@ class TestJuju(object):
             return self.config[scope]
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
-        pass
+        if scope:
+            for key, value in self._incoming_relation_data:
+                if key == scope:
+                    return value
+            return None
+        return dict(self._incoming_relation_data)
 
 
 class TestHooks(mocker.MockerTestCase):
@@ -136,10 +145,19 @@ class TestHooksService(TestHooks):
         Ensure the amqp relation joined hook spits out settings when run.
         """
         hooks.amqp_relation_joined()
-        baseline = {
-            "username": "landscape",
-            "vhost": "landscape"}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        baseline = (
+            ("username", "landscape"),
+            ("vhost", "landscape"))
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+    def test_amqp_relation_changed_no_hostname_password(self):
+        """
+        C{amqp-relation-changed} hook does not write C{LANDSCAPE_SERVICE_CONF}
+        settings if the relation does not provide the required C{hostname} and
+        C{password} relation data.
+        """
+        self.assertEqual((), hooks.juju._outgoing_relation_data)
+        self.assertRaises(SystemExit, hooks.amqp_relation_changed)
 
     def test__download_file_success(self):
         """
@@ -273,7 +291,7 @@ class TestHooksService(TestHooks):
         hooks.juju.config["service-count"] = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
-        data = hooks.juju._relation_data
+        data = dict(hooks.juju._outgoing_relation_data)
         self.assertNotEqual(len(data), 0)
         self.assertIn("services", data)
         for service in yaml.load(data["services"]):
@@ -845,11 +863,11 @@ class TestHooksServiceMock(TestHooks):
         Ensure the website relation joined hook spits out settings when run.
         """
         hooks.website_relation_joined()
-        baseline = {
-            "services": yaml.safe_dump(self.all_services),
-            "hostname": "localhost",
-            "port": 80}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        baseline = (
+            ("services", yaml.safe_dump(self.all_services)),
+            ("hostname", "localhost"),
+            ("port", 80))
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
 
     def test_notify_website_relation(self):
         """
@@ -857,6 +875,5 @@ class TestHooksServiceMock(TestHooks):
         my correct mocked data.
         """
         hooks.notify_website_relation()
-        baseline = {
-            "services": yaml.safe_dump(self.all_services)}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        baseline = (("services", yaml.safe_dump(self.all_services)),)
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
