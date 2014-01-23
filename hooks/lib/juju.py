@@ -43,13 +43,17 @@ class Juju(object):
             args.append(relation_name)
         return json.loads(subprocess.check_output(args))
 
-    def relation_list(self):
+    def relation_list(self, relation_id=None):
         """
         Wrapper around relation-list Juju command. Output will be returned
         from parsed JSON, which in the case of this command is a list of
         strings.
+
+        @param relation_id: specify relation id for out of context usage.
         """
         args = ["relation-list", "--format=json"]
+        if relation_id is not None:
+            args.extend(["-r", relation_id])
         return json.loads(subprocess.check_output(args))
 
     def unit_get(self, *args):
