@@ -48,7 +48,7 @@ class TestJuju(object):
         """
         return ["%s:1" % relation_name]
 
-    def relation_list(self):
+    def relation_list(self, relation_id=None):
         """
         Hardcode expected relation_list for tests.  Feel free to expand
         as more tests are added.
@@ -159,7 +159,8 @@ class TestHooksService(TestHooks):
         """
         self.assertEqual((), hooks.juju._incoming_relation_data)
         self.assertRaises(SystemExit, hooks.amqp_relation_changed)
-        message = "Waiting for valid hostname/password values from relation"
+        message = (
+            "Waiting for valid hostname/password values from amqp relation")
         self.assertIn(message, hooks.juju._logs)
 
     def test__download_file_success(self):
@@ -306,12 +307,16 @@ class TestHooksService(TestHooks):
 
     def test_config_changed_starts_landscape(self):
         """
-        config_changed() starts services when the database is configured.
+        config_changed() starts services when the database and amqp service are
+        configured.
         """
         lsctl = self.mocker.replace(hooks._lsctl)
         lsctl("start")
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
         self.mocker.result(True)
         self.mocker.replay()
 
@@ -327,6 +332,24 @@ class TestHooksService(TestHooks):
         self.mocker.count(0, 0)
         _is_db_up = self.mocker.replace(hooks._is_db_up)
         _is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks.config_changed()
+
+    def test_config_changed_without_amqp_skips_start(self):
+        """
+        config_changed() does not start services when the amqp is not
+        configured.
+        """
+        _lsctl = self.mocker.replace(hooks._lsctl)
+        _lsctl("start")
+        self.mocker.count(0, 0)
+        _is_db_up = self.mocker.replace(hooks._is_db_up)
+        _is_db_up()
+        self.mocker.result(True)
+        _is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        _is_amqp_up()
         self.mocker.result(False)
         self.mocker.replay()
 
