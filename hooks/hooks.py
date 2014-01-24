@@ -138,7 +138,7 @@ def amqp_relation_joined():
 
 
 def _is_amqp_up():
-    """Return C{True} if ampq-rela has defined required values"""
+    """Return C{True} if ampq-relation has defined required values"""
     relid = juju.relation_ids("amqp")[0]         # TODO support amqp clusters?
     amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
 
