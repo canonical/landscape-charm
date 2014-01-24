@@ -727,16 +727,16 @@ class TestHooksServiceMock(TestHooks):
         {"service_name": "foo",
          "servers": [[
              "foo", "localhost", "80",
-             "check inter 2000 rise 2 fall 5 maxconn 50"]],
+             "check inter 5000 rise 2 fall 5 maxconn 50"]],
          "service_options": [
              "mode http", "balance leastconn", "option httpchk foo"],
          "errorfiles": []},
         {"service_name": "bar",
          "servers":
             [["bar", "localhost", "81",
-              "check inter 2000 rise 2 fall 5 maxconn 50"],
+              "check inter 5000 rise 2 fall 5 maxconn 50"],
              ["bar", "localhost", "82",
-              "check inter 2000 rise 2 fall 5 maxconn 50"]],
+              "check inter 5000 rise 2 fall 5 maxconn 50"]],
          "service_options": [
              "mode http", "balance leastconn",
              "option httpchk GET / HTTP/1.0"],
@@ -803,7 +803,7 @@ class TestHooksServiceMock(TestHooks):
         baseline = {"service_name": "bar",
                     "servers": [[
                         "bar", "localhost", "81",
-                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                        "check inter 5000 rise 2 fall 5 maxconn 50"]],
                     "service_options": [
                         "mode http", "balance leastconn",
                         "option httpchk GET / HTTP/1.0"],
@@ -821,7 +821,7 @@ class TestHooksServiceMock(TestHooks):
             "service_name": "foo",
             "servers": [[
                 "foo", "localhost", "80",
-                "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                "check inter 5000 rise 2 fall 5 maxconn 50"]],
             "service_options": [
                 "mode http", "balance leastconn", "option httpchk foo"],
             "errorfiles": []}
@@ -852,7 +852,7 @@ class TestHooksServiceMock(TestHooks):
         baseline = {
             "service_name": "qux",
             "servers": [["qux", "localhost", "83",
-                         "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                         "check inter 5000 rise 2 fall 5 maxconn 50"]],
             "errorfiles": [{
                 "http_status": 403,
                 "path": self.filename,
