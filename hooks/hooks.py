@@ -140,11 +140,12 @@ def amqp_relation_joined():
 def amqp_relation_changed():
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
+    if None in [host, password]:
+        juju.juju_log(
+            "Waiting for valid hostname/password values from relation")
+        sys.exit(0)
 
     juju.juju_log("Using AMPQ server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
 
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
