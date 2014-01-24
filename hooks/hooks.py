@@ -375,7 +375,7 @@ def _enable_services():
 
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
-        server_options="check inter 2000 rise 2 fall 5 maxconn 50",
+        server_options="check inter 5000 rise 2 fall 5 maxconn 50",
         service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
