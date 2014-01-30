@@ -48,8 +48,7 @@ def is_db_up(database, host, user, password):
     False otherwise.
     """
     try:
-        conn = connect(database="postgres", host=host, user=user,
-                       password=password)
+        conn = connect_exclusive(host, user, password)
         cur = conn.cursor()
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
