@@ -52,7 +52,7 @@ def is_db_up(database, host, user, password):
         cur = conn.cursor()
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
-            "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY) "
+            'CREATE TEMP TABLE "write_access_test_%s" (id serial PRIMARY KEY) '
             "ON COMMIT DROP"
             % juju.local_unit().replace("/", "_"))
     except Exception as e:
