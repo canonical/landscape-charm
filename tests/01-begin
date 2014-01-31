@@ -20,7 +20,7 @@ from base64 import b64encode
 
 def _resolve_include(k, v):
     for include_type in ["file", "base64"]:
-        if (not isinstance(v, basestring)
+        if (not isinstance(v, str)
             or not v.startswith(
                 "include-%s://" % include_type)):
             continue

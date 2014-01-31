@@ -9,4 +9,5 @@ integration-test: stage-integration-test
 	juju test -v --timeout 2000s
 
 lint:
-	bzr ls-lint
+	find hooks -name *.py | xargs pyflakes
+	pyflakes3 tests/*
