@@ -13,7 +13,9 @@ class TestJuju(object):
     certain data is set.
     """
 
-    _relation_data = {}
+    _outgoing_relation_data = ()   # set by local juju unit
+    _incoming_relation_data = ()   # set by the REMOTE_JUJU_UNIT
+    _logs = ()
     _relation_list = ("postgres/0",)
 
     def __init__(self):
@@ -26,15 +28,18 @@ class TestJuju(object):
 
     def relation_set(self, *args, **kwargs):
         """
-        Capture result of relation_set into _relation_data, which
+        Capture result of relation_set into _outgoing_relation_data, which
         can then be checked later.
         """
         if "relation_id" in kwargs:
             del kwargs["relation_id"]
-        self._relation_data = dict(self._relation_data, **kwargs)
+        for key, value in kwargs.iteritems():
+            self._outgoing_relation_data = (
+                self._outgoing_relation_data + ((key, value),))
         for arg in args:
             (key, value) = arg.split("=")
-            self._relation_data[key] = value
+            self._outgoing_relation_data = (
+                self._outgoing_relation_data + ((key, value),))
 
     def relation_ids(self, relation_name="website"):
         """
@@ -43,7 +48,7 @@ class TestJuju(object):
         """
         return ["%s:1" % relation_name]
 
-    def relation_list(self):
+    def relation_list(self, relation_id=None):
         """
         Hardcode expected relation_list for tests.  Feel free to expand
         as more tests are added.
@@ -60,8 +65,8 @@ class TestJuju(object):
     def local_unit(self):
         return hooks.os.environ["JUJU_UNIT_NAME"]
 
-    def juju_log(self, *args, **kwargs):
-        pass
+    def juju_log(self, message, level="INFO"):
+        self._logs = self._logs + (message,)
 
     def config_get(self, scope=None):
         if scope is None:
@@ -70,7 +75,12 @@ class TestJuju(object):
             return self.config[scope]
 
     def relation_get(self, scope=None, unit_name=None, relation_id=None):
-        pass
+        if scope:
+            for key, value in self._incoming_relation_data:
+                if key == scope:
+                    return value
+            return None
+        return dict(self._incoming_relation_data)
 
 
 class TestHooks(mocker.MockerTestCase):
@@ -139,7 +149,19 @@ class TestHooksService(TestHooks):
         baseline = {
             "username": "landscape",
             "vhost": "landscape"}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        self.assertEqual(baseline, dict(hooks.juju._outgoing_relation_data))
+
+    def test_amqp_relation_changed_no_hostname_password(self):
+        """
+        C{amqp-relation-changed} hook does not write C{LANDSCAPE_SERVICE_CONF}
+        settings if the relation does not provide the required C{hostname} and
+        C{password} relation data.
+        """
+        self.assertEqual((), hooks.juju._incoming_relation_data)
+        self.assertRaises(SystemExit, hooks.amqp_relation_changed)
+        message = (
+            "Waiting for valid hostname/password values from amqp relation")
+        self.assertIn(message, hooks.juju._logs)
 
     def test__download_file_success(self):
         """
@@ -273,7 +295,7 @@ class TestHooksService(TestHooks):
         hooks.juju.config["service-count"] = "2"
         self.seed_default_file_services_off()
         hooks.config_changed()
-        data = hooks.juju._relation_data
+        data = dict(hooks.juju._outgoing_relation_data)
         self.assertNotEqual(len(data), 0)
         self.assertIn("services", data)
         for service in yaml.load(data["services"]):
@@ -285,12 +307,16 @@ class TestHooksService(TestHooks):
 
     def test_config_changed_starts_landscape(self):
         """
-        config_changed() starts services when the database is configured.
+        config_changed() starts services when the database and amqp service are
+        configured.
         """
         lsctl = self.mocker.replace(hooks._lsctl)
         lsctl("start")
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
         self.mocker.result(True)
         self.mocker.replay()
 
@@ -311,18 +337,36 @@ class TestHooksService(TestHooks):
 
         hooks.config_changed()
 
+    def test_config_changed_without_amqp_skips_start(self):
+        """
+        config_changed() does not start services when the amqp is not
+        configured.
+        """
+        _lsctl = self.mocker.replace(hooks._lsctl)
+        _lsctl("start")
+        self.mocker.count(0, 0)
+        _is_db_up = self.mocker.replace(hooks._is_db_up)
+        _is_db_up()
+        self.mocker.result(True)
+        _is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        _is_amqp_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks.config_changed()
+
     def test_db_admin_relation_changed(self):
         """
         db_admin_relation_changed creates the database user and sets up
         landscape.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/0", "user": "auto_db_admin",
-            "password": "abc123", "allowed-units": "landscape/0 landscape/1",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "password": "abc123",
+            "allowed-units": "landscape/0 landscape/1",
+            "state": "standalone"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -360,11 +404,11 @@ class TestHooksService(TestHooks):
         database is not yet configured.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/0", "user": "", "password": "",
-            "allowed-units": "landscape/0 landscape/1", "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "allowed-units": "landscape/0 landscape/1",
+            "state": "standalone"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -386,12 +430,11 @@ class TestHooksService(TestHooks):
         signal that database configuration can begin.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/0", "user": "auto_db_admin",
             "password": "abc123", "allowed-units": "landscape/0",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "state": "standalone"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -412,12 +455,11 @@ class TestHooksService(TestHooks):
         is in a C{hot standby} state.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/1", "user": "auto_db_admin",
             "password": "abc123", "allowed-units": "landscape/0",
-            "state": "hot standby"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "state": "hot standby"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -438,12 +480,11 @@ class TestHooksService(TestHooks):
         is in a C{failover} state.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/1", "user": "auto_db_admin",
             "password": "abc123", "allowed-units": "landscape/0",
-            "state": "failover"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "state": "failover"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -468,12 +509,11 @@ class TestHooksService(TestHooks):
         C{replication-relation-joined} hooks and is unaware of its clustering.
         """
         self.addCleanup(
-            setattr, hooks.juju, "relation_get", hooks.juju.relation_get)
-        self.relation_gets = {
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
             "host": "postgres/1", "user": "auto_db_admin",
             "password": "abc123", "allowed-units": "landscape/0",
-            "state": "standalone"}
-        hooks.juju.relation_get = lambda x: self.relation_gets[x]
+            "state": "standalone"}.items()
 
         self.addCleanup(
             setattr, hooks.juju, "config_get", hooks.juju.config_get)
@@ -684,29 +724,29 @@ class TestHooksService(TestHooks):
 class TestHooksServiceMock(TestHooks):
 
     all_services = [
-            {"service_name": "foo",
-             "servers": [[
-                 "foo", "localhost", "80",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn", "option httpchk foo"],
-             "errorfiles": []},
-            {"service_name": "bar",
-             "servers":
-                [["bar", "localhost", "81",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"],
-                 ["bar", "localhost", "82",
-                 "check inter 2000 rise 2 fall 5 maxconn 50"]],
-             "service_options": [
-                 "mode http", "balance leastconn",
-                 "option httpchk GET / HTTP/1.0"],
-             "errorfiles": []},
-            {"service_name": "baz",
-             "servers": [["baz", "localhost", "82", "server"],
-                         ["baz", "localhost", "83", "server"],
-                         ["baz", "localhost", "84", "server"]],
-             "service_options": ["options"],
-             "errorfiles": []}]
+        {"service_name": "foo",
+         "servers": [[
+             "foo", "localhost", "80",
+             "check inter 5000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn", "option httpchk foo"],
+         "errorfiles": []},
+        {"service_name": "bar",
+         "servers":
+            [["bar", "localhost", "81",
+              "check inter 5000 rise 2 fall 5 maxconn 50"],
+             ["bar", "localhost", "82",
+              "check inter 5000 rise 2 fall 5 maxconn 50"]],
+         "service_options": [
+             "mode http", "balance leastconn",
+             "option httpchk GET / HTTP/1.0"],
+         "errorfiles": []},
+        {"service_name": "baz",
+         "servers": [["baz", "localhost", "82", "server"],
+                     ["baz", "localhost", "83", "server"],
+                     ["baz", "localhost", "84", "server"]],
+         "service_options": ["options"],
+         "errorfiles": []}]
 
     def setUp(self):
         super(TestHooksServiceMock, self).setUp()
@@ -763,7 +803,7 @@ class TestHooksServiceMock(TestHooks):
         baseline = {"service_name": "bar",
                     "servers": [[
                         "bar", "localhost", "81",
-                        "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                        "check inter 5000 rise 2 fall 5 maxconn 50"]],
                     "service_options": [
                         "mode http", "balance leastconn",
                         "option httpchk GET / HTTP/1.0"],
@@ -778,13 +818,13 @@ class TestHooksServiceMock(TestHooks):
         """
         result = hooks._format_service("foo", 1, **hooks.SERVICE_PROXY["foo"])
         baseline = {
-                "service_name": "foo",
-                "servers": [[
-                    "foo", "localhost", "80",
-                    "check inter 2000 rise 2 fall 5 maxconn 50"]],
-                "service_options": [
-                    "mode http", "balance leastconn", "option httpchk foo"],
-                "errorfiles": []}
+            "service_name": "foo",
+            "servers": [[
+                "foo", "localhost", "80",
+                "check inter 5000 rise 2 fall 5 maxconn 50"]],
+            "service_options": [
+                "mode http", "balance leastconn", "option httpchk foo"],
+            "errorfiles": []}
         self.assertEqual(baseline, result)
 
     def test_format_service_with_more_options(self):
@@ -812,7 +852,7 @@ class TestHooksServiceMock(TestHooks):
         baseline = {
             "service_name": "qux",
             "servers": [["qux", "localhost", "83",
-                         "check inter 2000 rise 2 fall 5 maxconn 50"]],
+                         "check inter 5000 rise 2 fall 5 maxconn 50"]],
             "errorfiles": [{
                 "http_status": 403,
                 "path": self.filename,
@@ -845,11 +885,11 @@ class TestHooksServiceMock(TestHooks):
         Ensure the website relation joined hook spits out settings when run.
         """
         hooks.website_relation_joined()
-        baseline = {
-            "services": yaml.safe_dump(self.all_services),
-            "hostname": "localhost",
-            "port": 80}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        baseline = (
+            ("services", yaml.safe_dump(self.all_services)),
+            ("hostname", "localhost"),
+            ("port", 80))
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
 
     def test_notify_website_relation(self):
         """
@@ -857,6 +897,5 @@ class TestHooksServiceMock(TestHooks):
         my correct mocked data.
         """
         hooks.notify_website_relation()
-        baseline = {
-            "services": yaml.safe_dump(self.all_services)}
-        self.assertEqual(baseline, hooks.juju._relation_data)
+        baseline = (("services", yaml.safe_dump(self.all_services)),)
+        self.assertEqual(baseline, hooks.juju._outgoing_relation_data)

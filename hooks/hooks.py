@@ -127,7 +127,7 @@ def db_admin_relation_changed():
     try:
         # Handle remove-relation db-admin.  This call will fail because
         # database access has already been removed.
-        _lsctl("restart")
+        config_changed()  # only restart if is_db_up and _is_amqp_up
     except Exception as e:
         juju.juju_log(str(e), level="DEBUG")
 
@@ -137,14 +137,30 @@ def amqp_relation_joined():
     juju.relation_set("vhost=landscape")
 
 
+def _is_amqp_up():
+    """Return C{True} if the ampq-relation has defined required values"""
+    relid = juju.relation_ids("amqp")[0]         # TODO support amqp clusters?
+    amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
+
+    host = juju.relation_get(
+        "hostname", unit_name=amqp_unit, relation_id=relid)
+    password = juju.relation_get(
+        "password", unit_name=amqp_unit, relation_id=relid)
+    if None in [host, password]:
+        juju.juju_log(
+            "Waiting for valid hostname/password values from amqp relation")
+        return False
+    return True
+
+
 def amqp_relation_changed():
+    if not _is_amqp_up():
+        sys.exit(0)
+
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
 
     juju.juju_log("Using AMPQ server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
 
     parser = RawConfigParser()
     parser.read([LANDSCAPE_SERVICE_CONF])
@@ -156,6 +172,9 @@ def amqp_relation_changed():
     with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
         parser.write(output_file)
 
+    if _is_db_up():
+        config_changed()  # only restarty is_db_up and _is_amqp_up
+
 
 def config_changed():
     _lsctl("stop")
@@ -164,7 +183,7 @@ def config_changed():
     _set_maintenance()
     _set_upgrade_schema()
 
-    if _is_db_up():
+    if _is_db_up() and _is_amqp_up():
         _lsctl("start")
 
     notify_website_relation()
@@ -356,7 +375,7 @@ def _enable_services():
 
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
-        server_options="check inter 2000 rise 2 fall 5 maxconn 50",
+        server_options="check inter 5000 rise 2 fall 5 maxconn 50",
         service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
