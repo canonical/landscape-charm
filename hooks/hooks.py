@@ -113,16 +113,18 @@ def db_admin_relation_changed():
         parser.write(output_file)
 
     try:
-        conn = util.connect_exclusive(host, admin, admin_password)
+        # Name as lock so we don't try to reuse it as a database connection
+        lock = util.connect_exclusive(host, admin, admin_password)
     except psycopg2.Error:
         # Another unit is performing database configuration.
         pass
     else:
         try:
-            util.create_user(conn, user, password)
+            util.create_user(user, password, host, admin, admin_password)
             check_call("setup-landscape-server")
         finally:
-            conn.close()
+            juju.juju_log("Landscape database initialized!")
+            lock.close()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
