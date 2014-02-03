@@ -1,11 +1,29 @@
 test:
 	cd hooks && trial test_hooks.py
 
+verify-juju-test:
+	@echo "Checking for ... "
+	@echo -n "juju-test: "
+	@if [ -z `which juju-test` ]; then \
+		echo "\nRun ./dev/install-amulet to get the juju-test command installed"; \
+		exit 1;\
+	else \
+		echo "installed"; \
+	fi 
+	@echo -n "amulet: "
+	@if echo 'import amulet' | python3; then \
+		echo "installed"; \
+	else \
+		echo "\nRun ./dev/install-amulet to get the juju-test command installed"; \
+		exit 1;\
+	fi 
+
+
 stage-integration-test:
 	@echo "** Note: config/repo-file & config/license-file must exist"
 	cp -f config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl .
 
-integration-test: stage-integration-test
+integration-test: verify-juju-test stage-integration-test
 	juju test -v --timeout 2000s
 
 lint:
