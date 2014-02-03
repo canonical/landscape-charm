@@ -1,4 +1,11 @@
 #!/usr/bin/python2.7
+"""
+This test simply creats a real landscape deployment, and runs a command there.
+There isn't much to it for now.  The intent is to deploy landscape and our
+dependent charms to test for any non-starter type issues.
+"""
+
+
 import subprocess
 import amulet
 import shutil
