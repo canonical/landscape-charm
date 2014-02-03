@@ -381,16 +381,21 @@ class TestHooksService(TestHooks):
         parser.add_section("schema")
         parser.write(self._service_conf)
         self._service_conf.seek(0)
+        new_user = "landscape"
+        new_password = "def456"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        password = "abc123"
 
         is_db_up = self.mocker.replace(hooks.util.is_db_up)
-        is_db_up("postgres", "postgres/0", "auto_db_admin", "abc123")
+        is_db_up("postgres", host, admin, password)
         self.mocker.result(True)
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
-        connect_exclusive("postgres/0", "auto_db_admin", "abc123")
+        connect_exclusive(host, admin, password)
         connection = self.mocker.mock()
         self.mocker.result(connection)
         create_user = self.mocker.replace(hooks.util.create_user)
-        create_user(connection, "landscape", "def456")
+        create_user(new_user, new_password, host, admin, password)
         check_call = self.mocker.replace(hooks.check_call)
         check_call("setup-landscape-server")
         connection.close()
