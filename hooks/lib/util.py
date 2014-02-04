@@ -15,31 +15,37 @@ def connect_exclusive(host, admin_user, admin_password):
     time.  This method succeeds on the first unit and fails on every other
     unit.
     """
+    table = "landscape_install_lock"
     conn = connect(database="postgres", host=host, user=admin_user,
                    password=admin_password)
     try:
         cur = conn.cursor()
+        juju.juju_log("Gaining MUTEX on %s" % table)
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS "
-            "landscape_install_lock (id serial PRIMARY KEY);")
-        cur.execute("LOCK landscape_install_lock IN ACCESS EXCLUSIVE MODE;")
-        juju.juju_log("Mutex acquired on landscape_install_lock, Proceeding")
+            "CREATE TABLE IF NOT EXISTS %s (id serial PRIMARY KEY);" % table)
+        cur.execute("LOCK %s IN ACCESS EXCLUSIVE MODE;" % table)
+        juju.juju_log("MUTEX Acquired on %s, Proceeding" % table)
     except:
-        juju.juju_log("Mutex acquire on landscape_install_lock failed.")
+        juju.juju_log("MUTEX failed on %s." % table)
         conn.close()
         raise
     return conn
 
 
-def create_user(conn, user, password):
+def create_user(user, password, host, admin_user, admin_password):
     """Create a user in the database if one does not already exist."""
-    cur = conn.cursor()
-    cur.execute("SELECT usename FROM pg_user WHERE usename='%s'" % user)
-    result = cur.fetchall()
-    if not result:
-        juju.juju_log("Creating landscape db user")
-        cur.execute("CREATE user %s WITH PASSWORD '%s'" % (user, password))
-        conn.commit()
+    conn = connect(database="postgres", host=host, user=admin_user,
+                   password=admin_password)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT usename FROM pg_user WHERE usename='%s'" % user)
+        result = cur.fetchall()
+        if not result:
+            juju.juju_log("Creating postgres db user: %s" % user)
+            cur.execute("CREATE user %s WITH PASSWORD '%s'" % (user, password))
+            conn.commit()
+    finally:
+        conn.close()
 
 
 def is_db_up(database, host, user, password):
@@ -48,12 +54,11 @@ def is_db_up(database, host, user, password):
     False otherwise.
     """
     try:
-        conn = connect(database="postgres", host=host, user=user,
-                       password=password)
+        conn = connect_exclusive(host, user, password)
         cur = conn.cursor()
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
-            "CREATE TEMP TABLE write_access_test_%s (id serial PRIMARY KEY) "
+            'CREATE TEMP TABLE "write_access_test_%s" (id serial PRIMARY KEY) '
             "ON COMMIT DROP"
             % juju.local_unit().replace("/", "_"))
     except Exception as e:

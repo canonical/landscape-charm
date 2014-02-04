@@ -1,0 +1,28 @@
+#!/bin/bash -e
+# Needs to be run as a user who can sudo.  d'oh!
+# It will ask your password a lot.
+
+# Add the juju stable ppa, install amulet deps
+sudo add-apt-repository -y ppa:juju/stable
+sudo apt-get update
+sudo apt-get -y install juju-deployer amulet juju-core charm-tools
+
+# Install Amulet from Trunk
+# - not supporting py2.7 was the latest issue
+# - See the test cases for a list of other problems
+dir=$(mktemp -d)
+cd $dir
+git clone https://github.com/dpb1/amulet.git
+cd amulet
+git checkout make-non-interactive
+make sysdeps </dev/null
+sudo PY=python2.7 make install
+sudo python2.7 setup.py install
+
+# another one to remove asap
+# https://bugs.launchpad.net/charm-tools/+bug/1271803
+cd $dir
+bzr branch lp:~davidpbritton/charm-tools/fix-test-env-1271745/ charm-tools
+cd charm-tools
+sudo python ./setup.py install
+sudo rm -rf $dir

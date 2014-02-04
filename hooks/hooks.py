@@ -113,21 +113,23 @@ def db_admin_relation_changed():
         parser.write(output_file)
 
     try:
-        conn = util.connect_exclusive(host, admin, admin_password)
+        # Name as lock so we don't try to reuse it as a database connection
+        lock = util.connect_exclusive(host, admin, admin_password)
     except psycopg2.Error:
         # Another unit is performing database configuration.
         pass
     else:
         try:
-            util.create_user(conn, user, password)
+            util.create_user(user, password, host, admin, admin_password)
             check_call("setup-landscape-server")
         finally:
-            conn.close()
+            juju.juju_log("Landscape database initialized!")
+            lock.close()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
         # database access has already been removed.
-        _lsctl("restart")
+        config_changed()  # only restart if is_db_up and _is_amqp_up
     except Exception as e:
         juju.juju_log(str(e), level="DEBUG")
 
@@ -214,7 +216,26 @@ def update_config_settings(config_settings):
             parser.write(output_file)
 
 
+def _is_amqp_up():
+    """Return C{True} if the ampq-relation has defined required values"""
+    relid = juju.relation_ids("amqp")[0]         # TODO support amqp clusters?
+    amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
+
+    host = juju.relation_get(
+        "hostname", unit_name=amqp_unit, relation_id=relid)
+    password = juju.relation_get(
+        "password", unit_name=amqp_unit, relation_id=relid)
+    if None in [host, password]:
+        juju.juju_log(
+            "Waiting for valid hostname/password values from amqp relation")
+        return False
+    return True
+
+
 def amqp_relation_changed():
+    if not _is_amqp_up():
+        sys.exit(0)
+
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
 
@@ -226,6 +247,9 @@ def amqp_relation_changed():
     update_config_settings(
         {"broker": {"password": password, "host": host, "user": "landscape"}})
 
+    if _is_db_up():
+        config_changed()  # only restarty is_db_up and _is_amqp_up
+
 
 def config_changed():
     _lsctl("stop")
@@ -234,7 +258,7 @@ def config_changed():
     _set_maintenance()
     _set_upgrade_schema()
 
-    if _is_db_up():
+    if _is_db_up() and _is_amqp_up():
         _lsctl("start")
 
     notify_website_relation()
@@ -426,8 +450,8 @@ def _enable_services():
 
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
-                    server_options="check inter 2000 rise 2 fall 5 maxconn 50",
-                    service_options=None, errorfiles=None):
+        server_options="check inter 5000 rise 2 fall 5 maxconn 50",
+        service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a

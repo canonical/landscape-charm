@@ -1,6 +1,7 @@
 <VirtualHost *:443>
     ServerName {{ servername }}
     ServerAdmin webmaster@%{SERVER_NAME}
+    DocumentRoot /var/www
 
     ErrorLog /var/log/apache2/vhost_error.log
     CustomLog /var/log/apache2/vhost_access.log combined
@@ -10,15 +11,13 @@
     SSLCertificateFile /etc/ssl/certs/apache2.cert
     SSLCertificateKeyFile /etc/ssl/private/apache2.key
 
+    <Files "*.woff">
+        FileETag None
+        Header append Cache-Control "max-age=2592000,public"
+        Header unset Last-Modified
+    </Files>
+
     ProxyRequests off
-    <Proxy *>
-        Order Allow,Deny
-        Allow from All
-        #ErrorDocument 403 /offline.html
-        #ErrorDocument 500 /offline.html
-        #ErrorDocument 502 /offline.html
-        #ErrorDocument 503 /offline.html
-    </Proxy>
 
     ProxyPreserveHost On
     ProxyPassReverse / http://{{ haproxy_static }}/
@@ -28,39 +27,34 @@
     RewriteRule ^/.*\+\+.* / [F]
     RewriteRule ^/r/([^/]+)/(.*) /$2
 
-    RewriteRule ^/message-system http://{{ haproxy_msgserver }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
+    # bug #685958
+    # Map the internal lowercase function so we can use it below.
+    RewriteMap lowercase int:tolower
+    # Only lookup skin name in cookie value for the favicon.
+    RewriteCond %{REQUEST_URI} ^/favicon.ico$
+    # If there's a 'skin' selected in the cookie...
+    RewriteCond %{HTTP_COOKIE} skin=([^;\ ]+) [OR]
+    # Else, use the default skin.
+    RewriteCond manx ^(.+)$
+    # If the skin name is a valid one...
+    RewriteCond ${lowercase:%1} ^(manx|hokan)$
+    # Then rewrite the url to be relative to the specified skin.
+    RewriteRule ^/(.*) /static/skin/%1/$1
 
+    RewriteRule ^/message-system http://{{ haproxy_msgserver }}/++vh++https:%{SERVER_NAME}:443/++/ [P,L]
     RewriteRule ^/ajax http://{{ haproxy_asyncfrontend }}/ [P,L]
     RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]
     RewriteRule ^/api http://{{ haproxy_apiserver }}/ [P,L]
     RewriteRule ^/attachment/(.*) http://{{ haproxy_static }}/attachment/$1 [P,L]
     RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
-
-    RewriteRule ^/(robots.txt.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(favicon.ico.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
-
+    RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
+    # The rest goes to the application server, with a few exceptions
+    RewriteCond %{REQUEST_URI} !/icons
+    RewriteCond %{REQUEST_URI} !/robots.txt
+    RewriteCond %{REQUEST_URI} !/server-status
     RewriteRule ^/(.*) http://{{ haproxy_appserver }}/++vh++https:%{SERVER_NAME}:443/++/$1 [P]
-
-# TODO: put in some place?
-#    Alias /packages /srv/staging.landscape.canonical.com/packages
-#    <Directory "/srv/landscape.canonical.com/packages">
-#        Order allow,deny
-#        Allow from all
-#    </Directory>
-#    <Location "/packages">
-#       Order allow,deny
-#       Allow from all
-#    </Location>
-#    <Location "/static">
-#       Options -Indexes
-#    </Location>
-#    <Files "*.woff">
-#       FileETag None
-#       Header append Cache-Control "max-age=2592000,public"
-#       Header unset Last-Modified
-#    </Files>
 
 </VirtualHost>
