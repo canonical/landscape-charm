@@ -63,6 +63,9 @@ def load_deployer_config(yaml_file):
             for key, value in service["options"].items():
                 service["options"][key] = _resolve_include(value)
 
+    # FIXME: This is only needed since amulet switches your environment
+    #        if you pass in a config.  There are ways to break this
+    #        parsing (like including a quote in your environment name).
     output = subprocess.check_output(['juju', 'env']).split()
     env = output[2].strip('"')
 
