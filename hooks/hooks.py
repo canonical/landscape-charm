@@ -167,7 +167,7 @@ def data_relation_changed():
     parser.read([LANDSCAPE_SERVICE_CONF])
     try:
         log_path = parser.get("global", "log-path")
-        repository_path = parser.get("landscape", "repository-path")
+        repo_path = parser.get("landscape", "repository-path")
     except Error:
         juju.juju_log(
             "Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
@@ -179,16 +179,17 @@ def data_relation_changed():
             os.makedirs(new_log_path)
 
         # Shared repository path is shared by all units
-        new_repository_path = "%s/landscape-repository" % mountpoint
-        if not os.path.exists(new_repository_path):
-            os.makedirs(new_repository_path)
+        new_repo_path = "%s/landscape-repository" % mountpoint
+        if not os.path.exists(new_repo_path):
+            os.makedirs(new_repo_path)
 
         # TODO do we need to migrate OOPS files?
-        check_call("cp -f %s/*log %s" % (log_path, new_log_path))
+        check_call("cp -f %s/*log %s" % (log_path, new_log_path), shell=True)
         # Migrate repository data if any exist
-        if len(os.listdir(repository_path)):
-            check_call(
-                "cp -r %s/* %s" % (repository_path, new_repository_path))
+        if os.path.exists(repo_path) and len(os.listdir(repo_path)):
+                check_call(
+                    "cp -r %s/* %s" % (repo_path, new_repo_path),
+                    shell=True)
         else:
             juju.juju_log("INFO: No repository data migrated")
 
@@ -196,7 +197,7 @@ def data_relation_changed():
     update_config_settings(
         {"global": {"oops-path": "%s/logs" % new_path,
                     "log-path": new_log_path},
-         "landscape": {"repository-path": new_repository_path}})
+         "landscape": {"repository-path": new_repo_path}})
 
 
 def update_config_settings(config_settings):

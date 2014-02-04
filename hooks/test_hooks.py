@@ -194,6 +194,63 @@ class TestHooksService(TestHooks):
         self.assertIn(
             message, hooks.juju._logs, "Not logged- %s" % message)
 
+    def test_data_relation_changed_success_no_repository_path(self):
+        """
+        When no repository path directory is discovered,
+        L{data_relation_changed} will log that no repository info is migrated.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape/1/logs")
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape-repository")
+        self.mocker.result(True)
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
+            shell=True)
+        exists("/some/repository/path")
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("global")
+        parser.add_section("landscape")
+        for section, key, value in data:
+            parser.set(section, key, value)
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the parser to read config changes
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual(
+            parser.get("landscape", "repository-path"),
+            "/srv/juju/vol-0001/landscape-repository")
+        self.assertEqual(parser.get("global", "log-path"), new_log_path)
+        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+
+        messages = ["Migrating logs and hosted repository data",
+                    "INFO: No repository data migrated"]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
+
     def test_data_relation_changed_success_no_repository_data(self):
         """
         L{data_relation_changed} will migrate existing logs to the new
@@ -217,7 +274,10 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs")
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
+            shell=True)
+        exists("/some/repository/path")
+        self.mocker.result(True)
         listdir = self.mocker.replace(os.listdir)
         listdir("/some/repository/path")
         self.mocker.result([])
@@ -276,13 +336,16 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs")
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
+            shell=True)
+        exists("/some/repository/path")
+        self.mocker.result(True)
         listdir = self.mocker.replace(os.listdir)
         listdir("/some/repository/path")
         self.mocker.result(["one-repo-dir"])
         check_call_mock(
             "cp -r /some/repository/path/* "
-            "/srv/juju/vol-0001/landscape-repository")
+            "/srv/juju/vol-0001/landscape-repository", shell=True)
         self.mocker.replay()
 
         # Setup sample config file values
