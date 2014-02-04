@@ -25,19 +25,26 @@ from base64 import b64encode
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
-def _resolve_include(k, v):
+def _resolve_include(value):
+    """
+    resolve include-*:// style links in the way that
+    juju-deployer does.  I cut and paste this code for now
+    since it was a bit burried in a method.  The goal is
+    to move this into amulet, I really don't want to maintain
+    this here.
+    """
     for include_type in ["file", "base64"]:
-        if (not isinstance(v, str)
-            or not v.startswith(
+        if (not isinstance(value, str)
+            or not value.startswith(
                 "include-%s://" % include_type)):
             continue
-        include, fname = v.split("://", 1)
-        ip = resolve_include(fname, ".")
-        with open(ip) as fh:
-            v = fh.read()
+        include, fname = value.split("://", 1)
+        include_path = resolve_include(fname, ".")
+        with open(include_path) as fh:
+            result = fh.read()
             if include_type == "base64":
-                v = b64encode(v)
-            return v
+                result = b64encode(result)
+            return result
 
 
 def load_deployer_config(yaml_file):
@@ -55,7 +62,7 @@ def load_deployer_config(yaml_file):
     for service_name, service in data['services'].items():
         if "options" in service:
             for key, value in service["options"].items():
-                service["options"][key] = _resolve_include(key, value)
+                service["options"][key] = _resolve_include(value)
 
     output = subprocess.check_output(['juju', 'env']).split()
     env = output[2].strip('"')
