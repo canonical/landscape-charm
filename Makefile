@@ -18,8 +18,7 @@ verify-juju-test:
 		exit 1;\
 	fi 
 
-stage-integration-test:
-	@echo "** Note: config/repo-file & config/license-file must exist"
+stage-integration-test: config/repo-file config/license-file
 	cp -f config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl .
 
 integration-test: verify-juju-test stage-integration-test
