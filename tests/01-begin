@@ -58,7 +58,7 @@ def load_deployer_config(yaml_file):
     if "relations" not in data:
         data["relations"] = {}
 
-    for service_name, service in data['services'].items():
+    for service_name, service in data["services"].iteritems():
         if "options" in service:
             for key, value in service["options"].items():
                 service["options"][key] = _resolve_include(value)
