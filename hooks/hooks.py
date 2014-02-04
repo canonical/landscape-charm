@@ -200,6 +200,7 @@ def data_relation_changed():
         {"global": {"oops-path": "%s/logs" % new_path,
                     "log-path": new_log_path},
          "landscape": {"repository-path": new_repo_path}})
+    config_changed()  # only starts services again if is_db_up and _is_amqp_up
 
 
 def update_config_settings(config_settings):
@@ -248,7 +249,7 @@ def amqp_relation_changed():
         {"broker": {"password": password, "host": host, "user": "landscape"}})
 
     if _is_db_up():
-        config_changed()  # only restarty is_db_up and _is_amqp_up
+        config_changed()  # only restart when is_db_up and _is_amqp_up
 
 
 def config_changed():

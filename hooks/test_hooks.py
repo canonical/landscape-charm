@@ -210,6 +210,8 @@ class TestHooksService(TestHooks):
         """
         When no repository path directory is discovered,
         L{data_relation_changed} will log that no repository info is migrated.
+        Finally L{data_relation_changed} will call L{config-changed} to ensure
+        landscape services are restarted to reload the changes.
         """
         self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
         hooks.juju._incoming_relation_data = (
@@ -230,6 +232,8 @@ class TestHooksService(TestHooks):
             shell=True)
         exists("/some/repository/path")
         self.mocker.result(False)
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
         self.mocker.replay()
 
         # Setup sample config file values
@@ -270,6 +274,8 @@ class TestHooksService(TestHooks):
         following configuration settings: C{repository-path}, C{log-path} and
         C{oops-path}. When no repository data is discovered,
         L{data_relation_changed} will log that info.
+        Finally L{data_relation_changed} will call L{config-changed} to ensure
+        landscape services are restarted to reload the changes.
         """
         self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
         hooks.juju._incoming_relation_data = (
@@ -293,6 +299,8 @@ class TestHooksService(TestHooks):
         listdir = self.mocker.replace(os.listdir)
         listdir("/some/repository/path")
         self.mocker.result([])
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
         self.mocker.replay()
 
         # Setup sample config file values
