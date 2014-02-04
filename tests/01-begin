@@ -1,19 +1,18 @@
 #!/usr/bin/python2.7
 """
-This test simply creats a real landscape deployment, and runs a command there.
+This test simply creates a real landscape deployment, and runs a command there.
 There isn't much to it for now.  The intent is to deploy landscape and our
 dependent charms to test for any non-starter type issues.
 """
 
 
 import subprocess
-import amulet
 import shutil
-
+from base64 import b64encode
 import logging
+import amulet
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
-from base64 import b64encode
 
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into

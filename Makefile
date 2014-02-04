@@ -18,7 +18,6 @@ verify-juju-test:
 		exit 1;\
 	fi 
 
-
 stage-integration-test:
 	@echo "** Note: config/repo-file & config/license-file must exist"
 	cp -f config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl .
@@ -29,3 +28,5 @@ integration-test: verify-juju-test stage-integration-test
 lint:
 	find hooks -name *.py | xargs pyflakes
 	pyflakes3 tests/*
+
+.PHONY: lint integration-test stage-integration-test verify-juju-test test
