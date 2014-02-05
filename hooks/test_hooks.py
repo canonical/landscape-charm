@@ -218,17 +218,21 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
         exists = self.mocker.replace(os.path.exists)
         exists(hooks.STORAGE_MOUNTPOINT)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape/1/logs")
+        exists(new_log_path)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape-repository")
+        exists(new_repo_path)
         self.mocker.result(True)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
-            shell=True)
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
         exists("/some/repository/path")
         self.mocker.result(False)
         config_changed = self.mocker.replace(hooks.config_changed)
@@ -252,16 +256,14 @@ class TestHooksService(TestHooks):
         hooks.data_relation_changed()
 
         # Refresh the parser to read config changes
-        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
         parser.read([hooks.LANDSCAPE_SERVICE_CONF])
         self.assertEqual(
-            parser.get("landscape", "repository-path"),
-            "/srv/juju/vol-0001/landscape-repository")
+            parser.get("landscape", "repository-path"), new_repo_path)
         self.assertEqual(parser.get("global", "log-path"), new_log_path)
         self.assertEqual(parser.get("global", "oops-path"), new_log_path)
 
-        messages = ["Migrating logs and hosted repository data",
-                    "INFO: No repository data migrated"]
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "No repository data migrated"]
         for message in messages:
             self.assertIn(
                 message, hooks.juju._logs, "Not logged- %s" % message)
@@ -282,17 +284,21 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
         exists = self.mocker.replace(os.path.exists)
         exists(hooks.STORAGE_MOUNTPOINT)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape/1/logs")
+        exists(new_log_path)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape-repository")
+        exists(new_repo_path)
         self.mocker.result(True)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
-            shell=True)
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
         exists("/some/repository/path")
         self.mocker.result(True)
         listdir = self.mocker.replace(os.listdir)
@@ -319,16 +325,14 @@ class TestHooksService(TestHooks):
         hooks.data_relation_changed()
 
         # Refresh the parser to read config changes
-        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
         parser.read([hooks.LANDSCAPE_SERVICE_CONF])
         self.assertEqual(
-            parser.get("landscape", "repository-path"),
-            "/srv/juju/vol-0001/landscape-repository")
+            parser.get("landscape", "repository-path"), new_repo_path)
         self.assertEqual(parser.get("global", "log-path"), new_log_path)
         self.assertEqual(parser.get("global", "oops-path"), new_log_path)
 
-        messages = ["Migrating logs and hosted repository data",
-                    "INFO: No repository data migrated"]
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "No repository data migrated"]
         for message in messages:
             self.assertIn(
                 message, hooks.juju._logs, "Not logged- %s" % message)
@@ -346,25 +350,28 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
         exists = self.mocker.replace(os.path.exists)
         exists(hooks.STORAGE_MOUNTPOINT)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape/1/logs")
+        exists(new_log_path)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape-repository")
+        exists(new_repo_path)
         self.mocker.result(True)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
-            shell=True)
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
         exists("/some/repository/path")
         self.mocker.result(True)
         listdir = self.mocker.replace(os.listdir)
         listdir("/some/repository/path")
         self.mocker.result(["one-repo-dir"])
         check_call_mock(
-            "cp -r /some/repository/path/* "
-            "/srv/juju/vol-0001/landscape-repository", shell=True)
+            "cp -r /some/repository/path/* %s" % new_repo_path, shell=True)
         self.mocker.replay()
 
         # Setup sample config file values
@@ -384,17 +391,17 @@ class TestHooksService(TestHooks):
         hooks.data_relation_changed()
 
         # Refresh the parser to read config changes
-        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
         parser.read([hooks.LANDSCAPE_SERVICE_CONF])
         self.assertEqual(
-            parser.get("landscape", "repository-path"),
-            "/srv/juju/vol-0001/landscape-repository")
+            parser.get("landscape", "repository-path"), new_repo_path)
         self.assertEqual(parser.get("global", "log-path"), new_log_path)
         self.assertEqual(parser.get("global", "oops-path"), new_log_path)
 
-        message = "Migrating logs and hosted repository data"
-        self.assertIn(
-            message, hooks.juju._logs, "Not logged- %s" % message)
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "Migrating repository data to %s" % new_repo_path]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_data_relation_changed_creates_new_log_and_repository_paths(self):
         """
@@ -407,31 +414,32 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
         exists = self.mocker.replace(os.path.exists)
         exists(hooks.STORAGE_MOUNTPOINT)
         self.mocker.result(True)
-        exists("/srv/juju/vol-0001/landscape/1/logs")
+        exists(new_log_path)
         self.mocker.result(False)
         makedirs = self.mocker.replace(os.makedirs)
-        makedirs("/srv/juju/vol-0001/landscape/1/logs")
-        _chown = self.mocker.replace(hooks._chown)
-        _chown("/srv/juju/vol-0001/landscape/1/logs")
-        exists("/srv/juju/vol-0001/landscape-repository")
-        self.mocker.result(False)
-        makedirs("/srv/juju/vol-0001/landscape-repository")
-        _chown("/srv/juju/vol-0001/landscape-repository")
+        makedirs(new_log_path)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
-            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
-            shell=True)
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
+        exists(new_repo_path)
+        self.mocker.result(False)
+        makedirs(new_repo_path)
+        _chown(new_repo_path, owner="root")
         exists("/some/repository/path")
         self.mocker.result(True)
         listdir = self.mocker.replace(os.listdir)
         listdir("/some/repository/path")
         self.mocker.result(["one-repo-dir"])
         check_call_mock(
-            "cp -r /some/repository/path/* "
-            "/srv/juju/vol-0001/landscape-repository", shell=True)
+            "cp -r /some/repository/path/* %s" % new_repo_path, shell=True)
         self.mocker.replay()
 
         # Setup sample config file values
@@ -451,17 +459,17 @@ class TestHooksService(TestHooks):
         hooks.data_relation_changed()
 
         # Refresh the parser to read config changes
-        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
         parser.read([hooks.LANDSCAPE_SERVICE_CONF])
         self.assertEqual(
-            parser.get("landscape", "repository-path"),
-            "/srv/juju/vol-0001/landscape-repository")
+            parser.get("landscape", "repository-path"), new_repo_path)
         self.assertEqual(parser.get("global", "log-path"), new_log_path)
         self.assertEqual(parser.get("global", "oops-path"), new_log_path)
 
-        message = "Migrating logs and hosted repository data"
-        self.assertIn(
-            message, hooks.juju._logs, "Not logged- %s" % message)
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "Migrating repository data to %s" % new_repo_path]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test__download_file_success(self):
         """

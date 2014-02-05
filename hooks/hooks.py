@@ -204,8 +204,6 @@ def data_relation_changed():
             juju.juju_log("Migrating log data to %s" % new_log_path)
             if not os.path.exists(new_log_path):
                 os.makedirs(new_log_path)
-                _chown(new_log_path)
-
             check_call(
                 "cp -f %s/*log %s" % (log_path, new_log_path), shell=True)
             _chown(new_log_path)  # to set landscape owner of all files
@@ -215,7 +213,7 @@ def data_relation_changed():
                 os.makedirs(new_repo_path)
                 _chown(new_repo_path, owner="root")  # root since shared
             if os.path.exists(repo_path) and len(os.listdir(repo_path)):
-                juju.juju_log("Migrating repository data to %s" % new_log_path)
+                juju.juju_log("Migrating repository data to %s" % new_repo_path)
                 check_call(
                     "cp -r %s/* %s" % (repo_path, new_repo_path), shell=True)
             else:
