@@ -143,7 +143,7 @@ def data_relation_changed():
     juju.juju_log(
         "External storage relation changed: "
         "requesting mountpoint %s from storage charm" % STORAGE_MOUNTPOINT)
-    juju.relation_set("mountpoint=/srv/juju/vol-0001")
+    juju.relation_set("mountpoint=%s" % STORAGE_MOUNTPOINT)
 
     # Has storage charm setup the mountpoint we requested?
     mountpoint = juju.relation_get("mountpoint")
