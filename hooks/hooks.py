@@ -139,6 +139,15 @@ def amqp_relation_joined():
     juju.relation_set("vhost=landscape")
 
 
+def _chown(path, owner="landscape"):
+    """Ensure the provided C{path} is owned by C{owner}"""
+    import pwd
+    import grp
+    uid = pwd.getpwnam(owner).pw_uid
+    gid = grp.getgrnam(owner).gr_gid
+    os.chown(path, uid, gid)
+
+
 def data_relation_changed():
     juju.juju_log(
         "External storage relation changed: "
@@ -186,11 +195,13 @@ def data_relation_changed():
         new_log_path = "%s/logs" % new_path
         if not os.path.exists(new_log_path):
             os.makedirs(new_log_path)
+            _chown(new_log_path)
 
         # Shared repository path is shared by all units
         new_repo_path = "%s/landscape-repository" % mountpoint
         if not os.path.exists(new_repo_path):
             os.makedirs(new_repo_path)
+            _chown(new_repo_path)
 
         # TODO do we need to migrate OOPS files?
         check_call("cp -f %s/*log %s" % (log_path, new_log_path), shell=True)

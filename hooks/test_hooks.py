@@ -396,6 +396,73 @@ class TestHooksService(TestHooks):
         self.assertIn(
             message, hooks.juju._logs, "Not logged- %s" % message)
 
+    def test_data_relation_changed_creates_new_log_and_repository_paths(self):
+        """
+        L{data_relation_changed} will create the new shared log and repository
+        data paths if they don't exist during the log and data migration.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists("/srv/juju/vol-0001/landscape/1/logs")
+        self.mocker.result(False)
+        makedirs = self.mocker.replace(os.makedirs)
+        makedirs("/srv/juju/vol-0001/landscape/1/logs")
+        _chown = self.mocker.replace(hooks._chown)
+        _chown("/srv/juju/vol-0001/landscape/1/logs")
+        exists("/srv/juju/vol-0001/landscape-repository")
+        self.mocker.result(False)
+        makedirs("/srv/juju/vol-0001/landscape-repository")
+        _chown("/srv/juju/vol-0001/landscape-repository")
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log /srv/juju/vol-0001/landscape/1/logs",
+            shell=True)
+        exists("/some/repository/path")
+        self.mocker.result(True)
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result(["one-repo-dir"])
+        check_call_mock(
+            "cp -r /some/repository/path/* "
+            "/srv/juju/vol-0001/landscape-repository", shell=True)
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        parser = RawConfigParser()
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        parser.add_section("global")
+        parser.add_section("landscape")
+        for section, key, value in data:
+            parser.set(section, key, value)
+        parser.write(self._service_conf)
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the parser to read config changes
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        self.assertEqual(
+            parser.get("landscape", "repository-path"),
+            "/srv/juju/vol-0001/landscape-repository")
+        self.assertEqual(parser.get("global", "log-path"), new_log_path)
+        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+
+        message = "Migrating logs and hosted repository data"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
     def test__download_file_success(self):
         """
         Make sure the happy path of download file works.
