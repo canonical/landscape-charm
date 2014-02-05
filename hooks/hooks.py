@@ -9,20 +9,22 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import util
 from lib.juju import Juju
 
+from base64 import b64encode
+from ConfigParser import RawConfigParser, Error
+from copy import deepcopy
+import cStringIO
+import datetime
+import grp
 import os
+import psutil
+import psycopg2
+import pwd
+import pycurl
+import re
+import shutil
 import sys
 import yaml
-import shutil
-import re
-import pycurl
-import cStringIO
-import psutil
-import datetime
-import psycopg2
-from copy import deepcopy
-from base64 import b64encode
 from subprocess import check_call
-from ConfigParser import RawConfigParser, Error
 
 
 def website_relation_joined():
@@ -141,8 +143,6 @@ def amqp_relation_joined():
 
 def _chown(dir_path, owner="landscape"):
     """Ensure the provided C{path} is owned by C{owner}"""
-    import pwd
-    import grp
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(owner).gr_gid
     os.chown(dir_path, uid, gid)
@@ -213,11 +213,12 @@ def data_relation_changed():
                 os.makedirs(new_repo_path)
                 _chown(new_repo_path, owner="root")  # root since shared
             if os.path.exists(repo_path) and len(os.listdir(repo_path)):
-                juju.juju_log("Migrating repository data to %s" % new_repo_path)
+                juju.juju_log(
+                    "Migrating repository data to %s" % new_repo_path)
                 check_call(
                     "cp -r %s/* %s" % (repo_path, new_repo_path), shell=True)
             else:
-               juju.juju_log("No repository data migrated")
+                juju.juju_log("No repository data migrated")
 
     # Change logs and repository path to our new nfs mountpoint
     update_config_settings(

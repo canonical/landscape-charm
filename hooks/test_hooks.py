@@ -1,11 +1,11 @@
-import subprocess
+import base64
+from ConfigParser import RawConfigParser
 import hooks
-import yaml
+import mocker
 import os
 import pycurl
-import base64
-import mocker
-from ConfigParser import RawConfigParser
+import subprocess
+import yaml
 
 
 class TestJuju(object):
@@ -141,6 +141,55 @@ class TestHooksService(TestHooks):
         hooks.juju.config["services"] = "jobhandler"
         result = hooks._get_services_haproxy()
         self.assertEqual(len(result), 0)
+
+    def test_wb_chown_sets_dir_and_file_ownership_to_landscape(self):
+        """
+        For a C{dir_path} specified, L{_chown} sets directory mode to 777 and
+        ownership of the directory and all contained files to C{landscape} user
+        and group.
+        """
+        import stat
+
+        class fake_pw_struct(object):
+            """
+            Fake both structs returned by getgrpnam and getpwnam for our needs
+            """
+            gr_gid = None
+            pw_uid = None
+
+            def __init__(self, value):
+                self.gr_gid = value
+                self.pw_uid = value
+
+        dir_name = self.makeDir()
+        with open("%s/anyfile" % dir_name, "w") as fp:
+            fp.write("foobar")
+
+        mode700 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+        mode777 = (
+            mode700 | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP |
+            stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)
+
+        getpwnam = self.mocker.replace("pwd.getpwnam")
+        getpwnam("landscape")
+        self.mocker.result(fake_pw_struct(987))
+        getpwnam = self.mocker.replace("grp.getgrnam")
+        getpwnam("landscape")
+        self.mocker.result(fake_pw_struct(989))
+        chown = self.mocker.replace(os.chown)
+        chown(dir_name, 987, 989)
+        chown("%s/anyfile" % dir_name, 987, 989)
+        self.mocker.replay()
+
+        # Check initial file permissions and ownership
+        mode = os.stat(dir_name).st_mode
+        self.assertEqual(mode & mode700, mode700)
+        self.assertNotEqual(mode & mode777, mode777)
+        hooks._chown(dir_name)
+
+        # Directory mode changed to 777 and gid/uid set
+        mode = os.stat(dir_name).st_mode
+        self.assertEqual(mode & mode777, mode777)
 
     def test_amqp_relation_joined(self):
         """
