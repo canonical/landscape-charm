@@ -139,13 +139,18 @@ def amqp_relation_joined():
     juju.relation_set("vhost=landscape")
 
 
-def _chown(path, owner="landscape"):
+def _chown(dir_path, owner="landscape"):
     """Ensure the provided C{path} is owned by C{owner}"""
     import pwd
     import grp
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(owner).gr_gid
-    os.chown(path, uid, gid)
+    os.chown(dir_path, uid, gid)
+    os.chmod(dir_path, 0o777)
+    for dirpath, dirnames, filenames in os.walk(dir_path):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            os.chown(path, uid, gid)
 
 
 def data_relation_changed():
@@ -191,27 +196,30 @@ def data_relation_changed():
             "Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
         sys.exit(1)
     else:
-        juju.juju_log("Migrating logs and hosted repository data")
         new_log_path = "%s/logs" % new_path
-        if not os.path.exists(new_log_path):
-            os.makedirs(new_log_path)
-            _chown(new_log_path)
-
         # Shared repository path is shared by all units
         new_repo_path = "%s/landscape-repository" % mountpoint
-        if not os.path.exists(new_repo_path):
-            os.makedirs(new_repo_path)
-            _chown(new_repo_path)
 
-        # TODO do we need to migrate OOPS files?
-        check_call("cp -f %s/*log %s" % (log_path, new_log_path), shell=True)
-        # Migrate repository data if any exist
-        if os.path.exists(repo_path) and len(os.listdir(repo_path)):
+        if new_log_path != log_path:
+            juju.juju_log("Migrating log data to %s" % new_log_path)
+            if not os.path.exists(new_log_path):
+                os.makedirs(new_log_path)
+                _chown(new_log_path)
+
+            check_call(
+                "cp -f %s/*log %s" % (log_path, new_log_path), shell=True)
+            _chown(new_log_path)  # to set landscape owner of all files
+        if new_repo_path != repo_path:
+            # Migrate repository data if any exist
+            if not os.path.exists(new_repo_path):
+                os.makedirs(new_repo_path)
+                _chown(new_repo_path, owner="root")  # root since shared
+            if os.path.exists(repo_path) and len(os.listdir(repo_path)):
+                juju.juju_log("Migrating repository data to %s" % new_log_path)
                 check_call(
-                    "cp -r %s/* %s" % (repo_path, new_repo_path),
-                    shell=True)
-        else:
-            juju.juju_log("INFO: No repository data migrated")
+                    "cp -r %s/* %s" % (repo_path, new_repo_path), shell=True)
+            else:
+               juju.juju_log("No repository data migrated")
 
     # Change logs and repository path to our new nfs mountpoint
     update_config_settings(
