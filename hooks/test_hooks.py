@@ -18,7 +18,6 @@ class TestJuju(object):
     _incoming_relation_data = ()   # set by the REMOTE_JUJU_UNIT
     _logs = ()
     _relation_list = ("postgres/0",)
-    _logs = ()
 
     def __init__(self):
         self.config = {
@@ -157,7 +156,7 @@ class TestHooksService(TestHooks):
         """
         C{data-relation-changed hook sends a requested C{mountpoint}
         to the storage subordinate charm. It will wait for the subordinate to
-        respond with the initialized C{mountpoint} in the relation before
+        respond with the initialised C{mountpoint} in the relation before
         acting.
         """
         self.assertRaises(SystemExit, hooks.data_relation_changed)
@@ -165,7 +164,7 @@ class TestHooksService(TestHooks):
         self.assertEqual(baseline, dict(hooks.juju._outgoing_relation_data))
         messages = ["External storage relation changed: requesting mountpoint "
                     "%s from storage charm" % hooks.STORAGE_MOUNTPOINT,
-                    "Awaiting storage mountpoint intialization from storage "
+                    "Awaiting storage mountpoint intialisation from storage "
                     "relation"]
         for message in messages:
             self.assertIn(

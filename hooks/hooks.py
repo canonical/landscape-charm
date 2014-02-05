@@ -145,11 +145,18 @@ def data_relation_changed():
         "requesting mountpoint %s from storage charm" % STORAGE_MOUNTPOINT)
     juju.relation_set("mountpoint=%s" % STORAGE_MOUNTPOINT)
 
-    # Has storage charm setup the mountpoint we requested?
+    # Has storage charm setup the mountpoint we requested?a
+    #
+    # Since relation-data is one-way communication, the mountpoint we "set"
+    # above is only visible from a relation_get on the storage subordinate side
+    # of the relation. Hence, our relation_get here will only return non-None
+    # if the storage subordinate has called relation_set("mountpoint=X") on its
+    # side to announce that it has succeeded in attaching the requested
+    # mountpoint we sent above.
     mountpoint = juju.relation_get("mountpoint")
     if mountpoint != STORAGE_MOUNTPOINT:
         juju.juju_log(
-            "Awaiting storage mountpoint intialization from storage relation")
+            "Awaiting storage mountpoint intialisation from storage relation")
         sys.exit(0)
 
     if not os.path.exists(mountpoint):
@@ -451,8 +458,8 @@ def _enable_services():
 
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
-        server_options="check inter 5000 rise 2 fall 5 maxconn 50",
-        service_options=None, errorfiles=None):
+                    server_options="check inter 5000 rise 2 fall 5 maxconn 50",
+                    service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a
