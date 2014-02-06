@@ -17,5 +17,9 @@ requires:
     interface: rabbitmq
 
 provides:
+  data:
+    interface: block-storage
+    scope: container
+    optional: true
   website:
     interface: http

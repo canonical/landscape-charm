@@ -1,10 +1,12 @@
+import base64
+from configobj import ConfigObj
 import hooks
-import yaml
+import mocker
 import os
 import pycurl
-import base64
-import mocker
-from ConfigParser import RawConfigParser
+import stat
+import subprocess
+import yaml
 
 
 class TestJuju(object):
@@ -141,6 +143,54 @@ class TestHooksService(TestHooks):
         result = hooks._get_services_haproxy()
         self.assertEqual(len(result), 0)
 
+    def test_wb_chown_sets_dir_and_file_ownership_to_landscape(self):
+        """
+        For a C{dir_path} specified, L{_chown} sets directory mode to 777 and
+        ownership of the directory and all contained files to C{landscape} user
+        and group.
+        """
+
+        class fake_pw_struct(object):
+            """
+            Fake both structs returned by getgrpnam and getpwnam for our needs
+            """
+            gr_gid = None
+            pw_uid = None
+
+            def __init__(self, value):
+                self.gr_gid = value
+                self.pw_uid = value
+
+        dir_name = self.makeDir()
+        with open("%s/anyfile" % dir_name, "w") as fp:
+            fp.write("foobar")
+
+        mode700 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+        mode777 = (
+            mode700 | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP |
+            stat.S_IROTH | stat.S_IWOTH | stat.S_IXOTH)
+
+        getpwnam = self.mocker.replace("pwd.getpwnam")
+        getpwnam("landscape")
+        self.mocker.result(fake_pw_struct(987))
+        getpwnam = self.mocker.replace("grp.getgrnam")
+        getpwnam("landscape")
+        self.mocker.result(fake_pw_struct(989))
+        chown = self.mocker.replace(os.chown)
+        chown(dir_name, 987, 989)
+        chown("%s/anyfile" % dir_name, 987, 989)
+        self.mocker.replay()
+
+        # Check initial file permissions and ownership
+        mode = os.stat(dir_name).st_mode
+        self.assertEqual(mode & mode700, mode700)
+        self.assertNotEqual(mode & mode777, mode777)
+        hooks._chown(dir_name)
+
+        # Directory mode changed to 777 and gid/uid set
+        mode = os.stat(dir_name).st_mode
+        self.assertEqual(mode & mode777, mode777)
+
     def test_amqp_relation_joined(self):
         """
         Ensure the amqp relation joined hook spits out settings when run.
@@ -150,6 +200,47 @@ class TestHooksService(TestHooks):
             "username": "landscape",
             "vhost": "landscape"}
         self.assertEqual(baseline, dict(hooks.juju._outgoing_relation_data))
+
+    def test_data_relation_changed_sets_mountpoint_awaits_init(self):
+        """
+        C{data-relation-changed} hook sends a requested C{mountpoint}
+        to the storage subordinate charm. It will wait for the subordinate to
+        respond with the initialised C{mountpoint} in the relation before
+        acting.
+        """
+        self.assertRaises(SystemExit, hooks.data_relation_changed)
+        baseline = {"mountpoint": "/srv/juju/vol-0001"}
+        self.assertEqual(baseline, dict(hooks.juju._outgoing_relation_data))
+        messages = ["External storage relation changed: requesting mountpoint "
+                    "%s from storage charm" % hooks.STORAGE_MOUNTPOINT,
+                    "Awaiting storage mountpoint intialisation from storage "
+                    "relation"]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_error_on_mountpoint_from_subordinate(self):
+        """
+        C{data-relation-changed} will exit in error if the C{mountpoint} set
+        from the subordinate charm relation does not exist.
+        """
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+
+        self.assertEqual(
+            hooks.juju.relation_get("mountpoint"), hooks.STORAGE_MOUNTPOINT)
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        self.assertRaises(SystemExit, hooks.data_relation_changed)
+        message = (
+            "Error: Mountpoint %s doesn't appear to exist" %
+            hooks.STORAGE_MOUNTPOINT)
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_amqp_relation_changed_no_hostname_password(self):
         """
@@ -161,7 +252,283 @@ class TestHooksService(TestHooks):
         self.assertRaises(SystemExit, hooks.amqp_relation_changed)
         message = (
             "Waiting for valid hostname/password values from amqp relation")
-        self.assertIn(message, hooks.juju._logs)
+        self.assertIn(message, hooks.juju._logs, "Not logged; %s" % message)
+
+    def test_data_relation_changed_success_no_repository_path(self):
+        """
+        When no repository path directory is discovered,
+        L{data_relation_changed} will log that no repository info is migrated.
+        Finally L{data_relation_changed} will call L{config-changed} to ensure
+        landscape services are restarted to reload the changes.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists(new_log_path)
+        self.mocker.result(True)
+        exists(new_repo_path)
+        self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
+        exists("/some/repository/path")
+        self.mocker.result(False)
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {}
+        config_obj["landscape"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
+
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "No repository data migrated"]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_success_no_repository_data(self):
+        """
+        L{data_relation_changed} will migrate existing logs to the new
+        C{mountpoint} and update paths in C{LANDSCAPE_SERVICE_CONF} for the
+        following configuration settings: C{repository-path}, C{log-path} and
+        C{oops-path}. When no repository data is discovered,
+        L{data_relation_changed} will log that info.
+        Finally L{data_relation_changed} will call L{config-changed} to ensure
+        landscape services are restarted to reload the changes.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists(new_log_path)
+        self.mocker.result(True)
+        exists(new_repo_path)
+        self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
+        exists("/some/repository/path")
+        self.mocker.result(True)
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result([])
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {}
+        config_obj["landscape"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
+
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "No repository data migrated"]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_success_with_repository_data(self):
+        """
+        L{data_relation_changed} will migrate existing logs and respository
+        data to the new C{mountpoint} and update paths in
+        C{LANDSCAPE_SERVICE_CONF} for the following configuration settings:
+        C{repository-path}, C{log-path} and C{oops-path}.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists(new_log_path)
+        self.mocker.result(True)
+        exists(new_repo_path)
+        self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        self.mocker.count(3)   # 1 for log migration, repo, and config changed
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
+        exists("/some/repository/path")
+        self.mocker.result(True)
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result(["one-repo-dir"])
+        check_call_mock(
+            "cp -r /some/repository/path/* %s" % new_repo_path, shell=True)
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {}
+        config_obj["landscape"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
+
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "Migrating repository data to %s" % new_repo_path]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_data_relation_changed_creates_new_log_and_repository_paths(self):
+        """
+        L{data_relation_changed} will create the new shared log and repository
+        data paths if they don't exist during the log and data migration.
+        """
+        self.addCleanup(setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = (
+            ("mountpoint", hooks.STORAGE_MOUNTPOINT),)
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        new_log_path = "/srv/juju/vol-0001/landscape/1/logs"
+        new_repo_path = "/srv/juju/vol-0001/landscape-repository"
+
+        exists = self.mocker.replace(os.path.exists)
+        exists(hooks.STORAGE_MOUNTPOINT)
+        self.mocker.result(True)
+        exists(new_log_path)
+        self.mocker.result(False)
+        makedirs = self.mocker.replace(os.makedirs)
+        makedirs(new_log_path)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        self.mocker.count(3)
+        check_call_mock = self.mocker.replace(subprocess.check_call)
+        check_call_mock(
+            "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
+        _chown = self.mocker.replace(hooks._chown)
+        _chown(new_log_path)
+        exists(new_repo_path)
+        self.mocker.result(False)
+        makedirs(new_repo_path)
+        _chown(new_repo_path, owner="root")
+        exists("/some/repository/path")
+        self.mocker.result(True)
+        listdir = self.mocker.replace(os.listdir)
+        listdir("/some/repository/path")
+        self.mocker.result(["one-repo-dir"])
+        check_call_mock(
+            "cp -r /some/repository/path/* %s" % new_repo_path, shell=True)
+        self.mocker.replay()
+
+        # Setup sample config file values
+        data = [("global", "oops-path", "/some/oops/path"),
+                ("global", "log-path", "/some/log/path"),
+                ("landscape", "repository-path", "/some/repository/path")]
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {}
+        config_obj["landscape"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
+        self._service_conf.seek(0)
+
+        hooks.data_relation_changed()
+
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
+
+        messages = ["Migrating log data to %s" % new_log_path,
+                    "Migrating repository data to %s" % new_repo_path]
+        for message in messages:
+            self.assertIn(
+                message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test__download_file_success(self):
         """
@@ -375,11 +742,11 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.add_section("schema")
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj["schema"] = {}
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         new_user = "landscape"
         new_password = "def456"
@@ -424,9 +791,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_not_in_allowed_units(self):
         """
@@ -450,9 +816,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_hot_standby_state_ignore(self):
         """
@@ -475,9 +840,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_failover_state_ignore(self):
         """
@@ -500,9 +864,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_standalone_state_ignore(self):
         """
@@ -533,9 +896,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_calc_daemon_count(self):
         """
@@ -667,14 +1029,16 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_with_db_configured(self):
         """Return True when the db is configured."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.set("stores", "main", "somedb")
-        parser.set("stores", "host", "somehost")
-        parser.set("stores", "user", "someuser")
-        parser.set("stores", "password", "somepassword")
-        parser.write(self._service_conf)
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         is_db_up = self.mocker.replace(hooks.util.is_db_up)
@@ -686,14 +1050,16 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_db_not_configured(self):
         """Return False when the db is not configured."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.set("stores", "main", "somedb")
-        parser.set("stores", "host", "somehost")
-        parser.set("stores", "user", "someuser")
-        parser.set("stores", "password", "somepassword")
-        parser.write(self._service_conf)
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         is_db_up = self.mocker.replace(hooks.util.is_db_up)
@@ -710,18 +1076,18 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_service_config_missing_stores(self):
         """Return False when the service config is missing [stores]."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 
     def test_is_db_up_service_config_missing_keys(self):
         """Return False when the [stores] section is missing db settings."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 

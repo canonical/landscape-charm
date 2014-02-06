@@ -1,5 +1,5 @@
 test:
-	cd hooks && trial test_hooks.py
+	trial hooks
 
 verify-juju-test:
 	@echo "Checking for ... "
@@ -25,7 +25,7 @@ integration-test: verify-juju-test stage-integration-test
 	juju test -v --timeout 2000s
 
 lint:
-	find hooks -name *.py | xargs pyflakes
+	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/*
 
 .PHONY: lint integration-test stage-integration-test verify-juju-test test

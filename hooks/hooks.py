@@ -9,28 +9,46 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import util
 from lib.juju import Juju
 
+from base64 import b64encode
+from configobj import ConfigObj, ConfigObjError
+from copy import deepcopy
+import cStringIO
+import datetime
+import grp
 import os
+import psutil
+import psycopg2
+import pwd
+import pycurl
+import re
+import shutil
 import sys
 import yaml
-import shutil
-import re
-import pycurl
-import cStringIO
-import psutil
-import datetime
-import psycopg2
-from copy import deepcopy
-from base64 import b64encode
 from subprocess import check_call
-from ConfigParser import RawConfigParser, Error
+
+
+def _get_config_obj(config_source=None):
+    """Create a ConfigObj based on reading the config file C{filename}.
+    Shamelessly leveraged from landscape-client: deployment.py
+    """
+    if config_source is None:
+        config_source = LANDSCAPE_SERVICE_CONF
+    try:
+        config_obj = ConfigObj(config_source, list_values=False,
+                               raise_errors=False, write_empty_values=True)
+    except ConfigObjError, e:
+        juju.juju_log(str(e), "WARNING")
+        # Good configuration values are recovered here
+        config_obj = e.config
+    return config_obj
 
 
 def website_relation_joined():
     host = juju.unit_get("private-address")
     # N.B.: Port setting necessary due to limitations with haproxy charm
     juju.relation_set(
-            services=yaml.safe_dump(_get_services_haproxy()),
-            hostname=host, port=80)
+        services=yaml.safe_dump(_get_services_haproxy()),
+        hostname=host, port=80)
 
 
 def notify_website_relation():
@@ -62,8 +80,8 @@ def db_admin_relation_changed():
     password = juju.config_get("landscape-password")
 
     if not host or not admin or not admin_password:
-        juju.juju_log("Need host, user and password in relation"
-            " before proceeding")
+        juju.juju_log(
+            "Need host, user and password in relation before proceeding")
         return
 
     if not allowed_units or unit_name not in allowed_units:
@@ -89,18 +107,11 @@ def db_admin_relation_changed():
 
     juju.juju_log("Updating config due to database changes.")
 
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
-    parser.set("stores", "host", host)
-    parser.set("stores", "port", "5432")
-    parser.set("stores", "user", user)
-    parser.set("stores", "password", password)
-    parser.set("schema", "store_user", admin)
-    parser.set("schema", "store_password", admin_password)
-
-    # Write new changes to LANDSCAPE_NEW_SERVICE_CONF to test first
-    with open(LANDSCAPE_NEW_SERVICE_CONF, "w") as output_file:
-        parser.write(output_file)
+    update_config_settings(
+        {"stores": {"host": host, "port": "5432", "user": user,
+                    "password": password},
+         "schema": {"store_user": admin, "store_password": admin_password}},
+        outfile=LANDSCAPE_NEW_SERVICE_CONF)
 
     if not util.is_db_up("postgres", host, admin, admin_password):
         juju.juju_log(
@@ -109,8 +120,7 @@ def db_admin_relation_changed():
         return
 
     # Changes are validated; db is up has write-accessible
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
+    shutil.copyfile(LANDSCAPE_NEW_SERVICE_CONF, LANDSCAPE_SERVICE_CONF)
 
     try:
         # Name as lock so we don't try to reuse it as a database connection
@@ -139,6 +149,112 @@ def amqp_relation_joined():
     juju.relation_set("vhost=landscape")
 
 
+def _chown(dir_path, owner="landscape"):
+    """Ensure the provided C{path} is owned by C{owner}"""
+    uid = pwd.getpwnam(owner).pw_uid
+    gid = grp.getgrnam(owner).gr_gid
+    os.chown(dir_path, uid, gid)
+    os.chmod(dir_path, 0o777)
+    for dirpath, dirnames, filenames in os.walk(dir_path):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            os.chown(path, uid, gid)
+
+
+def data_relation_changed():
+    juju.juju_log(
+        "External storage relation changed: "
+        "requesting mountpoint %s from storage charm" % STORAGE_MOUNTPOINT)
+    juju.relation_set("mountpoint=%s" % STORAGE_MOUNTPOINT)
+
+    # Has storage charm setup the mountpoint we requested?
+    #
+    # Since relation-data is one-way communication, the mountpoint we "set"
+    # above is only visible from a relation_get on the storage subordinate side
+    # of the relation. Hence, our relation_get here will only return non-None
+    # if the storage subordinate has called relation_set("mountpoint=X") on its
+    # side to announce that it has succeeded in attaching the requested
+    # mountpoint we sent above.
+    mountpoint = juju.relation_get("mountpoint")
+    if mountpoint != STORAGE_MOUNTPOINT:
+        juju.juju_log(
+            "Awaiting storage mountpoint intialisation from storage relation")
+        sys.exit(0)
+
+    if not os.path.exists(mountpoint):
+        juju.juju_log(
+            "Error: Mountpoint %s doesn't appear to exist" % mountpoint)
+        sys.exit(1)
+
+    # Migrate existing logs
+    juju.juju_log(
+        "External volume mounted at %s. Migrating data and updating config"
+        % mountpoint)
+
+    unit_name = juju.local_unit()
+    new_path = "%s/%s" % (mountpoint, unit_name)
+
+    config_obj = _get_config_obj()
+    try:
+        log_path = config_obj["global"]["log-path"]
+        repo_path = config_obj["landscape"]["repository-path"]
+    except KeyError:
+        juju.juju_log(
+            "Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
+        sys.exit(1)
+    else:
+        new_log_path = "%s/logs" % new_path
+        # Shared repository path is shared by all units
+        new_repo_path = "%s/landscape-repository" % mountpoint
+
+        if new_log_path != log_path:
+            _lsctl("stop")  # Stop services before migrating logfiles
+            juju.juju_log("Migrating log data to %s" % new_log_path)
+            if not os.path.exists(new_log_path):
+                os.makedirs(new_log_path)
+            check_call(
+                "cp -f %s/*log %s" % (log_path, new_log_path), shell=True)
+            _chown(new_log_path)  # to set landscape owner of all files
+        if new_repo_path != repo_path:
+            # Migrate repository data if any exist
+            if not os.path.exists(new_repo_path):
+                os.makedirs(new_repo_path)
+                _chown(new_repo_path, owner="root")  # root since shared
+            if os.path.exists(repo_path) and len(os.listdir(repo_path)):
+                _lsctl("stop")  # Stop services before migrating repo data
+                juju.juju_log(
+                    "Migrating repository data to %s" % new_repo_path)
+                check_call(
+                    "cp -r %s/* %s" % (repo_path, new_repo_path), shell=True)
+            else:
+                juju.juju_log("No repository data migrated")
+
+    # Change logs and repository path to our new nfs mountpoint
+    update_config_settings(
+        {"global": {"oops-path": "%s/logs" % new_path,
+                    "log-path": new_log_path},
+         "landscape": {"repository-path": new_repo_path}})
+    config_changed()  # only starts services again if is_db_up and _is_amqp_up
+
+
+def update_config_settings(config_settings, outfile=None):
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    changes = False
+    for section_name, section in config_settings.iteritems():
+        if not section_name in config_obj:
+            config_obj[section_name] = {}
+        for key, value in section.iteritems():
+            if config_obj[section_name].get(key, None) != value:
+                changes = True
+                config_obj[section_name][key] = value
+    if changes:
+        if outfile is None:
+            config_obj.filename = LANDSCAPE_SERVICE_CONF
+        else:
+            config_obj.filename = outfile
+        config_obj.write()
+
+
 def _is_amqp_up():
     """Return C{True} if the ampq-relation has defined required values"""
     relid = juju.relation_ids("amqp")[0]         # TODO support amqp clusters?
@@ -164,18 +280,14 @@ def amqp_relation_changed():
 
     juju.juju_log("Using AMPQ server at %s" % host)
 
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+    if password == "":
+        sys.exit(0)
 
-    parser.set("broker", "password", password)
-    parser.set("broker", "host", host)
-    parser.set("broker", "user", "landscape")
-
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
+    update_config_settings(
+        {"broker": {"password": password, "host": host, "user": "landscape"}})
 
     if _is_db_up():
-        config_changed()  # only restarty is_db_up and _is_amqp_up
+        config_changed()  # only restart when is_db_up and _is_amqp_up
 
 
 def config_changed():
@@ -277,7 +389,7 @@ def _get_system_ram():
 
 
 def _calc_daemon_count(service, minimum=1, auto_maximum=None, maximum=None,
-        requested=None):
+                       requested=None):
     """
     Calculate the appropriate number of daemons to spawn for a requested
     service.
@@ -377,8 +489,8 @@ def _enable_services():
 
 
 def _format_service(name, count, port=None, httpchk="GET / HTTP/1.0",
-        server_options="check inter 5000 rise 2 fall 5 maxconn 50",
-        service_options=None, errorfiles=None):
+                    server_options="check inter 5000 rise 2 fall 5 maxconn 50",
+                    service_options=None, errorfiles=None):
     """
     Given a name and port, define a service in python data-structure
     format that will be exported as a yaml config to be set int a
@@ -488,14 +600,14 @@ def _is_db_up():
     """
     Return True if the database is accessible and read/write, False otherwise.
     """
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     try:
-        database = parser.get("stores", "main")
-        host = parser.get("stores", "host")
-        user = parser.get("stores", "user")
-        password = parser.get("stores", "password")
-    except Error:
+        section = config_obj["stores"]
+        database = section["main"]
+        host = section["host"]
+        user = section["user"]
+        password = section["password"]
+    except KeyError:
         return False
     else:
         return util.is_db_up(database, host, user, password)
@@ -574,6 +686,7 @@ LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
 LANDSCAPE_NEW_SERVICE_CONF = "/etc/landscape/service.conf.new"
 LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
+STORAGE_MOUNTPOINT = "/srv/juju/vol-0001"
 ROOT = os.path.abspath(os.path.curdir)
 juju = Juju()
 
@@ -582,6 +695,7 @@ if __name__ == "__main__":
         "config-changed": config_changed,
         "amqp-relation-joined": amqp_relation_joined,
         "amqp-relation-changed": amqp_relation_changed,
+        "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
         "website-relation-joined": website_relation_joined}
