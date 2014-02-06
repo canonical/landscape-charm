@@ -1,5 +1,5 @@
 import base64
-from ConfigParser import RawConfigParser
+from configobj import ConfigObj
 import hooks
 import mocker
 import os
@@ -295,23 +295,23 @@ class TestHooksService(TestHooks):
                 ("global", "log-path", "/some/log/path"),
                 ("landscape", "repository-path", "/some/repository/path")]
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("global")
-        parser.add_section("landscape")
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {}
+        config_obj["landscape"] = {}
         for section, key, value in data:
-            parser.set(section, key, value)
-        parser.write(self._service_conf)
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         hooks.data_relation_changed()
 
-        # Refresh the parser to read config changes
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         self.assertEqual(
-            parser.get("landscape", "repository-path"), new_repo_path)
-        self.assertEqual(parser.get("global", "log-path"), new_log_path)
-        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
 
         messages = ["Migrating log data to %s" % new_log_path,
                     "No repository data migrated"]
@@ -347,7 +347,6 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         lsctl = self.mocker.replace(hooks._lsctl)
         lsctl("stop")
-        self.mocker.count(1)   # 1 for log migration and config changed
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
             "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
@@ -367,23 +366,23 @@ class TestHooksService(TestHooks):
                 ("global", "log-path", "/some/log/path"),
                 ("landscape", "repository-path", "/some/repository/path")]
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("global")
-        parser.add_section("landscape")
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {} 
+        config_obj["landscape"] = {}
         for section, key, value in data:
-            parser.set(section, key, value)
-        parser.write(self._service_conf)
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         hooks.data_relation_changed()
 
-        # Refresh the parser to read config changes
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         self.assertEqual(
-            parser.get("landscape", "repository-path"), new_repo_path)
-        self.assertEqual(parser.get("global", "log-path"), new_log_path)
-        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
 
         messages = ["Migrating log data to %s" % new_log_path,
                     "No repository data migrated"]
@@ -436,23 +435,23 @@ class TestHooksService(TestHooks):
                 ("global", "log-path", "/some/log/path"),
                 ("landscape", "repository-path", "/some/repository/path")]
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("global")
-        parser.add_section("landscape")
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {} 
+        config_obj["landscape"] = {}
         for section, key, value in data:
-            parser.set(section, key, value)
-        parser.write(self._service_conf)
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         hooks.data_relation_changed()
 
-        # Refresh the parser to read config changes
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         self.assertEqual(
-            parser.get("landscape", "repository-path"), new_repo_path)
-        self.assertEqual(parser.get("global", "log-path"), new_log_path)
-        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
 
         messages = ["Migrating log data to %s" % new_log_path,
                     "Migrating repository data to %s" % new_repo_path]
@@ -507,23 +506,23 @@ class TestHooksService(TestHooks):
                 ("global", "log-path", "/some/log/path"),
                 ("landscape", "repository-path", "/some/repository/path")]
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("global")
-        parser.add_section("landscape")
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["global"] = {} 
+        config_obj["landscape"] = {}
         for section, key, value in data:
-            parser.set(section, key, value)
-        parser.write(self._service_conf)
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         hooks.data_relation_changed()
 
-        # Refresh the parser to read config changes
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
+        # Refresh the config_obj to read config changes
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         self.assertEqual(
-            parser.get("landscape", "repository-path"), new_repo_path)
-        self.assertEqual(parser.get("global", "log-path"), new_log_path)
-        self.assertEqual(parser.get("global", "oops-path"), new_log_path)
+            config_obj["landscape"]["repository-path"], new_repo_path)
+        self.assertEqual(config_obj["global"]["log-path"], new_log_path)
+        self.assertEqual(config_obj["global"]["oops-path"], new_log_path)
 
         messages = ["Migrating log data to %s" % new_log_path,
                     "Migrating repository data to %s" % new_repo_path]
@@ -743,11 +742,11 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.add_section("schema")
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {} 
+        config_obj["schema"] = {}
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         new_user = "landscape"
         new_password = "def456"
@@ -792,9 +791,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_not_in_allowed_units(self):
         """
@@ -818,9 +816,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_hot_standby_state_ignore(self):
         """
@@ -843,9 +840,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_failover_state_ignore(self):
         """
@@ -868,9 +864,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_db_admin_relation_changed_standalone_state_ignore(self):
         """
@@ -901,9 +896,8 @@ class TestHooksService(TestHooks):
 
         hooks.db_admin_relation_changed()
 
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        self.assertEqual([], parser.sections())
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
 
     def test_calc_daemon_count(self):
         """
@@ -1035,14 +1029,16 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_with_db_configured(self):
         """Return True when the db is configured."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.set("stores", "main", "somedb")
-        parser.set("stores", "host", "somehost")
-        parser.set("stores", "user", "someuser")
-        parser.set("stores", "password", "somepassword")
-        parser.write(self._service_conf)
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         is_db_up = self.mocker.replace(hooks.util.is_db_up)
@@ -1054,14 +1050,16 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_db_not_configured(self):
         """Return False when the db is not configured."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.set("stores", "main", "somedb")
-        parser.set("stores", "host", "somehost")
-        parser.set("stores", "user", "someuser")
-        parser.set("stores", "password", "somepassword")
-        parser.write(self._service_conf)
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+           config_obj[section][key] = value
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
 
         is_db_up = self.mocker.replace(hooks.util.is_db_up)
@@ -1078,18 +1076,18 @@ class TestHooksService(TestHooks):
 
     def test_is_db_up_service_config_missing_stores(self):
         """Return False when the service config is missing [stores]."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 
     def test_is_db_up_service_config_missing_keys(self):
         """Return False when the [stores] section is missing db settings."""
-        parser = RawConfigParser()
-        parser.read([hooks.LANDSCAPE_SERVICE_CONF])
-        parser.add_section("stores")
-        parser.write(self._service_conf)
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 
