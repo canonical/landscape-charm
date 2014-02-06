@@ -201,6 +201,7 @@ def data_relation_changed():
         new_repo_path = "%s/landscape-repository" % mountpoint
 
         if new_log_path != log_path:
+            _lsctl("stop")  # Stop services before migrating logfiles
             juju.juju_log("Migrating log data to %s" % new_log_path)
             if not os.path.exists(new_log_path):
                 os.makedirs(new_log_path)
@@ -213,6 +214,7 @@ def data_relation_changed():
                 os.makedirs(new_repo_path)
                 _chown(new_repo_path, owner="root")  # root since shared
             if os.path.exists(repo_path) and len(os.listdir(repo_path)):
+                _lsctl("stop")  # Stop services before migrating repo data
                 juju.juju_log(
                     "Migrating repository data to %s" % new_repo_path)
                 check_call(

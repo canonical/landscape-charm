@@ -4,6 +4,7 @@ import hooks
 import mocker
 import os
 import pycurl
+import stat
 import subprocess
 import yaml
 
@@ -148,7 +149,6 @@ class TestHooksService(TestHooks):
         ownership of the directory and all contained files to C{landscape} user
         and group.
         """
-        import stat
 
         class fake_pw_struct(object):
             """
@@ -277,6 +277,8 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         exists(new_repo_path)
         self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
             "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
@@ -343,6 +345,9 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         exists(new_repo_path)
         self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        self.mocker.count(1)   # 1 for log migration and config changed
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
             "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
@@ -409,6 +414,9 @@ class TestHooksService(TestHooks):
         self.mocker.result(True)
         exists(new_repo_path)
         self.mocker.result(True)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        self.mocker.count(3)   # 1 for log migration, repo, and config changed
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
             "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
@@ -473,6 +481,9 @@ class TestHooksService(TestHooks):
         self.mocker.result(False)
         makedirs = self.mocker.replace(os.makedirs)
         makedirs(new_log_path)
+        lsctl = self.mocker.replace(hooks._lsctl)
+        lsctl("stop")
+        self.mocker.count(3)
         check_call_mock = self.mocker.replace(subprocess.check_call)
         check_call_mock(
             "cp -f /some/log/path/*log %s" % new_log_path, shell=True)
