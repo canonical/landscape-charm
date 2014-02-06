@@ -299,7 +299,7 @@ class TestHooksService(TestHooks):
         config_obj["global"] = {}
         config_obj["landscape"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
@@ -367,10 +367,10 @@ class TestHooksService(TestHooks):
                 ("landscape", "repository-path", "/some/repository/path")]
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
-        config_obj["global"] = {} 
+        config_obj["global"] = {}
         config_obj["landscape"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
@@ -436,10 +436,10 @@ class TestHooksService(TestHooks):
                 ("landscape", "repository-path", "/some/repository/path")]
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
-        config_obj["global"] = {} 
+        config_obj["global"] = {}
         config_obj["landscape"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
@@ -507,10 +507,10 @@ class TestHooksService(TestHooks):
                 ("landscape", "repository-path", "/some/repository/path")]
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
-        config_obj["global"] = {} 
+        config_obj["global"] = {}
         config_obj["landscape"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
@@ -743,7 +743,7 @@ class TestHooksService(TestHooks):
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
-        config_obj["stores"] = {} 
+        config_obj["stores"] = {}
         config_obj["schema"] = {}
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
@@ -1036,7 +1036,7 @@ class TestHooksService(TestHooks):
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         config_obj["stores"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
@@ -1057,7 +1057,7 @@ class TestHooksService(TestHooks):
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         config_obj["stores"] = {}
         for section, key, value in data:
-           config_obj[section][key] = value
+            config_obj[section][key] = value
         config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
         config_obj.write()
         self._service_conf.seek(0)
