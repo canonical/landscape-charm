@@ -159,7 +159,7 @@ def data_relation_changed():
         "requesting mountpoint %s from storage charm" % STORAGE_MOUNTPOINT)
     juju.relation_set("mountpoint=%s" % STORAGE_MOUNTPOINT)
 
-    # Has storage charm setup the mountpoint we requested?a
+    # Has storage charm setup the mountpoint we requested?
     #
     # Since relation-data is one-way communication, the mountpoint we "set"
     # above is only visible from a relation_get on the storage subordinate side

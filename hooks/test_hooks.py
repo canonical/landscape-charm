@@ -203,7 +203,7 @@ class TestHooksService(TestHooks):
 
     def test_data_relation_changed_sets_mountpoint_awaits_init(self):
         """
-        C{data-relation-changed hook sends a requested C{mountpoint}
+        C{data-relation-changed} hook sends a requested C{mountpoint}
         to the storage subordinate charm. It will wait for the subordinate to
         respond with the initialised C{mountpoint} in the relation before
         acting.
