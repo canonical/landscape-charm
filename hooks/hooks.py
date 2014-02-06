@@ -10,7 +10,7 @@ from lib import util
 from lib.juju import Juju
 
 from base64 import b64encode
-from ConfigParser import RawConfigParser, Error
+from configobj import ConfigObj, ConfigObjError
 from copy import deepcopy
 import cStringIO
 import datetime
@@ -25,6 +25,22 @@ import shutil
 import sys
 import yaml
 from subprocess import check_call
+
+
+def _get_config_obj(config_source=None):
+    """Create a ConfigObj based on reading the config file C{filename}.
+    Shamelessly leveraged from landscape-client: deployment.py
+    """
+    if config_source is None:
+        config_source = LANDSCAPE_SERVICE_CONF
+    try:
+        config_obj = ConfigObj(config_source, list_values=False,
+                               raise_errors=False, write_empty_values=True)
+    except ConfigObjError, e:
+        juju.juju_log(str(e), "WARNING")
+        # Good configuration values are recovered here
+        config_obj = e.config
+    return config_obj
 
 
 def website_relation_joined():
@@ -91,18 +107,11 @@ def db_admin_relation_changed():
 
     juju.juju_log("Updating config due to database changes.")
 
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
-    parser.set("stores", "host", host)
-    parser.set("stores", "port", "5432")
-    parser.set("stores", "user", user)
-    parser.set("stores", "password", password)
-    parser.set("schema", "store_user", admin)
-    parser.set("schema", "store_password", admin_password)
-
-    # Write new changes to LANDSCAPE_NEW_SERVICE_CONF to test first
-    with open(LANDSCAPE_NEW_SERVICE_CONF, "w") as output_file:
-        parser.write(output_file)
+    update_config_settings(
+        {"stores": {"host": host, "port": "5432", "user": user,
+                    "password": password},
+         "schema": {"store_user": admin, "store_password": admin_password}},
+        outfile=LANDSCAPE_NEW_SERVICE_CONF)
 
     if not util.is_db_up("postgres", host, admin, admin_password):
         juju.juju_log(
@@ -111,8 +120,7 @@ def db_admin_relation_changed():
         return
 
     # Changes are validated; db is up has write-accessible
-    with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-        parser.write(output_file)
+    shutil.copyfile(LANDSCAPE_NEW_SERVICE_CONF, LANDSCAPE_SERVICE_CONF)
 
     try:
         # Name as lock so we don't try to reuse it as a database connection
@@ -186,12 +194,11 @@ def data_relation_changed():
     unit_name = juju.local_unit()
     new_path = "%s/%s" % (mountpoint, unit_name)
 
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+    config_obj = _get_config_obj()
     try:
-        log_path = parser.get("global", "log-path")
-        repo_path = parser.get("landscape", "repository-path")
-    except Error:
+        log_path = config_obj["global"]["log-path"]
+        repo_path = config_obj["landscape"]["repository-path"]
+    except KeyError:
         juju.juju_log(
             "Error: can't read landscape config %s" % LANDSCAPE_SERVICE_CONF)
         sys.exit(1)
@@ -230,18 +237,22 @@ def data_relation_changed():
     config_changed()  # only starts services again if is_db_up and _is_amqp_up
 
 
-def update_config_settings(config_settings):
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+def update_config_settings(config_settings, outfile=None):
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     changes = False
-
     for section_name, section in config_settings.iteritems():
+        if not section_name in config_obj:
+            config_obj[section_name] = {}
         for key, value in section.iteritems():
-            changes = True
-            parser.set(section_name, key, value)
+            if config_obj[section_name].get(key, None) != value:
+                changes = True
+                config_obj[section_name][key] = value
     if changes:
-        with open(LANDSCAPE_SERVICE_CONF, "w+") as output_file:
-            parser.write(output_file)
+        if outfile is None:
+            config_obj.filename = LANDSCAPE_SERVICE_CONF
+        else:
+            config_obj.filename = outfile
+        config_obj.write()
 
 
 def _is_amqp_up():
@@ -589,14 +600,14 @@ def _is_db_up():
     """
     Return True if the database is accessible and read/write, False otherwise.
     """
-    parser = RawConfigParser()
-    parser.read([LANDSCAPE_SERVICE_CONF])
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     try:
-        database = parser.get("stores", "main")
-        host = parser.get("stores", "host")
-        user = parser.get("stores", "user")
-        password = parser.get("stores", "password")
-    except Error:
+        section = config_obj["stores"]
+        database = section["main"]
+        host = section["host"]
+        user = section["user"]
+        password = section["password"]
+    except KeyError:
         return False
     else:
         return util.is_db_up(database, host, user, password)
