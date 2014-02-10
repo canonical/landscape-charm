@@ -38,9 +38,9 @@ def test(config):
 
     print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
 
+print("PATH: {}".format(PATH))
 config = subprocess.check_output(
     "util/fix-config ../config/landscape-deployments.cfg",
     shell=True, cwd=PATH)
-print "PATH: %s" % PATH
-print "config: %s" % config
+print("config: {}".format(config))
 test(config)

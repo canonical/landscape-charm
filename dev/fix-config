@@ -31,6 +31,7 @@ def _resolve_include(value):
                 "include-%s://" % include_type)):
             continue
         include, fname = value.split("://", 1)
+        import pdb; pdb.set_trace()
         include_path = resolve_include(fname, ".")
         with open(include_path) as fh:
             result = fh.read()
