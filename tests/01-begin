@@ -1,16 +1,17 @@
 #!/usr/bin/python2.7
 """
-This test simply creates a real landscape deployment, and runs a command there.
-There isn't much to it for now.  The intent is to deploy landscape and our
-dependent charms to test for any non-starter type issues.
+This test creates a real landscape deployment, and runs some checks against it.
 """
 
 
-import subprocess
+from subprocess import check_output
 import shutil
+import sys
+from time import sleep
 from base64 import b64encode
 import logging
 import amulet
+import json
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 
@@ -22,6 +23,93 @@ from deployer.utils import resolve_include
 # - amulet bug: proper juju deployer files are assembled from multiple
 #               stanzas, amulet doesn't appear to support this.
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
+
+class LandscapeServiceError(Exception):
+
+    def __init__(self, test_name, output):
+        self.test_name = test_name
+        self.output = output
+
+class ServiceNotFound(Exception):
+
+    def __init__(self, service_name):
+        self.service_name = service_name
+
+class LandscapeLiveTests(object):
+
+    def __init__(self, deployment):
+        self.deployment = deployment
+        self.status = self._juju_status()
+        self.frontend = self._find_service("apache2")
+    
+    def _juju_status(self):
+        cmd = ["juju", "status", "--format=json"]
+        output = check_output(cmd).strip()
+        return json.loads(output)
+
+    def _find_service(self, service_name):
+        """
+        Given a service name, return the public address of its first unit.
+        Doesn't handle subordinates, sorry.
+        """
+        services = self.status["services"]
+        if service_name not in services:
+            return None
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            return units[unit_keys[0]].get('public-address', '')
+        else:
+            raise ServiceNotFound(service_name)
+
+    def run_tests(self):
+        tests = filter(callable, [getattr(self,i)
+                       for i in dir(self) if i.startswith('test_')])
+        for test in tests:
+            test()
+
+    def check_url(self, url, good_content, post_data=None, header=None,
+                  interval=10, attempts=60):
+        cmd = ["curl", url, "-k", "-L", "-s"]
+        if post_data:
+            cmd.add("-d %s" % post_data)
+        if header:
+            cmd.add("-H %s" % header)
+        while True: 
+            output = check_output(cmd).strip()
+            if good_content in output:
+                return True
+            attempts = attempts - 1
+            if attempts == 0:
+                break
+            sleep(interval)
+        raise LandscapeServiceError("Check failed", output) 
+            
+    def test_app(self):
+        logging.info("Testing app")
+        good_content = "New user - Landscape"
+        self.check_url("https://%s/" % self.frontend, good_content)
+        logging.info("app passed")
+
+    def test_msg(self):
+        logging.info("Testing msg")
+        good_content = "ds8:messagesl;s11:server-uuid"
+        post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
+        header = "X-MESSAGE-API: 3.1"
+        self.assertTrue(self.check_url("https://%s/message-system" %
+            self.frontend, good_content, post_data, header))
+        logging.info("msg passed")
+
+    def test_ping(self):
+        logging.info("Testing ping")
+        good_content = "ds5:errors19:provide insecure_id;"
+        self.assertTrue(
+            self.check_url("http://%s/ping" % self.frontend, good_content))
+        self.info("Ping passed")
+
+    def test_ssh(self):
+        print(check_output(["juju", "ssh", "landscape/0", "free -m"]))
 
 
 def _resolve_include(value):
@@ -66,7 +154,7 @@ def load_deployer_config(yaml_file):
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
-    output = subprocess.check_output(['juju', 'env']).split()
+    output = check_output(['juju', 'env']).split()
     env = output[2].strip('"')
 
     return {env: data}
@@ -85,4 +173,13 @@ d.load(config)
 
 d.setup(timeout=2000)
 
-print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
+live_tests = LandscapeLiveTests(d)
+try:
+    live_tests.run_tests()
+except LandscapeServiceError as e:
+    logging.error(
+        "Test %s failed. Output:\n%s" % (e.test_name,e.output))
+    sys.exit(1)
+else:
+    logging.info("Tests succeeded.")
+    sys.exit(0)
