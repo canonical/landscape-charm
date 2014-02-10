@@ -132,6 +132,7 @@ def _resolve_include(value):
             if include_type == "base64":
                 result = b64encode(result)
             return result
+    return value
 
 
 def load_deployer_config(yaml_file):
