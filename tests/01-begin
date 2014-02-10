@@ -4,16 +4,6 @@ This test simply creates a real landscape deployment, and runs a command there.
 There isn't much to it for now.  The intent is to deploy landscape and our
 dependent charms to test for any non-starter type issues.
 """
-
-
-import subprocess
-import shutil
-from base64 import b64encode
-import logging
-import amulet
-from deployer.config import ConfigStack
-from deployer.utils import resolve_include
-
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
 #               consideration
@@ -24,65 +14,33 @@ from deployer.utils import resolve_include
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
-def _resolve_include(value):
-    """
-    resolve include-*:// style links in the way that
-    juju-deployer does.  I cut and paste this code for now
-    since it was a bit burried in a method.  The goal is
-    to move this into amulet, I really don't want to maintain
-    this here.
-    """
-    for include_type in ["file", "base64"]:
-        if (not isinstance(value, str)
-            or not value.startswith(
-                "include-%s://" % include_type)):
-            continue
-        include, fname = value.split("://", 1)
-        include_path = resolve_include(fname, ".")
-        with open(include_path) as fh:
-            result = fh.read()
-            if include_type == "base64":
-                result = b64encode(result)
-            return result
+import subprocess
+import shutil
+import logging
+import amulet
+import os
+PATH = os.path.dirname(os.path.realpath(__file__))
 
 
-def load_deployer_config(yaml_file):
-    """
-    return a deployer config file in a format that amulet expects
-    """
-    config = ConfigStack([yaml_file])
-    config.load()
-    deployment = config.get("landscape")
-    data = deployment.data
+def test(config):
+    print("Testing Basic Deployment of the Landscape Charm Stack")
+    logging.basicConfig(
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+    shutil.copy2("config/vhostssl.tmpl", ".")
+    shutil.copy2("config/vhost.tmpl", ".")
+    shutil.copy2("config/repo-file", ".")
+    shutil.copy2("config/license-file", ".")
 
-    if "relations" not in data:
-        data["relations"] = {}
+    d = amulet.Deployment(sentries=False)
+    d.load(config)
 
-    for service_name, service in data["services"].iteritems():
-        if "options" in service:
-            for key, value in service["options"].items():
-                service["options"][key] = _resolve_include(value)
+    d.setup(timeout=2000)
 
-    # FIXME: This is only needed since amulet switches your environment
-    #        if you pass in a config.  There are ways to break this
-    #        parsing (like including a quote in your environment name).
-    output = subprocess.check_output(['juju', 'env']).split()
-    env = output[2].strip('"')
+    print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
 
-    return {env: data}
-
-print("Testing Basic Deployment of the Landscape Charm Stack")
-logging.basicConfig(
-    level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-shutil.copy2("config/vhostssl.tmpl", ".")
-shutil.copy2("config/vhost.tmpl", ".")
-shutil.copy2("config/repo-file", ".")
-shutil.copy2("config/license-file", ".")
-
-d = amulet.Deployment(sentries=False)
-config = load_deployer_config("config/landscape-deployments.cfg")
-d.load(config)
-
-d.setup(timeout=2000)
-
-print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
+config = subprocess.check_output(
+    "util/fix-config ../config/landscape-deployments.cfg",
+    shell=True, cwd=PATH)
+print "PATH: %s" % PATH
+print "config: %s" % config
+test(config)
