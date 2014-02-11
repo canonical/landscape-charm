@@ -16,6 +16,7 @@ import subprocess
 from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
+import yaml
 
 def _resolve_include(value):
     """
@@ -33,7 +34,7 @@ def _resolve_include(value):
         include, fname = value.split("://", 1)
         include_path = resolve_include(fname, ".")
         with open(include_path) as fh:
-            result = fh.read()
+            result = fh.read().strip()
             if include_type == "base64":
                 result = b64encode(result)
             return result
@@ -42,7 +43,7 @@ def _resolve_include(value):
 
 def load_deployer_config(yaml_file):
     """
-    return a deployer config file in a format that amulet expects
+    return a deployer config file in yaml format
     """
     config = ConfigStack([yaml_file])
     config.load()
@@ -60,10 +61,9 @@ def load_deployer_config(yaml_file):
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
-    output = subprocess.check_output(['juju', 'env']).split()
+    output = subprocess.check_output(['juju', 'env']).strip().split()
     env = output[2].strip('"')
-
-    return {env: data}
+    return yaml.dump({env: data}, Dumper=yaml.Dumper)
 
 
 # Arguments
@@ -72,4 +72,4 @@ if len(sys.argv) < 2:
     print "Usage: %s PATH_TO_CONFIG" % sys.argv[0]
     sys.exit(1)
 else:
-    print load_deployer_config(sys.argv[1])
+    print load_deployer_config(sys.argv[1]),
