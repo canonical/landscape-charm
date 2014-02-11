@@ -83,7 +83,6 @@ class LandscapeLiveTests(object):
             output = check_output(cmd).strip()
             if good_content in output:
                 return True
-            print ".",
             attempts = attempts - 1
             if attempts == 0:
                 break
