@@ -73,13 +73,14 @@ class LandscapeLiveTests(object):
                   interval=10, attempts=60):
         cmd = ["curl", url, "-k", "-L", "-s"]
         if post_data:
-            cmd.add("-d %s" % post_data)
+            cmd.extend(["-d", post_data])
         if header:
-            cmd.add("-H %s" % header)
+            cmd.extend(["-H", header])
         while True: 
             output = check_output(cmd).strip()
             if good_content in output:
                 return True
+            print ".",
             attempts = attempts - 1
             if attempts == 0:
                 break
@@ -97,16 +98,15 @@ class LandscapeLiveTests(object):
         good_content = "ds8:messagesl;s11:server-uuid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
-        self.assertTrue(self.check_url("https://%s/message-system" %
-            self.frontend, good_content, post_data, header))
+        self.check_url("https://%s/message-system" % self.frontend,
+                       good_content, post_data, header)
         logging.info("msg passed")
 
     def test_ping(self):
         logging.info("Testing ping")
         good_content = "ds5:errors19:provide insecure_id;"
-        self.assertTrue(
-            self.check_url("http://%s/ping" % self.frontend, good_content))
-        self.info("Ping passed")
+        self.check_url("http://%s/ping" % self.frontend, good_content)
+        logging.info("Ping passed")
 
     def test_ssh(self):
         print(check_output(["juju", "ssh", "landscape/0", "free -m"]))
