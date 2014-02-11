@@ -41,7 +41,7 @@ class LandscapeLiveTests(object):
     
     def _juju_status(self):
         cmd = ["juju", "status", "--format=json"]
-        output = check_output(cmd).strip()
+        output = check_output(cmd).decode('utf-8').strip()
         return json.loads(output)
 
     def _find_service(self, service_name):
@@ -77,7 +77,7 @@ class LandscapeLiveTests(object):
         if header:
             cmd.extend(["-H", header])
         while True: 
-            output = check_output(cmd).strip()
+            output = check_output(cmd).decode('utf-8').strip()
             if good_content in output:
                 return True
             attempts = attempts - 1
@@ -110,12 +110,12 @@ class LandscapeLiveTests(object):
     def test_ssh(self):
         logging.info("Testing ssh to landscape unit")
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
-                              stderr=STDOUT)
+                              stderr=STDOUT).decode('utf-8')
         if not "buffers/cache" in output:
             raise LandscapeTestError("ssh", output)
         logging.info("ssh passed")
 
-def setup(config):
+def deploy(config):
     logging.info("Testing Basic Deployment of the Landscape Charm Stack")
     logging.basicConfig(
         level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
@@ -130,21 +130,26 @@ def setup(config):
     d.setup(timeout=2000)
     return d
 
-with open("test-config.yaml", "r") as myfile:
-    data = yaml.load(myfile.read())
-deployment = setup(data)
+def main():
+    logging.basicConfig(
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+    with open("test-config.yaml", "r") as myfile:
+        data = yaml.load(myfile.read())
+    deployment = deploy(data)
 
-try:
-    live_tests = LandscapeLiveTests(deployment)
-    live_tests.run_tests()
-except LandscapeTestError as e:
-    logging.error(
-        "Test %s failed. Output:\n%s" % (e.test_name,e.output))
-except ServiceNotFound as e:
-    logging.error("Couldn't find service %s in this deployment." %
-                  e.service_name)
-else:
-    logging.info("Tests succeeded.")
-    sys.exit(0)
+    try:
+        live_tests = LandscapeLiveTests(deployment)
+        live_tests.run_tests()
+    except LandscapeTestError as e:
+        logging.error(
+            "Test %s failed. Output:\n%s" % (e.test_name,e.output))
+    except ServiceNotFound as e:
+        logging.error("Couldn't find service %s in this deployment." %
+                    e.service_name)
+    else:
+        logging.info("Tests succeeded.")
+        sys.exit(0)
 
-sys.exit(1)
+    sys.exit(1)
+
+main()
