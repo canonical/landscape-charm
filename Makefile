@@ -11,7 +11,7 @@ verify-juju-test:
 		echo "installed"; \
 	fi 
 	@echo -n "amulet: "
-	@if echo 'import amulet' | python2; then \
+	@if echo 'import amulet' | python3; then \
 		echo "installed"; \
 	else \
 		echo "\nRun ./dev/install-amulet to get the juju-test command installed"; \
