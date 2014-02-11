@@ -54,12 +54,15 @@ class LandscapeLiveTests(object):
         """
         services = self.status["services"]
         if service_name not in services:
-            return None
+            raise ServiceNotFound(service_name)
         service = services[service_name]
         units = service.get("units", {})
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
-            return units[unit_keys[0]].get('public-address', '')
+            public_address = units[unit_keys[0]].get("public-address", "")
+            logging.info("Service %s can be found at %s" %
+                         (service_name, public_address))
+            return public_address
         else:
             raise ServiceNotFound(service_name)
 
@@ -165,9 +168,10 @@ def load_deployer_config(yaml_file):
 
     return {env: data}
 
-print("Testing Basic Deployment of the Landscape Charm Stack")
+
 logging.basicConfig(
     level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+logging.info("Testing Basic Deployment of the Landscape Charm Stack")
 shutil.copy2("config/vhostssl.tmpl", ".")
 shutil.copy2("config/vhost.tmpl", ".")
 shutil.copy2("config/repo-file", ".")
@@ -179,13 +183,17 @@ d.load(config)
 
 d.setup(timeout=2000)
 
-live_tests = LandscapeLiveTests(d)
 try:
+    live_tests = LandscapeLiveTests(d)
     live_tests.run_tests()
 except LandscapeTestError as e:
     logging.error(
         "Test %s failed. Output:\n%s" % (e.test_name,e.output))
-    sys.exit(1)
+except ServiceNotFound as e:
+    logging.error("Couldn't find service %s in this deployment." %
+                  e.service_name)
 else:
     logging.info("Tests succeeded.")
     sys.exit(0)
+
+sys.exit(1)
