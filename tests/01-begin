@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 """
 This test simply creates a real landscape deployment, and runs a command there.
 There isn't much to it for now.  The intent is to deploy landscape and our
@@ -19,7 +19,7 @@ import shutil
 import logging
 import amulet
 import os
-PATH = os.path.dirname(os.path.realpath(__file__))
+import yaml
 
 
 def test(config):
@@ -38,9 +38,7 @@ def test(config):
 
     print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
 
-print("PATH: {}".format(PATH))
-config = subprocess.check_output(
-    "util/fix-config ../config/landscape-deployments.cfg",
-    shell=True, cwd=PATH)
-print("config: {}".format(config))
-test(config)
+print("CWD: {}".format(os.getcwd()))
+with open("test-config.yaml", "r") as myfile:
+    data = yaml.load(myfile.read())
+test(data)

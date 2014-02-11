@@ -18,8 +18,25 @@ verify-juju-test:
 		exit 1;\
 	fi 
 
-stage-integration-test: config/repo-file config/license-file
-	cp -f config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl .
+repo-file:
+	cp -f config/repo-file repo-file
+
+license-file:
+	cp -f config/license-file license-file
+
+vhostssl.tmpl:
+	cp -f config/vhostssl.tmpl vhostssl.tmpl
+
+vhost.tmpl:
+	cp -f config/vhost.tmpl vhost.tmpl
+
+test-config.yaml: repo-file license-file vhostssl.tmpl vhost.tmpl
+	dev/make-test-config config/landscape-deployments.cfg > test-config.yaml
+
+stage-integration-test: config/repo-file config/license-file test-config.yaml
+
+clean-integration-test:
+	rm -f repo-file license-file test-config.yaml vhostssl.tmpl vhost.tmpl
 
 integration-test: verify-juju-test stage-integration-test
 	juju test -v --timeout 2000s
