@@ -14,7 +14,7 @@ verify-juju-test:
 	@if echo 'import amulet' | python3; then \
 		echo "installed"; \
 	else \
-		echo "\nRun ./dev/install-amulet to get the juju-test command installed"; \
+		echo "\nRun ./dev/install-amulet to get the amulet library installed"; \
 		exit 1;\
 	fi 
 
