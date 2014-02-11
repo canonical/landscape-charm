@@ -24,7 +24,7 @@ from deployer.utils import resolve_include
 #               stanzas, amulet doesn't appear to support this.
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
-class LandscapeServiceError(Exception):
+class LandscapeTestError(Exception):
 
     def __init__(self, test_name, output):
         self.test_name = test_name
@@ -85,7 +85,7 @@ class LandscapeLiveTests(object):
             if attempts == 0:
                 break
             sleep(interval)
-        raise LandscapeServiceError("Check failed", output) 
+        raise LandscapeTestError("Check failed", output) 
             
     def test_app(self):
         logging.info("Testing app")
@@ -113,7 +113,7 @@ class LandscapeLiveTests(object):
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
                               stderr=STDOUT)
         if not "buffers/cache" in output:
-            raise LandscapeServiceError("ssh", output)
+            raise LandscapeTestError("ssh", output)
         logging.info("ssh passed")
 
 
@@ -182,7 +182,7 @@ d.setup(timeout=2000)
 live_tests = LandscapeLiveTests(d)
 try:
     live_tests.run_tests()
-except LandscapeServiceError as e:
+except LandscapeTestError as e:
     logging.error(
         "Test %s failed. Output:\n%s" % (e.test_name,e.output))
     sys.exit(1)
