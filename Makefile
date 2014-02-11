@@ -45,4 +45,6 @@ lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/*
 
-.PHONY: lint integration-test stage-integration-test verify-juju-test test
+clean: clean-integration-test
+
+.PHONY: lint integration-test stage-integration-test verify-juju-test test clean clean-integration-test
