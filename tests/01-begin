@@ -116,10 +116,6 @@ def deploy(config):
     logging.info("Testing Basic Deployment of the Landscape Charm Stack")
     logging.basicConfig(
         level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    shutil.copy2("config/vhostssl.tmpl", ".")
-    shutil.copy2("config/vhost.tmpl", ".")
-    shutil.copy2("config/repo-file", ".")
-    shutil.copy2("config/license-file", ".")
 
     d = amulet.Deployment(sentries=False)
     d.load(config)
