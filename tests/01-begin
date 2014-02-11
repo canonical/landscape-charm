@@ -23,8 +23,8 @@ import json
 
 class LandscapeTestError(Exception):
 
-    def __init__(self, test_name, output):
-        self.test_name = test_name
+    def __init__(self, msg, output):
+        self.msg = msg
         self.output = output
 
 class ServiceNotFound(Exception):
@@ -67,6 +67,8 @@ class LandscapeLiveTests(object):
         tests = filter(callable, [getattr(self,i)
                        for i in dir(self) if i.startswith('test_')])
         for test in tests:
+            test_name = test.func_name.lstrip("test_")
+            logging.info("Running test %s" % test_name)
             test()
 
     def check_url(self, url, good_content, post_data=None, header=None,
@@ -84,36 +86,31 @@ class LandscapeLiveTests(object):
             if attempts == 0:
                 break
             sleep(interval)
-        raise LandscapeTestError("Check failed", output) 
+        raise LandscapeTestError(
+            "Didn't find \"%s\" in output" % good_content, output)
             
     def test_app(self):
-        logging.info("Testing app")
         good_content = "New user - Landscape"
         self.check_url("https://%s/" % self.frontend, good_content)
-        logging.info("app passed")
 
     def test_msg(self):
-        logging.info("Testing msg")
         good_content = "ds8:messagesl;s11:server-uuid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
         self.check_url("https://%s/message-system" % self.frontend,
                        good_content, post_data, header)
-        logging.info("msg passed")
 
     def test_ping(self):
-        logging.info("Testing ping")
         good_content = "ds5:errors19:provide insecure_id;"
         self.check_url("http://%s/ping" % self.frontend, good_content)
-        logging.info("Ping passed")
 
     def test_ssh(self):
-        logging.info("Testing ssh to landscape unit")
+        good_content = "buffers/cache"
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
                               stderr=STDOUT).decode('utf-8')
-        if not "buffers/cache" in output:
-            raise LandscapeTestError("ssh", output)
-        logging.info("ssh passed")
+        if not good_content in output:
+            raise LandscapeTestError("Didn't find \"%s\" in output", output)
+
 
 def deploy(config):
     logging.info("Testing Basic Deployment of the Landscape Charm Stack")
@@ -129,6 +126,7 @@ def deploy(config):
 
     d.setup(timeout=2000)
     return d
+
 
 def main():
     logging.basicConfig(
@@ -151,5 +149,6 @@ def main():
         sys.exit(0)
 
     sys.exit(1)
+
 
 main()
