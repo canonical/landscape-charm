@@ -4,7 +4,7 @@ This test creates a real landscape deployment, and runs some checks against it.
 """
 
 
-from subprocess import check_output
+from subprocess import check_output, STDOUT
 import shutil
 import sys
 from time import sleep
@@ -109,7 +109,12 @@ class LandscapeLiveTests(object):
         logging.info("Ping passed")
 
     def test_ssh(self):
-        print(check_output(["juju", "ssh", "landscape/0", "free -m"]))
+        logging.info("Testing ssh to landscape unit")
+        output = check_output(["juju", "ssh", "landscape/0", "free -m"],
+                              stderr=STDOUT)
+        if not "buffers/cache" in output:
+            raise LandscapeServiceError("ssh", output)
+        logging.info("ssh passed")
 
 
 def _resolve_include(value):
