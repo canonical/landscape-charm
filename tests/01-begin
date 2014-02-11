@@ -1,9 +1,17 @@
 #!/usr/bin/python3
 """
-This test simply creates a real landscape deployment, and runs a command there.
-There isn't much to it for now.  The intent is to deploy landscape and our
-dependent charms to test for any non-starter type issues.
+This test creates a real landscape deployment, and runs some checks against it.
 """
+
+from subprocess import check_output, STDOUT
+import shutil
+import logging
+import amulet
+import yaml
+import sys
+from time import sleep
+import json
+
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
 #               consideration
@@ -13,17 +21,102 @@ dependent charms to test for any non-starter type issues.
 #               stanzas, amulet doesn't appear to support this.
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
+class LandscapeTestError(Exception):
 
-import subprocess
-import shutil
-import logging
-import amulet
-import os
-import yaml
+    def __init__(self, test_name, output):
+        self.test_name = test_name
+        self.output = output
 
+class ServiceNotFound(Exception):
 
-def test(config):
-    print("Testing Basic Deployment of the Landscape Charm Stack")
+    def __init__(self, service_name):
+        self.service_name = service_name
+
+class LandscapeLiveTests(object):
+
+    def __init__(self, deployment):
+        self.deployment = deployment
+        self.status = self._juju_status()
+        self.frontend = self._find_service("apache2")
+    
+    def _juju_status(self):
+        cmd = ["juju", "status", "--format=json"]
+        output = check_output(cmd).strip()
+        return json.loads(output)
+
+    def _find_service(self, service_name):
+        """
+        Given a service name, return the public address of its first unit.
+        Doesn't handle subordinates, sorry.
+        """
+        services = self.status["services"]
+        if service_name not in services:
+            raise ServiceNotFound(service_name)
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            public_address = units[unit_keys[0]].get("public-address", "")
+            logging.info("Service %s can be found at %s" %
+                         (service_name, public_address))
+            return public_address
+        else:
+            raise ServiceNotFound(service_name)
+
+    def run_tests(self):
+        tests = filter(callable, [getattr(self,i)
+                       for i in dir(self) if i.startswith('test_')])
+        for test in tests:
+            test()
+
+    def check_url(self, url, good_content, post_data=None, header=None,
+                  interval=10, attempts=60):
+        cmd = ["curl", url, "-k", "-L", "-s"]
+        if post_data:
+            cmd.extend(["-d", post_data])
+        if header:
+            cmd.extend(["-H", header])
+        while True: 
+            output = check_output(cmd).strip()
+            if good_content in output:
+                return True
+            attempts = attempts - 1
+            if attempts == 0:
+                break
+            sleep(interval)
+        raise LandscapeTestError("Check failed", output) 
+            
+    def test_app(self):
+        logging.info("Testing app")
+        good_content = "New user - Landscape"
+        self.check_url("https://%s/" % self.frontend, good_content)
+        logging.info("app passed")
+
+    def test_msg(self):
+        logging.info("Testing msg")
+        good_content = "ds8:messagesl;s11:server-uuid"
+        post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
+        header = "X-MESSAGE-API: 3.1"
+        self.check_url("https://%s/message-system" % self.frontend,
+                       good_content, post_data, header)
+        logging.info("msg passed")
+
+    def test_ping(self):
+        logging.info("Testing ping")
+        good_content = "ds5:errors19:provide insecure_id;"
+        self.check_url("http://%s/ping" % self.frontend, good_content)
+        logging.info("Ping passed")
+
+    def test_ssh(self):
+        logging.info("Testing ssh to landscape unit")
+        output = check_output(["juju", "ssh", "landscape/0", "free -m"],
+                              stderr=STDOUT)
+        if not "buffers/cache" in output:
+            raise LandscapeTestError("ssh", output)
+        logging.info("ssh passed")
+
+def setup(config):
+    logging.info("Testing Basic Deployment of the Landscape Charm Stack")
     logging.basicConfig(
         level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
     shutil.copy2("config/vhostssl.tmpl", ".")
@@ -35,10 +128,23 @@ def test(config):
     d.load(config)
 
     d.setup(timeout=2000)
+    return d
 
-    print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
-
-print("CWD: {}".format(os.getcwd()))
 with open("test-config.yaml", "r") as myfile:
     data = yaml.load(myfile.read())
-test(data)
+deployment = setup(data)
+
+try:
+    live_tests = LandscapeLiveTests(deployment)
+    live_tests.run_tests()
+except LandscapeTestError as e:
+    logging.error(
+        "Test %s failed. Output:\n%s" % (e.test_name,e.output))
+except ServiceNotFound as e:
+    logging.error("Couldn't find service %s in this deployment." %
+                  e.service_name)
+else:
+    logging.info("Tests succeeded.")
+    sys.exit(0)
+
+sys.exit(1)
