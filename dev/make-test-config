@@ -72,4 +72,7 @@ if len(sys.argv) < 2:
     print "Usage: %s PATH_TO_CONFIG" % sys.argv[0]
     sys.exit(1)
 else:
+    print "# Vim seems to have a cow with the long yaml lines, hack for now"
+    print "# See: https://stackoverflow.com/questions/20663169"
+    print "# vim" + ":syntax=off"
     print load_deployer_config(sys.argv[1]),
