@@ -81,7 +81,7 @@ class LandscapeLiveTests(object):
         tests = filter(callable, [getattr(self,i)
                        for i in dir(self) if i.startswith('test_')])
         for test in tests:
-            test_name = test.__name__.lstrip("test_")
+            test_name = test.__name__[len("test_"):]
             logging.info("Running test %s" % test_name)
             test()
 
