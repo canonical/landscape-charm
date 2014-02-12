@@ -3,7 +3,7 @@
 This test creates a real landscape deployment, and runs some checks against it.
 """
 
-from subprocess import check_output, STDOUT
+from subprocess import check_output, STDOUT, CalledProcessError
 import shutil
 import logging
 import amulet
@@ -185,9 +185,42 @@ class LandscapeLiveTests(object):
         """
         Verifies that the cron jobs run without errors.
         """
-        logging.info("Cron unit is %s" % self._find_cron_unit())
-
-
+        cron_unit = self._find_cron_unit()
+        logging.info("Unit hosting cron jobs is %s" % cron_unit)
+        cron_jobs = {
+            "maintenance": "/opt/canonical/landscape/scripts/maintenance.sh",
+            "update_security_db":
+                "/opt/canonical/landscape/scripts/update_security_db.sh",
+            "update_alerts":
+                "/opt/canonical/landscape/scripts/update_alerts.sh",
+            "process_profiles":
+                "/opt/canonical/landscape/scripts/process_profiles.sh",
+            "process_alerts":
+                "/opt/canonical/landscape/scripts/process_alerts.sh",
+            "hash_id_databases":
+                "/opt/canonical/landscape/scripts/hash_id_databases.sh",
+            "meta_releases":
+                "/opt/canonical/landscape/scripts/meta_releases.sh",
+            "sync_lds_releases":
+                "/opt/canonical/landscape/scripts/sync_lds_releases.sh",
+            "maas_poller": "/opt/canonical/landscape/scripts/maas_poller.sh"
+        }
+        for cron_job,script in cron_jobs.items():
+            # -q is to keep ssh quiet so that the only output we get is
+            # from the script we are running
+            cmd = ["juju", "ssh", cron_unit, "-q", "sudo", "-u landscape",
+                   script]
+            logging.info("Running cron job %s" % cron_job)
+            # these jobs currently don't set their exit status to non-zero
+            # if they fail, they just print things to stdout/stderr
+            try:
+                output = check_output(cmd, stderr=STDOUT).decode("utf-8").strip()
+            except CalledProcessError as e:
+                raise LandscapeTestError("Cron job %s failed, status %d" %
+                    (cron_job, e.returncode), e.output)
+            if len(output) > 0:
+                raise LandscapeTestError(
+                    "Cron job %s failed" % cron_job, output)
 
 def deploy(config):
     logging.info("Testing Basic Deployment of the Landscape Charm Stack")
@@ -213,7 +246,7 @@ def main():
         live_tests.run_tests()
     except LandscapeTestError as e:
         logging.error(
-            "Test %s failed. Output:\n%s" % (e.test_name,e.output))
+            "Test %s failed. Output:\n%s" % (e.msg,e.output))
     except ServiceNotFound as e:
         logging.error("Couldn't find service %s in this deployment." %
                     e.service_name)
