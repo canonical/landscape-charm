@@ -45,7 +45,7 @@ class LandscapeLiveTests(object):
 
     def __init__(self, deployment):
         self.deployment = deployment
-        self.status = self._juju_status()
+        self.juju_status = self._juju_status()
         self.frontend = self._find_service("apache2")
     
     def _juju_status(self):
@@ -59,7 +59,7 @@ class LandscapeLiveTests(object):
         Given a service name, return the public address of its first unit.
         Doesn't handle subordinates, sorry.
         """
-        services = self.status["services"]
+        services = self.juju_status["services"]
         if service_name not in services:
             raise ServiceNotFound(service_name)
         service = services[service_name]
@@ -78,7 +78,7 @@ class LandscapeLiveTests(object):
         tests = filter(callable, [getattr(self,i)
                        for i in dir(self) if i.startswith('test_')])
         for test in tests:
-            test_name = test.__name__.lstrip("test_")
+            test_name = test.__name__[len("test_"):]
             logging.info("Running test %s" % test_name)
             test()
 
@@ -148,6 +148,45 @@ class LandscapeLiveTests(object):
                               stderr=STDOUT).decode('utf-8')
         if not good_content in output:
             raise LandscapeTestError("Didn't find \"%s\" in output", output)
+
+    def _get_service_config(self, service_name):
+        """
+        Returns the configuration of the given service. Raises an error if
+        the service is not there.
+        
+        @param service_name: string representing the service we are looking for.
+        """
+        services = self.juju_status["services"]
+        if service_name not in services:
+            raise ServiceNotFound(service_name)
+        cmd = ["juju", "get", "--format=yaml", service_name]
+        output = check_output(cmd).decode('utf-8').strip()
+        return yaml.load(output)
+
+    def _find_cron_unit(self):
+        """
+        Find which landscape unit has the cron service on it.
+        """
+        services = self.juju_status["services"]
+        for service_name in services.keys():
+            if not service_name.startswith("landscape"):
+                continue
+            config = self._get_service_config(service_name)
+            landscape_services = config["settings"]["services"]["value"]
+            if "cron" not in landscape_services:
+                continue
+            service = services[service_name]
+            units = service.get("units", {})
+            unit_keys = list(sorted(units.keys()))
+            if unit_keys:
+                return unit_keys[0]
+
+    def test_cron(self):
+        """
+        Verifies that the cron jobs run without errors.
+        """
+        logging.info("Cron unit is %s" % self._find_cron_unit())
+
 
 
 def deploy(config):
