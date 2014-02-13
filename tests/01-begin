@@ -107,7 +107,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
     def __str__(self):
         file_name = os.path.splitext(os.path.basename(__file__))[0]
-        return "%s (%s.%s)" % (
+        return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
     def test_app(self):
@@ -119,7 +119,7 @@ class LandscapeLiveTests(unittest.TestCase):
         """
         good_content = "New user - Landscape"
         frontend = self._find_service("apache2")
-        self._check_url("https://%s/" % frontend, good_content)
+        self._check_url("https://{}/".format(frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -131,7 +131,7 @@ class LandscapeLiveTests(unittest.TestCase):
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
         frontend = self._find_service("apache2")
-        self._check_url("https://%s/message-system" % frontend,
+        self._check_url("https://{}/message-system".format(frontend),
                         good_content, post_data, header)
 
     def test_ping(self):
@@ -142,7 +142,7 @@ class LandscapeLiveTests(unittest.TestCase):
         """
         good_content = "ds5:errors19:provide insecure_id;"
         frontend = self._find_service("apache2")
-        self._check_url("http://%s/ping" % frontend, good_content)
+        self._check_url("http://{}/ping".format(frontend), good_content)
 
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
