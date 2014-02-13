@@ -57,7 +57,7 @@ class LandscapeLiveTests(unittest.TestCase):
         output = check_output(cmd).strip()
         return json.loads(output)
 
-    def _find_service(self, service_name):
+    def _find_address(self, service_name):
         """
         Given a service name, return the public address of its first unit.
         Doesn't handle subordinates, sorry.
@@ -118,7 +118,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
         """
         good_content = "New user - Landscape"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("https://%s/" % frontend, good_content)
 
     def test_msg(self):
@@ -130,7 +130,7 @@ class LandscapeLiveTests(unittest.TestCase):
         good_content = "ds8:messagesl;s11:server-uuid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("https://%s/message-system" % frontend,
                         good_content, post_data, header)
 
@@ -141,7 +141,7 @@ class LandscapeLiveTests(unittest.TestCase):
         correctly to a ping request without an ID.
         """
         good_content = "ds5:errors19:provide insecure_id;"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("http://%s/ping" % frontend, good_content)
 
     def test_ssh(self):
