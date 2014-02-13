@@ -40,10 +40,6 @@ class LandscapeLiveTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Starts the actual Landscape charm deployment. Runs once."""
-        shutil.copy2("config/vhostssl.tmpl", ".")
-        shutil.copy2("config/vhost.tmpl", ".")
-        shutil.copy2("config/repo-file", ".")
-        shutil.copy2("config/license-file", ".")
         d = amulet.Deployment(sentries=False)
         with open("test-config.yaml", "r") as myfile:
             data = yaml.load(myfile.read())
