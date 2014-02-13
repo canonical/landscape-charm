@@ -4,18 +4,17 @@ This test creates a real landscape deployment, and runs some checks against it.
 """
 
 
-from base64 import b64encode
+import amulet
 import json
 import os.path
 import shutil
-from subprocess import check_output, STDOUT
 import sys
-from time import sleep
 import unittest
-
-import amulet
+from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
+from subprocess import check_output, STDOUT
+from time import sleep
 
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
