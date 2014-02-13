@@ -118,7 +118,7 @@ class LandscapeLiveTests(unittest.TestCase):
         user form.
         """
         good_content = "New user - Landscape"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("https://{}/".format(frontend), good_content)
 
     def test_msg(self):
@@ -130,7 +130,7 @@ class LandscapeLiveTests(unittest.TestCase):
         good_content = "ds8:messagesl;s11:server-uuid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("https://{}/message-system".format(frontend),
                         good_content, post_data, header)
 
@@ -141,7 +141,7 @@ class LandscapeLiveTests(unittest.TestCase):
         correctly to a ping request without an ID.
         """
         good_content = "ds5:errors19:provide insecure_id;"
-        frontend = self._find_service("apache2")
+        frontend = self._find_address("apache2")
         self._check_url("http://{}/ping".format(frontend), good_content)
 
     def test_ssh(self):
