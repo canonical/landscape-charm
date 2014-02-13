@@ -9,6 +9,7 @@ sudo apt-get -y install python3 juju-deployer amulet juju-core charm-tools
 
 # Install charm-tools from trunk -- remove asap
 # https://bugs.launchpad.net/charm-tools/+bug/1271803
+dir=$(mktemp -d)
 cd $dir
 bzr branch lp:~davidpbritton/charm-tools/fix-test-env-1271745/ charm-tools
 cd charm-tools

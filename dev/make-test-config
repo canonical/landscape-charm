@@ -31,7 +31,7 @@ def _resolve_include(value):
             or not value.startswith(
                 "include-%s://" % include_type)):
             continue
-        include, fname = value.split("://", 1)
+        _, fname = value.split("://", 1)
         include_path = resolve_include(fname, ".")
         with open(include_path) as fh:
             result = fh.read().strip()
