@@ -1,0 +1,25 @@
+name: landscape
+summary: Charm for installing and using Landscape.
+maintainer: Landscape Team <landscape-team@canonical.com>
+description: A multi server Landscape charm.
+categories:
+  - app-servers
+requires:
+  db:
+    interface: pgsql
+  db-proxy:
+    interface: pgsql
+  db-admin:
+    interface: pgsql
+  db-admin-proxy:
+    interface: pgsql
+  amqp:
+    interface: rabbitmq
+
+provides:
+  data:
+    interface: block-storage
+    scope: container
+    optional: true
+  website:
+    interface: http

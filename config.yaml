@@ -1,0 +1,55 @@
+options:
+    repository:
+        description: APT Repository to use for installing Landscape.
+        type: string
+    license-file:
+        description: License file for LDS
+        type: string
+    landscape-password:
+        description: |
+            The password to use for the landscape DB user. If you change this
+            post-deployment via juju set, you will have to change the password
+            in the DB manually as the charm won't do it for you yet.
+        type: string
+        default: "landscape"
+    services:
+        description: |
+            Landscape services listed as space-separated entries.  Valid
+            services are: appserver, msgserver, pingserver, combo-loader,
+            async-frontend, apiserver, package-upload, jobhandler,
+            package-search, juju-sync, cron and static.
+        type: string
+    service-count:
+        type: string
+        default: AUTO
+        description: |
+            Many landscape services can have multiple instances started up.  By
+            altering this setting, you can increase the launch count.  A
+            numeric value will tell all capable landscape services on this juju
+            unit to spawn that number of instances.  Leave at the default
+            of "AUTO", to let the charm determine the optimum number of
+            services given the discovered properties of the box (RAM, Disk
+            Space, CPU).  You can also supply a syntax of:
+            "<service-name>:<number> <service-name>:<number>" as a value, to
+            control the launch of individual services.  Services that cannot
+            "scale" in this way will politely ignore these settings.
+    maintenance:
+        type: boolean
+        default: False
+        description: |
+            Put this landscape service unit into a maintenance mode.  Stop all
+            services and prevent any attempts to start them.  Cron jobs will
+            also not run.  Upgrade schema attempts will still be allowed to
+            process.
+    upgrade-schema:
+        type: boolean
+        default: False
+        description: |
+            When daemons attempt to start, they will first try to update the
+            schema (instead of just validating that it is correct).  This
+            should only typically be enabled as part of a landscape maintenance
+            cycle.
+        
+    
+
+
