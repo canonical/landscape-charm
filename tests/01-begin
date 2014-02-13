@@ -115,7 +115,6 @@ class LandscapeLiveTests(unittest.TestCase):
 
         Specifically that it is reachable and that it presents the new
         user form.
-
         """
         good_content = "New user - Landscape"
         frontend = self._find_address("apache2")
