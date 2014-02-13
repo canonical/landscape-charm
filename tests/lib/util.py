@@ -1,6 +1,5 @@
 #!/usr/bin/python2.7
 
-import amulet
 from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include

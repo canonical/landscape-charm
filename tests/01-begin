@@ -3,7 +3,6 @@
 This test creates a real landscape deployment, and runs some checks against it.
 """
 
-
 import amulet
 import json
 import os.path
@@ -11,9 +10,6 @@ import shutil
 import sys
 import unittest
 from lib import util
-from base64 import b64encode
-from deployer.config import ConfigStack
-from deployer.utils import resolve_include
 from subprocess import check_output, STDOUT
 from time import sleep
 
@@ -43,6 +39,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """Starts the actual Landscape charm deployment. Runs once."""
         shutil.copy2("config/vhostssl.tmpl", ".")
         shutil.copy2("config/vhost.tmpl", ".")
         shutil.copy2("config/repo-file", ".")
