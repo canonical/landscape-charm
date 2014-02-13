@@ -194,7 +194,12 @@ def _load_deployer_config(yaml_file):
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
     output = check_output(['juju', 'env']).split()
-    env = output[2].strip('"')
+    if len(output) == 1:
+        # juju 1.17.x
+        env = output[0]
+    else:
+        # juju 1.16.x
+        env = output[2].strip('"')
     return {env: data}
 
 
