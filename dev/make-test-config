@@ -61,6 +61,15 @@ def load_deployer_config(yaml_file):
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
+    output = subprocess.check_output(['juju', 'env']).strip()
+    # Current environment: "andreas-canonistack2" (from JUJU_ENV)
+    # <= Juju 1.16
+    if output.startswith("Current environment: "):
+        environment_name = output.split()[2].strip('"')
+    else:
+        environment_name = output
+    return yaml.dump({environment_name: data})
+
     output = subprocess.check_output(['juju', 'env']).strip().split()
     env = output[2].strip('"')
     return yaml.dump({env: data}, Dumper=yaml.Dumper)
