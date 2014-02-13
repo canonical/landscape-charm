@@ -39,6 +39,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """Starts the actual Landscape charm deployment. Runs once."""
         shutil.copy2("config/vhostssl.tmpl", ".")
         shutil.copy2("config/vhost.tmpl", ".")
         shutil.copy2("config/repo-file", ".")
@@ -57,7 +58,7 @@ class LandscapeLiveTests(unittest.TestCase):
         output = check_output(cmd).decode('utf-8').strip()
         return json.loads(output)
 
-    def _find_service(self, service_name):
+    def _find_address(self, service_name):
         """
         Given a service name, return the public address of its first unit.
         Doesn't handle subordinates, sorry.
@@ -115,7 +116,6 @@ class LandscapeLiveTests(unittest.TestCase):
 
         Specifically that it is reachable and that it presents the new
         user form.
-
         """
         good_content = "New user - Landscape"
         frontend = self._find_service("apache2")
