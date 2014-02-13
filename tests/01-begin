@@ -4,14 +4,16 @@ This test creates a real landscape deployment, and runs some checks against it.
 """
 
 
-from subprocess import check_output, STDOUT
+from base64 import b64encode
+import json
+import os.path
 import shutil
+from subprocess import check_output, STDOUT
 import sys
 from time import sleep
-from base64 import b64encode
-import amulet
-import json
 import unittest
+
+import amulet
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 
@@ -23,6 +25,7 @@ from deployer.utils import resolve_include
 # - amulet bug: proper juju deployer files are assembled from multiple
 #               stanzas, amulet doesn't appear to support this.
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
+
 
 class LandscapeTestError(Exception):
     """Exception thrown by test methods."""
@@ -58,7 +61,14 @@ class LandscapeLiveTests(unittest.TestCase):
         config = _load_deployer_config("config/landscape-deployments.cfg")
         d.load(config)
         d.setup(timeout=2000)
-        cls.juju_status = _juju_status()
+        cls.juju_status = cls._juju_status()
+
+    @classmethod
+    def _juju_status(self):
+        """Return a juju status structure."""
+        cmd = ["juju", "status", "--format=json"]
+        output = check_output(cmd).strip()
+        return json.loads(output)
 
     def _find_service(self, service_name):
         """
@@ -78,7 +88,7 @@ class LandscapeLiveTests(unittest.TestCase):
             raise ServiceNotFound(service_name)
 
     def _check_url(self, url, good_content, post_data=None, header=None,
-                  interval=10, attempts=60):
+                   interval=10, attempts=60):
         """
         Polls the given URL looking for the specified good_content. Raises
         LandscapeTestError if the content cannot be found in time, otherwise
@@ -97,40 +107,51 @@ class LandscapeLiveTests(unittest.TestCase):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
-        while True: 
+        while True:
             output = check_output(cmd).strip()
             if good_content in output:
                 break
             attempts = attempts - 1
             if attempts == 0:
                 break
+            sys.stdout.write(".")
+            sys.stdout.flush()
             sleep(interval)
         self.assertIn(good_content, output)
-            
+
+    def __str__(self):
+        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        return "%s (%s.%s)" % (
+            self._testMethodName, file_name, self.__class__.__name__)
+
     def test_app(self):
-        """
-        Verifies that the APP service is reachable and that it presents the new
+        """Verify that the APP service is up.
+
+        Specifically that it is reachable and that it presents the new
         user form.
+
         """
         good_content = "New user - Landscape"
         frontend = self._find_service("apache2")
         self._check_url("https://%s/" % frontend, good_content)
 
     def test_msg(self):
-        """
-        Verifies that the MSG service is reachable and that it responds
+        """Verify that the MSG service is up.
+
+        Specifically that it is reachable and that it responds
         correctly to requests.
         """
-        good_content = "ds8:messagesl;s11:server-uuid"
+        good_content = "ds8:messagesl;s11:server-uid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
         frontend = self._find_service("apache2")
         self._check_url("https://%s/message-system" % frontend,
-                       good_content, post_data, header)
+                        good_content, post_data, header)
 
     def test_ping(self):
-        """
-        Verifies that the PING service is reachable and that it responds
+        """Verifies that the PING service is up.
+
+        Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
         good_content = "ds5:errors19:provide insecure_id;"
@@ -138,20 +159,13 @@ class LandscapeLiveTests(unittest.TestCase):
         self._check_url("http://%s/ping" % frontend, good_content)
 
     def test_ssh(self):
-        """
-        Verifies that the landscape/0 unit can be reached via ssh.
-        """
+        """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
                               stderr=STDOUT)
         self.assertIn(good_content, output)
 
 
-def _juju_status():
-    """Return a juju status structure."""
-    cmd = ["juju", "status", "--format=json"]
-    output = check_output(cmd).strip()
-    return json.loads(output)
 
 def _resolve_include(value):
     """
@@ -193,16 +207,15 @@ def _load_deployer_config(yaml_file):
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
-    output = check_output(['juju', 'env']).split()
-    if len(output) == 1:
-        # juju 1.17.x
-        env = output[0]
-    else:
-        # juju 1.16.x
-        env = output[2].strip('"')
-    return {env: data}
+        output = check_output(['juju', 'env']).strip()
+        if output.startswith("Current environment: "):
+            # <= Juju 1.16
+            environment_name = output.split(":")[2].strip(' "')
+        else:
+            environment_name = output
+        return {environment_name: data}
 
 
 if __name__ == "__main__":
-    suite = unittest.TestLoader().loadTestsFromTestCase(LandscapeLiveTests)
-    unittest.TextTestRunner(verbosity=2, descriptions=False).run(suite)
+    unittest.main(verbosity=2)
+
