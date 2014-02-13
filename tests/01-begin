@@ -48,7 +48,7 @@ class LandscapeLiveTests(unittest.TestCase):
         shutil.copy2("config/repo-file", ".")
         shutil.copy2("config/license-file", ".")
         d = amulet.Deployment(sentries=False)
-        config = util.load_deployer_config("config/landscape-deployments.cfg")
+        config = util.load_deployer_config("config/landscape-deployments.yaml")
         d.load(config)
         d.setup(timeout=2000)
         cls.juju_status = cls._juju_status()
