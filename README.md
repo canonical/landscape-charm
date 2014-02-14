@@ -27,7 +27,7 @@ You can find the PPA and license information in the landscape GUI.  Look on
 the left side for "Landscape Dedicated Server" after Canonical Support
 has enabled the feature on your account.
 
-    $ cat >lds.cfg <<EOF
+    $ cat >lds.yaml <<EOF
         landscape:
             repository: https://user:pass@ppa-server/ppa-path/
             license-file: |
@@ -55,9 +55,9 @@ Deployment
 
 Once configured, you can deploy with the following commands:
 
-    $ juju deploy --config=lds.cfg landscape
-    $ juju deploy --config=lds.cfg postgresql
-    $ juju deploy --config=lds.cfg apache2
+    $ juju deploy --config=lds.yaml landscape
+    $ juju deploy --config=lds.yaml postgresql
+    $ juju deploy --config=lds.yaml apache2
     $ juju deploy haproxy
     $ juju deploy rabbitmq-server
     $ juju add-relation landscape:db-admin postgresql:db-admin
@@ -103,7 +103,7 @@ Next, you will need to add in a repository and license file to use:
 
 Then, one command to deploy.  (-v, -d, -W are optional, but nice):
 
-    $ juju-deployer -vdW -c landscape-deployments.cfg landscape
+    $ juju-deployer -vdW -c landscape-deployments.yaml landscape
 
 Unit Testing
 ------------

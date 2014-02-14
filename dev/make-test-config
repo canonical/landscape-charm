@@ -31,7 +31,7 @@ def _resolve_include(value):
             or not value.startswith(
                 "include-%s://" % include_type)):
             continue
-        include, fname = value.split("://", 1)
+        _, fname = value.split("://", 1)
         include_path = resolve_include(fname, ".")
         with open(include_path) as fh:
             result = fh.read().strip()
@@ -61,6 +61,15 @@ def load_deployer_config(yaml_file):
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
     #        parsing (like including a quote in your environment name).
+    output = subprocess.check_output(['juju', 'env']).strip()
+    # Current environment: "andreas-canonistack2" (from JUJU_ENV)
+    # <= Juju 1.16
+    if output.startswith("Current environment: "):
+        environment_name = output.split()[2].strip('"')
+    else:
+        environment_name = output
+    return yaml.dump({environment_name: data})
+
     output = subprocess.check_output(['juju', 'env']).strip().split()
     env = output[2].strip('"')
     return yaml.dump({env: data}, Dumper=yaml.Dumper)
@@ -72,7 +81,9 @@ if len(sys.argv) < 2:
     print "Usage: %s PATH_TO_CONFIG" % sys.argv[0]
     sys.exit(1)
 else:
+    # break the modeline print line so it isn't interpreted here
     print "# Vim seems to have a cow with the long yaml lines, hack for now"
     print "# See: https://stackoverflow.com/questions/20663169"
     print "# vim" + ":syntax=off"
+    print "# you need set modeline for this to work"
     print load_deployer_config(sys.argv[1]),
