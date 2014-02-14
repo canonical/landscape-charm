@@ -6,10 +6,9 @@ This test creates a real landscape deployment, and runs some checks against it.
 import amulet
 import json
 import os.path
-import shutil
 import sys
 import unittest
-from subprocess import check_output, STDOUT, CalledProcessError
+from subprocess import check_output, STDOUT
 from time import sleep
 import yaml
 
@@ -183,7 +182,6 @@ class LandscapeLiveTests(unittest.TestCase):
         Verifies that the cron jobs run without errors.
         """
         cron_unit = self._find_cron_unit()
-        logging.info("Unit hosting cron jobs is %s" % cron_unit)
         cron_jobs = {
             "maintenance": "/opt/canonical/landscape/scripts/maintenance.sh",
             "update_security_db":
@@ -207,11 +205,10 @@ class LandscapeLiveTests(unittest.TestCase):
             # from the script we are running
             cmd = ["juju", "ssh", cron_unit, "-q", "sudo", "-u landscape",
                    script]
-            logging.info("Running cron job %s" % cron_job)
             # these jobs currently don't set their exit status to non-zero
             # if they fail, they just print things to stdout/stderr
             output = check_output(cmd, stderr=STDOUT).decode("utf-8").strip()
-            self.assert(len(output), 0)
+            self.assertIs(len(output), 0)
 
 
 if __name__ == "__main__":
