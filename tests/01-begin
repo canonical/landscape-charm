@@ -8,7 +8,7 @@ import json
 import os.path
 import sys
 import unittest
-from subprocess import check_output, STDOUT
+from subprocess import check_output, STDOUT, CalledProcessError
 from time import sleep
 import yaml
 
@@ -129,7 +129,7 @@ class LandscapeLiveTests(unittest.TestCase):
                         good_content, post_data, header)
 
     def test_ping(self):
-        """Verifies that the PING service is up.
+        """Verify that the PING service is up.
 
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
@@ -178,10 +178,20 @@ class LandscapeLiveTests(unittest.TestCase):
                 return unit_keys[0]
 
     def test_cron(self):
+        """Verify that the cron jobs run without errors.
+
+        Each cron job is run in sequence. The test fails if the exit status
+        is not zero, or if there was anything printed to stdout or stderr.
         """
-        Verifies that the cron jobs run without errors.
-        """
-        cron_unit = self._find_cron_unit()
+        def _stop_cron(unit):
+            cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron", "stop"]
+            check_output(cmd, stderr=STDOUT)
+
+        def _start_cron(unit):
+            cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron",
+                   "start"]
+            check_output(cmd, stderr=STDOUT)
+
         cron_jobs = {
             "maintenance": "/opt/canonical/landscape/scripts/maintenance.sh",
             "update_security_db":
@@ -200,15 +210,29 @@ class LandscapeLiveTests(unittest.TestCase):
                 "/opt/canonical/landscape/scripts/sync_lds_releases.sh",
             "maas_poller": "/opt/canonical/landscape/scripts/maas_poller.sh"
         }
+        cron_unit = self._find_cron_unit()
+        self.addCleanup(_start_cron, cron_unit)
+        _stop_cron(cron_unit)
         for cron_job,script in cron_jobs.items():
             # -q is to keep ssh quiet so that the only output we get is
             # from the script we are running
+            status = 0
             cmd = ["juju", "ssh", cron_unit, "-q", "sudo", "-u landscape",
                    script]
+            sys.stdout.write("{} ".format(cron_job))
+            sys.stdout.flush()
+            try:
+                output = check_output(
+                    cmd, stderr=STDOUT).decode("utf-8").strip()
+            except CalledProcessError as e:
+                output = e.output
+                status = e.returncode
             # these jobs currently don't set their exit status to non-zero
             # if they fail, they just print things to stdout/stderr
-            output = check_output(cmd, stderr=STDOUT).decode("utf-8").strip()
-            self.assertIs(len(output), 0)
+            self.assertEqual(output.strip(), "")
+            self.assertEqual(status, 0)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
