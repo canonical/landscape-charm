@@ -11,15 +11,20 @@ verify-juju-test:
 		echo "installed"; \
 	fi 
 	@echo -n "amulet: "
-	@if echo 'import amulet' | python2; then \
+	@if echo 'import amulet' | python3; then \
 		echo "installed"; \
 	else \
-		echo "\nRun ./dev/install-amulet to get the juju-test command installed"; \
+		echo "\nRun ./dev/install-amulet to get the amulet library installed"; \
 		exit 1;\
 	fi 
 
-stage-integration-test: config/repo-file config/license-file
-	cp -f config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl .
+test-config.yaml: config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
+	cd config; ../dev/make-test-config landscape-deployments.yaml > ../test-config.yaml
+
+stage-integration-test: test-config.yaml
+
+clean-integration-test:
+	rm -f test-config.yaml
 
 integration-test: verify-juju-test stage-integration-test
 	juju test -v --timeout 2000s
@@ -28,4 +33,6 @@ lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/*
 
-.PHONY: lint integration-test stage-integration-test verify-juju-test test
+clean: clean-integration-test
+
+.PHONY: lint integration-test stage-integration-test verify-juju-test test clean clean-integration-test

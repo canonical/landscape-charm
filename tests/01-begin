@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 """
 This test creates a real landscape deployment, and runs some checks against it.
 """
@@ -9,9 +9,9 @@ import os.path
 import shutil
 import sys
 import unittest
-from lib import util
 from subprocess import check_output, STDOUT
 from time import sleep
+import yaml
 
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
@@ -40,13 +40,10 @@ class LandscapeLiveTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Starts the actual Landscape charm deployment. Runs once."""
-        shutil.copy2("config/vhostssl.tmpl", ".")
-        shutil.copy2("config/vhost.tmpl", ".")
-        shutil.copy2("config/repo-file", ".")
-        shutil.copy2("config/license-file", ".")
         d = amulet.Deployment(sentries=False)
-        config = util.load_deployer_config("config/landscape-deployments.yaml")
-        d.load(config)
+        with open("test-config.yaml", "r") as myfile:
+            data = yaml.load(myfile.read())
+        d.load(data)
         d.setup(timeout=2000)
         cls.juju_status = cls._juju_status()
 
@@ -54,7 +51,7 @@ class LandscapeLiveTests(unittest.TestCase):
     def _juju_status(self):
         """Return a juju status structure."""
         cmd = ["juju", "status", "--format=json"]
-        output = check_output(cmd).strip()
+        output = check_output(cmd).decode('utf-8').strip()
         return json.loads(output)
 
     def _find_address(self, service_name):
@@ -93,8 +90,8 @@ class LandscapeLiveTests(unittest.TestCase):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
-        while True:
-            output = check_output(cmd).strip()
+        while True: 
+            output = check_output(cmd).decode('utf-8').strip()
             if good_content in output:
                 break
             attempts = attempts - 1
@@ -107,7 +104,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
     def __str__(self):
         file_name = os.path.splitext(os.path.basename(__file__))[0]
-        return "%s (%s.%s)" % (
+        return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
     def test_app(self):
@@ -118,7 +115,7 @@ class LandscapeLiveTests(unittest.TestCase):
         """
         good_content = "New user - Landscape"
         frontend = self._find_address("apache2")
-        self._check_url("https://%s/" % frontend, good_content)
+        self._check_url("https://{}/".format(frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -130,7 +127,7 @@ class LandscapeLiveTests(unittest.TestCase):
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
         frontend = self._find_address("apache2")
-        self._check_url("https://%s/message-system" % frontend,
+        self._check_url("https://{}/message-system".format(frontend),
                         good_content, post_data, header)
 
     def test_ping(self):
@@ -141,16 +138,14 @@ class LandscapeLiveTests(unittest.TestCase):
         """
         good_content = "ds5:errors19:provide insecure_id;"
         frontend = self._find_address("apache2")
-        self._check_url("http://%s/ping" % frontend, good_content)
+        self._check_url("http://{}/ping".format(frontend), good_content)
 
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
-                              stderr=STDOUT)
+                              stderr=STDOUT).decode('utf-8')
         self.assertIn(good_content, output)
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

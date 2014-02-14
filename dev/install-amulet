@@ -5,22 +5,11 @@
 # Add the juju stable ppa, install amulet deps
 sudo add-apt-repository -y ppa:juju/stable
 sudo apt-get update
-sudo apt-get -y install juju-deployer amulet juju-core charm-tools
+sudo apt-get -y install python3 juju-deployer amulet juju-core charm-tools
 
-# Install Amulet from Trunk
-# - not supporting py2.7 was the latest issue
-# - See the test cases for a list of other problems
-dir=$(mktemp -d)
-cd $dir
-git clone https://github.com/dpb1/amulet.git
-cd amulet
-git checkout make-non-interactive
-make sysdeps </dev/null
-sudo PY=python2.7 make install
-sudo python2.7 setup.py install
-
-# another one to remove asap
+# Install charm-tools from trunk -- remove asap
 # https://bugs.launchpad.net/charm-tools/+bug/1271803
+dir=$(mktemp -d)
 cd $dir
 bzr branch lp:~davidpbritton/charm-tools/fix-test-env-1271745/ charm-tools
 cd charm-tools
