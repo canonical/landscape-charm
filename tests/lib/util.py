@@ -53,5 +53,3 @@ def load_deployer_config(yaml_file):
     else:
         environment_name = output
     return {environment_name: data}
-
-
