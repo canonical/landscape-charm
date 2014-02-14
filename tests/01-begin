@@ -210,37 +210,8 @@ class LandscapeLiveTests(unittest.TestCase):
             logging.info("Running cron job %s" % cron_job)
             # these jobs currently don't set their exit status to non-zero
             # if they fail, they just print things to stdout/stderr
-            try:
-                output = check_output(cmd, stderr=STDOUT).decode("utf-8").strip()
-            except CalledProcessError as e:
-                raise LandscapeTestError("Cron job %s failed, status %d" %
-                    (cron_job, e.returncode), e.output)
-            if len(output) > 0:
-                raise LandscapeTestError(
-                    "Cron job %s failed" % cron_job, output)
-
-
-def main():
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    with open("test-config.yaml", "r") as myfile:
-        data = yaml.load(myfile.read())
-    deployment = deploy(data)
-
-    try:
-        live_tests = LandscapeLiveTests(deployment)
-        live_tests.run_tests()
-    except LandscapeTestError as e:
-        logging.error(
-            "Test %s failed. Output:\n%s" % (e.msg,e.output))
-    except ServiceNotFound as e:
-        logging.error("Couldn't find service %s in this deployment." %
-                    e.service_name)
-    else:
-        logging.info("Tests succeeded.")
-        sys.exit(0)
-
-    sys.exit(1)
+            output = check_output(cmd, stderr=STDOUT).decode("utf-8").strip()
+            self.assert(len(output), 0)
 
 
 if __name__ == "__main__":
