@@ -1,18 +1,17 @@
 #!/usr/bin/python2.7
 """
-This test simply creates a real landscape deployment, and runs a command there.
-There isn't much to it for now.  The intent is to deploy landscape and our
-dependent charms to test for any non-starter type issues.
+This test creates a real landscape deployment, and runs some checks against it.
 """
 
-
-import subprocess
-import shutil
-from base64 import b64encode
-import logging
 import amulet
-from deployer.config import ConfigStack
-from deployer.utils import resolve_include
+import json
+import os.path
+import shutil
+import sys
+import unittest
+from lib import util
+from subprocess import check_output, STDOUT
+from time import sleep
 
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
@@ -24,66 +23,134 @@ from deployer.utils import resolve_include
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
-def _resolve_include(value):
+class ServiceNotFound(Exception):
     """
-    resolve include-*:// style links in the way that
-    juju-deployer does.  I cut and paste this code for now
-    since it was a bit burried in a method.  The goal is
-    to move this into amulet, I really don't want to maintain
-    this here.
+    Exception thrown if a service cannot be found in the deployment.
     """
-    for include_type in ["file", "base64"]:
-        if (not isinstance(value, str)
-            or not value.startswith(
-                "include-%s://" % include_type)):
-            continue
-        include, fname = value.split("://", 1)
-        include_path = resolve_include(fname, ".")
-        with open(include_path) as fh:
-            result = fh.read()
-            if include_type == "base64":
-                result = b64encode(result)
-            return result
-    return value
+
+    def __init__(self, service_name):
+        self.service_name = service_name
 
 
-def load_deployer_config(yaml_file):
+class LandscapeLiveTests(unittest.TestCase):
     """
-    return a deployer config file in a format that amulet expects
+    Class hosting all the tests we want to run against a Landscape deployment.
     """
-    config = ConfigStack([yaml_file])
-    config.load()
-    deployment = config.get("landscape")
-    data = deployment.data
 
-    if "relations" not in data:
-        data["relations"] = {}
+    @classmethod
+    def setUpClass(cls):
+        """Starts the actual Landscape charm deployment. Runs once."""
+        shutil.copy2("config/vhostssl.tmpl", ".")
+        shutil.copy2("config/vhost.tmpl", ".")
+        shutil.copy2("config/repo-file", ".")
+        shutil.copy2("config/license-file", ".")
+        d = amulet.Deployment(sentries=False)
+        config = util.load_deployer_config("config/landscape-deployments.yaml")
+        d.load(config)
+        d.setup(timeout=2000)
+        cls.juju_status = cls._juju_status()
 
-    for service_name, service in data["services"].iteritems():
-        if "options" in service:
-            for key, value in service["options"].items():
-                service["options"][key] = _resolve_include(value)
+    @classmethod
+    def _juju_status(self):
+        """Return a juju status structure."""
+        cmd = ["juju", "status", "--format=json"]
+        output = check_output(cmd).strip()
+        return json.loads(output)
 
-    # FIXME: This is only needed since amulet switches your environment
-    #        if you pass in a config.  There are ways to break this
-    #        parsing (like including a quote in your environment name).
-    output = subprocess.check_output(['juju', 'env']).split()
-    env = output[2].strip('"')
+    def _find_address(self, service_name):
+        """
+        Given a service name, return the public address of its first unit.
+        Doesn't handle subordinates, sorry.
+        """
+        services = self.juju_status["services"]
+        if service_name not in services:
+            raise ServiceNotFound(service_name)
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            public_address = units[unit_keys[0]].get("public-address", "")
+            return public_address
+        else:
+            raise ServiceNotFound(service_name)
 
-    return {env: data}
+    def _check_url(self, url, good_content, post_data=None, header=None,
+                   interval=10, attempts=30):
+        """
+        Polls the given URL looking for the specified good_content. Fails if
+        the content cannot be found in time, otherwise returns True.
 
-print("Testing Basic Deployment of the Landscape Charm Stack")
-logging.basicConfig(
-    level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-shutil.copy2("config/vhostssl.tmpl", ".")
-shutil.copy2("config/vhost.tmpl", ".")
-shutil.copy2("config/repo-file", ".")
-shutil.copy2("config/license-file", ".")
+        @param url: URL to poll
+        @param good_content: string we are looking for
+        @param post_data: optional POST data string
+        @param header: optional request header string
+        @param interval: number of seconds between polls
+        @param attempts: how many times we should poll
+        """
+        output = ""
+        cmd = ["curl", url, "-k", "-L", "-s"]
+        if post_data:
+            cmd.extend(["-d", post_data])
+        if header:
+            cmd.extend(["-H", header])
+        while True:
+            output = check_output(cmd).strip()
+            if good_content in output:
+                break
+            attempts = attempts - 1
+            if attempts == 0:
+                break
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            sleep(interval)
+        self.assertIn(good_content, output)
 
-d = amulet.Deployment(sentries=False)
-config = load_deployer_config("config/landscape-deployments.yaml")
-d.load(config)
+    def __str__(self):
+        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        return "%s (%s.%s)" % (
+            self._testMethodName, file_name, self.__class__.__name__)
 
-d.setup(timeout=2000)
+    def test_app(self):
+        """Verify that the APP service is up.
 
-print(subprocess.check_output(["juju", "ssh", "landscape/0", "free -m"]))
+        Specifically that it is reachable and that it presents the new
+        user form.
+        """
+        good_content = "New user - Landscape"
+        frontend = self._find_address("apache2")
+        self._check_url("https://%s/" % frontend, good_content)
+
+    def test_msg(self):
+        """Verify that the MSG service is up.
+
+        Specifically that it is reachable and that it responds
+        correctly to requests.
+        """
+        good_content = "ds8:messagesl;s11:server-uuid"
+        post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
+        header = "X-MESSAGE-API: 3.1"
+        frontend = self._find_address("apache2")
+        self._check_url("https://%s/message-system" % frontend,
+                        good_content, post_data, header)
+
+    def test_ping(self):
+        """Verifies that the PING service is up.
+
+        Specifically that it is reachable and that it responds
+        correctly to a ping request without an ID.
+        """
+        good_content = "ds5:errors19:provide insecure_id;"
+        frontend = self._find_address("apache2")
+        self._check_url("http://%s/ping" % frontend, good_content)
+
+    def test_ssh(self):
+        """Verify that the landscape/0 unit can be reached via ssh."""
+        good_content = "buffers/cache"
+        output = check_output(["juju", "ssh", "landscape/0", "free -m"],
+                              stderr=STDOUT)
+        self.assertIn(good_content, output)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+
