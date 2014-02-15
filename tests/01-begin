@@ -22,6 +22,14 @@ import yaml
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
+def setUpModule():
+    """Deploys Landscape via the charm."""
+    d = amulet.Deployment(sentries=False)
+    with open("test-config.yaml", "r") as myfile:
+        data = yaml.load(myfile.read())
+    d.load(data)
+    d.setup(timeout=2000)
+
 class ServiceNotFound(Exception):
     """
     Exception thrown if a service cannot be found in the deployment.
@@ -37,12 +45,7 @@ class LandscapeLiveTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Starts the actual Landscape charm deployment. Runs once."""
-        d = amulet.Deployment(sentries=False)
-        with open("test-config.yaml", "r") as myfile:
-            data = yaml.load(myfile.read())
-        d.load(data)
-        d.setup(timeout=2000)
+        """Prepares juju_status which many tests use."""
         cls.juju_status = cls._juju_status()
 
     @classmethod
