@@ -148,20 +148,46 @@ class LandscapeLiveTests(unittest.TestCase):
                               stderr=STDOUT).decode('utf-8')
         self.assertIn(good_content, output)
 
-    def _get_service_config(self, service_name):
+class LandscapeCronTests(unittest.TestCase):
+
+    def __str__(self):
+        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        return "{} ({}.{})".format(
+            self._testMethodName, file_name, self.__class__.__name__)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.juju_status = cls._juju_status()
+        cls.cron_unit = cls._find_cron_unit()
+        cls._stop_cron(cls.cron_unit)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._start_cron(cls.cron_unit)
+
+    @classmethod
+    def _juju_status(self):
+        """Return a juju status structure."""
+        cmd = ["juju", "status", "--format=json"]
+        output = check_output(cmd).decode('utf-8').strip()
+        return json.loads(output)
+
+    @classmethod
+    def _get_service_config(cls, service_name):
         """
         Returns the configuration of the given service. Raises an error if
         the service is not there.
         
         @param service_name: string representing the service we are looking for.
         """
-        services = self.juju_status["services"]
+        services = cls.juju_status["services"]
         if service_name not in services:
             raise ServiceNotFound(service_name)
         cmd = ["juju", "get", "--format=yaml", service_name]
         output = check_output(cmd).decode('utf-8').strip()
         return yaml.load(output)
 
+    @classmethod
     def _find_cron_unit(self):
         """
         Find which landscape unit has the cron service on it.
@@ -180,62 +206,93 @@ class LandscapeLiveTests(unittest.TestCase):
             if unit_keys:
                 return unit_keys[0]
 
-    def test_cron(self):
-        """Verify that the cron jobs run without errors.
+    def _run_cron(self, script):
+        status = 0
+        # -q is to keep ssh quiet so that the only output we get is
+        # from the script we are running
+        cmd = ["juju", "ssh", self.cron_unit, "-q", "sudo", "-u landscape",
+               script]
+        try:
+            output = check_output(
+                cmd, stderr=STDOUT).decode("utf-8").strip()
+        except CalledProcessError as e:
+            output = e.output
+            status = e.returncode
+        # these jobs currently don't set their exit status to non-zero
+        # if they fail, they just print things to stdout/stderr
+        return (output.strip(), status)
 
-        Each cron job is run in sequence. The test fails if the exit status
-        is not zero, or if there was anything printed to stdout or stderr.
-        """
-        def _stop_cron(unit):
-            cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron", "stop"]
-            check_output(cmd, stderr=STDOUT)
+    def test_maintenance_cron(self):
+        """Verify that the maintenance cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/maintenance.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
 
-        def _start_cron(unit):
-            cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron",
-                   "start"]
-            check_output(cmd, stderr=STDOUT)
+    def test_update_security_db_cron(self):
+        """Verify that the update_security_db cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/update_security_db.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
 
-        cron_jobs = {
-            "maintenance": "/opt/canonical/landscape/scripts/maintenance.sh",
-            "update_security_db":
-                "/opt/canonical/landscape/scripts/update_security_db.sh",
-            "update_alerts":
-                "/opt/canonical/landscape/scripts/update_alerts.sh",
-            "process_profiles":
-                "/opt/canonical/landscape/scripts/process_profiles.sh",
-            "process_alerts":
-                "/opt/canonical/landscape/scripts/process_alerts.sh",
-            "hash_id_databases":
-                "/opt/canonical/landscape/scripts/hash_id_databases.sh",
-            "meta_releases":
-                "/opt/canonical/landscape/scripts/meta_releases.sh",
-            "sync_lds_releases":
-                "/opt/canonical/landscape/scripts/sync_lds_releases.sh",
-            "maas_poller": "/opt/canonical/landscape/scripts/maas_poller.sh"
-        }
-        cron_unit = self._find_cron_unit()
-        self.addCleanup(_start_cron, cron_unit)
-        _stop_cron(cron_unit)
-        for cron_job,script in cron_jobs.items():
-            # -q is to keep ssh quiet so that the only output we get is
-            # from the script we are running
-            status = 0
-            cmd = ["juju", "ssh", cron_unit, "-q", "sudo", "-u landscape",
-                   script]
-            sys.stdout.write("{} ".format(cron_job))
-            sys.stdout.flush()
-            try:
-                output = check_output(
-                    cmd, stderr=STDOUT).decode("utf-8").strip()
-            except CalledProcessError as e:
-                output = e.output
-                status = e.returncode
-            # these jobs currently don't set their exit status to non-zero
-            # if they fail, they just print things to stdout/stderr
-            self.assertEqual(output.strip(), "")
-            self.assertEqual(status, 0)
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+    def test_update_alerts_cron(self):
+        """Verify that the update_alerts cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/update_alerts.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_process_profiles_cron(self):
+        """Verify that the process_profiles cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/process_profiles.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_process_alerts_cron(self):
+        """Verify that the process_alerts cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/process_alerts.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_hash_id_databases_cron(self):
+        """Verify that the hash_id_databases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_meta_releases_cron(self):
+        """Verify that the meta_releases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/meta_releases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_sync_lds_releases_cron(self):
+        """Verify that the sync_lds_releases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/sync_lds_releases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def test_maas_poller_cron(self):
+        """Verify that the maas_poller cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/maas_poller.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output.strip(), "")
+        self.assertEqual(status, 0)
+
+    def _stop_cron(unit):
+        cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron", "stop"]
+        check_output(cmd, stderr=STDOUT)
+
+    def _start_cron(unit):
+        cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron",
+               "start"]
+        check_output(cmd, stderr=STDOUT)
 
 
 if __name__ == "__main__":
