@@ -70,7 +70,7 @@ def find_address(juju_status, service_name):
 
 def find_cron_unit(juju_status):
     """
-    Find which landscape unit has the cron service on it.
+    Find the first landscape unit that has the cron service on it.
 
     @param juju_status: dictionary representing the juju status output.
     """
@@ -87,6 +87,7 @@ def find_cron_unit(juju_status):
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
             return unit_keys[0]
+    raise CronUnitNotFound()
 
 
 class ServiceNotFound(Exception):
@@ -97,6 +98,13 @@ class ServiceNotFound(Exception):
 
     def __init__(self, service_name):
         self.service_name = service_name
+
+
+class CronUnitNotFound(Exception):
+    """
+    Exception thrown if the cron service cannot be found in a landscape
+    unit.
+    """
 
 
 class LandscapeServiceTests(unittest.TestCase):
