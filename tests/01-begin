@@ -23,22 +23,83 @@ import yaml
 
 
 def setUpModule():
-    """Deploys Landscape via the charm."""
+    """Deploys Landscape via the charm. All the tests use this deployment."""
     d = amulet.Deployment(sentries=False)
     with open("test-config.yaml", "r") as myfile:
         data = yaml.load(myfile.read())
     d.load(data)
     d.setup(timeout=2000)
 
+def juju_status():
+    """Return a juju status structure."""
+    cmd = ["juju", "status", "--format=json"]
+    output = check_output(cmd).decode("utf-8").strip()
+    return json.loads(output)
+
+def get_service_config(service_name):
+    """
+    Returns the configuration of the given service. Raises an error if
+    the service is not there.
+    
+    @param juju_status: dictionary representing the juju status output.
+    @param service_name: string representing the service we are looking for.
+    """
+    cmd = ["juju", "get", "--format=yaml", service_name]
+    output = check_output(cmd).decode("utf-8").strip()
+    return yaml.load(output)
+
+def find_address(juju_status, service_name):
+    """
+    Find the first unit of service_name in the given juju status dictionary.
+    Doesn't handle subordinates, sorry.
+
+    @param juju_status: dictionary representing the juju status output.
+    @param service_name: String representing the name of the service.
+    """
+    services = juju_status["services"]
+    if service_name not in services:
+        raise ServiceNotFound(service_name)
+    service = services[service_name]
+    units = service.get("units", {})
+    unit_keys = list(sorted(units.keys()))
+    if unit_keys:
+        public_address = units[unit_keys[0]].get("public-address", "")
+        return public_address
+    else:
+        raise ServiceNotFound(service_name)
+
+def find_cron_unit(juju_status):
+    """
+    Find which landscape unit has the cron service on it.
+
+    @param juju_status: dictionary representing the juju status output.
+    """
+    services = juju_status["services"]
+    for service_name in services.keys():
+        if not service_name.startswith("landscape"):
+            continue
+        config = get_service_config(service_name)
+        landscape_services = config["settings"]["services"]["value"]
+        if "cron" not in landscape_services:
+            continue
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            return unit_keys[0]
+
+
 class ServiceNotFound(Exception):
     """
-    Exception thrown if a service cannot be found in the deployment.
+    Exception thrown if a service cannot be found in the deployment or has
+    no units.
     """
 
     def __init__(self, service_name):
         self.service_name = service_name
 
-class LandscapeLiveTests(unittest.TestCase):
+
+class LandscapeServiceTests(unittest.TestCase):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
     """
@@ -46,31 +107,8 @@ class LandscapeLiveTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Prepares juju_status which many tests use."""
-        cls.juju_status = cls._juju_status()
-
-    @classmethod
-    def _juju_status(self):
-        """Return a juju status structure."""
-        cmd = ["juju", "status", "--format=json"]
-        output = check_output(cmd).decode('utf-8').strip()
-        return json.loads(output)
-
-    def _find_address(self, service_name):
-        """
-        Given a service name, return the public address of its first unit.
-        Doesn't handle subordinates, sorry.
-        """
-        services = self.juju_status["services"]
-        if service_name not in services:
-            raise ServiceNotFound(service_name)
-        service = services[service_name]
-        units = service.get("units", {})
-        unit_keys = list(sorted(units.keys()))
-        if unit_keys:
-            public_address = units[unit_keys[0]].get("public-address", "")
-            return public_address
-        else:
-            raise ServiceNotFound(service_name)
+        cls.juju_status = juju_status()
+        cls.frontend = find_address(cls.juju_status, "apache2")
 
     def _check_url(self, url, good_content, post_data=None, header=None,
                    interval=10, attempts=30):
@@ -115,8 +153,7 @@ class LandscapeLiveTests(unittest.TestCase):
         user form.
         """
         good_content = "New user - Landscape"
-        frontend = self._find_address("apache2")
-        self._check_url("https://{}/".format(frontend), good_content)
+        self._check_url("https://{}/".format(self.frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -127,8 +164,7 @@ class LandscapeLiveTests(unittest.TestCase):
         good_content = "ds8:messagesl;s11:server-uuid"
         post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
         header = "X-MESSAGE-API: 3.1"
-        frontend = self._find_address("apache2")
-        self._check_url("https://{}/message-system".format(frontend),
+        self._check_url("https://{}/message-system".format(self.frontend),
                         good_content, post_data, header)
 
     def test_ping(self):
@@ -138,8 +174,7 @@ class LandscapeLiveTests(unittest.TestCase):
         correctly to a ping request without an ID.
         """
         good_content = "ds5:errors19:provide insecure_id;"
-        frontend = self._find_address("apache2")
-        self._check_url("http://{}/ping".format(frontend), good_content)
+        self._check_url("http://{}/ping".format(self.frontend), good_content)
 
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
@@ -147,6 +182,7 @@ class LandscapeLiveTests(unittest.TestCase):
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
                               stderr=STDOUT).decode('utf-8')
         self.assertIn(good_content, output)
+
 
 class LandscapeCronTests(unittest.TestCase):
 
@@ -157,54 +193,13 @@ class LandscapeCronTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.juju_status = cls._juju_status()
-        cls.cron_unit = cls._find_cron_unit()
+        cls.juju_status = juju_status()
+        cls.cron_unit = find_cron_unit(cls.juju_status)
         cls._stop_cron(cls.cron_unit)
 
     @classmethod
     def tearDownClass(cls):
         cls._start_cron(cls.cron_unit)
-
-    @classmethod
-    def _juju_status(self):
-        """Return a juju status structure."""
-        cmd = ["juju", "status", "--format=json"]
-        output = check_output(cmd).decode('utf-8').strip()
-        return json.loads(output)
-
-    @classmethod
-    def _get_service_config(cls, service_name):
-        """
-        Returns the configuration of the given service. Raises an error if
-        the service is not there.
-        
-        @param service_name: string representing the service we are looking for.
-        """
-        services = cls.juju_status["services"]
-        if service_name not in services:
-            raise ServiceNotFound(service_name)
-        cmd = ["juju", "get", "--format=yaml", service_name]
-        output = check_output(cmd).decode('utf-8').strip()
-        return yaml.load(output)
-
-    @classmethod
-    def _find_cron_unit(self):
-        """
-        Find which landscape unit has the cron service on it.
-        """
-        services = self.juju_status["services"]
-        for service_name in services.keys():
-            if not service_name.startswith("landscape"):
-                continue
-            config = self._get_service_config(service_name)
-            landscape_services = config["settings"]["services"]["value"]
-            if "cron" not in landscape_services:
-                continue
-            service = services[service_name]
-            units = service.get("units", {})
-            unit_keys = list(sorted(units.keys()))
-            if unit_keys:
-                return unit_keys[0]
 
     def _run_cron(self, script):
         status = 0
@@ -257,6 +252,8 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(output.strip(), "")
         self.assertEqual(status, 0)
 
+    @unittest.skipIf(os.getenv("SKIP_SLOW_TESTS", None),
+                     "Requested to skip slow tests.")
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
