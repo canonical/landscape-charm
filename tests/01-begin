@@ -138,7 +138,7 @@ class LandscapeServiceTests(unittest.TestCase):
         if header:
             cmd.extend(["-H", header])
         while True: 
-            output = check_output(cmd).decode('utf-8').strip()
+            output = check_output(cmd).decode("utf-8").strip()
             if good_content in output:
                 break
             attempts = attempts - 1
@@ -188,7 +188,7 @@ class LandscapeServiceTests(unittest.TestCase):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
         output = check_output(["juju", "ssh", "landscape/0", "free -m"],
-                              stderr=STDOUT).decode('utf-8')
+                              stderr=STDOUT).decode("utf-8")
         self.assertIn(good_content, output)
 
 
