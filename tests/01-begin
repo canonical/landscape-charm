@@ -229,35 +229,35 @@ class LandscapeCronTests(unittest.TestCase):
         """Verify that the maintenance cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/maintenance.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_update_security_db_cron(self):
         """Verify that the update_security_db cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_security_db.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_update_alerts_cron(self):
         """Verify that the update_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_alerts.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_process_profiles_cron(self):
         """Verify that the process_profiles cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/process_profiles.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_process_alerts_cron(self):
         """Verify that the process_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/process_alerts.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     @unittest.skipIf(os.getenv("SKIP_SLOW_TESTS", None),
@@ -266,28 +266,28 @@ class LandscapeCronTests(unittest.TestCase):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_meta_releases_cron(self):
         """Verify that the meta_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/meta_releases.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_sync_lds_releases_cron(self):
         """Verify that the sync_lds_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/sync_lds_releases.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def test_maas_poller_cron(self):
         """Verify that the maas_poller cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/maas_poller.sh"
         output, status = self._run_cron(script)
-        self.assertEqual(output.strip(), "")
+        self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
     def _stop_cron(unit):
