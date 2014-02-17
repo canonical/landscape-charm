@@ -30,23 +30,26 @@ def setUpModule():
     d.load(data)
     d.setup(timeout=2000)
 
+
 def juju_status():
     """Return a juju status structure."""
     cmd = ["juju", "status", "--format=json"]
     output = check_output(cmd).decode("utf-8").strip()
     return json.loads(output)
 
+
 def get_service_config(service_name):
     """
     Returns the configuration of the given service. Raises an error if
     the service is not there.
-    
+
     @param juju_status: dictionary representing the juju status output.
     @param service_name: string representing the service we are looking for.
     """
     cmd = ["juju", "get", "--format=yaml", service_name]
     output = check_output(cmd).decode("utf-8").strip()
     return yaml.load(output)
+
 
 def find_address(juju_status, service_name):
     """
@@ -67,6 +70,7 @@ def find_address(juju_status, service_name):
         return public_address
     else:
         raise ServiceNotFound(service_name)
+
 
 def find_cron_unit(juju_status):
     """
@@ -137,7 +141,7 @@ class LandscapeServiceTests(unittest.TestCase):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
-        while True: 
+        while True:
             output = check_output(cmd).decode("utf-8").strip()
             if good_content in output:
                 break
@@ -170,7 +174,8 @@ class LandscapeServiceTests(unittest.TestCase):
         correctly to requests.
         """
         good_content = "ds8:messagesl;s11:server-uuid"
-        post_data = "ds8:messagesl;s22:next-expected-sequencei0;s8:sequencei0;;"
+        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
+                     "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
         self._check_url("https://{}/message-system".format(self.frontend),
                         good_content, post_data, header)
