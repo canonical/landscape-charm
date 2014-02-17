@@ -27,7 +27,7 @@ clean-integration-test:
 	rm -f test-config.yaml
 
 integration-test: verify-juju-test stage-integration-test
-	juju test -v --timeout 2000s
+	juju test -v --timeout 3000s
 
 lint:
 	flake8 --exclude=charmhelpers hooks
