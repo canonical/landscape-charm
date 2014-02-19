@@ -29,7 +29,6 @@ def setUpModule():
         data = yaml.load(myfile.read())
     d.load(data)
     d.setup(timeout=2000)
-    sleep(90)
 
 
 def juju_status():
@@ -112,7 +111,7 @@ class CronUnitNotFound(Exception):
     """
 
 
-class LandscapeServiceTests(unittest.TestCase):
+class Landscape1ServiceTests(unittest.TestCase):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
     """
