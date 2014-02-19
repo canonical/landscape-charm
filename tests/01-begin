@@ -199,6 +199,14 @@ class Landscape1ServiceTests(unittest.TestCase):
                self.frontend))
         self._check_url(url, good_content)
 
+    def test_api(self):
+        """Verify that the API service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Query API Service"
+        self._check_url("https://{}/api".format(self.frontend), good_content)
+
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
