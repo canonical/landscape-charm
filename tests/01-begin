@@ -225,6 +225,16 @@ class Landscape1ServiceTests(unittest.TestCase):
         url = "https://{}/upload/".format(self.frontend)
         self._check_url(url, good_content)
 
+    def test_static(self):
+        """Verify that the STATIC service is up.
+
+        Specifically, that we can reach a file that is hosted on the static
+        server/unit.
+        """
+        good_content = "landscape-expandable-content"
+        url = "https://{}/static/skin/manx/base.css".format(self.frontend)
+        self._check_url(url, good_content)
+
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
