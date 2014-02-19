@@ -189,6 +189,16 @@ class Landscape1ServiceTests(unittest.TestCase):
         good_content = "ds5:errors19:provide insecure_id;"
         self._check_url("http://{}/ping".format(self.frontend), good_content)
 
+    def test_combo(self):
+        """Verify that the COMBO service is up.
+
+        Specifically that it is reachable and returns the expected text.
+        """
+        good_content = "Licensed under the BSD License"
+        url = ("http://{}/combo?yui/scrollview/scrollview-min.js".format(
+               self.frontend))
+        self._check_url(url, good_content)
+
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
