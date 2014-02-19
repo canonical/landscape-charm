@@ -22,6 +22,38 @@ import yaml
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
+def check_url(self, url, good_content, post_data=None, header=None,
+                interval=10, attempts=30):
+    """
+    Polls the given URL looking for the specified good_content.  If
+    not found in the timeout period, will assert.  If found, returns
+    the output matching.
+
+    @param url: URL to poll
+    @param good_content: string we are looking for
+    @param post_data: optional POST data string
+    @param header: optional request header string
+    @param interval: number of seconds between polls
+    @param attempts: how many times we should poll
+    """
+    output = ""
+    cmd = ["curl", url, "-k", "-L", "-s"]
+    if post_data:
+        cmd.extend(["-d", post_data])
+    if header:
+        cmd.extend(["-H", header])
+    while attempts != 0:
+        attempts -= 1
+        output = check_output(cmd).decode("utf-8").strip()
+        if good_content in output:
+            return output
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        sleep(interval)
+    assert False, "Not found!\nurl:{}\ngood_content:{}\noutput:{}".format(
+            url, good_content, output)
+
+
 def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     d = amulet.Deployment(sentries=False)
@@ -29,6 +61,9 @@ def setUpModule():
         data = yaml.load(myfile.read())
     d.load(data)
     d.setup(timeout=2000)
+    frontend = find_address(juju_status(), "apache2")
+    good_content = "New user - Landscape"
+    check_url("https://{}/".format(frontend), good_content)
 
 
 def juju_status():
@@ -111,7 +146,7 @@ class CronUnitNotFound(Exception):
     """
 
 
-class Landscape1ServiceTests(unittest.TestCase):
+class LandscapeServiceTests(unittest.TestCase):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
     """
@@ -121,37 +156,6 @@ class Landscape1ServiceTests(unittest.TestCase):
         """Prepares juju_status which many tests use."""
         cls.juju_status = juju_status()
         cls.frontend = find_address(cls.juju_status, "apache2")
-
-    def _check_url(self, url, good_content, post_data=None, header=None,
-                   interval=10, attempts=30):
-        """
-        Polls the given URL looking for the specified good_content. Fails if
-        the content cannot be found in time, otherwise returns True.
-
-        @param url: URL to poll
-        @param good_content: string we are looking for
-        @param post_data: optional POST data string
-        @param header: optional request header string
-        @param interval: number of seconds between polls
-        @param attempts: how many times we should poll
-        """
-        output = ""
-        cmd = ["curl", url, "-k", "-L", "-s"]
-        if post_data:
-            cmd.extend(["-d", post_data])
-        if header:
-            cmd.extend(["-H", header])
-        while True:
-            output = check_output(cmd).decode("utf-8").strip()
-            if good_content in output:
-                break
-            attempts = attempts - 1
-            if attempts == 0:
-                break
-            sys.stdout.write(".")
-            sys.stdout.flush()
-            sleep(interval)
-        self.assertIn(good_content, output)
 
     def __str__(self):
         file_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -165,7 +169,7 @@ class Landscape1ServiceTests(unittest.TestCase):
         user form.
         """
         good_content = "New user - Landscape"
-        self._check_url("https://{}/".format(self.frontend), good_content)
+        check_url("https://{}/".format(self.frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -177,7 +181,7 @@ class Landscape1ServiceTests(unittest.TestCase):
         post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
                      "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
-        self._check_url("https://{}/message-system".format(self.frontend),
+        check_url("https://{}/message-system".format(self.frontend),
                         good_content, post_data, header)
 
     def test_ping(self):
@@ -187,7 +191,7 @@ class Landscape1ServiceTests(unittest.TestCase):
         correctly to a ping request without an ID.
         """
         good_content = "ds5:errors19:provide insecure_id;"
-        self._check_url("http://{}/ping".format(self.frontend), good_content)
+        check_url("http://{}/ping".format(self.frontend), good_content)
 
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
