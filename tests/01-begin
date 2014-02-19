@@ -235,6 +235,17 @@ class Landscape1ServiceTests(unittest.TestCase):
         url = "https://{}/static/skin/manx/base.css".format(self.frontend)
         self._check_url(url, good_content)
 
+    def test_hash_id_databases(self):
+        """Verify that the hash-id-databases are available.
+
+        Specifically, that the directory can be listed and that the default
+        hash-id-database files are there. The cron job that populates this
+        with the actual uuid-named files might or might not have run yet.
+        """
+        good_content = "trusty_amd64"
+        url = "https://{}/hash-id-databases".format(self.frontend)
+        self._check_url(url, good_content)
+
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
