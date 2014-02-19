@@ -210,10 +210,20 @@ class Landscape1ServiceTests(unittest.TestCase):
     def test_ajax(self):
         """Verify that the AJAX srevice is up.
 
-        Specifically that it is reachable and returns its name."
+        Specifically that it is reachable and returns its name.
         """
         good_content = "Async frontend for landscape"
         self._check_url("https://{}/ajax".format(self.frontend), good_content)
+
+    def test_upload(self):
+        """Verify that the PACKAGE UPLOAD service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Landscape package upload service"
+        # ending / is important because of the way we wrote this RewriteRule
+        url = "https://{}/upload/".format(self.frontend)
+        self._check_url(url, good_content)
 
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
