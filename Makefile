@@ -26,7 +26,7 @@ stage-integration-test: test-config.yaml
 clean-integration-test:
 	rm -f test-config.yaml
 
-integration-test: verify-juju-test stage-integration-test
+integration-test: verify-juju-test clean-integration-test stage-integration-test
 	juju test -v --timeout 3000s
 
 lint:

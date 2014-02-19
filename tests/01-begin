@@ -22,7 +22,7 @@ import yaml
 # - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
-def check_url(self, url, good_content, post_data=None, header=None,
+def check_url(url, good_content, post_data=None, header=None,
                 interval=10, attempts=30):
     """
     Polls the given URL looking for the specified good_content.  If
