@@ -220,13 +220,10 @@ class LandscapeCronTests(unittest.TestCase):
 
     def _run_cron(self, script):
         status = 0
-        # -q is to keep ssh quiet so that the only output we get is
-        # from the script we are running
-        cmd = ["juju", "ssh", self.cron_unit, "-q", "sudo", "-u landscape",
-               script]
+        cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
+               "2>&1"]
         try:
-            output = check_output(
-                cmd, stderr=STDOUT).decode("utf-8").strip()
+            output = check_output(cmd).decode("utf-8").strip()
         except CalledProcessError as e:
             output = e.output
             status = e.returncode
@@ -300,13 +297,12 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(status, 0)
 
     def _stop_cron(unit):
-        cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron", "stop"]
-        check_output(cmd, stderr=STDOUT)
+        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
+        check_output(cmd)
 
     def _start_cron(unit):
-        cmd = ["juju", "ssh", unit, "-q", "sudo", "service", "cron",
-               "start"]
-        check_output(cmd, stderr=STDOUT)
+        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
+        check_output(cmd)
 
 
 if __name__ == "__main__":
