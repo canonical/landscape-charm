@@ -14,6 +14,8 @@ import unittest
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
 import yaml
+import logging
+log = logging.getLogger(__file__)
 
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
@@ -53,8 +55,12 @@ def check_url(url, good_content, post_data=None, header=None,
         sys.stdout.write(".")
         sys.stdout.flush()
         sleep(interval)
-    assert False, "Not found!\nurl:{}\ngood_content:{}\noutput:{}".format(
-            url, good_content, output)
+    msg = """Content Not found!
+    url:{}
+    good_content:{}
+    output:{}
+    """
+    raise AssertionError(msg.format(url, good_content, output))
 
 
 def setUpModule():
@@ -66,6 +72,7 @@ def setUpModule():
     d.setup(timeout=2000)
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
+    log.info("Polling. Waiting for app server: {}".format(frontend))
     check_url("https://{}/".format(frontend), good_content)
 
 
@@ -366,4 +373,6 @@ class LandscapeCronTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+            level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
     unittest.main(verbosity=2)
