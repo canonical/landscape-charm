@@ -196,6 +196,63 @@ class LandscapeServiceTests(unittest.TestCase):
         good_content = "ds5:errors19:provide insecure_id;"
         check_url("http://{}/ping".format(self.frontend), good_content)
 
+    def test_combo(self):
+        """Verify that the COMBO service is up.
+
+        Specifically that it is reachable and returns the expected text.
+        """
+        good_content = "Licensed under the BSD License"
+        url = ("http://{}/combo?yui/scrollview/scrollview-min.js".format(
+               self.frontend))
+        check_url(url, good_content)
+
+    def test_api(self):
+        """Verify that the API service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Query API Service"
+        check_url("https://{}/api".format(self.frontend), good_content)
+
+    def test_ajax(self):
+        """Verify that the AJAX srevice is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Async frontend for landscape"
+        check_url("https://{}/ajax".format(self.frontend), good_content)
+
+    def test_upload(self):
+        """Verify that the PACKAGE UPLOAD service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Landscape package upload service"
+        # ending / is important because of the way we wrote this RewriteRule
+        url = "https://{}/upload/".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_static(self):
+        """Verify that the STATIC service is up.
+
+        Specifically, that we can reach a file that is hosted on the static
+        server/unit.
+        """
+        good_content = "landscape-expandable-content"
+        url = "https://{}/static/skin/manx/base.css".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_hash_id_databases(self):
+        """Verify that the hash-id-databases are available.
+
+        Specifically, that the directory can be listed and that the default
+        hash-id-database files are there. The cron job that populates this
+        with the actual uuid-named files might or might not have run yet.
+        """
+        good_content = "trusty_amd64"
+        url = "https://{}/hash-id-databases".format(self.frontend)
+        check_url(url, good_content)
+
     def test_ssh(self):
         """Verify that the landscape/0 unit can be reached via ssh."""
         good_content = "buffers/cache"
