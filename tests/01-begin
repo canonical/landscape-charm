@@ -1,6 +1,9 @@
 #!/usr/bin/python3
 """
 This test creates a real landscape deployment, and runs some checks against it.
+
+FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
+       lp:1281577 is addressed.
 """
 
 import amulet
@@ -8,7 +11,7 @@ import json
 import os.path
 import sys
 import unittest
-from subprocess import check_output, STDOUT, CalledProcessError
+from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
 import yaml
 
@@ -223,7 +226,7 @@ class LandscapeCronTests(unittest.TestCase):
         cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
                "2>&1"]
         try:
-            output = check_output(cmd).decode("utf-8").strip()
+            output = check_output(cmd,stderr=PIPE).decode("utf-8").strip()
         except CalledProcessError as e:
             output = e.output
             status = e.returncode
@@ -298,11 +301,11 @@ class LandscapeCronTests(unittest.TestCase):
 
     def _stop_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
-        check_output(cmd)
+        check_output(cmd, stderr=PIPE)
 
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
-        check_output(cmd)
+        check_output(cmd, stderr=PIPE)
 
 
 if __name__ == "__main__":
