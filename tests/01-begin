@@ -28,7 +28,7 @@ log = logging.getLogger(__file__)
 
 
 def check_url(url, good_content, post_data=None, header=None,
-                interval=10, attempts=30):
+                interval=10, attempts=30, retry_unavailable=False):
     """
     Polls the given URL looking for the specified good_content.  If
     not found in the timeout period, will assert.  If found, returns
@@ -40,6 +40,7 @@ def check_url(url, good_content, post_data=None, header=None,
     @param header: optional request header string
     @param interval: number of seconds between polls
     @param attempts: how many times we should poll
+    @param retry_unavailable: if host is unavailable, retry (default: False)
     """
     output = ""
     cmd = ["curl", url, "-k", "-L", "-s"]
@@ -48,7 +49,18 @@ def check_url(url, good_content, post_data=None, header=None,
     if header:
         cmd.extend(["-H", header])
     for _ in range(attempts):
-        output = check_output(cmd).decode("utf-8").strip()
+        try:
+            output = check_output(cmd).decode("utf-8").strip()
+        except CalledProcessError as e:
+            if retry_unavailable:
+                raise
+            status = e.returncode
+            # curl: rc=7, host is unavailable, this can happen
+            #       when apache is being restarted, for instance
+            if status == 7:
+                log.info("Unavailable, retrying: {}".format(url))
+            else:
+                raise
         if good_content in output:
             return output
         sys.stdout.write(".")
@@ -72,7 +84,8 @@ def setUpModule():
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
-    check_url("https://{}/".format(frontend), good_content, interval=30)
+    check_url("https://{}/".format(frontend), good_content, interval=30,
+              retry_unavailable=True)
 
 
 def juju_status():
