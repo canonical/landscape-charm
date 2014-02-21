@@ -72,7 +72,7 @@ def setUpModule():
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
-    check_url("https://{}/".format(frontend), good_content, sleep=30)
+    check_url("https://{}/".format(frontend), good_content, interval=30)
 
 
 def juju_status():
