@@ -47,8 +47,7 @@ def check_url(url, good_content, post_data=None, header=None,
         cmd.extend(["-d", post_data])
     if header:
         cmd.extend(["-H", header])
-    while attempts != 0:
-        attempts -= 1
+    for _ in range(attempts):
         output = check_output(cmd).decode("utf-8").strip()
         if good_content in output:
             return output
