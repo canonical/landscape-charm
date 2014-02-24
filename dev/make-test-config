@@ -46,7 +46,7 @@ def load_deployer_config(yaml_file, deployer_target="landscape"):
     """
     return a deployer config file in yaml format
     """
-    config_dir = os.path.abspath(os.path.dirname(yaml_file))
+    config_dir = os.path.dirname(yaml_file)
     print config_dir
     config = ConfigStack([yaml_file])
     config.load()
