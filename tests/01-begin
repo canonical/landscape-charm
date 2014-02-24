@@ -28,7 +28,7 @@ log = logging.getLogger(__file__)
 
 
 def check_url(url, good_content, post_data=None, header=None,
-                interval=10, attempts=30, retry_unavailable=False):
+              interval=10, attempts=30, retry_unavailable=False):
     """
     Polls the given URL looking for the specified good_content.  If
     not found in the timeout period, will assert.  If found, returns
@@ -204,7 +204,7 @@ class LandscapeServiceTests(unittest.TestCase):
                      "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
         check_url("https://{}/message-system".format(self.frontend),
-                        good_content, post_data, header)
+                  good_content, post_data, header)
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -302,7 +302,7 @@ class LandscapeCronTests(unittest.TestCase):
         cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
                "2>&1"]
         try:
-            output = check_output(cmd,stderr=PIPE).decode("utf-8").strip()
+            output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
         except CalledProcessError as e:
             output = e.output
             status = e.returncode
@@ -386,5 +386,5 @@ class LandscapeCronTests(unittest.TestCase):
 
 if __name__ == "__main__":
     logging.basicConfig(
-            level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
     unittest.main(verbosity=2)

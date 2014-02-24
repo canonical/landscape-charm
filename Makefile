@@ -32,6 +32,8 @@ integration-test: verify-juju-test clean-integration-test stage-integration-test
 lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/*
+	find . -name *.py -print0 | xargs -0 pep8
+	pep8 tests/*
 
 clean: clean-integration-test
 
