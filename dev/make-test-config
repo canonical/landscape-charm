@@ -11,6 +11,7 @@ since deployer libs are py2, and amulet is py3
 """
 
 
+import os
 import sys
 import subprocess
 from base64 import b64encode
@@ -18,7 +19,7 @@ from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 import yaml
 
-def _resolve_include(value):
+def _resolve_include(value, base_dir):
     """
     resolve include-*:// style links in the way that
     juju-deployer does.  I cut and paste this code for now
@@ -32,7 +33,7 @@ def _resolve_include(value):
                 "include-%s://" % include_type)):
             continue
         _, fname = value.split("://", 1)
-        include_path = resolve_include(fname, ".")
+        include_path = resolve_include(fname, [base_dir])
         with open(include_path) as fh:
             result = fh.read().strip()
             if include_type == "base64":
@@ -41,10 +42,12 @@ def _resolve_include(value):
     return value
 
 
-def load_deployer_config(yaml_file):
+def load_deployer_config(yaml_file, deployer_target="landscape"):
     """
     return a deployer config file in yaml format
     """
+    config_dir = os.path.abspath(os.path.dirname(yaml_file))
+    print config_dir
     config = ConfigStack([yaml_file])
     config.load()
     deployment = config.get("landscape")
@@ -56,7 +59,7 @@ def load_deployer_config(yaml_file):
     for service_name, service in data["services"].iteritems():
         if "options" in service:
             for key, value in service["options"].items():
-                service["options"][key] = _resolve_include(value)
+                service["options"][key] = _resolve_include(value, config_dir)
 
     # FIXME: This is only needed since amulet switches your environment
     #        if you pass in a config.  There are ways to break this
@@ -74,11 +77,9 @@ def load_deployer_config(yaml_file):
     env = output[2].strip('"')
     return yaml.dump({env: data}, Dumper=yaml.Dumper)
 
-
-# Arguments
-# 1: path to the deployer config
 if len(sys.argv) < 2:
-    print "Usage: %s PATH_TO_CONFIG" % sys.argv[0]
+    print "Usage: %s PATH_TO_CONFIG [DEPLOYER_TARGET]\n" % sys.argv[0]
+    print " * DEPLOYER_TARGET default is 'landscape'"
     sys.exit(1)
 else:
     # break the modeline print line so it isn't interpreted here
@@ -86,4 +87,4 @@ else:
     print "# See: https://stackoverflow.com/questions/20663169"
     print "# vim" + ":syntax=off"
     print "# you need set modeline for this to work"
-    print load_deployer_config(sys.argv[1]),
+    print load_deployer_config(*sys.argv[1:]),
