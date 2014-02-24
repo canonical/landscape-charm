@@ -52,7 +52,7 @@ def check_url(url, good_content, post_data=None, header=None,
         try:
             output = check_output(cmd).decode("utf-8").strip()
         except CalledProcessError as e:
-            if retry_unavailable:
+            if not retry_unavailable:
                 raise
             status = e.returncode
             # curl: rc=7, host is unavailable, this can happen
