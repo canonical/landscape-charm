@@ -16,7 +16,6 @@ from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 import yaml
 import argparse
-import tempfile
 
 
 def _resolve_include(value, base_dir):
@@ -47,8 +46,8 @@ def load_deployer_config(yaml_file, deployer_target="landscape"):
     Load a deployer config, resolving all deployer indirections.
 
     The resulting structure will be a single-stanza, named after
-    the current juju environment.  i.e., all 'inherit' directives
-    will also be resolved.  This file would be portable and could be
+    the 'deployer_target' value.  e.g., all 'inherit' directives
+    will also be resolved.  This file is portable and could be
     pasted to someone else for debugging.
     """
     config_dir = os.path.dirname(yaml_file)
@@ -89,7 +88,7 @@ def process_override(config, target, override_key, override_value):
 
 
 def get_options():
-    """Parse check and retrieve arguments and options."""
+    """Parse, check and retrieve program options."""
     description = "Generate a fully-formed juju-deployer file"
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("config_file",
