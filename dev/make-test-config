@@ -10,15 +10,15 @@ This is to workaround some amulet/deployer quirks.  It's in a file
 since deployer libs are py2, and amulet is py3
 """
 
-
 import os
-import sys
 import subprocess
 from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 import yaml
 import argparse
+import tempfile
+
 
 def _resolve_include(value, base_dir):
     """
@@ -43,7 +43,7 @@ def _resolve_include(value, base_dir):
     return value
 
 
-def load_deployer_config(yaml_file, deployer_target="landscape"):
+def load_deployer_config(yaml_file, deployer_target="landscape", extra=None):
     """
     Load a deployer config, resolving all deployer indirections.
 
@@ -51,13 +51,22 @@ def load_deployer_config(yaml_file, deployer_target="landscape"):
     the current juju environment.  i.e., all 'inherit' directives
     will also be resolved.  This file would be portable and could be
     pasted to someone else for debugging.
+
+    @param extra Extra yaml to be fed to deployer in a separate file
     """
     config_dir = os.path.dirname(yaml_file)
-    print config_dir
-    config = ConfigStack([yaml_file])
+    files = [yaml_file]
+    if extra:
+        (handle, filename) = tempfile.mkstemp()
+        with os.fdopen(handle, 'w') as f:
+            f.write(extra)
+        files.append(filename)
+
+    config = ConfigStack(files)
     config.load()
     deployment = config.get(deployer_target)
     data = deployment.data
+    os.unlink(filename)
 
     if "relations" not in data:
         data["relations"] = {}
@@ -78,11 +87,6 @@ def load_deployer_config(yaml_file, deployer_target="landscape"):
     else:
         environment_name = output
     return {environment_name: data}
-
-
-def set_landscape_repository_url(config, url):
-    """Change deployer config to use different repository"""
-    pass
 
 
 def get_options():
@@ -112,9 +116,16 @@ def main():
     print "# See: https://stackoverflow.com/questions/20663169"
     print "# vim" + ":syntax=off"
     print "# you need set modeline for this to work"
-    config = load_deployer_config(options.config_file, deployer_target=options.deployer_target)
+
+    # Create an extra section '_extra_', which inherits the user-specified
+    # deployer_target.  Use this section when generating our new config file
+    # as it will allow us to specify extra things like overrides.
+    extra = {"_extra_": {
+        "inherits": options.deployer_target}}
     if options.repository_url:
-        set_landscape_repository_url(config, options.repository_url)
+        extra["_extra_"]["overrides"] = {"repository": options.repository_url}
+    config = load_deployer_config(
+        options.config_file, "_extra_", yaml.dump(extra))
     print yaml.dump(config, default_flow_style=False)
 
 
