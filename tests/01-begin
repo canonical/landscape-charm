@@ -79,6 +79,22 @@ def setUpModule():
     d = amulet.Deployment(sentries=False)
     with open("test-config.yaml", "r") as myfile:
         data = yaml.load(myfile.read())
+
+    # FIXME: This is only needed since amulet switches your environment
+    #        if you pass in a config.  There are ways to break this
+    #        parsing (like including a quote in your environment name).
+    output = check_output(['juju', 'env']).decode("utf-8").strip()
+    if output.startswith("Current environment: "):
+        # Current environment: "andreas-canonistack2" (from JUJU_ENV)
+        # <= Juju 1.16
+        environment_name = output.split()[2].strip('"')
+    else:
+        # >= JUJU 1.17 outputs just the environment name bare
+        environment_name = output
+    keys = list(data.keys())
+    assert len(keys) == 1, "test-config.yaml not formatted as expected"
+    data = {environment_name: data[keys[0]]}
+
     d.load(data)
     d.setup(timeout=2000)
     frontend = find_address(juju_status(), "apache2")
