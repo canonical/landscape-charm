@@ -18,6 +18,7 @@ from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 import yaml
+import optparse
 
 def _resolve_include(value, base_dir):
     """
@@ -44,13 +45,18 @@ def _resolve_include(value, base_dir):
 
 def load_deployer_config(yaml_file, deployer_target="landscape"):
     """
-    return a deployer config file in yaml format
+    Load a deployer config, resolving all deployer indirections.
+
+    The resulting structure will be a single-stanza, named after
+    the current juju environment.  i.e., all 'inherit' directives
+    will also be resolved.  This file would be portable and could be
+    pasted to someone else for debugging.
     """
     config_dir = os.path.dirname(yaml_file)
     print config_dir
     config = ConfigStack([yaml_file])
     config.load()
-    deployment = config.get("landscape")
+    deployment = config.get(deployer_target)
     data = deployment.data
 
     if "relations" not in data:
@@ -71,20 +77,49 @@ def load_deployer_config(yaml_file, deployer_target="landscape"):
         environment_name = output.split()[2].strip('"')
     else:
         environment_name = output
-    return yaml.dump({environment_name: data})
+    return {environment_name: data}
 
-    output = subprocess.check_output(['juju', 'env']).strip().split()
-    env = output[2].strip('"')
-    return yaml.dump({env: data}, Dumper=yaml.Dumper)
 
-if len(sys.argv) < 2:
-    print "Usage: %s PATH_TO_CONFIG [DEPLOYER_TARGET]\n" % sys.argv[0]
-    print " * DEPLOYER_TARGET default is 'landscape'"
-    sys.exit(1)
-else:
+def set_landscape_repository_url(config, url):
+    """Change deployer config to use different repository"""
+    pass
+
+
+def get_options():
+    """Parse check and retrieve arguments and options."""
+    description = "Generate a fully-formed juju-deployer file"
+    parser = optparse.OptionParser(description=description)
+    parser.add_option(
+        "-r", "--repository-url",
+        dest="repository_url",
+        help="URL of the LDS repository to use. Use this to also "
+        "implicitly select which LDS version you want.")
+    parser.add_option(
+        "-t", "--deployer-target",
+        dest="deployer_target",
+        default="landscape",
+        help="Deployer target to extract and use for testing")
+    options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.print_help()
+        sys.exit(1)
+
+    return options, args
+
+
+def main():
+    options, args = get_options()
     # break the modeline print line so it isn't interpreted here
     print "# Vim seems to have a cow with the long yaml lines, hack for now"
     print "# See: https://stackoverflow.com/questions/20663169"
     print "# vim" + ":syntax=off"
     print "# you need set modeline for this to work"
-    print load_deployer_config(*sys.argv[1:]),
+    config = load_deployer_config(args[0], deployer_target=options.deployer_target)
+    if options.repository_url:
+        set_landscape_repository_url(config, options.repository_url)
+    print yaml.dump(config, default_flow_style=False)
+
+
+if __name__ == '__main__':
+    main()
