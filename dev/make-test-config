@@ -18,7 +18,7 @@ from base64 import b64encode
 from deployer.config import ConfigStack
 from deployer.utils import resolve_include
 import yaml
-import optparse
+import argparse
 
 def _resolve_include(value, base_dir):
     """
@@ -88,34 +88,31 @@ def set_landscape_repository_url(config, url):
 def get_options():
     """Parse check and retrieve arguments and options."""
     description = "Generate a fully-formed juju-deployer file"
-    parser = optparse.OptionParser(description=description)
-    parser.add_option(
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("config_file",
+                        metavar='CONFIG_FILE', help='Config file to base on')
+    parser.add_argument(
         "-r", "--repository-url",
+        metavar="REPO_URL",
         dest="repository_url",
         help="URL of the LDS repository to use. Use this to also "
         "implicitly select which LDS version you want.")
-    parser.add_option(
+    parser.add_argument(
         "-t", "--deployer-target",
-        dest="deployer_target",
-        default="landscape",
+        metavar='TARGET', dest="deployer_target", default="landscape",
         help="Deployer target to extract and use for testing")
-    options, args = parser.parse_args()
-
-    if len(args) != 1:
-        parser.print_help()
-        sys.exit(1)
-
-    return options, args
+    options = parser.parse_args()
+    return options
 
 
 def main():
-    options, args = get_options()
+    options = get_options()
     # break the modeline print line so it isn't interpreted here
     print "# Vim seems to have a cow with the long yaml lines, hack for now"
     print "# See: https://stackoverflow.com/questions/20663169"
     print "# vim" + ":syntax=off"
     print "# you need set modeline for this to work"
-    config = load_deployer_config(args[0], deployer_target=options.deployer_target)
+    config = load_deployer_config(options.config_file, deployer_target=options.deployer_target)
     if options.repository_url:
         set_landscape_repository_url(config, options.repository_url)
     print yaml.dump(config, default_flow_style=False)
