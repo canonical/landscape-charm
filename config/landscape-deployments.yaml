@@ -1,22 +1,22 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-19
+            charm: cs:precise/rabbitmq-server-18
         postgresql:
-            charm: cs:precise/postgresql-62
+            charm: cs:precise/postgresql-61
             constraints: mem=2048
             options:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
                 max_connections: 500
         haproxy:
-            charm: cs:precise/haproxy-27
+            charm: cs:precise/haproxy-26
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
                 monitoring_password: "haproxy"
                 default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
         apache2:
-            charm: cs:precise/apache2-19
+            charm: cs:precise/apache2-18
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
@@ -78,7 +78,7 @@ landscape-storage:
     series: precise
     services:
         nfs:
-            charm: cs:precise/nfs-4
+            charm: cs:precise/nfs-3
 
         storage:
             branch: lp:~davidpbritton/charms/precise/storage/trunk
@@ -132,7 +132,7 @@ landscape-max:
             num_units: 2
         juju-gui:
             expose: True
-            charm: cs:precise/juju-gui-84
+            charm: cs:precise/juju-gui-83
         landscape:
             branch: lp:~landscape/landscape-charm/stable
             constraints: mem=2048
