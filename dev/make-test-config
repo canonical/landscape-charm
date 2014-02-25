@@ -42,8 +42,7 @@ def _resolve_include(value, base_dir):
     return value
 
 
-def load_deployer_config(yaml_file, deployer_target="landscape",
-                         section_name="landscape", extra=None):
+def load_deployer_config(yaml_file, deployer_target="landscape"):
     """
     Load a deployer config, resolving all deployer indirections.
 
@@ -51,22 +50,14 @@ def load_deployer_config(yaml_file, deployer_target="landscape",
     the current juju environment.  i.e., all 'inherit' directives
     will also be resolved.  This file would be portable and could be
     pasted to someone else for debugging.
-
-    @param extra Extra yaml to be fed to deployer in a separate file
     """
     config_dir = os.path.dirname(yaml_file)
     files = [yaml_file]
-    if extra:
-        (handle, filename) = tempfile.mkstemp()
-        with os.fdopen(handle, 'w') as f:
-            f.write(extra)
-        files.append(filename)
 
     config = ConfigStack(files)
     config.load()
     deployment = config.get(deployer_target)
     data = deployment.data
-    os.unlink(filename)
 
     if "relations" not in data:
         data["relations"] = {}
@@ -76,7 +67,7 @@ def load_deployer_config(yaml_file, deployer_target="landscape",
             for key, value in service["options"].items():
                 service["options"][key] = _resolve_include(value, config_dir)
 
-    return {section_name: data}
+    return {deployer_target: data}
 
 
 def process_override(config, target, override_key, override_value):
@@ -84,6 +75,10 @@ def process_override(config, target, override_key, override_value):
     Process any 'overrides' as juju-deployer would.  look for any key
     in any service 'options' definition, and override it with the given
     key.
+
+    FIXME: ideally this could be replaced, by specifying overrides in a
+    section, which juju-deployer understands, but amulet doesn't pass that
+    information along to deployer
     """
     for service_name, service in config[target]["services"].iteritems():
         if "options" not in service:
@@ -121,18 +116,11 @@ def main():
     print "# vim" + ":syntax=off"
     print "# you need set modeline for this to work"
 
-    # Create an extra section '_extra_', which inherits the user-specified
-    # deployer_target.  Use this section when generating our new config file
-    # as it will allow us to specify extra things like overrides.
-    extra = {"_extra_": {
-        "inherits": options.deployer_target}}
     config = load_deployer_config(
-        options.config_file, "_extra_", options.deployer_target,
-        yaml.dump(extra))
+        options.config_file, options.deployer_target)
     if options.repository_url:
-        process_override(
-            config, options.deployer_target, "repository",
-            options.repository_url)
+        process_override(config, options.deployer_target, "repository",
+                         options.repository_url)
     print yaml.dump(config, default_flow_style=False)
 
 
