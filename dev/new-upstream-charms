@@ -1,0 +1,80 @@
+#!/usr/bin/python3
+
+import argparse
+import fileinput
+import re
+import sys
+from urllib.request import urlopen
+from yaml import load, Loader
+
+
+class Charm(object):
+
+    def __init__(self, charm_name):
+        """Create a charm object.
+        
+        @param name of charm
+        """
+        reference = "cs:precise/{}".format(charm_name)
+        base_url = "https://store.juju.ubuntu.com/charm-info?charms="
+        url = "{}{}".format(base_url, reference)
+        response = urlopen(url)
+        self.charm_data = load(response, Loader=Loader)[reference]
+        self.charm_name = charm_name
+        if 'errors' in self.charm_data:
+            raise Exception(self.charm_data['errors'])
+
+    def get_revision(self):
+        return self.charm_data['revision']
+
+    def get_name(self):
+        return self.charm_name
+
+def replace_in_config(charms):
+    """
+    Iterate over each charm, replacing all occurances of old charm store
+    urls with new versions.  Intent is to leave file in a state that can
+    be tested and checked in if successful.
+
+    Look for lines like:
+
+      charm: cs:precise/juju-gui-83
+
+    Replace the digit at the end with the latest rev.
+    """
+    filename = "config/landscape-deployments.yaml"
+    for line in fileinput.input(filename, inplace=1):
+        for charm in charms:
+            pattern = re.compile(
+                "(^.*cs:{}/{})-[0-9]+".format("precise", charm.get_name()))
+            replace = r"\1-{}".format(charm.get_revision())
+            line = re.sub(pattern, replace, line.rstrip("\n"))
+        print(line)
+
+    print("#")
+    print("# New config written, use `bzr diff` to see changes (if any)")
+
+
+def get_options():
+    """Parse and return command line options."""
+    description = "Put new charmstore descriptors into a deployer file."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("charms",
+        help="List charms to update", nargs='*')
+    return parser.parse_args()
+
+def main():
+    options = get_options()
+    charms = []
+    if len(options.charms):
+        print("# Latest upstream versions of charms: ")
+    for charm_name in options.charms:
+        charm = Charm(charm_name)
+        print("#   {}: {}".format(charm_name,charm.get_revision()))
+        charms.append(charm)
+    replace_in_config(charms)
+
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
