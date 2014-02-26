@@ -78,7 +78,7 @@ landscape-storage:
     series: precise
     services:
         nfs:
-            charm: cs:precise/nfs-3
+            charm: cs:precise/nfs-4
 
         storage:
             branch: lp:~davidpbritton/charms/precise/storage/trunk
