@@ -24,7 +24,7 @@ test-config.yaml: config/repo-file config/license-file config/vhostssl.tmpl conf
 stage-integration-test: test-config.yaml
 
 update-charm-revision-numbers:
-	dev/new-upstream-charms apache2 postgresql juju-gui haproxy rabbitmq-server
+	dev/update-charm-revision-numbers apache2 postgresql juju-gui haproxy rabbitmq-server
 
 clean-integration-test:
 	rm -f test-config.yaml
