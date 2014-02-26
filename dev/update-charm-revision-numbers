@@ -20,15 +20,11 @@ class Charm(object):
         url = "{}{}".format(base_url, reference)
         response = urlopen(url)
         self.charm_data = load(response, Loader=Loader)[reference]
-        self.charm_name = charm_name
+        self.name = charm_name
         if 'errors' in self.charm_data:
             raise Exception(self.charm_data['errors'])
+        self.revision = self.charm_data['revision']
 
-    def get_revision(self):
-        return self.charm_data['revision']
-
-    def get_name(self):
-        return self.charm_name
 
 def replace_in_config(charms):
     """
@@ -46,8 +42,8 @@ def replace_in_config(charms):
     for line in fileinput.input(filename, inplace=1):
         for charm in charms:
             pattern = re.compile(
-                "(^.*cs:{}/{})-[0-9]+".format("precise", charm.get_name()))
-            replace = r"\1-{}".format(charm.get_revision())
+                "(^.*cs:{}/{})-[0-9]+".format("precise", charm.name))
+            replace = r"\1-{}".format(charm.revision)
             line = re.sub(pattern, replace, line.rstrip("\n"))
         print(line)
 
@@ -70,7 +66,7 @@ def main():
         print("# Latest upstream versions of charms: ")
     for charm_name in options.charms:
         charm = Charm(charm_name)
-        print("#   {}: {}".format(charm_name,charm.get_revision()))
+        print("#   {}: {}".format(charm_name,charm.revision))
         charms.append(charm)
     replace_in_config(charms)
 
