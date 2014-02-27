@@ -33,10 +33,10 @@ integration-test: verify-juju-test clean-integration-test stage-integration-test
 	juju test -v --timeout 3000s
 
 lint:
-	flake8 --exclude=charmhelpers hooks
-	pyflakes3 tests/*
+	flake8 --exclude=charmhelpers hooks dev/make-test-config
+	pyflakes3 tests/* dev/update-charm-revision-numbers
 	find . -name *.py -print0 | xargs -0 pep8
-	pep8 tests/*
+	pep8 tests/* dev/make-test-config dev/update-charm-revision-numbers 
 
 clean: clean-integration-test
 

@@ -26,7 +26,7 @@ class Charm(object):
 
 def replace_in_config(charms, series="precise"):
     """
-    Iterate over each charm, replacing all occurances of old charm store
+    Iterate over each charm, replacing all occurences of old charm store
     urls with new versions.  Intent is to leave file in a state that can
     be tested and checked in if successful.
 
@@ -41,8 +41,8 @@ def replace_in_config(charms, series="precise"):
         for charm in charms:
             pattern = "(cs:{}/{})-[0-9]+".format(series, charm.name)
             replace = r"\1-{}".format(charm.revision)
-            line = re.sub(pattern, replace, line.rstrip("\n"))
-        print(line)
+            line = re.sub(pattern, replace, line)
+        sys.stdout.write(line)
 
     print("#")
     print("# New config written, use `bzr diff` to see changes (if any)")
@@ -52,9 +52,9 @@ def get_options():
     """Parse and return command line options."""
     description = "Put new charmstore descriptors into a deployer file."
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("charms",
-        help="List charms to update", nargs='*')
+    parser.add_argument("charms", help="List charms to update", nargs='*')
     return parser.parse_args()
+
 
 def main():
     options = get_options()
@@ -63,7 +63,7 @@ def main():
         print("# Latest upstream versions of charms: ")
     for charm_name in options.charms:
         charm = Charm(charm_name)
-        print("#   {}: {}".format(charm_name,charm.revision))
+        print("#   {}: {}".format(charm_name, charm.revision))
         charms.append(charm)
     replace_in_config(charms)
 
