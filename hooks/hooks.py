@@ -57,7 +57,6 @@ def notify_website_relation():
     duplicate values out of this, so we don't need to worry about calling it
     only in case of a change
     """
-    juju.juju_log(yaml.safe_dump(_get_services_haproxy()))
     for id in juju.relation_ids("website"):
         juju.relation_set(
             relation_id=id,
