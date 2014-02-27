@@ -39,8 +39,7 @@ def replace_in_config(charms, series="precise"):
     filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
         for charm in charms:
-            pattern = re.compile(
-                "(^.*cs:{}/{})-[0-9]+".format(series, charm.name))
+            pattern = "(cs:{}/{})-[0-9]+".format(series, charm.name)
             replace = r"\1-{}".format(charm.revision)
             line = re.sub(pattern, replace, line.rstrip("\n"))
         print(line)
