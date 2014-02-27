@@ -20,7 +20,7 @@ class Charm(object):
         response = urlopen(url)
         self.charm_data = load(response)[reference]
         self.name = charm_name
-        assert self.charm_data.get("errors"), self.charm_data["errors"]
+        assert "errors" not in self.charm_data, self.charm_data["errors"]
         self.revision = self.charm_data["revision"]
 
 
