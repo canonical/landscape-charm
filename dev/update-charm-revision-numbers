@@ -5,24 +5,22 @@ import fileinput
 import re
 import sys
 from urllib.request import urlopen
-from yaml import load, Loader
+from yaml import load
 
 
 class Charm(object):
 
     def __init__(self, charm_name, series="precise"):
         """Create a charm object.
-        
         @param name of charm
         """
-        reference = "cs:{}/{}".format(series,charm_name)
+        reference = "cs:{}/{}".format(series, charm_name)
         base_url = "https://store.juju.ubuntu.com/charm-info?charms="
         url = "{}{}".format(base_url, reference)
         response = urlopen(url)
-        self.charm_data = load(response, Loader=Loader)[reference]
+        self.charm_data = load(response)[reference]
         self.name = charm_name
-        if 'errors' in self.charm_data:
-            raise Exception(self.charm_data['errors'])
+        assert self.charm_data.get("errors"), self.charm_data["errors"]
         self.revision = self.charm_data['revision']
 
 
