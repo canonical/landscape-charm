@@ -91,9 +91,9 @@ def setUpModule():
     else:
         # >= JUJU 1.17 outputs just the environment name bare
         environment_name = output
-    keys = list(data.keys())
-    assert len(keys) == 1, "test-config.yaml not formatted as expected"
-    data = {environment_name: data[keys[0]]}
+    _, value = data.popitem()
+    assert not data, "test-config.yaml not formatted as expected"
+    data = {environment_name: value}
 
     d.load(data)
     d.setup(timeout=2000)
