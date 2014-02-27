@@ -23,6 +23,9 @@ test-config.yaml: config/repo-file config/license-file config/vhostssl.tmpl conf
 
 stage-integration-test: test-config.yaml
 
+update-charm-revision-numbers:
+	dev/update-charm-revision-numbers apache2 postgresql juju-gui haproxy rabbitmq-server nfs
+
 clean-integration-test:
 	rm -f test-config.yaml
 
@@ -30,11 +33,13 @@ integration-test: verify-juju-test clean-integration-test stage-integration-test
 	juju test -v --timeout 3000s
 
 lint:
-	flake8 --exclude=charmhelpers hooks
-	pyflakes3 tests/*
+	flake8 --exclude=charmhelpers hooks dev/make-test-config
+	pyflakes3 tests/* dev/update-charm-revision-numbers
 	find . -name *.py -print0 | xargs -0 pep8
-	pep8 tests/*
+	pep8 tests/* dev/make-test-config dev/update-charm-revision-numbers 
 
 clean: clean-integration-test
 
-.PHONY: lint integration-test stage-integration-test verify-juju-test test clean clean-integration-test
+.PHONY: lint integration-test stage-integration-test verify-juju-test \
+	test clean clean-integration-test \
+	update-charm-revision-numbers
