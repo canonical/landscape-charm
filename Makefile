@@ -19,7 +19,7 @@ verify-juju-test:
 	fi 
 
 test-config.yaml: config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
-	cd config; ../dev/make-test-config landscape-deployments.yaml > ../test-config.yaml
+	dev/make-test-config config/landscape-deployments.yaml > test-config.yaml
 
 stage-integration-test: test-config.yaml
 

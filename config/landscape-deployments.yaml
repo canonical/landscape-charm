@@ -1,22 +1,22 @@
 _common:
     services:
         rabbitmq-server:
-            branch: lp:~landscape/landscape-charm/rabbitmq-server
+            charm: cs:precise/rabbitmq-server-19
         postgresql:
-            branch: lp:~landscape/landscape-charm/postgresql
+            charm: cs:precise/postgresql-62
             constraints: mem=2048
             options:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
                 max_connections: 500
         haproxy:
-            branch: lp:~landscape/landscape-charm/haproxy
+            charm: cs:precise/haproxy-27
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
                 monitoring_password: "haproxy"
                 default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
         apache2:
-            branch: lp:~landscape/landscape-charm/apache2
+            charm: cs:precise/apache2-19
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
@@ -78,7 +78,7 @@ landscape-storage:
     series: precise
     services:
         nfs:
-            branch: lp:~landscape/landscape-charm/nfs
+            charm: cs:precise/nfs-4
 
         storage:
             branch: lp:~davidpbritton/charms/precise/storage/trunk
@@ -100,13 +100,13 @@ landscape-with-upstream:
         landscape-msg:
             branch: lp:~landscape/landscape-charm/trunk
         rabbitmq-server:
-            branch: lp:charms/precise/rabbitmq-server
+            charm: cs:precise/rabbitmq-server
         postgresql:
-            branch: lp:charms/precise/postgresql
+            charm: cs:precise/postgresql
         haproxy:
-            branch: lp:charms/precise/haproxy
+            charm: cs:precise/haproxy
         apache2:
-            branch: lp:charms/precise/apache2
+            charm: cs:precise/apache2
 
 landscape-with-upstream-dense-maas:
     inherits: landscape-with-upstream
@@ -132,7 +132,7 @@ landscape-max:
             num_units: 2
         juju-gui:
             expose: True
-            branch: lp:~landscape/landscape-charm/juju-gui
+            charm: cs:precise/juju-gui-84
         landscape:
             branch: lp:~landscape/landscape-charm/stable
             constraints: mem=2048
@@ -217,15 +217,15 @@ landscape-max-with-upstream:
         landscape-ping:
             branch: lp:~landscape/landscape-charm/trunk
         rabbitmq-server:
-            branch: lp:charms/precise/rabbitmq-server
+            charm: cs:precise/rabbitmq-server
         postgresql:
-            branch: lp:charms/precise/postgresql
+            charm: cs:precise/postgresql
         haproxy:
-            branch: lp:charms/precise/haproxy
+            charm: cs:precise/haproxy
         apache2:
-            branch: lp:charms/precise/apache2
+            charm: cs:precise/apache2
         juju-gui:
-            branch: lp:charms/precise/juju-gui
+            charm: cs:precise/juju-gui
  
 landscape-max-with-upstream-dense-maas:
     inherits: landscape-max-with-upstream
