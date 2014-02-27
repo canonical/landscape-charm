@@ -21,7 +21,7 @@ class Charm(object):
         self.charm_data = load(response)[reference]
         self.name = charm_name
         assert self.charm_data.get("errors"), self.charm_data["errors"]
-        self.revision = self.charm_data['revision']
+        self.revision = self.charm_data["revision"]
 
 
 def replace_in_config(charms, series="precise"):
