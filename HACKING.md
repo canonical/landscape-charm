@@ -19,6 +19,11 @@ will use whatever 'juju env' reports as your current environment.  It will use
 a number of machines to do this test -- it should work on a local environment
 (LXC), but could be quite resource intensive.
 
+Please also note that if you want to deploy the current charm branch you are
+working on, you need to change the branch URL in the landscape-deployments.yaml
+file to point to your branch and commit all changes.  After you are done with
+testing, remember to return the branch URL to what it was before
+
 
 Testing with Dependent Upstream Charms
 ======================================
