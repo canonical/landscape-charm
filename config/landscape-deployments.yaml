@@ -92,38 +92,6 @@ landscape-storage:
         - ["landscape:db-admin", "postgresql:db-admin"]
         - ["haproxy:website", "apache2:reverseproxy"]
 
-landscape-with-upstream:
-    inherits: landscape
-    services:
-        landscape:
-            branch: lp:~landscape/landscape-charm/trunk
-        landscape-msg:
-            branch: lp:~landscape/landscape-charm/trunk
-        rabbitmq-server:
-            charm: cs:precise/rabbitmq-server
-        postgresql:
-            charm: cs:precise/postgresql
-        haproxy:
-            charm: cs:precise/haproxy
-        apache2:
-            charm: cs:precise/apache2
-
-landscape-with-upstream-dense-maas:
-    inherits: landscape-with-upstream
-    services:
-        landscape:
-            to: lxc:0
-        landscape-msg:
-            to: lxc:0
-        postgresql:
-            to: lxc:0
-        rabbitmq-server:
-            to: lxc:0
-        apache2:
-            to: lxc:0
-        haproxy:
-            to: lxc:0
-
 landscape-max:
     inherits: _common
     series: precise
@@ -204,49 +172,3 @@ landscape-max-dense-maas:
             to: lxc:0
         landscape-msg:
             to: lxc:0
-
-landscape-max-with-upstream:
-    inherits: landscape-max
-    services:
-        landscape:
-            branch: lp:~landscape/landscape-charm/trunk
-        landscape-app:
-            branch: lp:~landscape/landscape-charm/trunk
-        landscape-msg:
-            branch: lp:~landscape/landscape-charm/trunk
-        landscape-ping:
-            branch: lp:~landscape/landscape-charm/trunk
-        rabbitmq-server:
-            charm: cs:precise/rabbitmq-server
-        postgresql:
-            charm: cs:precise/postgresql
-        haproxy:
-            charm: cs:precise/haproxy
-        apache2:
-            charm: cs:precise/apache2
-        juju-gui:
-            charm: cs:precise/juju-gui
- 
-landscape-max-with-upstream-dense-maas:
-    inherits: landscape-max-with-upstream
-    services:
-        postgresql:
-            to: ["lxc:0", "lxc:0"]
-        juju-gui:
-            to: lxc:0
-        apache2:
-            to: lxc:0
-        rabbitmq-server:
-            to: lxc:0
-        haproxy:
-            to: lxc:0
-        landscape:
-            to: lxc:0
-        landscape-app:
-            to: lxc:0
-        landscape-ping:
-            to: lxc:0
-        landscape-msg:
-            to: lxc:0
-
-
