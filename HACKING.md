@@ -13,9 +13,11 @@ This charm comes with an integration test suite.  You can run it as follows:
 
     make integration-test
 
-N.B., It will deploy into a real juju environment (that cannot be bootstrapped
-yet), and will use a number of machines to do so.  It should work on a local
-environment (LXC), but could be quite resource intensive.
+N.B., It will deploy into a real juju environment. It uses the juju-test
+command to facilitate this, which takes care of bootstrapping for you.  It
+will use whatever 'juju env' reports as your current environment.  It will use
+a number of machines to do this test -- it should work on a local environment
+(LXC), but could be quite resource intensive.
 
 
 Testing with Dependent Upstream Charms
