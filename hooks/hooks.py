@@ -353,7 +353,7 @@ def _install_license():
     license_file_re = r"^(file://|http://|https://).*$"
     license_file = juju.config_get("license-file")
     if license_file is None or len(license_file) == 0:
-        juju.juju_log("license file not set, skipping")
+        juju.juju_log("No license file given, skipping")
         return
     if re.match(license_file_re, license_file):
         license_file = _download_file(license_file)
