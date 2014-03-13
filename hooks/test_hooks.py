@@ -580,12 +580,12 @@ class TestHooksService(TestHooks):
         self.assertRaises(Exception, hooks._enable_services)
 
     def test__install_license_text(self):
-        """Install a license as a string."""
+        """Install a license from a string."""
         hooks._install_license()
         self.assertFileContains(hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT")
 
     def test__install_license_url(self):
-        """Install a license as a url."""
+        """Install a license from a url."""
         source = self.makeFile()
         with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
@@ -598,13 +598,13 @@ class TestHooksService(TestHooks):
         """Don't try to install the license when none was given."""
         hooks.juju.config["license-file"] = None
         hooks._install_license()
-        self.assertEquals(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST), False)
+        self.assertFalse(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST))
 
     def test_handle_empty_license(self):
         """Don't try to install the license when it's empty."""
         hooks.juju.config["license-file"] = ""
         hooks._install_license()
-        self.assertEquals(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST), False)
+        self.assertFalse(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST))
 
     def test_config_changed(self):
         """
