@@ -91,7 +91,6 @@ class TestHooks(mocker.MockerTestCase):
         hooks._lsctl = lambda x: True
         hooks.juju = TestJuju()
         hooks.LANDSCAPE_LICENSE_DEST = self.makeFile()
-        self._license_dest = open(hooks.LANDSCAPE_LICENSE_DEST, "w")
         hooks.LANDSCAPE_DEFAULT_FILE = self.makeFile()
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
@@ -581,19 +580,32 @@ class TestHooksService(TestHooks):
         self.assertRaises(Exception, hooks._enable_services)
 
     def test__install_license_text(self):
-        """Install a license with as a string."""
+        """Install a license from a string."""
         hooks._install_license()
-        self.assertFileContains(self._license_dest.name, "LICENSE_FILE_TEXT")
+        self.assertFileContains(
+            hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT")
 
     def test__install_license_url(self):
-        """Install a license with as a url."""
+        """Install a license from a url."""
         source = self.makeFile()
         with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
         hooks.juju.config["license-file"] = "file://%s" % source
         hooks._install_license()
         self.assertFileContains(
-            self._license_dest.name, "LICENSE_FILE_TEXT from curl")
+            hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
+
+    def test_handle_no_license(self):
+        """Don't try to install the license when none was given."""
+        hooks.juju.config["license-file"] = None
+        hooks._install_license()
+        self.assertFalse(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST))
+
+    def test_handle_empty_license(self):
+        """Don't try to install the license when it's empty."""
+        hooks.juju.config["license-file"] = ""
+        hooks._install_license()
+        self.assertFalse(os.path.exists(hooks.LANDSCAPE_LICENSE_DEST))
 
     def test_config_changed(self):
         """
