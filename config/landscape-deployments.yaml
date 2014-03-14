@@ -1,7 +1,7 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-19
+            charm: cs:precise/rabbitmq-server-20
         postgresql:
             charm: cs:precise/postgresql-62
             constraints: mem=2048
@@ -9,7 +9,7 @@ _common:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
                 max_connections: 500
         haproxy:
-            charm: cs:precise/haproxy-27
+            charm: cs:precise/haproxy-28
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
@@ -100,7 +100,7 @@ landscape-max:
             num_units: 2
         juju-gui:
             expose: True
-            charm: cs:precise/juju-gui-84
+            charm: cs:precise/juju-gui-86
         landscape:
             branch: lp:~landscape/landscape-charm/stable
             constraints: mem=2048
