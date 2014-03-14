@@ -582,7 +582,8 @@ class TestHooksService(TestHooks):
     def test__install_license_text(self):
         """Install a license from a string."""
         hooks._install_license()
-        self.assertFileContains(hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT")
+        self.assertFileContains(
+            hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT")
 
     def test__install_license_url(self):
         """Install a license from a url."""
