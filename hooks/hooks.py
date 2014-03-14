@@ -346,9 +346,8 @@ def _setup_apache():
 
 def _install_license():
     """
-    Read the license from the config.  It can either be just the data
-    as plain text, or it can be a URL.  In either case, save it to the
-    global LANDSCAPE_LICENSE_DEST
+    If a license was given, either in plain text or in the form of a URL,
+    write its contents to the file specified by LANDSCAPE_LICENSE_DEST.
     """
     license_file_re = r"^(file://|http://|https://).*$"
     license_file = juju.config_get("license-file")
