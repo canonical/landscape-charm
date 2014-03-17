@@ -17,6 +17,18 @@ import yaml
 import logging
 log = logging.getLogger(__file__)
 
+class Deployer(object):
+
+    def __init__(self, config):
+        """Create a deployer Object, passing in the working directory"""
+        
+        pass
+    
+    def deploy(config, target):
+        """Run deployer, passing the config (basename) and deployer target"""
+        pass
+
+
 #TODO:
 # - amulet bug: juju-deployer include directives don't take path into
 #               consideration
