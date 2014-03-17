@@ -16,7 +16,7 @@ class Deployer(object):
         Stage the directory for calling deployer.  Return the name
         of the created directory.
         """
-        charm_src = path.dirname(path.dirname(__file__))
+        charm_src = path.dirname(path.dirname(path.dirname(__file__)))
         charm_dest = path.join(deployer_dir, "precise", "landscape")
         shutil.copytree(charm_src, charm_dest)
 
@@ -27,6 +27,7 @@ class Deployer(object):
         @param target: target to deployer in the config file.
         @param config_files: list of config files to pass to deployer (-c)
         """
+        deployer_dir = None
         try:
             deployer_dir = tempfile.mkdtemp()
             self._stage_deployer_dir(deployer_dir)
@@ -35,8 +36,9 @@ class Deployer(object):
                 args.extend(["-c", config_file])
             args.append(target)
             if timeout is not None:
-                args.extend(["timeout", timeout])
-            logging.info("Calling Juju-deployer: %s" % args)
+                args.extend(["--timeout", str(timeout)])
+            logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
             subprocess.check_call(args, cwd=deployer_dir)
         finally:
-            shutil.rmtree(self.deployer_dir)
+            if deployer_dir is not None:
+                shutil.rmtree(deployer_dir)

@@ -7,7 +7,8 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 """
 
 import json
-import os.path
+from os import getenv
+from os.path import dirname, abspath, join, splitext, basename
 import sys
 import unittest
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
@@ -68,21 +69,10 @@ def check_url(url, good_content, post_data=None, header=None,
 def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     deployer = jujulib.deployer.Deployer()
-    config_file = os.path.join(
-            os.path.dirname(__file__), "config", "landscape-deployments.yaml")
+    config_file = join(
+            dirname(dirname(abspath(__file__))),
+            "config", "landscape-deployments.yaml")
     deployer.deploy("landscape", [config_file], timeout=2000)
-
-#    output = check_output(['juju', 'env']).decode("utf-8").strip()
-#    if output.startswith("Current environment: "):
-#        # Current environment: "andreas-canonistack2" (from JUJU_ENV)
-#        # <= Juju 1.16
-#        environment_name = output.split()[2].strip('"')
-#    else:
-#        # >= JUJU 1.17 outputs just the environment name bare
-#        environment_name = output
-#    _, value = data.popitem()
-#    assert not data, "test-config.yaml not formatted as expected"
-#    data = {environment_name: value}
 
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
@@ -183,7 +173,7 @@ class LandscapeServiceTests(unittest.TestCase):
         cls.frontend = find_address(cls.juju_status, "apache2")
 
     def __str__(self):
-        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
@@ -286,7 +276,7 @@ class LandscapeServiceTests(unittest.TestCase):
 class LandscapeCronTests(unittest.TestCase):
 
     def __str__(self):
-        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
@@ -348,7 +338,7 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skipIf(os.getenv("SKIP_SLOW_TESTS", None),
+    @unittest.skipIf(getenv("SKIP_SLOW_TESTS", None),
                      "Requested to skip slow tests.")
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
