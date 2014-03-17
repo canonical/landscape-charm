@@ -18,10 +18,10 @@ integration-test: verify-juju-test config/repo-file config/license-file config/v
 	juju test -p SKIP_SLOW_TESTS -v --timeout 3000s
 
 lint:
-	flake8 --exclude=charmhelpers hooks dev/make-test-config
+	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/* dev/update-charm-revision-numbers
 	find . -name *.py -print0 | xargs -0 pep8
-	pep8 tests/* dev/make-test-config dev/update-charm-revision-numbers 
+	pep8 tests/* dev/update-charm-revision-numbers 
 
 clean: clean-integration-test
 
