@@ -6,26 +6,26 @@ import subprocess
 
 
 class Deployer(object):
+    """
+    Simple wrapper around juju-deployer.  It's designed to copy the current
+    charm branch in place in a staging directory where juju-deployer will be
+    called.  Juju-deployer will then use that when references to "lp:<charm>"
+    is used.
+    """
 
-    def __init__(self):
-        """Create a deployer Object"""
-        pass
-    
     def _stage_deployer_dir(self, deployer_dir):
-        """
-        Stage the directory for calling deployer.  Return the name
-        of the created directory.
-        """
+        """Stage the directory for calling deployer."""
         charm_src = path.dirname(path.dirname(path.dirname(__file__)))
         charm_dest = path.join(deployer_dir, "precise", "landscape")
         shutil.copytree(charm_src, charm_dest)
 
     def deploy(self, target, config_files, timeout=None):
         """
-        Run deployer.
+        Use juju-deployer to install `target` on current `juju env`
         
-        @param target: target to deployer in the config file.
+        @param target: target to deploye in the config file.
         @param config_files: list of config files to pass to deployer (-c)
+        @param timeout: timeout in seconds (int or string is OK)
         """
         deployer_dir = None
         try:
