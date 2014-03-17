@@ -70,8 +70,8 @@ def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     deployer = jujulib.deployer.Deployer()
     config_file = join(
-            dirname(dirname(abspath(__file__))),
-            "config", "landscape-deployments.yaml")
+        dirname(dirname(abspath(__file__))),
+        "config", "landscape-deployments.yaml")
     deployer.deploy("landscape", [config_file], timeout=2000)
 
     frontend = find_address(juju_status(), "apache2")

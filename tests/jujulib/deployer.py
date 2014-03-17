@@ -22,7 +22,7 @@ class Deployer(object):
     def deploy(self, target, config_files, timeout=None):
         """
         Use juju-deployer to install `target` on current `juju env`
-        
+
         @param target: target to deploye in the config file.
         @param config_files: list of config files to pass to deployer (-c)
         @param timeout: timeout in seconds (int or string is OK)
