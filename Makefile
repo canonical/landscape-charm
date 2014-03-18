@@ -5,7 +5,7 @@ verify-juju-test:
 	@echo "Checking for ... "
 	@echo -n "juju-test: "
 	@if [ -z `which juju-test` ]; then \
-		echo "\nRun ./dev/ubuntu-deps to get the juju-test command installed"; \
+		echo -e "\nRun ./dev/ubuntu-deps to get the juju-test command installed"; \
 		exit 1;\
 	else \
 		echo "installed"; \
