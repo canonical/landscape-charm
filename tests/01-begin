@@ -6,25 +6,17 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
 
-import amulet
 import json
-import os.path
+from os import getenv
+from os.path import dirname, abspath, join, splitext, basename
 import sys
 import unittest
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
 import yaml
 import logging
+import jujulib.deployer
 log = logging.getLogger(__file__)
-
-#TODO:
-# - amulet bug: juju-deployer include directives don't take path into
-#               consideration
-# - amulet bug: couldn't get sentries to work... need to retry
-# - amulet bug: juju environment is assumed from the data file.
-# - amulet bug: proper juju deployer files are assembled from multiple
-#               stanzas, amulet doesn't appear to support this.
-# - amulet bug: it chokes if the config file doesn't contain all stanzas
 
 
 def check_url(url, good_content, post_data=None, header=None,
@@ -76,27 +68,12 @@ def check_url(url, good_content, post_data=None, header=None,
 
 def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
-    d = amulet.Deployment(sentries=False)
-    with open("test-config.yaml", "r") as myfile:
-        data = yaml.load(myfile.read())
+    deployer = jujulib.deployer.Deployer()
+    config_file = join(
+        dirname(dirname(abspath(__file__))),
+        "config", "landscape-deployments.yaml")
+    deployer.deploy("landscape", [config_file], timeout=2000)
 
-    # FIXME: This is only needed since amulet switches your environment
-    #        if you pass in a config.  There are ways to break this
-    #        parsing (like including a quote in your environment name).
-    output = check_output(['juju', 'env']).decode("utf-8").strip()
-    if output.startswith("Current environment: "):
-        # Current environment: "andreas-canonistack2" (from JUJU_ENV)
-        # <= Juju 1.16
-        environment_name = output.split()[2].strip('"')
-    else:
-        # >= JUJU 1.17 outputs just the environment name bare
-        environment_name = output
-    _, value = data.popitem()
-    assert not data, "test-config.yaml not formatted as expected"
-    data = {environment_name: value}
-
-    d.load(data)
-    d.setup(timeout=2000)
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
@@ -196,7 +173,7 @@ class LandscapeServiceTests(unittest.TestCase):
         cls.frontend = find_address(cls.juju_status, "apache2")
 
     def __str__(self):
-        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
@@ -299,7 +276,7 @@ class LandscapeServiceTests(unittest.TestCase):
 class LandscapeCronTests(unittest.TestCase):
 
     def __str__(self):
-        file_name = os.path.splitext(os.path.basename(__file__))[0]
+        file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
 
@@ -361,7 +338,7 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skipIf(os.getenv("SKIP_SLOW_TESTS", None),
+    @unittest.skipIf(getenv("SKIP_SLOW_TESTS", None),
                      "Requested to skip slow tests.")
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
@@ -391,10 +368,12 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
+    @staticmethod
     def _stop_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
         check_output(cmd, stderr=PIPE)
 
+    @staticmethod
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
         check_output(cmd, stderr=PIPE)

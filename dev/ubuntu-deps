@@ -1,0 +1,8 @@
+#!/bin/bash -e
+# Needs to be run as a user who can sudo.  d'oh!
+# It will ask your password a lot.
+
+# Add the juju stable ppa, install charm-tools (juju-test plugin) and other deps
+sudo add-apt-repository -y ppa:juju/stable
+sudo apt-get update
+sudo apt-get -y install juju-deployer juju-core charm-tools python3
