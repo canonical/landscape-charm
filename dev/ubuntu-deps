@@ -5,4 +5,4 @@
 # Add the juju stable ppa, install charm-tools (juju-test plugin) and other deps
 sudo add-apt-repository -y ppa:juju/stable
 sudo apt-get update
-sudo apt-get -y install juju-deployer juju-core charm-tools
+sudo apt-get -y install juju-deployer juju-core charm-tools python3

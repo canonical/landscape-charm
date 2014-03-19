@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 This test creates a real landscape deployment, and runs some checks against it.
 
@@ -368,10 +368,12 @@ class LandscapeCronTests(unittest.TestCase):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
+    @staticmethod
     def _stop_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
         check_output(cmd, stderr=PIPE)
 
+    @staticmethod
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
         check_output(cmd, stderr=PIPE)
