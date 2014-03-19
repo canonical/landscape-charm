@@ -117,10 +117,9 @@ should be submitted with unit tests.  You can run them like this:
 Integration Testing
 -------------------
 
-This charm makes use of amulet and the charm-tools package to enable
+This charm makes use of juju-deployer and the charm-tools package to enable
 end-to-end integration testing.  This is how you proceed with running
 them:
 
-    $ dev/install-amulet
     # Make sure your JUJU_ENV is *not* bootstraped, and:
     $ JUJU_ENV=<env> make integration-test
