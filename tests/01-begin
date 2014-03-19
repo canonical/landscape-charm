@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 """
 This test creates a real landscape deployment, and runs some checks against it.
 
