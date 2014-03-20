@@ -71,39 +71,53 @@ You can expand the capacity of the service node as follows:
 
     $ juju add-unit landscape
 
-This charm uses a self-contained apache and ha-proxy in the core charm
-so configuration is taken care of automatically for load-balancing.
-
-Customized Deployment
----------------------
-
-`TODO: describe multi-service deployment here`
 
 Juju-Deployer
 -------------
 
 You can use juju-deployer to greatly simplify the deployment of Landscape to a
-real cloud.  Inside the charm, there is a "config" directory that contains skeleton
-files that should allow interaction with the tool.
+real cloud.  Inside the charm, there is a "config" directory that contains a
+deployer configuration file that encapsulates all the charms and their
+configuration options.
 
-First branch juju-deployer and the landscape charm.  Note this will be changed
-when things find official homes:
+juju-deployer is packaged and available in the juju PPA. If you don't have
+that PPA, you can add it like this:
 
-    $ bzr branch lp:juju-deployer/darwin juju-deployer
-    $ cd juju-deployer
-    $ sudo python setup.py develop
-    $ cd ..
-    $ bzr branch lp:~landscape/landscape/landscape-charm
+    $ sudo add-apt-repository ppa:juju/stable
+    $ sudo apt-get update
+
+Then install deployer:
+
+    $ sudo apt-get install juju-deployer
+
+Grab the landscape charm:
+
+    $ bzr branch lp:landscape-charm
     $ cd landscape-charm/config
 
 Next, you will need to add in a repository and license file to use:
 
-    $ vim license-file               # Insert your license text here
+    $ vim license-file               # Put the license text in this file
     $ vim repo-file                  # Insert the URL part of an APT sources list line here
 
 Then, one command to deploy.  (-v, -d, -W are optional, but nice):
 
     $ juju-deployer -vdW -c landscape-deployments.yaml landscape
+
+Use the list option to view the other available targets:
+
+    $ juju-deployer -c landscape-deployments.yaml -l
+
+The available targets are:
+
+  * landscape: standard deployment target. You get landscape, landscape-msg
+    (the message server) and the remaining services on individual machines.
+    You should use this one if you want a simple and normal deployment.
+  * landscape-max: each landscape service gets its own machine.
+  * landscape-dense-maas: deploys everything to the bootstrap node using lxc.
+    Only works with the MAAS provider for now, due to a limitation in juju.
+  * landscape-max-dense-maas: same as above, but uses the landscape-max layout.
+
 
 Unit Testing
 ------------

@@ -73,25 +73,6 @@ landscape-dense-maas:
         haproxy:
             to: lxc:0
 
-landscape-storage:
-    inherits: landscape
-    series: precise
-    services:
-        nfs:
-            charm: cs:precise/nfs-4
-
-        storage:
-            branch: lp:~davidpbritton/charms/precise/storage/trunk
-            options:
-                provider: "nfs"
-    relations:
-        - [landscape, storage]
-        - [storage, nfs]
-        - [landscape, rabbitmq-server]
-        - [landscape, haproxy]
-        - ["landscape:db-admin", "postgresql:db-admin"]
-        - ["haproxy:website", "apache2:reverseproxy"]
-
 landscape-max:
     inherits: _common
     series: precise
