@@ -13,6 +13,7 @@ below.
 For more information about Landscape, please visit
 [Canonical's website](http://canonical.com/landscape).
 
+
 Usage
 =====
 
@@ -70,6 +71,16 @@ To view what other deployment targets are available, use the list option:
     $ juju-deployer -c landscape-deployments.yaml -l
 
 
+SSL
+===
+The included deployment targets will ask Apache to generate a self signed
+certificate. While useful for testing, this must not be used for production
+deployments.
+
+For production deployments, you should include the "real" SSL certificate key
+pair in the apache charm configuration.
+
+
 Deployment targets
 ==================
 
@@ -83,7 +94,8 @@ deployment targets available:
 
 Targets that start with an underscore should be ignored as they are used
 internally only. Your choice of target should be made taking into consideration
-the scaling options available for each one and available resources.
+the scaling options available for each one and existing resources in your
+environment.
 
 "landscape" target
 ------------------
@@ -131,6 +143,7 @@ machines registered with MAAS, you can try out the dense targets:
   * landscape-max-dense-maas
 These two targets behave like their "landscape" and "landscape-max"
 counterparts, but everything is deployed into the bootstrap node using LXC.
+
 The reason it only works with MAAS for now is that MAAS is the only provider so
 far that can offer external network connectivity to units deployed into LXC.
 
@@ -140,8 +153,9 @@ Customized deployments
 -----------------------
 You can customize the Landscape deployment quite a lot. Via the "services"
 charm config option you can select exactly which landscape services (or
-processes) you want running where, and also how many copies. Look at the
-config.yaml file for details on how to use this option.
+processes) you want running where, and also how many copies per unit. Look at
+the config.yaml file for details on how to use this option.
+
 
 Unit Testing
 ============
