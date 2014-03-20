@@ -10,8 +10,7 @@ This charm will deploy the dedicated version of Landscape (LDS), and needs to be
 connected to other charms to be fully functional.  Example deployments are given
 below.
 
-For more information about Landscape, please visit
-[Canonical's website](http://canonical.com/landscape).
+For more information about Landscape, go to http://www.ubuntu.com/management
 
 
 Usage
