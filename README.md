@@ -6,7 +6,7 @@ entire Ubuntu infrastructure from a single interface. Part of Canonical’s
 Ubuntu Advantage support service, Landscape brings you intuitive systems
 management tools combined with world-class support.
 
-This charm will deploy the dedicated version of Landsacpe (LDS), and needs to be
+This charm will deploy the dedicated version of Landscape (LDS), and needs to be
 connected to other charms to be fully functional.  Example deployments are given
 below.
 
@@ -16,61 +16,7 @@ For more information about Landscape, please visit
 Usage
 =====
 
-The typical deployment of landscape is as follows:
-
-Configuration
--------------
-
-Landscape will not run without external configuration.  The following
-options represent the basic options needed to get landscape up and going.
-You can find the PPA and license information in the landscape GUI.  Look on
-the left side for "Landscape Dedicated Server" after Canonical Support
-has enabled the feature on your account.
-
-    $ cat >lds.yaml <<EOF
-        landscape:
-            repository: https://user:pass@ppa-server/ppa-path/
-            license-file: |
-                <license file here>
-            services: static appserver msgserver pingserver combo-loader
-                      async-frontend apiserver package-upload jobhandler
-                      package-search
-        postgresql:
-            extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
-        apache2:
-            enable-modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
-            ssl_cert: SELFSIGNED
-            ssl_certlocation: apache2.cert
-            vhost_https_template: <base64 encoded template>
-            vhost_http_template: <base64 encoded template>
-        haproxy:
-            default_timeouts: queue 60000, connect 5000, client 120000, server 120000
-            monitoring_allowed_cidr: 0.0.0.0/0
-            monitoring_password: haproxy
-            default_timeouts: queue 60000, connect 5000, client 120000, server 120000
-    EOF
-
-Deployment
-----------
-
-Once configured, you can deploy with the following commands:
-
-    $ juju deploy --config=lds.yaml landscape
-    $ juju deploy --config=lds.yaml postgresql
-    $ juju deploy --config=lds.yaml apache2
-    $ juju deploy haproxy
-    $ juju deploy rabbitmq-server
-    $ juju add-relation landscape:db-admin postgresql:db-admin
-    $ juju add-relation landscape rabbitmq-server
-    $ juju add-relation landscape haproxy
-    $ juju add-relation haproxy:website apache2:reverseproxy
-
-This will result in a landscape cluster of 5 nodes.  Landscape, postgresql
-(database), rabbitmq (message server), haproxy (load balancer), apache2 (web/ssl endpoint).
-You can expand the capacity of the service node as follows:
-
-    $ juju add-unit landscape
-
+The typical deployment of Landscape happens using juju-deployer.
 
 Juju-Deployer
 -------------
@@ -78,10 +24,10 @@ Juju-Deployer
 You can use juju-deployer to greatly simplify the deployment of Landscape to a
 real cloud.  Inside the charm, there is a "config" directory that contains a
 deployer configuration file that encapsulates all the charms and their
-configuration options.
+configuration options into what we call "deployer targets".
 
-juju-deployer is packaged and available in the juju PPA. If you don't have
-that PPA, you can add it like this:
+juju-deployer is packaged and available in the juju PPA. If you don't have that
+PPA, you can add it like this:
 
     $ sudo add-apt-repository ppa:juju/stable
     $ sudo apt-get update
@@ -95,32 +41,110 @@ Grab the landscape charm:
     $ bzr branch lp:landscape-charm
     $ cd landscape-charm/config
 
-Next, you will need to add in a repository and license file to use:
+Prepare the repository and license files:
 
-    $ vim license-file               # Put the license text in this file
-    $ vim repo-file                  # Insert the URL part of an APT sources list line here
+    $ vim license-file   # Put the license text in this file
+    $ vim repo-file      # Insert the URL part of an APT sources list line here
 
-Then, one command to deploy.  (-v, -d, -W are optional, but nice):
+If you don't have a Landscape license file, just create an empty file:
+
+    $ touch license-file
+
+This will make Landscape use a default free license with 10 seats.
+
+Now we are ready to deploy (the -v, -d, -W flags are optional, but nice). The
+"landscape" deployer target is the one you should start with. It uses 6
+machines plus the juju bootstrap node:
 
     $ juju-deployer -vdW -c landscape-deployments.yaml landscape
 
-Use the list option to view the other available targets:
+After juju-deployer finishes, the deployment is not entirely ready yet.
+
+Hooks are still running, and it can be a few minutes until everything is ready.
+You can point your browser to the apache2/0 unit and keep reloading until you
+see the form to create the first Landscape administrator, and/or follow the
+output of juju debug-log until it shows that all hooks are done.
+
+To view what other deployment targets are available, use the list option:
 
     $ juju-deployer -c landscape-deployments.yaml -l
 
-The available targets are:
 
-  * landscape: standard deployment target. You get landscape, landscape-msg
-    (the message server) and the remaining services on individual machines.
-    You should use this one if you want a simple and normal deployment.
-  * landscape-max: each landscape service gets its own machine.
-  * landscape-dense-maas: deploys everything to the bootstrap node using lxc.
-    Only works with the MAAS provider for now, due to a limitation in juju.
-  * landscape-max-dense-maas: same as above, but uses the landscape-max layout.
+Deployment targets
+==================
 
+The config/landscape-deployments.yaml deployer configuration file has several
+deployment targets available:
+
+  * landscape
+  * landscape-max
+  * landscape-dense-maas
+  * landscape-max-dense-maas
+
+Targets that start with an underscore should be ignored as they are used
+internally only. Your choice of target should be made taking into consideration
+the scaling options available for each one and available resources.
+
+"landscape" target
+------------------
+The "landscape" target is a good compromise between scalability and resource
+usage. This deployment will give you 6 units (plus the bootstrap node):
+  * single database server, acting as master
+  * one landscape message server unit, responsible for managing the computers
+    you have registered with landscape
+  * one other landscape unit which hosts the other less resource-intensive
+    landscape services
+  * apache, haproxy and rabbitmq-server each in its own unit
+
+There are three common scaling out options for this deployment:
+ * if you need Landscape to handle more computers, add another landscape-msg
+   unit
+ * if you need to allow more concurrent access for administrators, add another
+   landscape unit
+ * add another database unit if you want database replication. The replication
+   configuration happens automatically.
+
+"landscape-max" target
+----------------------
+The landscape-max target spreads out almost all of the Landscape services into
+their own units and there are a few of other changes too:
+  * you get two database units, deployed with replication enabled
+  * you get juju-gui (not necessary, of course, but nice for a visualization
+    of this more complex deployment)
+  * landscape is separated into four services:
+    * landscape-app: contains the app server, which is the part that serves
+      up what you see in your browser
+    * landscape-ping: the ping server is used to speed up exchanges between
+      registered computers and the message server
+    * landscape-msg: handles the exchanges between landscape and the
+      registered computers
+    * rabbitmq-server, apache and haproxy remain unchanged
+
+The scaling options for the max deployment target are very flexible. You can
+add more units of each of the landscape services depending on your needs.
+
+Landscape dense targets
+-----------------------
+If you are using juju backed by the MAAS provider, and have big enough
+machines registered with MAAS, you can try out the dense targets:
+  * landscape-dense-maas
+  * landscape-max-dense-maas
+These two targets behave like their "landscape" and "landscape-max"
+counterparts, but everything is deployed into the bootstrap node using LXC.
+The reason it only works with MAAS for now is that MAAS is the only provider so
+far that can offer external network connectivity to units deployed into LXC.
+
+The dense targets are most useful for testing and demonstration purposes.
+
+Customized deployments
+-----------------------
+You can customize the Landscape deployment quite a lot. Via the "services"
+charm config option you can select exactly which landscape services (or
+processes) you want running where, and also how many copies. Look at the
+config.yaml file for details on how to use this option.
 
 Unit Testing
-------------
+============
 
 The Landscape charm is fairly well unit tested and new code changes
 should be submitted with unit tests.  You can run them like this:
