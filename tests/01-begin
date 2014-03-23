@@ -261,7 +261,7 @@ class LandscapeServiceTests(unittest.TestCase):
         hash-id-database files are there. The cron job that populates this
         with the actual uuid-named files might or might not have run yet.
         """
-        good_content = "trusty_amd64"
+        good_content = "precise_amd64"
         url = "https://{}/hash-id-databases".format(self.frontend)
         check_url(url, good_content)
 
