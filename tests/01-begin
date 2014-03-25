@@ -293,11 +293,11 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
     def setUpClass(cls):
         landscape_units = ["landscape/0", "landscape-msg/0",
                            "landscape-ping/0", "landscape-app/0"]
-        cls.landscape_service_conf = {}
+        cls.landscape_service_conf = []
         for unit in landscape_units:
             config = ConfigParser()
             config.read_string(cls.get_landscape_service_conf(unit))
-            cls.landscape_service_conf[unit] = config
+            cls.landscape_service_conf.append(config)
 
     @classmethod
     def get_landscape_service_conf(self, unit):
@@ -309,21 +309,21 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
     def test_no_broker_defaults(self):
         """No default settings for the [broker] section."""
-        for unit, config in self.landscape_service_conf.items():
+        for config in self.landscape_service_conf:
             broker = config["broker"]
             self.assertNotEqual(broker["host"], "localhost")
             self.assertNotEqual(broker["password"], "landscape")
 
     def test_no_stores_defaults(self):
         """No default settings for the [store] section."""
-        for unit, config in self.landscape_service_conf.items():
+        for config in self.landscape_service_conf:
             stores = config["stores"]
             self.assertNotEqual(stores["password"], "landscape")
             self.assertNotEqual(stores["host"], "localhost")
 
     def test_no_schema_defaults(self):
         """No default settings for the [schema] section."""
-        for unit, config in self.landscape_service_conf.items():
+        for config in self.landscape_service_conf:
             schema = config["schema"]
             self.assertNotEqual(schema["store_user"], "superuser")
             # default service.conf doesn't ship with a store_password in this
