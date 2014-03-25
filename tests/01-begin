@@ -294,7 +294,7 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
                            "landscape-ping/0", "landscape-app/0"]
         cls.landscape_service_conf = {}
         for unit in landscape_units:
-            config = ConfigObj(cls.get_landscape_service_conf(unit)
+            config = ConfigObj(cls.get_landscape_service_conf(unit))
             cls.landscape_service_conf[unit] = config
 
     @classmethod
