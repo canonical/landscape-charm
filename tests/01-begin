@@ -314,14 +314,14 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
     def test_no_stores_defaults(self):
         """No default settings for the [store] section."""
-        for unit, config in self.landscape_service_conf.items()
+        for unit, config in self.landscape_service_conf.items()):
             stores = config["stores"]
             self.assertNotEqual(stores["password"], "landscape")
             self.assertNotEqual(stores["host"], "localhost")
 
     def test_no_schema_defaults(self):
         """No default settings for the [schema] section."""
-        for unit, config in self.landscape_service_conf.items()
+        for unit, config in self.landscape_service_conf.items()):
             schema = config["schema"]
             self.assertNotEqual(schema["store_user"], "superuser")
             # default service.conf doesn't ship with a store_password in this
