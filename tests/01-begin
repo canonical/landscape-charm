@@ -13,7 +13,7 @@ import unittest
 import yaml
 import jujulib.deployer
 
-from configobj import ConfigObj
+from configparser import ConfigParser
 from os import getenv
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
@@ -294,7 +294,8 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
                            "landscape-ping/0", "landscape-app/0"]
         cls.landscape_service_conf = {}
         for unit in landscape_units:
-            config = ConfigObj(cls.get_landscape_service_conf(unit))
+            config = ConfigParser()
+            config.read_string(cls.get_landscape_service_conf(unit))
             cls.landscape_service_conf[unit] = config
 
     @classmethod
