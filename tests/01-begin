@@ -305,7 +305,7 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
         output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
         return output
 
-    def test_no_broker_default(self):
+    def test_no_broker_defaults(self):
         """No default settings for the [broker] section."""
         for unit in self.landscape_units:
             config = ConfigObj(self.get_service_conf(unit))
@@ -313,11 +313,23 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
             self.assertNotEqual(broker["host"], "localhost")
             self.assertNotEqual(broker["password"], "landscape")
 
-    def test_no_stores_default(self):
+    def test_no_stores_defaults(self):
         """No default settings for the [store] section."""
         for unit in self.landscape_units:
             config = ConfigObj(self.get_service_conf(unit))
+            stores = config["stores"]
+            self.assertNotEqual(stores["password"], "landscape")
+            self.assertNotEqual(stores["host"], "localhost")
 
+    def test_no_schema_defaults(self):
+        """No default settings for the [schema] section."""
+        for unit in self.landscape_units:
+            config = ConfigObj(self.get_service_conf(unit))
+            schema = config["schema"]
+            self.assertNotEqual(schema["store_user"], "superuser")
+            # default service.conf doesn't ship with a store_password in this
+            # section, so this tests that a) it exists; b) it's not empty
+            self.assertNotEqual(schema["store_password"], "")
 
 class LandscapeCronTests(unittest.TestCase):
 
