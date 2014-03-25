@@ -160,8 +160,24 @@ class CronUnitNotFound(Exception):
     unit.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """Prepares juju_status which many tests use."""
+        cls.juju_status = juju_status()
 
-class LandscapeServiceTests(unittest.TestCase):
+
+class BaseLandscapeTests(unittest.TestCase):
+    """
+    Base class with some commonality between all test classes.
+    """
+
+    def __str__(self):
+        file_name = splitext(basename(__file__))[0]
+        return "{} ({}.{})".format(
+            self._testMethodName, file_name, self.__class__.__name__)
+
+
+class LandscapeServiceTests(BaseLandscapeTests):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
     """
@@ -273,12 +289,33 @@ class LandscapeServiceTests(unittest.TestCase):
         self.assertIn(good_content, output)
 
 
-class LandscapeCronTests(unittest.TestCase):
+class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
-    def __str__(self):
-        file_name = splitext(basename(__file__))[0]
-        return "{} ({}.{})".format(
-            self._testMethodName, file_name, self.__class__.__name__)
+    @classmethod
+    def setUpClass(cls):
+        cls.landscape_units = ["landscape/0", "landscape-msg/0",
+                               "landscape-ping/0", "landscape-app/0"]
+
+    def get_service_conf(self, unit):
+        """Fetch the contents of service.conf from the given unit."""
+        cmd = ["juju", "ssh", unit, "sudo", "cat",
+               "/etc/landscape/service.conf", "2>&1"]
+        output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+        return output
+
+    def test_no_broker_default(self):
+        """No default settings for the [broker] section."""
+        for unit in self.landscape_units:
+            config = ConfigObj(self.get_service_conf(unit))
+            broker = config["broker"]
+            self.assertNotEqual(broker["host"], "localhost")
+            self.assertNotEqual(broker["password"], "landscape")
+
+    def test_no_stores_default(self):
+        """No default settings for the [store] section."""
+
+
+class LandscapeCronTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
