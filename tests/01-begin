@@ -7,17 +7,19 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 """
 
 import json
-from os import getenv
-from os.path import dirname, abspath, join, splitext, basename
+import logging
 import sys
 import unittest
+import yaml
+import jujulib.deployer
+
+from configobj import ConfigObj
+from os import getenv
+from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
-import yaml
-import logging
-import jujulib.deployer
-log = logging.getLogger(__file__)
 
+log = logging.getLogger(__file__)
 
 def check_url(url, good_content, post_data=None, header=None,
               interval=10, attempts=30, retry_unavailable=False):
@@ -313,6 +315,8 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
     def test_no_stores_default(self):
         """No default settings for the [store] section."""
+        for unit in self.landscape_units:
+            config = ConfigObj(self.get_service_conf(unit))
 
 
 class LandscapeCronTests(unittest.TestCase):
