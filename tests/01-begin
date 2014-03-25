@@ -190,11 +190,6 @@ class LandscapeServiceTests(BaseLandscapeTests):
         cls.juju_status = juju_status()
         cls.frontend = find_address(cls.juju_status, "apache2")
 
-    def __str__(self):
-        file_name = splitext(basename(__file__))[0]
-        return "{} ({}.{})".format(
-            self._testMethodName, file_name, self.__class__.__name__)
-
     def test_app(self):
         """Verify that the APP service is up.
 
