@@ -302,8 +302,8 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
     @classmethod
     def get_landscape_service_conf(self, unit):
         """Fetch the contents of service.conf from the given unit."""
-        cmd = ["juju", "ssh", unit, "sudo", "cat",
-               "/etc/landscape/service.conf", "2>&1"]
+        cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
+               "2>/dev/null"]
         output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
         return output
 
