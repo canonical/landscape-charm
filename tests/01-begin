@@ -323,15 +323,15 @@ class LandscapeServiceTests(BaseLandscapeTests):
         self.assertIn(good_content, output)
 
 
-class LandscapeDefaultConfigTests(BaseLandscapeTests):
+class LandscapeServiceConfigTests(BaseLandscapeTests):
 
     @classmethod
     def setUpClass(cls):
         """Prepare landscape_service_conf which will be used by the tests."""
         landscape_units = []
-        status = juju_status()
+        cls.juju_status = juju_status()
         cls.landscape_service_conf = []
-        landscape_units = get_landscape_units(status)
+        landscape_units = get_landscape_units(cls.juju_status)
         for unit in landscape_units:
             config = ConfigParser()
             config.read_string(get_landscape_service_conf(unit))
@@ -339,9 +339,11 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
     def test_no_broker_defaults(self):
         """No default settings for the [broker] section."""
+        broker_host = find_address(self.juju_status, "rabbitmq-server")
         for config in self.landscape_service_conf:
             broker = config["broker"]
-            self.assertNotEqual(broker["host"], "localhost")
+            self.assertEqual(broker["host"], broker_host)
+            # password must be different than the default one
             self.assertNotEqual(broker["password"], "landscape")
 
     def test_no_stores_defaults(self):
