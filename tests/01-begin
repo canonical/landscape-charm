@@ -132,7 +132,7 @@ def find_cron_unit(juju_status):
     @param juju_status: dictionary representing the juju status output.
     """
     services = juju_status["services"]
-    for service_name in services.keys():
+    for service_name in services:
         if not service_name.startswith("landscape"):
             continue
         config = get_service_config(service_name)
