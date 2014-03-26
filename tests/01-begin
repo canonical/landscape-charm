@@ -147,6 +147,35 @@ def find_cron_unit(juju_status):
     raise CronUnitNotFound()
 
 
+def get_landscape_units(juju_status):
+    """
+    Return a list of all the landscape service units.
+
+    @param juju_status: dictionary representing the juju status output.
+    """
+    landscape_units = []
+    services = juju_status["services"]
+    for service_name in services:
+        if not service_name.startswith("landscape"):
+            continue
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            landscape_units.extend(unit_keys)
+    if not landscape_units:
+        raise LandscapeUnitsNotFound()
+    return landscape_units
+
+
+def get_landscape_service_conf(unit):
+    """Fetch the contents of service.conf from the given unit."""
+    cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
+           "2>/dev/null"]
+    output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+    return output
+
+
 class ServiceNotFound(Exception):
     """
     Exception thrown if a service cannot be found in the deployment or has
@@ -155,6 +184,13 @@ class ServiceNotFound(Exception):
 
     def __init__(self, service_name):
         self.service_name = service_name
+
+
+class LandscapeUnitsNotFound(Exception):
+    """
+    Exception raised if not a single landscape unit can be found in the
+    current deployment.
+    """
 
 
 class CronUnitNotFound(Exception):
@@ -291,21 +327,15 @@ class LandscapeDefaultConfigTests(BaseLandscapeTests):
 
     @classmethod
     def setUpClass(cls):
-        landscape_units = ["landscape/0", "landscape-msg/0",
-                           "landscape-ping/0", "landscape-app/0"]
+        """Prepare landscape_service_conf which will be used by the tests."""
+        landscape_units = []
+        status = juju_status()
         cls.landscape_service_conf = []
+        landscape_units = get_landscape_units(status)
         for unit in landscape_units:
             config = ConfigParser()
-            config.read_string(cls.get_landscape_service_conf(unit))
+            config.read_string(get_landscape_service_conf(unit))
             cls.landscape_service_conf.append(config)
-
-    @classmethod
-    def get_landscape_service_conf(self, unit):
-        """Fetch the contents of service.conf from the given unit."""
-        cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
-               "2>/dev/null"]
-        output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
-        return output
 
     def test_no_broker_defaults(self):
         """No default settings for the [broker] section."""
