@@ -21,6 +21,7 @@ from time import sleep
 
 log = logging.getLogger(__file__)
 
+
 def check_url(url, good_content, post_data=None, header=None,
               interval=10, attempts=30, retry_unavailable=False):
     """
@@ -114,7 +115,7 @@ def find_address(juju_status, service_name):
     """
     services = juju_status["services"]
     if service_name not in services:
-        raise ServiceNotFound(service_name)
+        raise ServiceOrUnitNotFound(service_name)
     service = services[service_name]
     units = service.get("units", {})
     unit_keys = list(sorted(units.keys()))
@@ -122,7 +123,7 @@ def find_address(juju_status, service_name):
         public_address = units[unit_keys[0]].get("public-address", "")
         return public_address
     else:
-        raise ServiceNotFound(service_name)
+        raise ServiceOrUnitNotFound(service_name)
 
 
 def find_cron_unit(juju_status):
@@ -144,7 +145,7 @@ def find_cron_unit(juju_status):
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
             return unit_keys[0]
-    raise CronUnitNotFound()
+    raise ServiceOrUnitNotFound("cron")
 
 
 def get_landscape_units(juju_status):
@@ -164,7 +165,7 @@ def get_landscape_units(juju_status):
         if unit_keys:
             landscape_units.extend(unit_keys)
     if not landscape_units:
-        raise LandscapeUnitsNotFound()
+        raise ServiceOrUnitNotFound("landscape")
     return landscape_units
 
 
@@ -176,7 +177,7 @@ def get_landscape_service_conf(unit):
     return output
 
 
-class ServiceNotFound(Exception):
+class ServiceOrUnitNotFound(Exception):
     """
     Exception thrown if a service cannot be found in the deployment or has
     no units.
@@ -184,25 +185,6 @@ class ServiceNotFound(Exception):
 
     def __init__(self, service_name):
         self.service_name = service_name
-
-
-class LandscapeUnitsNotFound(Exception):
-    """
-    Exception raised if not a single landscape unit can be found in the
-    current deployment.
-    """
-
-
-class CronUnitNotFound(Exception):
-    """
-    Exception thrown if the cron service cannot be found in a landscape
-    unit.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        """Prepares juju_status which many tests use."""
-        cls.juju_status = juju_status()
 
 
 class BaseLandscapeTests(unittest.TestCase):
@@ -338,23 +320,34 @@ class LandscapeServiceConfigTests(BaseLandscapeTests):
             cls.landscape_service_conf.append(config)
 
     def test_no_broker_defaults(self):
-        """No default settings for the [broker] section."""
-        broker_host = find_address(self.juju_status, "rabbitmq-server")
+        """Verify that [broker] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [broker] section don't remain at their default values.
+        """
         for config in self.landscape_service_conf:
             broker = config["broker"]
-            self.assertEqual(broker["host"], broker_host)
-            # password must be different than the default one
+            self.assertNotEqual(broker["host"], "localhost")
             self.assertNotEqual(broker["password"], "landscape")
 
     def test_no_stores_defaults(self):
-        """No default settings for the [store] section."""
+        """Verify that [store] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [stores] section don't remain at their default values.
+        """
         for config in self.landscape_service_conf:
             stores = config["stores"]
             self.assertNotEqual(stores["password"], "landscape")
             self.assertNotEqual(stores["host"], "localhost")
 
     def test_no_schema_defaults(self):
-        """No default settings for the [schema] section."""
+        """Verify that [schema] has no default values.
+
+        This test verifies that the store_user and store_password
+        configuration keys from the [schema] section don't remain at their
+        default values.
+        """
         for config in self.landscape_service_conf:
             schema = config["schema"]
             self.assertNotEqual(schema["store_user"], "superuser")
