@@ -260,7 +260,7 @@ def _is_amqp_up():
         "hostname", unit_name=amqp_unit, relation_id=relid)
     password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
-    if None in [host, password]:
+    if not host or not password:
         juju.juju_log(
             "Waiting for valid hostname/password values from amqp relation")
         return False
@@ -275,9 +275,6 @@ def amqp_relation_changed():
     host = juju.relation_get("hostname")
 
     juju.juju_log("Using AMQP server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
 
     update_config_settings(
         {"broker": {"password": password, "host": host, "user": "landscape"}})
