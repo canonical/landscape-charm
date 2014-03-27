@@ -831,7 +831,6 @@ class TestHooksService(TestHooks):
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         self.assertEqual(config_obj.keys(), [])
 
-
     def test_db_admin_relation_changed_not_in_allowed_units(self):
         """
         db_admin_relation_changed does not configure landscape when the unit is

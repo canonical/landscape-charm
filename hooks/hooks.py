@@ -274,7 +274,7 @@ def amqp_relation_changed():
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
 
-    juju.juju_log("Using AMPQ server at %s" % host)
+    juju.juju_log("Using AMQP server at %s" % host)
 
     if password == "":
         sys.exit(0)
