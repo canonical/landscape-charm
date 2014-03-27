@@ -297,11 +297,11 @@ class LandscapeCronTests(unittest.TestCase):
         try:
             output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
         except CalledProcessError as e:
-            output = e.output
+            output = e.output.decode("utf-8").strip()
             status = e.returncode
         # these jobs currently don't set their exit status to non-zero
         # if they fail, they just print things to stdout/stderr
-        return (output.strip(), status)
+        return (output, status)
 
     def test_maintenance_cron(self):
         """Verify that the maintenance cron job runs without errors."""
