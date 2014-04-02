@@ -93,7 +93,7 @@ def db_admin_relation_changed():
     relation_count = len(juju.relation_list())
     if relation_count > 1:
         juju.juju_log(
-            "Our database is clustered with %s units."
+            "Our database is clustered with %s units. "
             "Ignoring any intermittent 'standalone' states."
             % relation_count)
         ignored_states.add("standalone")

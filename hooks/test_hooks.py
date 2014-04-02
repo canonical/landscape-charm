@@ -1035,9 +1035,64 @@ class TestHooksService(TestHooks):
         hooks.juju.config["maintenance"] = True
         hooks._set_maintenance()
         self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Putting unit into maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_only_removed_if_db_is_up(self):
+        """
+        When maintenance flag is set C{False} and the database is accessible,
+        the maintenance file will be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.write()
         hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(True)
+        self.mocker.replay()
+
         hooks._set_maintenance()
         self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Remove unit from maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_only_removed_if_db_is_not_up(self):
+        """
+        When maintenance flag is set C{False} and the database is not
+        accessible, the maintenance file will not be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.write()
+        hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
     def test_is_db_up_with_db_configured(self):
         """Return True when the db is configured."""
