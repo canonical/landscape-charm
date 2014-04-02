@@ -91,7 +91,7 @@ setup_local_repo || add_apt_sources
 # Set maintenance mode to prevent cron jobs until db relationship is setup
 MAINTENANCE_DIR=`dirname $LANDSCAPE_MAINTENANCE`
 mkdir -p $MAINTENANCE_DIR
-date > LANDSCAPE_MAINTENANCE
+date > $LANDSCAPE_MAINTENANCE
 
 install_landscape || die "Error installing landscape"
 "Install complete"
