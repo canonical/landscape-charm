@@ -286,14 +286,14 @@ def amqp_relation_changed():
         {"broker": {"password": password, "host": host, "user": "landscape"}})
 
     if _is_db_up():
-        config_changed()  # only restart when is_db_up and _is_amqp_up
+        config_changed()
 
 
 def config_changed():
     _lsctl("stop")
     _install_license()
-    _enable_services()
     _set_maintenance()
+    _enable_services()
     _set_upgrade_schema()
 
     if _is_db_up() and _is_amqp_up():
@@ -572,9 +572,12 @@ def _set_maintenance():
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
+        # Only remove maintenance mode when we are sure the db is up.
+        # Otherwise cron scripts like maas-poller will traceback per lp:1272140
         if os.path.exists(LANDSCAPE_MAINTENANCE):
-            juju.juju_log("Remove unit from maintenance mode")
-            os.unlink(LANDSCAPE_MAINTENANCE)
+            if _is_db_up():
+                juju.juju_log("Remove unit from maintenance mode")
+                os.unlink(LANDSCAPE_MAINTENANCE)
 
 
 def _set_upgrade_schema():
