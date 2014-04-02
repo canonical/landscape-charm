@@ -777,10 +777,74 @@ class TestHooksService(TestHooks):
         create_user(new_user, new_password, host, admin, password)
         check_call = self.mocker.replace(hooks.check_call)
         check_call("setup-landscape-server")
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "landscape-server"])
+        self.mocker.result("14.01")
         connection.close()
         self.mocker.replay()
 
         hooks.db_admin_relation_changed()
+
+    def test_db_admin_relation_changed_adds_maintenance_user_for_13_09(self):
+        """
+        db_admin_relation_changed creates both landscape and
+        landscape_maintenance database users for 13.09 releases and sets up
+        landscape.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
+            "host": "postgres/0", "user": "auto_db_admin",
+            "password": "abc123",
+            "allowed-units": "landscape/0 landscape/1",
+            "state": "standalone"}.items()
+
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: "def456"
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj["schema"] = {}
+        config_obj.filename = hooks.LANDSCAPE_SERVICE_CONF
+        config_obj.write()
+        self._service_conf.seek(0)
+        new_user = "landscape"
+        maintenance_user = "landscape_maintenance"
+        new_password = "def456"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        password = "abc123"
+
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("postgres", host, admin, password)
+        self.mocker.result(True)
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive(host, admin, password)
+        connection = self.mocker.mock()
+        self.mocker.result(connection)
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(new_user, new_password, host, admin, password)
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "landscape-server"])
+        self.mocker.result("13.09.02-bzr722")
+        create_user(maintenance_user, new_password, host, admin, password)
+        check_call = self.mocker.replace(hooks.check_call)
+        check_call("setup-landscape-server")
+        connection.close()
+        self.mocker.replay()
+
+        hooks.db_admin_relation_changed()
+        message = "Creating landscape_maintenance user"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
 
     def test_db_admin_relation_changed_no_user(self):
         """

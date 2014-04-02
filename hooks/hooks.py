@@ -24,7 +24,33 @@ import re
 import shutil
 import sys
 import yaml
-from subprocess import check_call
+from subprocess import check_call, check_output, CalledProcessError
+
+
+def _get_installed_version(name):
+    """Returns the version string of name using dpkg-query or returns None"""
+    try:
+        version = check_output(
+            ["dpkg-query", "--show", "--showformat=${Version}", name])
+    except CalledProcessError:
+        juju.juju_log(
+            "Failed to detemine package version of %s using dpkg-query" % name)
+        return None
+    return version
+
+
+def _landscape_installed_version_between(minimum, maximum):
+    """
+    Return C{True} if installed version of landscape is between minimum and
+    maximum.
+    """
+    import apt_pkg
+    apt_pkg.init()
+    version = _get_installed_version("landscape-server")
+    if version is None:
+        return False
+    return (apt_pkg.version_compare(version, minimum) > 0 and
+            apt_pkg.version_compare(maximum, version) > 0)
 
 
 def _get_config_obj(config_source=None):
@@ -130,6 +156,11 @@ def db_admin_relation_changed():
     else:
         try:
             util.create_user(user, password, host, admin, admin_password)
+            if _landscape_installed_version_between("13.09", "14.00"):
+                juju.juju_log("Creating landscape_maintenance user")
+                util.create_user(
+                    "landscape_maintenance", password, host, admin,
+                    admin_password)
             check_call("setup-landscape-server")
         finally:
             juju.juju_log("Landscape database initialized!")
