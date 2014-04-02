@@ -572,8 +572,8 @@ def _set_maintenance():
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
-        # Only remove maintenance mode when we are sure the db is up.
-        # Otherwise cron scripts like maas-poller will traceback per lp:1272140
+        # Only remove maintenance mode when we are sure the db is up
+        # otherwise cron scripts like maas-poller will traceback per lp:1272140
         # Also validate is_amqp_up as well otherwise we receive
         # twisted.internet.error.ConnectionRefusedError:
         if os.path.exists(LANDSCAPE_MAINTENANCE):
