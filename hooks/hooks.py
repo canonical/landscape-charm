@@ -574,8 +574,10 @@ def _set_maintenance():
     else:
         # Only remove maintenance mode when we are sure the db is up.
         # Otherwise cron scripts like maas-poller will traceback per lp:1272140
+        # Also validate is_amqp_up as well otherwise we receive
+        # twisted.internet.error.ConnectionRefusedError:
         if os.path.exists(LANDSCAPE_MAINTENANCE):
-            if _is_db_up():
+            if _is_db_up() and _is_amqp_up():
                 juju.juju_log("Remove unit from maintenance mode")
                 os.unlink(LANDSCAPE_MAINTENANCE)
 
