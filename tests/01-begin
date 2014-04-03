@@ -7,15 +7,18 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 """
 
 import json
-from os import getenv
-from os.path import dirname, abspath, join, splitext, basename
+import logging
 import sys
 import unittest
+import yaml
+import jujulib.deployer
+
+from configparser import ConfigParser
+from os import getenv
+from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
-import yaml
-import logging
-import jujulib.deployer
+
 log = logging.getLogger(__file__)
 
 
@@ -72,8 +75,8 @@ def setUpModule():
     config_file = join(
         dirname(dirname(abspath(__file__))),
         "config", "landscape-deployments.yaml")
-    deployer.deploy("landscape", [config_file], timeout=3000)
-
+    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), [config_file],
+                    timeout=2000)
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
@@ -111,7 +114,7 @@ def find_address(juju_status, service_name):
     """
     services = juju_status["services"]
     if service_name not in services:
-        raise ServiceNotFound(service_name)
+        raise ServiceOrUnitNotFound(service_name)
     service = services[service_name]
     units = service.get("units", {})
     unit_keys = list(sorted(units.keys()))
@@ -119,7 +122,7 @@ def find_address(juju_status, service_name):
         public_address = units[unit_keys[0]].get("public-address", "")
         return public_address
     else:
-        raise ServiceNotFound(service_name)
+        raise ServiceOrUnitNotFound(service_name)
 
 
 def find_cron_unit(juju_status):
@@ -129,7 +132,7 @@ def find_cron_unit(juju_status):
     @param juju_status: dictionary representing the juju status output.
     """
     services = juju_status["services"]
-    for service_name in services.keys():
+    for service_name in services:
         if not service_name.startswith("landscape"):
             continue
         config = get_service_config(service_name)
@@ -141,10 +144,39 @@ def find_cron_unit(juju_status):
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
             return unit_keys[0]
-    raise CronUnitNotFound()
+    raise ServiceOrUnitNotFound("cron")
 
 
-class ServiceNotFound(Exception):
+def get_landscape_units(juju_status):
+    """
+    Return a list of all the landscape service units.
+
+    @param juju_status: dictionary representing the juju status output.
+    """
+    landscape_units = []
+    services = juju_status["services"]
+    for service_name in services:
+        if not service_name.startswith("landscape"):
+            continue
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            landscape_units.extend(unit_keys)
+    if not landscape_units:
+        raise ServiceOrUnitNotFound("landscape")
+    return landscape_units
+
+
+def get_landscape_service_conf(unit):
+    """Fetch the contents of service.conf from the given unit."""
+    cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
+           "2>/dev/null"]
+    output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+    return output
+
+
+class ServiceOrUnitNotFound(Exception):
     """
     Exception thrown if a service cannot be found in the deployment or has
     no units.
@@ -154,14 +186,18 @@ class ServiceNotFound(Exception):
         self.service_name = service_name
 
 
-class CronUnitNotFound(Exception):
+class BaseLandscapeTests(unittest.TestCase):
     """
-    Exception thrown if the cron service cannot be found in a landscape
-    unit.
+    Base class with some commonality between all test classes.
     """
 
+    def __str__(self):
+        file_name = splitext(basename(__file__))[0]
+        return "{} ({}.{})".format(
+            self._testMethodName, file_name, self.__class__.__name__)
 
-class LandscapeServiceTests(unittest.TestCase):
+
+class LandscapeServiceTests(BaseLandscapeTests):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
     """
@@ -171,11 +207,6 @@ class LandscapeServiceTests(unittest.TestCase):
         """Prepares juju_status which many tests use."""
         cls.juju_status = juju_status()
         cls.frontend = find_address(cls.juju_status, "apache2")
-
-    def __str__(self):
-        file_name = splitext(basename(__file__))[0]
-        return "{} ({}.{})".format(
-            self._testMethodName, file_name, self.__class__.__name__)
 
     def test_app(self):
         """Verify that the APP service is up.
@@ -273,12 +304,58 @@ class LandscapeServiceTests(unittest.TestCase):
         self.assertIn(good_content, output)
 
 
-class LandscapeCronTests(unittest.TestCase):
+class LandscapeServiceConfigTests(BaseLandscapeTests):
 
-    def __str__(self):
-        file_name = splitext(basename(__file__))[0]
-        return "{} ({}.{})".format(
-            self._testMethodName, file_name, self.__class__.__name__)
+    @classmethod
+    def setUpClass(cls):
+        """Prepare landscape_service_conf which will be used by the tests."""
+        landscape_units = []
+        cls.juju_status = juju_status()
+        cls.landscape_service_conf = []
+        landscape_units = get_landscape_units(cls.juju_status)
+        for unit in landscape_units:
+            config = ConfigParser()
+            config.read_string(get_landscape_service_conf(unit))
+            cls.landscape_service_conf.append(config)
+
+    def test_no_broker_defaults(self):
+        """Verify that [broker] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [broker] section don't remain at their default values.
+        """
+        for config in self.landscape_service_conf:
+            broker = config["broker"]
+            self.assertNotEqual(broker["host"], "localhost")
+            self.assertNotEqual(broker["password"], "landscape")
+
+    def test_no_stores_defaults(self):
+        """Verify that [store] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [stores] section don't remain at their default values.
+        """
+        for config in self.landscape_service_conf:
+            stores = config["stores"]
+            self.assertNotEqual(stores["password"], "landscape")
+            self.assertNotEqual(stores["host"], "localhost")
+
+    def test_no_schema_defaults(self):
+        """Verify that [schema] has no default values.
+
+        This test verifies that the store_user and store_password
+        configuration keys from the [schema] section don't remain at their
+        default values.
+        """
+        for config in self.landscape_service_conf:
+            schema = config["schema"]
+            self.assertNotEqual(schema["store_user"], "superuser")
+            # default service.conf doesn't ship with a store_password in this
+            # section, so this tests that a) it exists; b) it's not empty
+            self.assertNotEqual(len(schema["store_password"]), 0)
+
+
+class LandscapeCronTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
