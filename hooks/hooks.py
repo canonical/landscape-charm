@@ -34,23 +34,31 @@ def _get_installed_version(name):
             ["dpkg-query", "--show", "--showformat=${Version}", name])
     except CalledProcessError:
         juju.juju_log(
-            "Failed to detemine package version of %s using dpkg-query" % name)
+            "Cannot determine version of %s. Package is not installed." %
+            name)
         return None
     return version
 
 
-def _landscape_installed_version_between(minimum, maximum):
+def _create_maintenance_user(password, host, admin, admin_password):
     """
-    Return C{True} if installed version of landscape is between minimum and
-    maximum.
+    Any LDS version prior to 14.01 needs a C{landscape_maintenance} database
+    user.  Create this user if needed with the provided password on the host
+    using the admin/admin_password credentials. Otherwise, do nothing.
     """
     import apt_pkg
     apt_pkg.init()
     version = _get_installed_version("landscape-server")
     if version is None:
-        return False
-    return (apt_pkg.version_compare(version, minimum) > 0 and
-            apt_pkg.version_compare(maximum, version) > 0)
+        return
+
+    if apt_pkg.version_compare(version, "14.01") >= 0:
+        """We are on 14.01 or greater. No landscape_maintenance needed"""
+        return
+
+    juju.juju_log("Creating landscape_maintenance user")
+    util.create_user(
+        "landscape_maintenance", password, host, admin, admin_password)
 
 
 def _get_config_obj(config_source=None):
@@ -156,11 +164,7 @@ def db_admin_relation_changed():
     else:
         try:
             util.create_user(user, password, host, admin, admin_password)
-            if _landscape_installed_version_between("13.09", "14.00"):
-                juju.juju_log("Creating landscape_maintenance user")
-                util.create_user(
-                    "landscape_maintenance", password, host, admin,
-                    admin_password)
+            _create_maintenance_user(password, host, admin, admin_password)
             check_call("setup-landscape-server")
         finally:
             juju.juju_log("Landscape database initialized!")
