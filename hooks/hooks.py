@@ -51,7 +51,7 @@ def _create_maintenance_user(password, host, admin, admin_password):
         return
 
     if call(["dpkg", "--compare-versions", version, "ge", "14.01"]) == 0:
-        """We are on 14.01 or greater. No landscape_maintenance needed"""
+        # We are on 14.01 or greater. No landscape_maintenance needed
         return
 
     juju.juju_log("Creating landscape_maintenance user")
