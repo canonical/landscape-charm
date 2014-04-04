@@ -24,7 +24,7 @@ import re
 import shutil
 import sys
 import yaml
-from subprocess import check_call, check_output, CalledProcessError
+from subprocess import check_call, check_output, CalledProcessError, call
 
 
 def _get_installed_version(name):
@@ -46,13 +46,11 @@ def _create_maintenance_user(password, host, admin, admin_password):
     user.  Create this user if needed with the provided password on the host
     using the admin/admin_password credentials. Otherwise, do nothing.
     """
-    import apt_pkg
-    apt_pkg.init()
     version = _get_installed_version("landscape-server")
     if version is None:
         return
 
-    if apt_pkg.version_compare(version, "14.01") >= 0:
+    if call(["dpkg", "--compare-versions", version, "ge", "14.01"]) == 0:
         """We are on 14.01 or greater. No landscape_maintenance needed"""
         return
 
