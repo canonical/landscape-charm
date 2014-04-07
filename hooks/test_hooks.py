@@ -164,8 +164,8 @@ class TestHooksService(TestHooks):
 
     def test_wb_get_installed_version_success_when_installed(self):
         """
-        L{_get_installed_version} will report an error when the dpkg-query
-        command fails due to specified package not being installed.
+        When the requested package is installed, L{_get_installed_version} will
+        return the package version as reported by the dpkg-query command.
         """
         version_call = self.mocker.replace(hooks.check_output)
         version_call(
