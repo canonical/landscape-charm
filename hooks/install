@@ -96,5 +96,3 @@ date > $LANDSCAPE_MAINTENANCE
 
 install_landscape || die "Error installing landscape"
 echo "Install complete"
-
-exit 0

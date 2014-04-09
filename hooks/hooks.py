@@ -290,6 +290,14 @@ def amqp_relation_changed():
 
 
 def config_changed():
+    """Update and restart services based on config setting changes.
+
+    This hook is called either by the config-changed hook or other hooks when
+    something has modified configuration values. Before any changes, we stop
+    all landscape services and call _set_maintenance to ensure we are in proper
+    maintenance state before attempting to enable any periodic processes or
+    services.
+    """
     _lsctl("stop")
     _install_license()
     _set_maintenance()
