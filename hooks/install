@@ -5,6 +5,7 @@ LS_PPA=`config-get repository`
 LS_PACKAGE="landscape-server_*.tar.gz"
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
+LANDSCAPE_MAINTENANCE=/opt/canonical/landscape/maintenance.txt
 
 die() {
     STATUS=$?
@@ -86,6 +87,12 @@ apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
 
 # Setup a local repository and build the server if supplied in the charm
 setup_local_repo || add_apt_sources
-install_landscape || die "Error installing landscape"
 
-exit 0
+# Set maintenance mode to prevent cron jobs until db relationship is setup
+MAINTENANCE_DIR=`dirname $LANDSCAPE_MAINTENANCE`
+echo "Setting maintenance mode until database is configured"
+mkdir -p $MAINTENANCE_DIR
+date > $LANDSCAPE_MAINTENANCE
+
+install_landscape || die "Error installing landscape"
+echo "Install complete"
