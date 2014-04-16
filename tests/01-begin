@@ -12,7 +12,6 @@ import sys
 import unittest
 import yaml
 import jujulib.deployer
-import re
 
 from configparser import ConfigParser
 from os import getenv
