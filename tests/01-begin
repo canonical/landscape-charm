@@ -12,6 +12,7 @@ import sys
 import unittest
 import yaml
 import jujulib.deployer
+import re
 
 from configparser import ConfigParser
 from os import getenv
@@ -370,6 +371,22 @@ class LandscapeCronTests(BaseLandscapeTests):
     def tearDownClass(cls):
         cls._start_cron(cls.cron_unit)
 
+    def _grab_logfile(self, text):
+        """
+        Scan the given text blob for a logfile pattern. If found,
+        grab it from the unit and return its contents.
+        """
+        # alert_admin() in landscape-env.sh prints out the log filename
+        # in this format, between whitespace, when the cron failed.
+        log_re = r"\s+/var/log/(?P<logfile>\S+\.log)\s+"
+        match = re.match(log_re, text)
+        if match:
+            lofgile = match.group("logfile")
+            cmd = ["juju", "ssh", self.cron_unit, "sudo", "cat", logfile]
+            output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+            return "Contents of %s:\n%s" % (logfile, output)
+        return None
+
     def _run_cron(self, script):
         status = 0
         cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
@@ -379,6 +396,9 @@ class LandscapeCronTests(BaseLandscapeTests):
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
+            if output:
+                # scan for a logfile. If there is one, grab it.
+                output = output + self._grab_logfile(output)
         # these jobs currently don't set their exit status to non-zero
         # if they fail, they just print things to stdout/stderr
         return (output, status)
