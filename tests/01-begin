@@ -192,6 +192,8 @@ class BaseLandscapeTests(unittest.TestCase):
     Base class with some commonality between all test classes.
     """
 
+    maxDiff = None
+
     def __str__(self):
         file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
@@ -356,7 +358,7 @@ class LandscapeServiceConfigTests(BaseLandscapeTests):
             self.assertNotEqual(len(schema["store_password"]), 0)
 
 
-class LandscapeCronTests(unittest.TestCase):
+class LandscapeCronTests(BaseLandscapeTests):
 
     @classmethod
     def setUpClass(cls):
