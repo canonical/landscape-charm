@@ -138,12 +138,6 @@ def db_admin_relation_changed():
 
     juju.juju_log("Updating config due to database changes.")
 
-    update_config_settings(
-        {"stores": {"host": host, "port": "5432", "user": user,
-                    "password": password},
-         "schema": {"store_user": admin, "store_password": admin_password}},
-        outfile=LANDSCAPE_NEW_SERVICE_CONF)
-
     if not util.is_db_up("postgres", host, admin, admin_password):
         juju.juju_log(
             "Ignoring config changes. Because new service settings don't "
@@ -151,7 +145,10 @@ def db_admin_relation_changed():
         return
 
     # Changes are validated; db is up has write-accessible
-    shutil.copyfile(LANDSCAPE_NEW_SERVICE_CONF, LANDSCAPE_SERVICE_CONF)
+    update_config_settings(
+        {"stores": {"host": host, "port": "5432", "user": user,
+                    "password": password},
+         "schema": {"store_user": admin, "store_password": admin_password}})
 
     try:
         # Name as lock so we don't try to reuse it as a database connection
@@ -296,7 +293,7 @@ def _is_amqp_up():
         "hostname", unit_name=amqp_unit, relation_id=relid)
     password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
-    if None in [host, password]:
+    if not host or not password:
         juju.juju_log(
             "Waiting for valid hostname/password values from amqp relation")
         return False
@@ -310,10 +307,7 @@ def amqp_relation_changed():
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
 
-    juju.juju_log("Using AMPQ server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
+    juju.juju_log("Using AMQP server at %s" % host)
 
     update_config_settings(
         {"broker": {"password": password, "host": host, "user": "landscape"}})
@@ -727,7 +721,6 @@ SERVICE_DEFAULT = {
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
-LANDSCAPE_NEW_SERVICE_CONF = "/etc/landscape/service.conf.new"
 LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 STORAGE_MOUNTPOINT = "/srv/juju/vol-0001"

@@ -95,8 +95,6 @@ class TestHooks(mocker.MockerTestCase):
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
         self._service_conf = open(hooks.LANDSCAPE_SERVICE_CONF, "w")
-        hooks.LANDSCAPE_NEW_SERVICE_CONF = self.makeFile()
-        self._new_service_conf = open(hooks.LANDSCAPE_NEW_SERVICE_CONF, "w")
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None
@@ -904,6 +902,33 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        hooks.db_admin_relation_changed()
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
+
+    def test_db_admin_relation_changed_no_config_if_db_down(self):
+        """
+        db_admin_relation_changed does not update the service configuration
+        file if is_db_up() returns False.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
+            "host": "postgres/0", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "standalone"}.items()
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}
+
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("postgres", "postgres/0", "auto_db_admin", "abc123")
+        self.mocker.result(False)
+        self.mocker.replay()
         hooks.db_admin_relation_changed()
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)

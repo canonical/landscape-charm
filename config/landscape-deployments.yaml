@@ -1,9 +1,9 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-20
+            charm: cs:precise/rabbitmq-server-22
         postgresql:
-            charm: cs:precise/postgresql-62
+            charm: cs:precise/postgresql-63
             constraints: mem=2048
             options:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
@@ -81,7 +81,7 @@ landscape-max:
             num_units: 2
         juju-gui:
             expose: True
-            charm: cs:precise/juju-gui-86
+            charm: cs:precise/juju-gui-89
         landscape:
             branch: lp:~landscape/landscape-charm/stable
             constraints: mem=2048
