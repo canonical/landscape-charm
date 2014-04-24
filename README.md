@@ -16,10 +16,14 @@ For more information about Landscape, go to http://www.ubuntu.com/management
 Usage
 =====
 
-The typical deployment of Landscape happens using juju-deployer.
+The typical deployment of Landscape happens using juju-deployer.  This charm is
+not useful without a deployed bundle of services.  Please read below for how to
+deploy all services necessary for a functioning install of LDS.
 
 Juju-Deployer
 -------------
+
+NOTE: This section will be superseded by a juju "bundle", when that is ready.
 
 You can use juju-deployer to greatly simplify the deployment of Landscape to a
 real cloud.  Inside the charm, there is a "config" directory that contains a
@@ -38,19 +42,14 @@ Then install deployer:
 
 Grab the landscape charm:
 
-    $ bzr branch lp:landscape-charm
-    $ cd landscape-charm/config
+    $ bzr branch lp:~landscape-charmers/charms/precise/landscape-server/trunk
+    $ cd trunk/config
 
-Prepare the repository and license files:
+Prepare the repository and license files (See "Configuration" section for more
+details):
 
     $ vim license-file   # Put the license text in this file
-    $ vim repo-file      # Insert the URL part of an APT sources list line here
-
-If you don't have a Landscape license file, just create an empty file:
-
-    $ touch license-file
-
-This will make Landscape use a default free license with 10 seats.
+    $ vim repo-file      # Put the URL part of an APT sources.list line here
 
 Now we are ready to deploy (the -v, -d, -W flags are optional, but nice). The
 "landscape" deployer target is the one you should start with. It uses 6
@@ -58,7 +57,7 @@ machines plus the juju bootstrap node:
 
     $ juju-deployer -vdW -c landscape-deployments.yaml landscape
 
-After juju-deployer finishes, the deployment is not entirely ready yet.
+NOTE: After juju-deployer finishes, the deployment is not entirely ready yet.
 
 Hooks are still running, and it can be a few minutes until everything is ready.
 You can point your browser to the apache2/0 unit and keep reloading until you
@@ -70,8 +69,58 @@ To view what other deployment targets are available, use the list option:
     $ juju-deployer -c landscape-deployments.yaml -l
 
 
+Configuration
+=============
+
+license-file
+------------
+
+Since Landscape is a commercial product, it requires a license file to
+use.  This license file can be deployed and manipulated through the
+charm.  The license file can be downloaded from your hosted account, on
+the left side of the page, under a link called: 'access the Landscape 
+Dedicated Server archive'.
+
+`config/landscape-deployments.yaml` supports reading a `license-file` in
+the `config` directory.  Take the license file you downloaded, put it in
+the a file called `config/license-file`, and juju-deployer
+should read it in and deploy as usual.
+
+You can also set this as a juju configuration option after deployment
+on each deployed landscape-service like:
+
+    $ juju set <landscape-service> "license-file=$(cat license-file)"
+
+If you don't have a Landscape license file, just create an empty file:
+
+    $ touch config/license-file
+
+This will make Landscape use a default free license with 10 seats.
+
+
+repository
+----------
+
+Since Landscape is a commercial product, the source code has to be
+downloaded from a password protected repository.  You can find this link
+from your Landscape hosted account on the left side of the page under a
+link called: 'access the Landscape Dedicated Server archive'.
+
+Put just the URL part of that deb line into a file called
+`config/repo-file` and juju-deployer should read it in and
+depoy as usual.
+
+At this time, this setting is not changeable after Landscape has been
+deployed.
+
+Example:
+    
+    $ cat config/repo-file
+    https://username:password@archive.landscape.canonical.com/
+
 SSL
 ===
+
 The included deployment targets will ask Apache to generate a self signed
 certificate. While useful for testing, this must not be used for production
 deployments.
@@ -168,9 +217,11 @@ should be submitted with unit tests.  You can run them like this:
 Integration Testing
 -------------------
 
+
 This charm makes use of juju-deployer and the charm-tools package to enable
 end-to-end integration testing.  This is how you proceed with running
 them:
 
     # Make sure your JUJU_ENV is *not* bootstraped, and:
+    $ sudo apt-get install python-pyscopg2 python-mocker python-psutil
     $ JUJU_ENV=<env> make integration-test
