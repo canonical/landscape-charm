@@ -140,6 +140,41 @@ class TestHooksService(TestHooks):
         result = hooks._get_services_haproxy()
         self.assertEqual(len(result), 0)
 
+    def test_wb_get_installed_version_error_when_not_installed(self):
+        """
+        L{_get_installed_version} will report an error when the dpkg-query
+        command fails due to specified package not being installed.
+        """
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "I-dont-exist"])
+        self.mocker.throw(subprocess.CalledProcessError(1, "Command failed"))
+        self.mocker.replay()
+
+        result = hooks._get_installed_version("I-dont-exist")
+        self.assertIsNone(result)
+        message = (
+            "Cannot determine version of I-dont-exist. Package is not "
+            "installed.")
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_wb_get_installed_version_success_when_installed(self):
+        """
+        When the requested package is installed, L{_get_installed_version} will
+        return the package version as reported by the dpkg-query command.
+        """
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "I-exist"])
+        self.mocker.result("1.2.3+456")
+        self.mocker.replay()
+
+        result = hooks._get_installed_version("I-exist")
+        self.assertEqual("1.2.3+456", result)
+
     def test_wb_chown_sets_dir_and_file_ownership_to_landscape(self):
         """
         For a C{dir_path} specified, L{_chown} sets directory mode to 777 and
@@ -187,6 +222,72 @@ class TestHooksService(TestHooks):
         # Directory mode changed to 777 and gid/uid set
         mode = os.stat(dir_name).st_mode
         self.assertEqual(mode & mode777, mode777)
+
+    def test_wb_create_maintenance_user_creates_on_lds_less_than_14_01(self):
+        """
+        C{landscape_maintenance} database user is created on installs with
+        versions less than 14.01.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result("14.00+bzr1919")
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
+        message = "Creating landscape_maintenance user"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_wb_create_maintenance_user_not_created_if_lds_not_installed(self):
+        """
+        C{landscape_maintenance} database user is not created when we are
+        unable to obtain installed version information for the landscape-server
+        package.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result(None)  # No version info found (not installed)
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.count(0)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
+
+    def test_wb_create_maintenance_user_not_created_on_14_01(self):
+        """
+        C{landscape_maintenance} database user is not created on installs with
+        versions 14.01 or greater.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result("14.01")
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.count(0)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
 
     def test_amqp_relation_joined(self):
         """
@@ -775,6 +876,8 @@ class TestHooksService(TestHooks):
         create_user(new_user, new_password, host, admin, password)
         check_call = self.mocker.replace(hooks.check_call)
         check_call("setup-landscape-server")
+        maintenance_mock = self.mocker.replace(hooks._create_maintenance_user)
+        maintenance_mock(new_password, host, admin, password)
         connection.close()
         self.mocker.replay()
 
@@ -1060,9 +1163,80 @@ class TestHooksService(TestHooks):
         hooks.juju.config["maintenance"] = True
         hooks._set_maintenance()
         self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Putting unit into maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_only_removed_if_db_and_amqp_are(self):
+        """
+        When maintenance flag is set C{False} and both the database and amqp
+        are accessible, the maintenance file will be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.write()
         hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+
         hooks._set_maintenance()
         self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Remove unit from maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_not_removed_if_db_is_not_up(self):
+        """
+        When maintenance flag is set C{False} and the database is not
+        accessible, the maintenance file will not be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+
+        hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+
+    def test_maintenance_file_not_removed_if_amqp_is_not_up(self):
+        """
+        When maintenance flag is set C{False} and the AMQP service is not
+        accessible, the maintenance file will not be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+
+        hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
     def test_is_db_up_with_db_configured(self):
         """Return True when the db is configured."""
