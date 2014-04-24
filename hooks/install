@@ -58,8 +58,7 @@ install_landscape() {
     apt_get update
     # only install the hash-id package if we host the static service
     config=$(config-get services)
-    # bash version of "contains"
-    if [[ "$config" == *static* ]]; then
+    if echo "$config" | grep -qw static; then
         extra_packages="landscape-hashids"
     else
         extra_packages=""
