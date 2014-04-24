@@ -633,7 +633,10 @@ SERVICE_PROXY = {
         "port": "9070",
         "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
         "errorfiles": deepcopy(ERROR_FILES)},
-    "async-frontend": {"port": "9090"},
+    "async-frontend": {
+        "port": "9090",
+        "service_options": ["timeout client 300000",
+                            "timeout server 300000"]},
     "apiserver": {"port": "9080"},
     "package-upload": {"port": "9100"},
     "package-search": {"port": "9090"}}
