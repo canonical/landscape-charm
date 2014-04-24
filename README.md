@@ -72,43 +72,31 @@ To view what other deployment targets are available, use the list option:
 Configuration
 =============
 
+Landscape is a commercial product, as such it needs configuration of a license
+and password protected repository before deployment.  Please login to your
+"hosted account" (on landscape.canonical.com) to gather these details after
+purchasing seats for LDS.  All information is found by following a link on the
+left side of the page called "access the Landscape Dedicated Server archive"
+
 license-file
 ------------
 
-Since Landscape is a commercial product, it requires a license file to
-use.  This license file can be deployed and manipulated through the
-charm.  The license file can be downloaded from your hosted account, on
-the left side of the page, under a link called: 'access the Landscape 
-Dedicated Server archive'.
-
-`config/landscape-deployments.yaml` supports reading a `license-file` in
-the `config` directory.  Take the license file you downloaded, put it in
-the a file called `config/license-file`, and juju-deployer
-should read it in and deploy as usual.
+`config/landscape-deployments.yaml` supports reading a `license-file` in the
+`config` directory.  Take the license file you downloaded, put it in the file
+called `config/license-file`, and juju-deployer should read it in and deploy as
+usual.
 
 You can also set this as a juju configuration option after deployment
 on each deployed landscape-service like:
 
     $ juju set <landscape-service> "license-file=$(cat license-file)"
 
-If you don't have a Landscape license file, just create an empty file:
-
-    $ touch config/license-file
-
-This will make Landscape use a default free license with 10 seats.
-
 
 repository
 ----------
 
-Since Landscape is a commercial product, the source code has to be
-downloaded from a password protected repository.  You can find this link
-from your Landscape hosted account on the left side of the page under a
-link called: 'access the Landscape Dedicated Server archive'.
-
-Put just the URL part of that deb line into a file called
-`config/repo-file` and juju-deployer should read it in and
-depoy as usual.
+Put just the URL part of the "deb ..." line into a file called
+`config/repo-file` and juju-deployer should read it in and depoy as usual.
 
 At this time, this setting is not changeable after Landscape has been
 deployed.
@@ -117,6 +105,7 @@ Example:
     
     $ cat config/repo-file
     https://username:password@archive.landscape.canonical.com/
+    $
 
 SSL
 ===

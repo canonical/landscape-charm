@@ -19,7 +19,7 @@ options:
             async-frontend, apiserver, package-upload, jobhandler,
             package-search, juju-sync, cron and static.
         type: string
-        default: appserver msgserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search juju-sync cron and static.
+        default: appserver msgserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search juju-sync cron static
     service-count:
         type: string
         default: AUTO
