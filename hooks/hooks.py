@@ -24,7 +24,39 @@ import re
 import shutil
 import sys
 import yaml
-from subprocess import check_call
+from subprocess import check_call, check_output, CalledProcessError, call
+
+
+def _get_installed_version(name):
+    """Returns the version string of name using dpkg-query or returns None"""
+    try:
+        version = check_output(
+            ["dpkg-query", "--show", "--showformat=${Version}", name])
+    except CalledProcessError:
+        juju.juju_log(
+            "Cannot determine version of %s. Package is not installed." %
+            name)
+        return None
+    return version
+
+
+def _create_maintenance_user(password, host, admin, admin_password):
+    """
+    Any LDS version prior to 14.01 needs a C{landscape_maintenance} database
+    user.  Create this user if needed with the provided password on the host
+    using the admin/admin_password credentials. Otherwise, do nothing.
+    """
+    version = _get_installed_version("landscape-server")
+    if version is None:
+        return
+
+    if call(["dpkg", "--compare-versions", version, "ge", "14.01"]) == 0:
+        # We are on 14.01 or greater. No landscape_maintenance needed
+        return
+
+    juju.juju_log("Creating landscape_maintenance user")
+    util.create_user(
+        "landscape_maintenance", password, host, admin, admin_password)
 
 
 def _get_config_obj(config_source=None):
@@ -93,7 +125,7 @@ def db_admin_relation_changed():
     relation_count = len(juju.relation_list())
     if relation_count > 1:
         juju.juju_log(
-            "Our database is clustered with %s units."
+            "Our database is clustered with %s units. "
             "Ignoring any intermittent 'standalone' states."
             % relation_count)
         ignored_states.add("standalone")
@@ -127,6 +159,7 @@ def db_admin_relation_changed():
     else:
         try:
             util.create_user(user, password, host, admin, admin_password)
+            _create_maintenance_user(password, host, admin, admin_password)
             check_call("setup-landscape-server")
         finally:
             juju.juju_log("Landscape database initialized!")
@@ -280,14 +313,22 @@ def amqp_relation_changed():
         {"broker": {"password": password, "host": host, "user": "landscape"}})
 
     if _is_db_up():
-        config_changed()  # only restart when is_db_up and _is_amqp_up
+        config_changed()
 
 
 def config_changed():
+    """Update and restart services based on config setting changes.
+
+    This hook is called either by the config-changed hook or other hooks when
+    something has modified configuration values. Before any changes, we stop
+    all landscape services and call _set_maintenance to ensure we are in proper
+    maintenance state before attempting to enable any periodic processes or
+    services.
+    """
     _lsctl("stop")
     _install_license()
-    _enable_services()
     _set_maintenance()
+    _enable_services()
     _set_upgrade_schema()
 
     if _is_db_up() and _is_amqp_up():
@@ -566,9 +607,14 @@ def _set_maintenance():
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
+        # Only remove maintenance mode when we are sure the db is up
+        # otherwise cron scripts like maas-poller will traceback per lp:1272140
+        # Also validate is_amqp_up as well otherwise we receive
+        # twisted.internet.error.ConnectionRefusedError:
         if os.path.exists(LANDSCAPE_MAINTENANCE):
-            juju.juju_log("Remove unit from maintenance mode")
-            os.unlink(LANDSCAPE_MAINTENANCE)
+            if _is_db_up() and _is_amqp_up():
+                juju.juju_log("Remove unit from maintenance mode")
+                os.unlink(LANDSCAPE_MAINTENANCE)
 
 
 def _set_upgrade_schema():
