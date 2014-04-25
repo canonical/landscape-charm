@@ -316,6 +316,27 @@ def amqp_relation_changed():
         config_changed()
 
 
+def vhost_relation_changed():
+    """Relate to apache to configure a vhost.
+
+    This hook will supply vhost configuration as well as read simple data
+    out of apache (servername, certificate).
+    """
+    # TODO: do something with these.
+    apache_servername = juju.relation_get("hostname")
+    apache_cert = juju.relation_get("ssl_cert")
+    juju.juju_log("Apache Servername: %s" % apache_servername)
+    juju.juju_log(apache_cert)
+
+    # Update vhost data.
+    settings = {"vhost_ports": [], "vhost_templates": []}
+    settings["vhost_ports"].append(443)
+    with open("config/vhostssl.tmpl", 'r') as handle:
+        settings["vhost_templates"].append(b64encode(handle.read()))
+    settings["vhost_ports"].append(80)
+    with open("config/vhost.tmpl", 'r') as handle:
+        settings["vhost_templates"].append(b64encode(handle.read()))
+
 def config_changed():
     """Update and restart services based on config setting changes.
 
@@ -738,7 +759,8 @@ if __name__ == "__main__":
         "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
-        "website-relation-joined": website_relation_joined}
+        "website-relation-joined": website_relation_joined,
+        "vhost-relation-changed": vhost_relation_changed}
     hook = os.path.basename(sys.argv[0])
     # If the hook is unsupported, let it raise a KeyError and exit with error.
     hooks[hook]()
