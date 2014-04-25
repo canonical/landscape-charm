@@ -23,3 +23,5 @@ provides:
     optional: true
   website:
     interface: http
+  vhost-config:
+    interface: apache-vhost-config
