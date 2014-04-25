@@ -79,9 +79,6 @@ landscape-max:
     services:
         postgresql:
             num_units: 2
-        juju-gui:
-            expose: True
-            charm: cs:precise/juju-gui-90
         landscape:
             branch: lp:~landscape/landscape-charm/stable
             constraints: mem=2048
@@ -137,8 +134,6 @@ landscape-max-dense-maas:
     services:
         postgresql:
             to: ["lxc:0", "lxc:0"]
-        juju-gui:
-            to: lxc:0
         apache2:
             to: lxc:0
         rabbitmq-server:
