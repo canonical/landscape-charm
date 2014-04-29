@@ -1481,3 +1481,12 @@ class TestHooksServiceMock(TestHooks):
         hooks.notify_website_relation()
         baseline = (("services", yaml.safe_dump(self.all_services)),)
         self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+    def test_vhost_config_relation_changed(self):
+        """Send vhost configuration to apache."""
+        hooks.vhost_config_relation_changed()
+        settings = dict(hooks.juju._outgoing_relation_data)['relation_settings']
+        self.assertEqual(settings["vhost_ports"], ["443", "80"])
+        self.assertEqual(len(settings["vhost_templates"]), 2)
+        
+
