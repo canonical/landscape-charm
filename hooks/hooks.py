@@ -338,6 +338,7 @@ def vhost_config_relation_changed():
     informing clients of the correct URL and cert to use when connecting
     to the server.
     """
+
     settings = {"vhost_ports": [], "vhost_templates": []}
     settings["vhost_ports"].append("443")
     with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
@@ -345,6 +346,7 @@ def vhost_config_relation_changed():
     settings["vhost_ports"].append("80")
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
         settings["vhost_templates"].append(b64encode(handle.read()))
+    # If called outside relation contex
     juju.relation_set(relation_settings=settings)
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
@@ -358,7 +360,13 @@ def vhost_config_relation_changed():
         juju.juju_log("Database not ready yet, deferring call")
         sys.exit(0)
  
-    apache_servername = juju.relation_get("hostname")
+    relids = juju.relation_ids("vhost-config")
+    if relids:
+        relid = relids[0]
+        apache2_unit = juju.relation_list(relid)[0]
+    apache_servername = juju.relation_get(
+        "hostname", unit_name=apache2_unit, relation_id=relid)
+
     if not apache_servername:
         juju.juju_log("Waiting for data from apache, deferring")
         sys.exit(0)
@@ -377,7 +385,8 @@ def vhost_config_relation_changed():
         finally:
             lock.close()
 
-    ssl_cert = juju.relation_get("ssl_cert")
+    ssl_cert = juju.relation_get("ssl_cert",
+            unit_name=apache2_unit, relation_id=relid)
     if ssl_cert:
         juju.juju_log("Writing new SSL cert: %s" % SSL_CERT_LOCATION)
         with open(SSL_CERT_LOCATION, 'w') as f:
