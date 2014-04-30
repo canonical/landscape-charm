@@ -98,6 +98,29 @@ def notify_website_relation():
             services=yaml.safe_dump(_get_services_haproxy()))
 
 
+def notify_vhost_config_relation(relation_id=None):
+    """
+    Notify the vhost-config relation.
+
+    This will mark it "ready to proceed".  If relation_id is specified
+    use that as the relation context, otherwise look up and notify all
+    relations.
+    """
+    settings = {"vhost_ports": [], "vhost_templates": []}
+    settings["vhost_ports"].append("443")
+    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
+        settings["vhost_templates"].append(b64encode(handle.read()))
+    settings["vhost_ports"].append("80")
+    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
+        settings["vhost_templates"].append(b64encode(handle.read()))
+
+    relation_ids = [relation_id]
+    if relation_id is None:
+        relation_ids = juju.relation_ids("vhost-config")
+    for relation_id in relation_ids:
+        juju.relation_set(relation_id=relation_id, **settings)
+
+
 def db_admin_relation_joined():
     pass
 
@@ -168,11 +191,7 @@ def db_admin_relation_changed():
             juju.juju_log("Landscape database initialized!")
             lock.close()
 
-    # The vhost relation is dependent on the db being setup, after the db
-    # has been configured call the vhost_config hook and it should continue
-    # (if there was any data it had not sent yet)
-    # TODO: change to just set appropriate data in the relation, which will trigger a dance.
-    vhost_config_relation_changed()
+    notify_vhost_config_relation()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
@@ -333,16 +352,7 @@ def vhost_config_relation_changed():
     informing clients of the correct URL and cert to use when connecting
     to the server.
     """
-
-    settings = {"vhost_ports": [], "vhost_templates": []}
-    settings["vhost_ports"].append("443")
-    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
-        settings["vhost_templates"].append(b64encode(handle.read()))
-    settings["vhost_ports"].append("80")
-    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
-        settings["vhost_templates"].append(b64encode(handle.read()))
-    # If called outside relation contex
-    juju.relation_set(relation_settings=settings)
+    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     try:
@@ -359,8 +369,10 @@ def vhost_config_relation_changed():
     if relids:
         relid = relids[0]
         apache2_unit = juju.relation_list(relid)[0]
-    apache_servername = juju.relation_get(
-        "hostname", unit_name=apache2_unit, relation_id=relid)
+        apache_servername = juju.relation_get(
+            "servername", unit_name=apache2_unit, relation_id=relid)
+    else:
+        apache_servername = juju.relation_get("servername")
 
     if not apache_servername:
         juju.juju_log("Waiting for data from apache, deferring")
