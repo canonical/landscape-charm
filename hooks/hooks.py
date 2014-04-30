@@ -274,12 +274,6 @@ def data_relation_changed():
     config_changed()  # only starts services again if is_db_up and _is_amqp_up
 
 
-def get_config_setting(section, setting):
-    """Read config setting from the LANDSCAPE_SERVICE_CONF."""
-    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
-    import ipdb; ipdb.set_trace()
-
-
 def update_config_settings(config_settings, outfile=None):
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     changes = False
@@ -304,7 +298,7 @@ def _is_amqp_up():
     amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
 
     host = juju.relation_get(
-        "hostname", unit_name=amqp_unit, relation_id=relid)
+        "servername", unit_name=amqp_unit, relation_id=relid)
     password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
     if not host or not password:

@@ -52,19 +52,26 @@ def change_root_url(database, user, password, host, url):
     """Change the root url in the database."""
     conn = connect(database=database, host=host, user=user,
                    password=password)
+    url = 'u' + len(url) + url
     try:
         cur = conn.cursor()
-        cur.execute("SELECT key FROM system_configuration WHERE key='root_url'")
+        cur.execute("SELECT encode(key, 'escape') "
+                    "FROM system_configuration "
+                    "WHERE key='landscape.root_url'")
         result = cur.fetchall()
         if not result:
             juju.juju_log("Setting new root_url: %s" % url)
-            cur.execute("UPDATE system_configuration "
-                        "SET key='root_url',value='%s'" % url)
+            cur.execute(
+                "UPDATE system_configuration "
+                "SET key=decode(key='landscape.root_url', 'escape'),"
+                "    value=decode('%s', 'escape')" % url)
         else:
             juju.juju_log("Updating root_url %s => %s" % (result, url))
-            cur.execute("UPDATE system_configuration "
-                        "SET key='root_url',value='%s' "
-                        "WHERE key='root_url'" % url)
+            cur.execute(
+                "UPDATE system_configuration "
+                "SET key=decode('landscape.root_url', 'escape'),"
+                "    value=decode('%s', 'escape')"
+                "WHERE key='landscape.root_url'" % url)
         conn.commit()
     finally:
         conn.close()
