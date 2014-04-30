@@ -52,7 +52,7 @@ def change_root_url(database, user, password, host, url):
     """Change the root url in the database."""
     conn = connect(database=database, host=host, user=user,
                    password=password)
-    url = 'u' + len(url) + url
+    url = "u" + str(len(url)) + url
     try:
         cur = conn.cursor()
         cur.execute("SELECT encode(key, 'escape') "

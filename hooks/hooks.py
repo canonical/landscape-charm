@@ -364,7 +364,7 @@ def vhost_config_relation_changed():
     if not apache_servername:
         juju.juju_log("Waiting for data from apache, deferring")
         sys.exit(0)
-    apache_url = "http://%s/" % apache_servername
+    apache_url = "https://%s/" % apache_servername
         
     try:
         # Name as lock so we don't try to reuse it as a database connection
