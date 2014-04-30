@@ -48,6 +48,28 @@ def create_user(user, password, host, admin_user, admin_password):
         conn.close()
 
 
+def change_root_url(database, user, password, host, url):
+    """Change the root url in the database."""
+    conn = connect(database=database, host=host, user=user,
+                   password=password)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT key FROM system_configuration WHERE key='root_url'")
+        result = cur.fetchall()
+        if not result:
+            juju.juju_log("Setting new root_url: %s" % url)
+            cur.execute("UPDATE system_configuration "
+                        "SET key='root_url',value='%s'" % url)
+        else:
+            juju.juju_log("Updating root_url %s => %s" % (result, url))
+            cur.execute("UPDATE system_configuration "
+                        "SET key='root_url',value='%s' "
+                        "WHERE key='root_url'" % url)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def is_db_up(database, host, user, password):
     """
     Return True if the database relation is configured with write permission,

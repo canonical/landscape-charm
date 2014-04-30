@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import util
 from lib.juju import Juju
 
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from configobj import ConfigObj, ConfigObjError
 from copy import deepcopy
 import cStringIO
@@ -25,6 +25,9 @@ import shutil
 import sys
 import yaml
 from subprocess import check_call, check_output, CalledProcessError, call
+
+
+SSL_CERT_LOCATION = "/etc/ssl/certs/landscape_server_ca.crt"
 
 
 def _get_installed_version(name):
@@ -165,6 +168,11 @@ def db_admin_relation_changed():
             juju.juju_log("Landscape database initialized!")
             lock.close()
 
+    # The vhost relation is dependent on the db being setup, after the db
+    # has been configured call the vhost_config hook and it should continue
+    # (if there was any data it had not sent yet)
+    vhost_config_relation_changed()
+
     try:
         # Handle remove-relation db-admin.  This call will fail because
         # database access has already been removed.
@@ -266,6 +274,12 @@ def data_relation_changed():
     config_changed()  # only starts services again if is_db_up and _is_amqp_up
 
 
+def get_config_setting(section, setting):
+    """Read config setting from the LANDSCAPE_SERVICE_CONF."""
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    import ipdb; ipdb.set_trace()
+
+
 def update_config_settings(config_settings, outfile=None):
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     changes = False
@@ -320,15 +334,10 @@ def vhost_config_relation_changed():
     """Relate to apache to configure a vhost.
 
     This hook will supply vhost configuration as well as read simple data
-    out of apache (servername, certificate).
+    out of apache (servername, certificate).  This data is necessary for 
+    informing clients of the correct URL and cert to use when connecting
+    to the server.
     """
-    # TODO: do something with these.
-    apache_servername = juju.relation_get("hostname")
-    apache_cert = juju.relation_get("ssl_cert")
-    juju.juju_log("Apache Servername: %s" % apache_servername)
-    juju.juju_log(apache_cert)
-
-    # Update vhost data.
     settings = {"vhost_ports": [], "vhost_templates": []}
     settings["vhost_ports"].append("443")
     with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
@@ -337,6 +346,45 @@ def vhost_config_relation_changed():
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
         settings["vhost_templates"].append(b64encode(handle.read()))
     juju.relation_set(relation_settings=settings)
+
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    try:
+        section = config_obj["stores"]
+        database = section["main"]
+        host = section["host"]
+        user = section["user"]
+        password = section["password"]
+    except KeyError:
+        juju.juju_log("Database not ready yet, deferring call")
+        sys.exit(0)
+ 
+    apache_servername = juju.relation_get("hostname")
+    if not apache_servername:
+        juju.juju_log("Waiting for data from apache, deferring")
+        sys.exit(0)
+    apache_url = "http://%s/" % apache_servername
+        
+    try:
+        # Name as lock so we don't try to reuse it as a database connection
+        lock = util.connect_exclusive(host, user, password)
+    except psycopg2.Error:
+        juju.juju_log("Database is being setup, deferring")
+        sys.exit(0)
+    else:
+        try:
+            juju.juju_log("Updating Landscape root_url: %s" % apache_url)
+            util.change_root_url(database, user, password, host, apache_url)
+        finally:
+            lock.close()
+
+    ssl_cert = juju.relation_get("ssl_cert")
+    if ssl_cert:
+        juju.juju_log("Writing new SSL cert: %s" % SSL_CERT_LOCATION)
+        with open(SSL_CERT_LOCATION, 'w') as f:
+            f.write(str(b64decode(ssl_cert)))
+    else:
+        if os.path.exists(SSL_CERT_LOCATION):
+            os.remove(SSL_CERT_LOCATION)
 
 def config_changed():
     """Update and restart services based on config setting changes.
