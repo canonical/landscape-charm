@@ -171,6 +171,7 @@ def db_admin_relation_changed():
     # The vhost relation is dependent on the db being setup, after the db
     # has been configured call the vhost_config hook and it should continue
     # (if there was any data it had not sent yet)
+    # TODO: change to just set appropriate data in the relation, which will trigger a dance.
     vhost_config_relation_changed()
 
     try:
@@ -388,6 +389,8 @@ def vhost_config_relation_changed():
     else:
         if os.path.exists(SSL_CERT_LOCATION):
             os.remove(SSL_CERT_LOCATION)
+    config_changed()  # only starts services again if is_db_up and _is_amqp_up
+
 
 def config_changed():
     """Update and restart services based on config setting changes.

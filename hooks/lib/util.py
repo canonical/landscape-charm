@@ -55,7 +55,7 @@ def change_root_url(database, user, password, host, url):
     url = "u" + str(len(url)) + url
     try:
         cur = conn.cursor()
-        cur.execute("SELECT encode(key, 'escape') "
+        cur.execute("SELECT encode(key, 'escape'),encode(value, 'escape') "
                     "FROM system_configuration "
                     "WHERE key='landscape.root_url'")
         result = cur.fetchall()
