@@ -106,19 +106,19 @@ def notify_vhost_config_relation(relation_id=None):
     use that as the relation context, otherwise look up and notify all
     relations.
     """
-    settings = {"vhost_ports": [], "vhost_templates": []}
-    settings["vhost_ports"].append("443")
+    vhosts = []
     with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
-        settings["vhost_templates"].append(b64encode(handle.read()))
-    settings["vhost_ports"].append("80")
+        vhosts.append({
+            "port": "443", "template": b64encode(handle.read())})
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
-        settings["vhost_templates"].append(b64encode(handle.read()))
+        vhosts.append({
+            "port": "80", "template": b64encode(handle.read())})
 
     relation_ids = [relation_id]
     if relation_id is None:
         relation_ids = juju.relation_ids("vhost-config")
     for relation_id in relation_ids:
-        juju.relation_set(relation_id=relation_id, **settings)
+        juju.relation_set(relation_id=relation_id, vhosts=yaml.dump(vhosts))
 
 
 def db_admin_relation_joined():
