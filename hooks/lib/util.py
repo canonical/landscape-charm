@@ -71,7 +71,7 @@ def change_root_url(database, user, password, host, url):
                 "UPDATE system_configuration "
                 "SET key=decode('landscape.root_url', 'escape'),"
                 "    value=decode('%s', 'escape')"
-                "WHERE key='landscape.root_url'" % url)
+                "WHERE encode(key, 'escape')='landscape.root_url'" % url)
         conn.commit()
     finally:
         conn.close()
