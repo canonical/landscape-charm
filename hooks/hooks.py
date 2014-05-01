@@ -318,7 +318,7 @@ def _is_amqp_up():
     amqp_unit = juju.relation_list(relid)[0]     # TODO support amqp clusters?
 
     host = juju.relation_get(
-        "servername", unit_name=amqp_unit, relation_id=relid)
+        "hostname", unit_name=amqp_unit, relation_id=relid)
     password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
     if not host or not password:
