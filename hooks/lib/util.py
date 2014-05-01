@@ -62,9 +62,9 @@ def change_root_url(database, user, password, host, url):
         if not result:
             juju.juju_log("Setting new root_url: %s" % url)
             cur.execute(
-                "UPDATE system_configuration "
-                "SET key=decode('landscape.root_url', 'escape'),"
-                "    value=decode('%s', 'escape')" % url)
+                "INSERT INTO system_configuration "
+                "VALUES (decode('landscape.root_url', 'escape'), "
+                "        decode('%s', 'escape'))" % url)
         else:
             juju.juju_log("Updating root_url %s => %s" % (result, url))
             cur.execute(
