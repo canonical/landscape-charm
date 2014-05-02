@@ -9,7 +9,7 @@ _common:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
                 max_connections: 500
         haproxy:
-            charm: cs:precise/haproxy-28
+            charm: cs:precise/haproxy-29
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
