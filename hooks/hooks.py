@@ -104,7 +104,7 @@ def notify_vhost_config_relation(relation_id=None):
 
     This will mark it "ready to proceed".  If relation_id is specified
     use that as the relation context, otherwise look up and notify all
-    relations.
+    vhost-config relations.
     """
     vhosts = []
     with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
@@ -348,7 +348,7 @@ def vhost_config_relation_changed():
     """Relate to apache to configure a vhost.
 
     This hook will supply vhost configuration as well as read simple data
-    out of apache (servername, certificate).  This data is necessary for 
+    out of apache (servername, certificate).  This data is necessary for
     informing clients of the correct URL and cert to use when connecting
     to the server.
     """
@@ -364,7 +364,7 @@ def vhost_config_relation_changed():
     except KeyError:
         juju.juju_log("Database not ready yet, deferring call")
         sys.exit(0)
- 
+
     relids = juju.relation_ids("vhost-config")
     if relids:
         relid = relids[0]
@@ -378,7 +378,7 @@ def vhost_config_relation_changed():
         juju.juju_log("Waiting for data from apache, deferring")
         sys.exit(0)
     apache_url = "https://%s/" % apache_servername
-        
+
     try:
         # Name as lock so we don't try to reuse it as a database connection
         lock = util.connect_exclusive(host, user, password)
@@ -392,8 +392,10 @@ def vhost_config_relation_changed():
         finally:
             lock.close()
 
-    ssl_cert = juju.relation_get("ssl_cert",
-            unit_name=apache2_unit, relation_id=relid)
+    # This data may or may not be present, dependeing on if cert is self
+    # signed from apache.
+    ssl_cert = juju.relation_get(
+        "ssl_cert", unit_name=apache2_unit, relation_id=relid)
     if ssl_cert:
         juju.juju_log("Writing new SSL cert: %s" % SSL_CERT_LOCATION)
         with open(SSL_CERT_LOCATION, 'w') as f:
@@ -401,7 +403,9 @@ def vhost_config_relation_changed():
     else:
         if os.path.exists(SSL_CERT_LOCATION):
             os.remove(SSL_CERT_LOCATION)
-    config_changed()  # only starts services again if is_db_up and _is_amqp_up
+
+    # only starts services again if is_db_up and _is_amqp_up
+    config_changed()
 
 
 def config_changed():
