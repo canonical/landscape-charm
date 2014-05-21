@@ -1554,7 +1554,7 @@ class TestHooksServiceMock(TestHooks):
     def test_vhost_config_relation_changed_cert_not_provided(self):
         """
         Ensure vhost_relation_changed runs to completion.
-        
+
         Existing cert should be removed.
         """
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
@@ -1586,7 +1586,7 @@ class TestHooksServiceMock(TestHooks):
     def test_vhost_config_relation_changed_ssl_cert_provided(self):
         """
         Ensure vhost_relation_changed runs to completion.
-        
+
         Cert passed in to other side of relation should be written on disk.
         """
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
