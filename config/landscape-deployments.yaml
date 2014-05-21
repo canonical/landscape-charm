@@ -3,7 +3,7 @@ _common:
         rabbitmq-server:
             charm: cs:precise/rabbitmq-server-23
         postgresql:
-            charm: cs:precise/postgresql-69
+            charm: cs:precise/postgresql-70
             constraints: mem=2048
             options:
                 extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
