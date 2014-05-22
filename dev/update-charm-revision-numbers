@@ -23,7 +23,7 @@ class Charm(object):
         if "errors" in self.charm_data:
             raise IOError("%s: %s" % (charm_name, self.charm_data["errors"]))
         self.revision = self.charm_data["revision"]
-
+        self.store_url = "cs:{}/{}-{}".format(series, self.name, self.revision)
 
 def _get_charm(charm_name, series):
     try: 
@@ -53,9 +53,8 @@ def replace_in_config(charms, series):
     filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
         for charm in charms:
-            pattern = "(cs:){}/{}-[0-9]+".format(series, charm.name)
-            replace = r"\1{}/{}-{}".format(series, charm.name, charm.revision)
-            line = re.sub(pattern, replace, line)
+            pattern = "cs:[^/]+/{}-[0-9]+".format(charm.name)
+            line = re.sub(pattern, charm.store_url, line)
         sys.stdout.write(line)
 
     print("#")
