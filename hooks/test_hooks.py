@@ -1481,3 +1481,40 @@ class TestHooksServiceMock(TestHooks):
         hooks.notify_website_relation()
         baseline = (("services", yaml.safe_dump(self.all_services)),)
         self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+
+class TestHooksUtils(TestHooks):
+    def test__setup_apache(self):
+        """
+        Responsible for setting up apache to serve static content.
+        - various 'a2*' commands need to be mocked and tested to ensure
+          proper parameters are passed.  
+        - make sure we actually replace '@hostname@' with 'localhost' in the
+          site file we are installing.  
+        - ensure new file has '.conf' extension.
+        """
+        tempdir = self.makeDir()
+        with open("%s/default.random_extension" % tempdir, 'w') as f:
+            f.write("HI!")
+        with open("%s/default2.conf" % tempdir, 'w') as f:
+            f.write("HI!")
+        # Replace dir, but leave basename to check that it has '.conf'
+        # (new requirement with Trusty apache2)
+        site_file = os.path.basename(hooks.LANDSCAPE_APACHE_SITE)
+        hooks.LANDSCAPE_APACHE_SITE = "%s/%s" % (tempdir, site_file)
+        _a2enmods = self.mocker.replace(hooks._a2enmods)
+        _a2dissite = self.mocker.replace(hooks._a2dissite)
+        _a2ensite = self.mocker.replace(hooks._a2ensite)
+        _service = self.mocker.replace(hooks._service)
+        _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+        _a2dissite("default.random_extension")
+        _a2dissite("default2.conf")
+        _a2ensite("landscape.conf")
+        _service("apache2", "restart")
+        self.mocker.replay()
+        hooks._setup_apache()
+        self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
+        with open("%s/landscape.conf" % tempdir, 'r') as f:
+            site_text = f.read()
+        self.assertFalse("@hostname@" in site_text)
+        self.assertTrue("localhost" in site_text)
