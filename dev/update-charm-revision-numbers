@@ -10,7 +10,7 @@ from yaml import load
 
 class Charm(object):
 
-    def __init__(self, charm_name, series="precise"):
+    def __init__(self, charm_name, series):
         """Create a charm object.
         @param charm_name: name of charm
         """
@@ -20,11 +20,25 @@ class Charm(object):
         response = urlopen(url)
         self.charm_data = load(response)[reference]
         self.name = charm_name
-        assert "errors" not in self.charm_data, self.charm_data["errors"]
+        if "errors" in self.charm_data:
+            raise IOError("%s: %s" % (charm_name, self.charm_data["errors"]))
         self.revision = self.charm_data["revision"]
 
 
-def replace_in_config(charms, series="precise"):
+def _get_charm(charm_name, series):
+    try: 
+        return Charm(charm_name, series)
+    except IOError as e:
+        if series != "precise":
+            try:
+                return Charm(charm_name, series="precise")
+            except IOError as precise_e:
+                raise IOError("%s: not found? (even tried precise): %s, %s" % (
+                        charm_name, e, precise_e))
+        raise
+
+
+def replace_in_config(charms, series):
     """
     Iterate over each charm, replacing all occurences of old charm store
     urls with new versions.  Intent is to leave file in a state that can
@@ -39,8 +53,8 @@ def replace_in_config(charms, series="precise"):
     filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
         for charm in charms:
-            pattern = "(cs:{}/{})-[0-9]+".format(series, charm.name)
-            replace = r"\1-{}".format(charm.revision)
+            pattern = "(cs:){}/{}-[0-9]+".format(series, charm.name)
+            replace = r"\1{}/{}-{}".format(series, charm.name, charm.revision)
             line = re.sub(pattern, replace, line)
         sys.stdout.write(line)
 
@@ -53,6 +67,7 @@ def get_options():
     description = "Put new charmstore descriptors into a deployer file."
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("charms", help="List charms to update", nargs='*')
+    parser.add_argument("--series", help="Charm series", default="precise")
     return parser.parse_args()
 
 
@@ -62,10 +77,10 @@ def main():
     if len(options.charms):
         print("# Latest upstream versions of charms: ")
     for charm_name in options.charms:
-        charm = Charm(charm_name)
+        charm = _get_charm(charm_name, series=options.series)
         print("#   {}: {}".format(charm_name, charm.revision))
         charms.append(charm)
-    replace_in_config(charms)
+    replace_in_config(charms, series=options.series)
 
     sys.exit(0)
 
