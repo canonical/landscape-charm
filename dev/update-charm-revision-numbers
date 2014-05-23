@@ -45,13 +45,15 @@ def replace_in_config(charms, series):
     be tested and checked in if successful.
 
     Look for lines like:
-
       charm: cs:precise/juju-gui-83
 
-    Replace the digit at the end with the latest rev.
+    Or:
+      series: precise
     """
     filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
+        pattern = "^(\s*)series:\s.*$"
+        line = re.sub(pattern, r"\1series: %s" % series, line)
         for charm in charms:
             pattern = "cs:[^/]+/{}-[0-9]+".format(charm.name)
             line = re.sub(pattern, charm.store_url, line)
