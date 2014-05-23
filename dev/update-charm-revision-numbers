@@ -76,7 +76,8 @@ def main():
     options = get_options()
     charms = []
     if len(options.charms):
-        print("# Latest upstream versions of charms: ")
+        print("# Latest upstream versions of charms ({}):".format(
+            options.series))
     for charm_name in options.charms:
         charm = _get_charm(charm_name, series=options.series)
         print("#   {}: {}".format(charm_name, charm.revision))
