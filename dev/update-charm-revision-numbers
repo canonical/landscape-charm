@@ -25,8 +25,13 @@ class Charm(object):
         self.revision = self.charm_data["revision"]
         self.store_url = "cs:{}/{}-{}".format(series, self.name, self.revision)
 
+
 def _get_charm(charm_name, series):
-    try: 
+    """
+    Small wrapper to try to get the series charm you specify.  Falls back
+    to precise if you specified something else
+    """
+    try:
         return Charm(charm_name, series)
     except IOError as e:
         if series != "precise":
@@ -34,7 +39,7 @@ def _get_charm(charm_name, series):
                 return Charm(charm_name, series="precise")
             except IOError as precise_e:
                 raise IOError("%s: not found? (even tried precise): %s, %s" % (
-                        charm_name, e, precise_e))
+                    charm_name, e, precise_e))
         raise
 
 

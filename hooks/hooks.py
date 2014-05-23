@@ -377,7 +377,7 @@ def _setup_apache():
     _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
     sites_available = os.listdir(os.path.dirname(LANDSCAPE_APACHE_SITE))
     for site in sites_available:
-        _a2dissite(site) 
+        _a2dissite(site)
     shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
     _a2ensite("landscape.conf")

@@ -1488,9 +1488,9 @@ class TestHooksUtils(TestHooks):
         """
         Responsible for setting up apache to serve static content.
         - various 'a2*' commands need to be mocked and tested to ensure
-          proper parameters are passed.  
+          proper parameters are passed.
         - make sure we actually replace '@hostname@' with 'localhost' in the
-          site file we are installing.  
+          site file we are installing.
         - ensure new file has '.conf' extension.
         """
         tempdir = self.makeDir()
