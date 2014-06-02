@@ -6,7 +6,7 @@ _common:
             charm: cs:precise/postgresql-71
             constraints: mem=2048
             options:
-                extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
+                extra-packages: python-apt postgresql-contrib postgresql-.*-debversion
                 max_connections: 500
         haproxy:
             charm: cs:precise/haproxy-30
