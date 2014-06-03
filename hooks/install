@@ -80,6 +80,7 @@ function apt_get() {
 # Workaround for: https://bugs.launchpad.net/juju/+bug/993034
 echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-proxy
 
+apt_get update
 apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
                 python-support wget pwgen apache2-mpm-worker \
