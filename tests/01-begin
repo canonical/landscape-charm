@@ -128,13 +128,13 @@ def find_address(juju_status, service_name):
         raise ServiceOrUnitNotFound(service_name)
 
 
-def find_landscape_unit_with_service(juju_status, landscape_service):
+def find_landscape_unit_with_service(juju_status, wanted_service):
     """
     Find the first landscape unit that has the specified service on it.
 
     @param juju_status: dictionary representing the juju status output.
-    @param landscape_service: string representing the landscape service we
-                              are looking for.
+    @param wanted_service: string representing the landscape service we
+                           are looking for.
     """
     services = juju_status["services"]
     for service_name in services:
@@ -142,14 +142,14 @@ def find_landscape_unit_with_service(juju_status, landscape_service):
             continue
         config = get_service_config(service_name)
         landscape_services = config["settings"]["services"]["value"]
-        if landscape_service not in landscape_services:
+        if wanted_service not in landscape_services:
             continue
         service = services[service_name]
         units = service.get("units", {})
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
             return unit_keys[0]
-    raise ServiceOrUnitNotFound(landscape_service)
+    raise ServiceOrUnitNotFound(wanted_service)
 
 
 def get_landscape_units(juju_status):
