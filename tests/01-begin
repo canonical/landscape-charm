@@ -23,14 +23,14 @@ log = logging.getLogger(__file__)
 
 
 def check_url(url, good_content, post_data=None, header=None,
-              interval=10, attempts=30, retry_unavailable=False):
+              interval=5, attempts=2, retry_unavailable=False):
     """
     Polls the given URL looking for the specified good_content.  If
     not found in the timeout period, will assert.  If found, returns
     the output matching.
 
     @param url: URL to poll
-    @param good_content: string we are looking for
+    @param good_content: string we are looking for, or list of strings
     @param post_data: optional POST data string
     @param header: optional request header string
     @param interval: number of seconds between polls
@@ -38,6 +38,8 @@ def check_url(url, good_content, post_data=None, header=None,
     @param retry_unavailable: if host is unavailable, retry (default: False)
     """
     output = ""
+    if type(good_content) is not list:
+        good_content = [good_content]
     cmd = ["curl", url, "-k", "-L", "-s"]
     if post_data:
         cmd.extend(["-d", post_data])
@@ -56,7 +58,7 @@ def check_url(url, good_content, post_data=None, header=None,
                 log.info("Unavailable, retrying: {}".format(url))
             else:
                 raise
-        if good_content in output:
+        if all(content in output for content in good_content):
             return output
         sys.stdout.write(".")
         sys.stdout.flush()
@@ -82,7 +84,7 @@ def setUpModule():
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
     check_url("https://{}/".format(frontend), good_content, interval=30,
-              retry_unavailable=True)
+              attempts=10, retry_unavailable=True)
 
 
 def juju_status():
@@ -126,11 +128,13 @@ def find_address(juju_status, service_name):
         raise ServiceOrUnitNotFound(service_name)
 
 
-def find_cron_unit(juju_status):
+def find_landscape_unit_with_service(juju_status, landscape_service):
     """
-    Find the first landscape unit that has the cron service on it.
+    Find the first landscape unit that has the specified service on it.
 
     @param juju_status: dictionary representing the juju status output.
+    @param landscape_service: string representing the landscape service we
+                              are looking for.
     """
     services = juju_status["services"]
     for service_name in services:
@@ -138,14 +142,14 @@ def find_cron_unit(juju_status):
             continue
         config = get_service_config(service_name)
         landscape_services = config["settings"]["services"]["value"]
-        if "cron" not in landscape_services:
+        if landscape_service not in landscape_services:
             continue
         service = services[service_name]
         units = service.get("units", {})
         unit_keys = list(sorted(units.keys()))
         if unit_keys:
             return unit_keys[0]
-    raise ServiceOrUnitNotFound("cron")
+    raise ServiceOrUnitNotFound(landscape_service)
 
 
 def get_landscape_units(juju_status):
@@ -284,8 +288,8 @@ class LandscapeServiceTests(BaseLandscapeTests):
         Specifically, that we can reach a file that is hosted on the static
         server/unit.
         """
-        good_content = "landscape-expandable-content"
-        url = "https://{}/static/skin/manx/base.css".format(self.frontend)
+        good_content = ".link-button-image-landscape"
+        url = "https://{}/static/skin/hokan/widgets.css".format(self.frontend)
         check_url(url, good_content)
 
     def test_hash_id_databases(self):
@@ -358,12 +362,150 @@ class LandscapeServiceConfigTests(BaseLandscapeTests):
             self.assertNotEqual(len(schema["store_password"]), 0)
 
 
+class LandscapeErrorPagesTests(BaseLandscapeTests):
+
+    @classmethod
+    def setUpClass(cls):
+        """Prepares juju_status and other attributes that many tests use."""
+        cls.juju_status = juju_status()
+        cls.frontend = find_address(cls.juju_status, "apache2")
+        cls.app_unit = find_landscape_unit_with_service(
+                       cls.juju_status, "appserver")
+        cls.msg_unit = find_landscape_unit_with_service(
+                       cls.juju_status, "msgserver")
+        cls.ping_unit = find_landscape_unit_with_service(
+                        cls.juju_status, "pingserver")
+        cls.async_unit = find_landscape_unit_with_service(
+                         cls.juju_status, "async-frontend")
+        cls.combo_unit = find_landscape_unit_with_service(
+                         cls.juju_status, "combo-loader")
+
+    def run_command_on_unit(self, cmd, unit):
+        output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
+        return output.decode("utf-8").strip()
+
+    def stop_app_server(self):
+        cmd = "sudo service landscape-appserver stop"
+        self.run_command_on_unit(cmd, self.app_unit)
+
+    def stop_msg_server(self):
+        cmd = "sudo service landscape-msgserver stop"
+        self.run_command_on_unit(cmd, self.msg_unit)
+
+    def stop_ping_server(self):
+        cmd = "sudo service landscape-pingserver stop"
+        self.run_command_on_unit(cmd, self.ping_unit)
+
+    def stop_async_server(self):
+        cmd = "sudo service landscape-async-frontend stop"
+        self.run_command_on_unit(cmd, self.async_unit)
+
+    def stop_combo_server(self):
+        cmd = "sudo service landscape-combo-loader stop"
+        self.run_command_on_unit(cmd, self.combo_unit)
+
+    def start_app_server(self):
+        cmd = "sudo service landscape-appserver start"
+        self.run_command_on_unit(cmd, self.app_unit)
+
+    def start_msg_server(self):
+        cmd = "sudo service landscape-msgserver start"
+        self.run_command_on_unit(cmd, self.msg_unit)
+
+    def start_ping_server(self):
+        cmd = "sudo service landscape-pingserver start"
+        self.run_command_on_unit(cmd, self.ping_unit)
+
+    def start_async_server(self):
+        cmd = "sudo service landscape-async-frontend start"
+        self.run_command_on_unit(cmd, self.async_unit)
+
+    def start_combo_server(self):
+        cmd = "sudo service landscape-combo-loader start"
+        self.run_command_on_unit(cmd, self.combo_unit)
+
+    def test_app_unavailable_page(self):
+        """
+        Verify that the frontend shows the styled unavailable page for app.
+        """
+        self.stop_app_server()
+        good_content = ["Worldwide support number", "static/skin/hokan"]
+        url = "https://{}/".format(self.frontend)
+        try:
+            check_url(url, good_content)
+        except:
+            self.start_app_server()
+            raise
+        self.start_app_server()
+
+    def test_msg_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for msg.
+        """
+        self.stop_msg_server()
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "https://{}/message-system".format(self.frontend)
+        try:
+            check_url(url, good_content)
+        except:
+            self.start_msg_server()
+            raise
+        self.start_msg_server()
+
+    def test_ping_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for ping.
+        """
+        self.stop_ping_server()
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "http://{}/ping".format(self.frontend)
+        try:
+            check_url(url, good_content)
+        except:
+            self.start_ping_server()
+            raise
+        self.start_ping_server()
+
+    def test_async_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for async.
+        """
+        self.stop_async_server()
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "https://{}/ajax".format(self.frontend)
+        try:
+            check_url(url, good_content)
+        except:
+            self.start_async_server()
+            raise
+        self.start_async_server()
+
+    def test_combo_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for combo.
+        """
+        self.stop_combo_server()
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "http://{}/combo".format(self.frontend)
+        try:
+            check_url(url, good_content)
+        except:
+            self.start_combo_server()
+            raise
+        self.start_combo_server()
+    
+
 class LandscapeCronTests(BaseLandscapeTests):
 
     @classmethod
     def setUpClass(cls):
         cls.juju_status = juju_status()
-        cls.cron_unit = find_cron_unit(cls.juju_status)
+        cls.cron_unit = find_landscape_unit_with_service(
+                            cls.juju_status, "cron")
         cls._stop_cron(cls.cron_unit)
 
     @classmethod
