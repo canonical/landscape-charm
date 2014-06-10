@@ -288,8 +288,8 @@ class LandscapeServiceTests(BaseLandscapeTests):
         Specifically, that we can reach a file that is hosted on the static
         server/unit.
         """
-        good_content = ".link-button-image-landscape"
-        url = "https://{}/static/skin/hokan/widgets.css".format(self.frontend)
+        good_content = "ubuntu.woff"
+        url = "https://{}/static/fonts/ubuntu-font.css".format(self.frontend)
         check_url(url, good_content)
 
     def test_hash_id_databases(self):
