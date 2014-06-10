@@ -397,7 +397,7 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         Verify that the frontend shows the styled unavailable page for app.
         """
         self.stop_server("landscape-appserver", self.app_unit)
-        good_content = "Worldwide support number"
+        good_content = "please phone us"
         url = "https://{}/".format(self.frontend)
         try:
             check_url(url, good_content)
