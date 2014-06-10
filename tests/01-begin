@@ -512,12 +512,30 @@ class LandscapeCronTests(BaseLandscapeTests):
     def tearDownClass(cls):
         cls._start_cron(cls.cron_unit)
 
+    def _sanitize_ssh_output(self, output,
+            remove_text=["sudo: unable to resolve",
+                         "Warning: Permanently added"]):
+        """Strip some common warning messages from ssh output.
+
+        @param output: output to sanitize
+        @param remove_txt: list of text that, if found at the beginning of
+                           the a output line, will have that line removed
+                           entirely.
+        """
+        new_output = []
+        for line in output.split("\n"): 
+            if any(line.startswith(remove) for remove in remove_text):
+                continue
+            new_output.append(line)
+        return "\n".join(new_output)
+        
     def _run_cron(self, script):
         status = 0
         cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
                "2>&1"]
         try:
-            output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+            output = self._sanitize_ssh_output(
+                check_output(cmd, stderr=PIPE).decode("utf-8").strip())
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
