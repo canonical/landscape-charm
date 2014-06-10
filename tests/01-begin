@@ -433,10 +433,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "https://{}/".format(self.frontend)
         try:
             check_url(url, good_content)
-        except:
+        finally:
             self.start_app_server()
-            raise
-        self.start_app_server()
 
     def test_msg_unavailable_page(self):
         """
@@ -448,10 +446,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "https://{}/message-system".format(self.frontend)
         try:
             check_url(url, good_content)
-        except:
+        finally:
             self.start_msg_server()
-            raise
-        self.start_msg_server()
 
     def test_ping_unavailable_page(self):
         """
@@ -463,10 +459,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "http://{}/ping".format(self.frontend)
         try:
             check_url(url, good_content)
-        except:
+        finally:
             self.start_ping_server()
-            raise
-        self.start_ping_server()
 
     def test_async_unavailable_page(self):
         """
@@ -478,10 +472,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "https://{}/ajax".format(self.frontend)
         try:
             check_url(url, good_content)
-        except:
+        finally:
             self.start_async_server()
-            raise
-        self.start_async_server()
 
     def test_combo_unavailable_page(self):
         """
@@ -493,10 +485,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "http://{}/combo".format(self.frontend)
         try:
             check_url(url, good_content)
-        except:
+        finally:
             self.start_combo_server()
-            raise
-        self.start_combo_server()
 
 
 class LandscapeCronTests(BaseLandscapeTests):
