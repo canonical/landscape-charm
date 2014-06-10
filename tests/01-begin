@@ -476,9 +476,9 @@ class LandscapeCronTests(BaseLandscapeTests):
         """Strip some common warning messages from ssh output.
 
         @param output: output to sanitize
-        @param remove_txt: list of text that, if found at the beginning of
-                           the a output line, will have that line removed
-                           entirely.
+        @param remove_text: list of text that, if found at the beginning of
+                            the a output line, will have that line removed
+                            entirely.
         """
         new_output = []
         for line in output.split("\n"):
