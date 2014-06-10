@@ -524,6 +524,7 @@ class LandscapeCronTests(BaseLandscapeTests):
         cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
                "2>&1"]
         try:
+            # The sanitize is a workaround for lp:1328269
             output = self._sanitize_ssh_output(
                 check_output(cmd, stderr=PIPE).decode("utf-8").strip())
         except CalledProcessError as e:
