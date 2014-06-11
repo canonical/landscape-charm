@@ -460,14 +460,19 @@ def _service(service, action):
 
 def _setup_apache():
     """
-    Setup apache2 to serve static landscape content
+    Setup apache2 to serve static landscape content, removing everything else.
+
+    N.B. As of Trusty, sites must be named with '.conf' at the end.
+    Precise and Trusty can then both use a2ensite/a2dissite with 'file.conf'.
     """
     public = juju.unit_get("public-address")
     _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
-    _a2dissite("default")
+    sites_available = os.listdir(os.path.dirname(LANDSCAPE_APACHE_SITE))
+    for site in sites_available:
+        _a2dissite(site)
     shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
-    _a2ensite("landscape")
+    _a2ensite("landscape.conf")
     _service("apache2", "restart")
 
 
@@ -762,15 +767,15 @@ SERVICE_PROXY = {
         "port": "8080",
         "errorfiles": deepcopy(ERROR_FILES)},
     "msgserver": {
-        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"
+        },
     "pingserver": {
-        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"
+        },
     "combo-loader": {
         "port": "9070",
-        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
+        },
     "async-frontend": {
         "port": "9090",
         "service_options": ["timeout client 300000",
@@ -814,7 +819,7 @@ SERVICE_DEFAULT = {
     "static": None}
 
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
-LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
+LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape.conf"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
 LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"

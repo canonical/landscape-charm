@@ -13,6 +13,8 @@ NameVirtualHost *:80
      Options +Indexes
      Order deny,allow
      Allow from all
+     Require all granted
+     Satisfy Any
      ErrorDocument 403 /static/offline/unauthorized.html
      ErrorDocument 404 /static/offline/notfound.html
    </Directory>

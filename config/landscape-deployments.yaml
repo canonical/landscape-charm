@@ -1,15 +1,15 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-23
+            charm: cs:precise/rabbitmq-server-25
         postgresql:
-            charm: cs:precise/postgresql-69
+            charm: cs:precise/postgresql-71
             constraints: mem=2048
             options:
-                extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
+                extra-packages: python-apt postgresql-contrib postgresql-.*-debversion
                 max_connections: 500
         haproxy:
-            charm: cs:precise/haproxy-29
+            charm: cs:precise/haproxy-30
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
