@@ -396,65 +396,60 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         """
         Verify that the frontend shows the styled unavailable page for app.
         """
+        self.addCleanup(self.start_server, "landscape-appserver",
+                        self.app_unit)
         self.stop_server("landscape-appserver", self.app_unit)
         good_content = "please phone us"
         url = "https://{}/".format(self.frontend)
-        try:
-            check_url(url, good_content)
-        finally:
-            self.start_server("landscape-appserver", self.app_unit)
+        check_url(url, good_content)
 
     def test_msg_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for msg.
         """
+        self.addCleanup(self.start_server, "landscape-msgserver",
+                        self.msg_unit)
         self.stop_server("landscape-msgserver", self.msg_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/message-system".format(self.frontend)
-        try:
-            check_url(url, good_content)
-        finally:
-            self.start_server("landscape-msgserver", self.msg_unit)
+        check_url(url, good_content)
 
     def test_ping_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for ping.
         """
+        self.addCleanup(self.start_server, "landscape-pingserver",
+                        self.ping_unit)
         self.stop_server("landscape-pingserver", self.ping_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "http://{}/ping".format(self.frontend)
-        try:
-            check_url(url, good_content)
-        finally:
-            self.start_server("landscape-pingserver", self.ping_unit)
+        check_url(url, good_content)
 
     def test_async_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for async.
         """
+        self.addCleanup(self.start_server, "landscape-async-frontend",
+                        self.async_unit)
         self.stop_server("landscape-async-frontend", self.async_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/ajax".format(self.frontend)
-        try:
-            check_url(url, good_content)
-        finally:
-            self.start_server("landscape-async-frontend", self.async_unit)
+        check_url(url, good_content)
 
     def test_combo_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for combo.
         """
+        self.addCleanup(self.start_server, "landscape-combo-loader",
+                        self.combo_unit)
         self.stop_server("landscape-combo-loader", self.combo_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "http://{}/combo".format(self.frontend)
-        try:
-            check_url(url, good_content)
-        finally:
-            self.start_server("landscape-combo-loader", self.combo_unit)
+        check_url(url, good_content)
 
 
 class LandscapeCronTests(BaseLandscapeTests):
