@@ -675,15 +675,15 @@ SERVICE_PROXY = {
         "port": "8080",
         "errorfiles": deepcopy(ERROR_FILES)},
     "msgserver": {
-        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"
+        },
     "pingserver": {
-        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"
+        },
     "combo-loader": {
         "port": "9070",
-        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
+        },
     "async-frontend": {
         "port": "9090",
         "service_options": ["timeout client 300000",
