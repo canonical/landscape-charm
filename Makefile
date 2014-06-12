@@ -12,10 +12,12 @@ verify-juju-test:
 	fi 
 
 update-charm-revision-numbers:
-	dev/update-charm-revision-numbers apache2 postgresql juju-gui haproxy rabbitmq-server nfs
+	dev/update-charm-revision-numbers \
+		$(EXTRA_UPDATE_ARGUMENTS) \
+		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 integration-test: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
-	juju test -p SKIP_SLOW_TESTS,DEPLOYER_TARGET -v --timeout 3000s
+	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME -v --timeout 3000s
 
 lint:
 	flake8 --exclude=charmhelpers hooks
