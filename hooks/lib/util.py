@@ -56,8 +56,8 @@ def change_root_url(database, user, password, host, url):
     try:
         cur = conn.cursor()
         cur.execute("SELECT encode(key, 'escape'),encode(value, 'escape') "
-                    "FROM system_configuration FOR UPDATE "
-                    "WHERE key='landscape.root_url'")
+                    "FROM system_configuration "
+                    "WHERE key='landscape.root_url' FOR UPDATE")
         result = cur.fetchall()
         if not result:
             juju.juju_log("Setting new root_url: %s" % url)
@@ -70,7 +70,7 @@ def change_root_url(database, user, password, host, url):
             cur.execute(
                 "UPDATE system_configuration "
                 "SET key=decode('landscape.root_url', 'escape'),"
-                "    value=decode(%s, 'escape')"
+                "    value=decode(%s, 'escape') "
                 "WHERE encode(key, 'escape')='landscape.root_url'", (url,))
         conn.commit()
     finally:
