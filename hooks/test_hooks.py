@@ -3,6 +3,7 @@ from configobj import ConfigObj
 import hooks
 import mocker
 import os
+import psycopg2
 import pycurl
 import stat
 import subprocess
@@ -1554,6 +1555,25 @@ class TestHooksServiceMock(TestHooks):
         self.assertIn(
             'Waiting for database to become available, deferring',
             hooks.juju._logs[-1])
+
+    def test_vhost_config_relation_changed_fail_root_url_db_update(self):
+        """vhost_config_relation_changed should error if db update fails"""
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+        self.assertRaises(psycopg2.Error, hooks.vhost_config_relation_changed)
 
     def test_vhost_config_relation_changed_cert_not_provided(self):
         """
