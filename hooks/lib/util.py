@@ -42,7 +42,7 @@ def create_user(user, password, host, admin_user, admin_password):
         result = cur.fetchall()
         if not result:
             juju.juju_log("Creating postgres db user: %s" % user)
-            cur.execute("CREATE user %s WITH PASSWORD %s", (user, password))
+            cur.execute("CREATE user %s WITH PASSWORD %s" % (user, password))
             conn.commit()
     finally:
         conn.close()

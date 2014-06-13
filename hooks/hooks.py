@@ -349,7 +349,6 @@ def vhost_config_relation_changed():
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
-    import ipdb; ipdb.set_trace()
     try:
         section = config_obj["stores"]
         database = section["main"]

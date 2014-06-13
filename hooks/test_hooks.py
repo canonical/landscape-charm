@@ -1546,10 +1546,14 @@ class TestHooksServiceMock(TestHooks):
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
         notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(False)
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn(
-            'Database is being setup, deferring', hooks.juju._logs[-1])
+            'Waiting for database to become available, deferring',
+            hooks.juju._logs[-1])
 
     def test_vhost_config_relation_changed_cert_not_provided(self):
         """
@@ -1579,6 +1583,9 @@ class TestHooksServiceMock(TestHooks):
             "database", "user", "password", "host", "https://foobar/")
         config_changed = self.mocker.replace(hooks.config_changed)
         config_changed()
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
         self.mocker.replay()
         hooks.vhost_config_relation_changed()
         self.assertFalse(os.path.exists(hooks.SSL_CERT_LOCATION))
@@ -1590,7 +1597,7 @@ class TestHooksServiceMock(TestHooks):
         Cert passed in to other side of relation should be written on disk.
         """
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
-        _get_config_obj = self.mocker.replace(hooks._get_config_obj).count(2)
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
         hooks.juju._incoming_relation_data += (("servername", "foobar"),)
         hooks.juju._incoming_relation_data += (
