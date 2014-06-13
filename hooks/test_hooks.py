@@ -6,8 +6,8 @@ import os
 import pycurl
 import stat
 import subprocess
-import yaml
 import tempfile
+import yaml
 
 
 class TestJuju(object):
