@@ -374,6 +374,9 @@ def vhost_config_relation_changed():
         sys.exit(0)
     apache_url = "https://%s/" % apache_servername
 
+    if not _is_db_up():
+        juju.juju_log("Waiting for database to become available, deferring.")
+
     # Name as lock so we don't try to reuse it as a database connection
     lock = util.connect_exclusive(host, user, password)
     try:

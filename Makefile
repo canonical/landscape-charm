@@ -20,7 +20,7 @@ integration-test: verify-juju-test config/repo-file config/license-file config/v
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME -v --timeout 3000s
 
 deploy-dense-maas: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
-	SKIP_SLOW_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
 
 lint:
 	flake8 --exclude=charmhelpers hooks
