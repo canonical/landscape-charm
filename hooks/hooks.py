@@ -178,12 +178,12 @@ def db_admin_relation_changed():
     # Name as lock so we don't try to reuse it as a database connection
     lock = util.connect_exclusive(host, admin, admin_password)
     try:
-	util.create_user(user, password, host, admin, admin_password)
-	_create_maintenance_user(password, host, admin, admin_password)
-	check_call("setup-landscape-server")
+        util.create_user(user, password, host, admin, admin_password)
+        _create_maintenance_user(password, host, admin, admin_password)
+        check_call("setup-landscape-server")
     finally:
-	juju.juju_log("Landscape database initialized!")
-	lock.close()
+        juju.juju_log("Landscape database initialized!")
+        lock.close()
 
     notify_vhost_config_relation()
 
@@ -380,10 +380,10 @@ def vhost_config_relation_changed():
     # Name as lock so we don't try to reuse it as a database connection
     lock = util.connect_exclusive(host, user, password)
     try:
-	juju.juju_log("Updating Landscape root_url: %s" % apache_url)
-	util.change_root_url(database, user, password, host, apache_url)
+        juju.juju_log("Updating Landscape root_url: %s" % apache_url)
+        util.change_root_url(database, user, password, host, apache_url)
     finally:
-	lock.close()
+        lock.close()
 
     # This data may or may not be present, dependeing on if cert is self
     # signed from apache.
