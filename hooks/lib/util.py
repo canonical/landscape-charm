@@ -4,6 +4,7 @@ Utility library for juju hooks
 
 from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
+from contextlib import closing
 
 juju = Juju()
 
@@ -50,10 +51,9 @@ def create_user(user, password, host, admin_user, admin_password):
 
 def change_root_url(database, user, password, host, url):
     """Change the root url in the database."""
-    conn = connect(database=database, host=host, user=user,
-                   password=password)
     url = "u%s:%s" % (len(url), url)
-    try:
+    with closing(connect(database=database, host=host, 
+                         user=user, password=password)) as conn:
         cur = conn.cursor()
         cur.execute("SELECT encode(key, 'escape'),encode(value, 'escape') "
                     "FROM system_configuration "
@@ -73,8 +73,6 @@ def change_root_url(database, user, password, host, url):
                 "    value=decode(%s, 'escape') "
                 "WHERE encode(key, 'escape')='landscape.root_url'", (url,))
         conn.commit()
-    finally:
-        conn.close()
 
 
 def is_db_up(database, host, user, password):

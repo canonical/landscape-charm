@@ -11,6 +11,7 @@ from lib.juju import Juju
 
 from base64 import b64encode, b64decode
 from configobj import ConfigObj, ConfigObjError
+from contextlib import closing
 from copy import deepcopy
 import cStringIO
 import datetime
@@ -175,15 +176,11 @@ def db_admin_relation_changed():
                     "password": password},
          "schema": {"store_user": admin, "store_password": admin_password}})
 
-    # Name as lock so we don't try to reuse it as a database connection
-    lock = util.connect_exclusive(host, admin, admin_password)
-    try:
+    with closing(util.connect(host, admin, admin_password)):
         util.create_user(user, password, host, admin, admin_password)
         _create_maintenance_user(password, host, admin, admin_password)
         check_call("setup-landscape-server")
-    finally:
         juju.juju_log("Landscape database initialized!")
-        lock.close()
 
     notify_vhost_config_relation()
 
@@ -377,13 +374,9 @@ def vhost_config_relation_changed():
         juju.juju_log("Waiting for database to become available, deferring.")
         sys.exit(0)
 
-    # Name as lock so we don't try to reuse it as a database connection
-    lock = util.connect_exclusive(host, user, password)
-    try:
+    with closing(util.connect_exclusive(host, user, password)):
         juju.juju_log("Updating Landscape root_url: %s" % apache_url)
         util.change_root_url(database, user, password, host, apache_url)
-    finally:
-        lock.close()
 
     # This data may or may not be present, dependeing on if cert is self
     # signed from apache.

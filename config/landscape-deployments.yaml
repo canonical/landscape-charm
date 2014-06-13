@@ -130,6 +130,7 @@ landscape-max:
         - [landscape-app, rabbitmq-server]
         - [landscape-app, haproxy]
         - ["landscape-app:db-admin", "postgresql:db-admin"]
+        - ["landscape-app:vhost-config", "apache2:vhost-config"]
 
 landscape-max-dense-maas:
     inherits: landscape-max
