@@ -191,6 +191,8 @@ class ServiceOrUnitNotFound(Exception):
         self.service_name = service_name
 
 
+@unittest.skipIf(
+    getenv("SKIP_TESTS", None), "Requested to skip all tests.")
 class BaseLandscapeTests(unittest.TestCase):
     """
     Base class with some commonality between all test classes.
@@ -204,8 +206,6 @@ class BaseLandscapeTests(unittest.TestCase):
             self._testMethodName, file_name, self.__class__.__name__)
 
 
-@unittest.skipIf(
-    getenv("SKIP_TESTS", None), "Requested to skip all tests.")
 class LandscapeServiceTests(BaseLandscapeTests):
     """
     Class hosting all the tests we want to run against a Landscape deployment.
