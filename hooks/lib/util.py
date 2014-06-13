@@ -22,8 +22,8 @@ def connect_exclusive(host, admin_user, admin_password):
         cur = conn.cursor()
         juju.juju_log("Gaining MUTEX on %s" % table)
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS %s (id serial PRIMARY KEY);", (table,))
-        cur.execute("LOCK %s IN ACCESS EXCLUSIVE MODE;", (table,))
+            "CREATE TABLE IF NOT EXISTS %s (id serial PRIMARY KEY);" % table)
+        cur.execute("LOCK %s IN ACCESS EXCLUSIVE MODE;" % table)
         juju.juju_log("MUTEX Acquired on %s, Proceeding" % table)
     except:
         juju.juju_log("MUTEX failed on %s." % table)
@@ -38,7 +38,7 @@ def create_user(user, password, host, admin_user, admin_password):
                    password=admin_password)
     try:
         cur = conn.cursor()
-        cur.execute("SELECT usename FROM pg_user WHERE usename=%s", (user))
+        cur.execute("SELECT usename FROM pg_user WHERE usename=%s", (user,))
         result = cur.fetchall()
         if not result:
             juju.juju_log("Creating postgres db user: %s" % user)
@@ -88,7 +88,7 @@ def is_db_up(database, host, user, password):
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
             'CREATE TEMP TABLE "write_access_test_%s" (id serial PRIMARY KEY) '
-            "ON COMMIT DROP", (juju.local_unit().replace("/", "_"),))
+            "ON COMMIT DROP" % juju.local_unit().replace("/", "_"))
     except psycopg2Error as e:
         juju.juju_log("Database not yet up: %s" % e)
         return False

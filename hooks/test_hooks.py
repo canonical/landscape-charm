@@ -1590,7 +1590,7 @@ class TestHooksServiceMock(TestHooks):
         Cert passed in to other side of relation should be written on disk.
         """
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
-        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj).count(2)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
         hooks.juju._incoming_relation_data += (("servername", "foobar"),)
         hooks.juju._incoming_relation_data += (
@@ -1603,6 +1603,9 @@ class TestHooksServiceMock(TestHooks):
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
         notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
         mock_conn = self.mocker.mock()
         mock_conn.close()
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)

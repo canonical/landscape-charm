@@ -17,7 +17,6 @@ import datetime
 import grp
 import os
 import psutil
-import psycopg2
 import pwd
 import pycurl
 import re
@@ -350,6 +349,7 @@ def vhost_config_relation_changed():
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    import ipdb; ipdb.set_trace()
     try:
         section = config_obj["stores"]
         database = section["main"]
@@ -376,6 +376,7 @@ def vhost_config_relation_changed():
 
     if not _is_db_up():
         juju.juju_log("Waiting for database to become available, deferring.")
+        sys.exit(0)
 
     # Name as lock so we don't try to reuse it as a database connection
     lock = util.connect_exclusive(host, user, password)
