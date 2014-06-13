@@ -2,7 +2,7 @@
 Utility library for juju hooks
 """
 
-from psycopg2 import connect
+from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
 
 juju = Juju()
@@ -22,8 +22,8 @@ def connect_exclusive(host, admin_user, admin_password):
         cur = conn.cursor()
         juju.juju_log("Gaining MUTEX on %s" % table)
         cur.execute(
-            "CREATE TABLE IF NOT EXISTS %s (id serial PRIMARY KEY);" % table)
-        cur.execute("LOCK %s IN ACCESS EXCLUSIVE MODE;" (table))
+            "CREATE TABLE IF NOT EXISTS %s (id serial PRIMARY KEY);", (table,))
+        cur.execute("LOCK %s IN ACCESS EXCLUSIVE MODE;", (table,))
         juju.juju_log("MUTEX Acquired on %s, Proceeding" % table)
     except:
         juju.juju_log("MUTEX failed on %s." % table)
@@ -64,14 +64,14 @@ def change_root_url(database, user, password, host, url):
             cur.execute(
                 "INSERT INTO system_configuration "
                 "VALUES (decode('landscape.root_url', 'escape'), "
-                "        decode(%s, 'escape'))", (url))
+                "        decode(%s, 'escape'))", (url,))
         else:
             juju.juju_log("Updating root_url %s => %s" % (result, url))
             cur.execute(
                 "UPDATE system_configuration "
                 "SET key=decode('landscape.root_url', 'escape'),"
                 "    value=decode(%s, 'escape')"
-                "WHERE encode(key, 'escape')='landscape.root_url'", (url))
+                "WHERE encode(key, 'escape')='landscape.root_url'", (url,))
         conn.commit()
     finally:
         conn.close()
@@ -88,9 +88,9 @@ def is_db_up(database, host, user, password):
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
             'CREATE TEMP TABLE "write_access_test_%s" (id serial PRIMARY KEY) '
-            "ON COMMIT DROP", (juju.local_unit().replace("/", "_")))
-    except Exception as e:
-        juju.juju_log(str(e))
+            "ON COMMIT DROP", (juju.local_unit().replace("/", "_"),))
+    except psycopg2Error as e:
+        juju.juju_log("Database not yet up: %s" % e)
         return False
     else:
         return True
