@@ -176,7 +176,7 @@ def db_admin_relation_changed():
                     "password": password},
          "schema": {"store_user": admin, "store_password": admin_password}})
 
-    with closing(util.connect(host, admin, admin_password)):
+    with closing(util.connect_exclusive(host, admin, admin_password)):
         util.create_user(user, password, host, admin, admin_password)
         _create_maintenance_user(password, host, admin, admin_password)
         check_call("setup-landscape-server")

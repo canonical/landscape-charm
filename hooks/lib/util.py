@@ -52,7 +52,7 @@ def create_user(user, password, host, admin_user, admin_password):
 def change_root_url(database, user, password, host, url):
     """Change the root url in the database."""
     url = "u%s:%s" % (len(url), url)
-    with closing(connect(database=database, host=host, 
+    with closing(connect(database=database, host=host,
                          user=user, password=password)) as conn:
         cur = conn.cursor()
         cur.execute("SELECT encode(key, 'escape'),encode(value, 'escape') "
