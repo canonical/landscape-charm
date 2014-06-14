@@ -191,6 +191,8 @@ class ServiceOrUnitNotFound(Exception):
         self.service_name = service_name
 
 
+@unittest.skipIf(
+    getenv("SKIP_TESTS", None), "Requested to skip all tests.")
 class BaseLandscapeTests(unittest.TestCase):
     """
     Base class with some commonality between all test classes.

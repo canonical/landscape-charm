@@ -25,8 +25,6 @@ _common:
                 ssl_cert: SELFSIGNED
                 ssl_certlocation: apache2.cert
                 ssl_keylocation: apache2.key
-                vhost_https_template: include-base64://vhostssl.tmpl
-                vhost_http_template: include-base64://vhost.tmpl
 
 landscape:
     inherits: _common
@@ -53,6 +51,7 @@ landscape:
     relations:
         - [landscape, rabbitmq-server]
         - [landscape, haproxy]
+        - ["landscape:vhost-config", "apache2:vhost-config"]
         - ["landscape:db-admin", "postgresql:db-admin"]
         - ["haproxy:website", "apache2:reverseproxy"]
         - [landscape-msg, rabbitmq-server]
@@ -119,6 +118,7 @@ landscape-max:
     relations:
         - [landscape, rabbitmq-server]
         - [landscape, haproxy]
+        - ["landscape:vhost-config", "apache2:vhost-config"]
         - ["landscape:db-admin", "postgresql:db-admin"]
         - ["haproxy:website", "apache2:reverseproxy"]
         - [landscape-msg, rabbitmq-server]
@@ -130,6 +130,7 @@ landscape-max:
         - [landscape-app, rabbitmq-server]
         - [landscape-app, haproxy]
         - ["landscape-app:db-admin", "postgresql:db-admin"]
+        - ["landscape-app:vhost-config", "apache2:vhost-config"]
 
 landscape-max-dense-maas:
     inherits: landscape-max

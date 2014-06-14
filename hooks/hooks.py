@@ -9,15 +9,15 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import util
 from lib.juju import Juju
 
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from configobj import ConfigObj, ConfigObjError
+from contextlib import closing
 from copy import deepcopy
 import cStringIO
 import datetime
 import grp
 import os
 import psutil
-import psycopg2
 import pwd
 import pycurl
 import re
@@ -25,6 +25,9 @@ import shutil
 import sys
 import yaml
 from subprocess import check_call, check_output, CalledProcessError, call
+
+
+SSL_CERT_LOCATION = "/etc/ssl/certs/landscape_server_ca.crt"
 
 
 def _get_installed_version(name):
@@ -95,6 +98,29 @@ def notify_website_relation():
             services=yaml.safe_dump(_get_services_haproxy()))
 
 
+def notify_vhost_config_relation(relation_id=None):
+    """
+    Notify the vhost-config relation.
+
+    This will mark it "ready to proceed".  If relation_id is specified
+    use that as the relation context, otherwise look up and notify all
+    vhost-config relations.
+    """
+    vhosts = []
+    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
+        vhosts.append({
+            "port": "443", "template": b64encode(handle.read())})
+    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
+        vhosts.append({
+            "port": "80", "template": b64encode(handle.read())})
+
+    relation_ids = [relation_id]
+    if relation_id is None:
+        relation_ids = juju.relation_ids("vhost-config")
+    for relation_id in relation_ids:
+        juju.relation_set(relation_id=relation_id, vhosts=yaml.dump(vhosts))
+
+
 def db_admin_relation_joined():
     pass
 
@@ -150,20 +176,13 @@ def db_admin_relation_changed():
                     "password": password},
          "schema": {"store_user": admin, "store_password": admin_password}})
 
-    try:
-        # Name as lock so we don't try to reuse it as a database connection
-        lock = util.connect_exclusive(host, admin, admin_password)
-    except psycopg2.Error:
-        # Another unit is performing database configuration.
-        pass
-    else:
-        try:
-            util.create_user(user, password, host, admin, admin_password)
-            _create_maintenance_user(password, host, admin, admin_password)
-            check_call("setup-landscape-server")
-        finally:
-            juju.juju_log("Landscape database initialized!")
-            lock.close()
+    with closing(util.connect_exclusive(host, admin, admin_password)):
+        util.create_user(user, password, host, admin, admin_password)
+        _create_maintenance_user(password, host, admin, admin_password)
+        check_call("setup-landscape-server")
+        juju.juju_log("Landscape database initialized!")
+
+    notify_vhost_config_relation()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
@@ -314,6 +333,65 @@ def amqp_relation_changed():
 
     if _is_db_up():
         config_changed()
+
+
+def vhost_config_relation_changed():
+    """Relate to apache to configure a vhost.
+
+    This hook will supply vhost configuration as well as read simple data
+    out of apache (servername, certificate).  This data is necessary for
+    informing clients of the correct URL and cert to use when connecting
+    to the server.
+    """
+    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
+
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    try:
+        section = config_obj["stores"]
+        database = section["main"]
+        host = section["host"]
+        user = section["user"]
+        password = section["password"]
+    except KeyError:
+        juju.juju_log("Database not ready yet, deferring call")
+        sys.exit(0)
+
+    relids = juju.relation_ids("vhost-config")
+    if relids:
+        relid = relids[0]
+        apache2_unit = juju.relation_list(relid)[0]
+        apache_servername = juju.relation_get(
+            "servername", unit_name=apache2_unit, relation_id=relid)
+    else:
+        apache_servername = juju.relation_get("servername")
+
+    if not apache_servername:
+        juju.juju_log("Waiting for data from apache, deferring")
+        sys.exit(0)
+    apache_url = "https://%s/" % apache_servername
+
+    if not _is_db_up():
+        juju.juju_log("Waiting for database to become available, deferring.")
+        sys.exit(0)
+
+    with closing(util.connect_exclusive(host, user, password)):
+        juju.juju_log("Updating Landscape root_url: %s" % apache_url)
+        util.change_root_url(database, user, password, host, apache_url)
+
+    # This data may or may not be present, dependeing on if cert is self
+    # signed from apache.
+    ssl_cert = juju.relation_get(
+        "ssl_cert", unit_name=apache2_unit, relation_id=relid)
+    if ssl_cert:
+        juju.juju_log("Writing new SSL cert: %s" % SSL_CERT_LOCATION)
+        with open(SSL_CERT_LOCATION, 'w') as f:
+            f.write(str(b64decode(ssl_cert)))
+    else:
+        if os.path.exists(SSL_CERT_LOCATION):
+            os.remove(SSL_CERT_LOCATION)
+
+    # only starts services again if is_db_up and _is_amqp_up
+    config_changed()
 
 
 def config_changed():
@@ -743,7 +821,8 @@ if __name__ == "__main__":
         "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
-        "website-relation-joined": website_relation_joined}
+        "website-relation-joined": website_relation_joined,
+        "vhost-config-relation-changed": vhost_config_relation_changed}
     hook = os.path.basename(sys.argv[0])
     # If the hook is unsupported, let it raise a KeyError and exit with error.
     hooks[hook]()

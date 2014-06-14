@@ -16,8 +16,16 @@ update-charm-revision-numbers:
 		$(EXTRA_UPDATE_ARGUMENTS) \
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
-integration-test: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
-	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME -v --timeout 3000s
+test-depends: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
+
+integration-test: test-depends
+	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
+
+deploy-dense-maas: test-depends
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
+
+deploy-max-dense-maas: test-depends
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-max-dense-maas tests/01-begin
 
 lint:
 	flake8 --exclude=charmhelpers hooks
@@ -28,9 +36,13 @@ lint:
 clean: clean-integration-test
 
 .PHONY: lint \
+	test-depends \
+	deploy-dense-maas \
+	deploy-max-dense-maas \
 	integration-test \
 	verify-juju-test \
 	test \
 	clean \
 	clean-integration-test \
 	update-charm-revision-numbers
+	

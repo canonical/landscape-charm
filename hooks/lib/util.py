@@ -2,8 +2,9 @@
 Utility library for juju hooks
 """
 
-from psycopg2 import connect
+from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
+from contextlib import closing
 
 juju = Juju()
 
@@ -38,7 +39,7 @@ def create_user(user, password, host, admin_user, admin_password):
                    password=admin_password)
     try:
         cur = conn.cursor()
-        cur.execute("SELECT usename FROM pg_user WHERE usename='%s'" % user)
+        cur.execute("SELECT usename FROM pg_user WHERE usename=%s", (user,))
         result = cur.fetchall()
         if not result:
             juju.juju_log("Creating postgres db user: %s" % user)
@@ -46,6 +47,32 @@ def create_user(user, password, host, admin_user, admin_password):
             conn.commit()
     finally:
         conn.close()
+
+
+def change_root_url(database, user, password, host, url):
+    """Change the root url in the database."""
+    url = "u%s:%s" % (len(url), url)
+    with closing(connect(database=database, host=host,
+                         user=user, password=password)) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT encode(key, 'escape'),encode(value, 'escape') "
+                    "FROM system_configuration "
+                    "WHERE key='landscape.root_url' FOR UPDATE")
+        result = cur.fetchall()
+        if not result:
+            juju.juju_log("Setting new root_url: %s" % url)
+            cur.execute(
+                "INSERT INTO system_configuration "
+                "VALUES (decode('landscape.root_url', 'escape'), "
+                "        decode(%s, 'escape'))", (url,))
+        else:
+            juju.juju_log("Updating root_url %s => %s" % (result, url))
+            cur.execute(
+                "UPDATE system_configuration "
+                "SET key=decode('landscape.root_url', 'escape'),"
+                "    value=decode(%s, 'escape') "
+                "WHERE encode(key, 'escape')='landscape.root_url'", (url,))
+        conn.commit()
 
 
 def is_db_up(database, host, user, password):
@@ -59,10 +86,9 @@ def is_db_up(database, host, user, password):
         # Ensure we are user with write access, to avoid hot standby dbs
         cur.execute(
             'CREATE TEMP TABLE "write_access_test_%s" (id serial PRIMARY KEY) '
-            "ON COMMIT DROP"
-            % juju.local_unit().replace("/", "_"))
-    except Exception as e:
-        juju.juju_log(str(e))
+            "ON COMMIT DROP" % juju.local_unit().replace("/", "_"))
+    except psycopg2Error as e:
+        juju.juju_log("Database not yet up: %s" % e)
         return False
     else:
         return True
