@@ -24,9 +24,6 @@ integration-test: test-depends
 deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
 
-deploy-max-dense-maas: test-depends
-	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-max-dense-maas tests/01-begin
-
 lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/* dev/update-charm-revision-numbers
@@ -38,7 +35,6 @@ clean: clean-integration-test
 .PHONY: lint \
 	test-depends \
 	deploy-dense-maas \
-	deploy-max-dense-maas \
 	integration-test \
 	verify-juju-test \
 	test \
