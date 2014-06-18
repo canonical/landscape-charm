@@ -121,13 +121,11 @@ pair in the apache charm configuration.
 Deployment targets
 ==================
 
-The config/landscape-deployments.yaml deployer configuration file has several
+The config/landscape-deployments.yaml deployer configuration file has two
 deployment targets available:
 
   * landscape
-  * landscape-max
   * landscape-dense-maas
-  * landscape-max-dense-maas
 
 Targets that start with an underscore should be ignored as they are used
 internally only. Your choice of target should be made taking into consideration
@@ -153,38 +151,15 @@ There are three common scaling out options for this deployment:
  * add another database unit if you want database replication. The replication
    configuration happens automatically.
 
-"landscape-max" target
+Landscape dense target
 ----------------------
-The landscape-max target spreads out almost all of the Landscape services into
-their own units and there are a few of other changes too:
-  * you get two database units, deployed with replication enabled
-  * you get juju-gui (not necessary, of course, but nice for a visualization
-    of this more complex deployment)
-  * landscape is separated into four services:
-    * landscape-app: contains the app server, which is the part that serves
-      up what you see in your browser
-    * landscape-ping: the ping server is used to speed up exchanges between
-      registered computers and the message server
-    * landscape-msg: handles the exchanges between landscape and the
-      registered computers
-    * rabbitmq-server, apache and haproxy remain unchanged
-
-The scaling options for the max deployment target are very flexible. You can
-add more units of each of the landscape services depending on your needs.
-
-Landscape dense targets
------------------------
-If you are using juju backed by the MAAS provider, and have big enough
-machines registered with MAAS, you can try out the dense targets:
-  * landscape-dense-maas
-  * landscape-max-dense-maas
-These two targets behave like their "landscape" and "landscape-max"
-counterparts, but everything is deployed into the bootstrap node using LXC.
+If you are using juju backed by the MAAS provider, and have big enough machines
+registered with MAAS, you can try out the landscape-dense-maas target.  It
+behaves like its "landscape" counterpart, but everything is deployed into the
+bootstrap node using LXC.
 
 The reason it only works with MAAS for now is that MAAS is the only provider so
 far that can offer external network connectivity to units deployed into LXC.
-
-The dense targets are most useful for testing and demonstration purposes.
 
 Customized deployments
 -----------------------
