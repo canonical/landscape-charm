@@ -13,10 +13,10 @@ class Deployer(object):
     is used.
     """
 
-    def _stage_deployer_dir(self, deployer_dir):
+    def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
         charm_src = path.dirname(path.dirname(path.dirname(__file__)))
-        charm_dest = path.join(deployer_dir, "precise", "landscape")
+        charm_dest = path.join(deployer_dir, series, "landscape")
         shutil.copytree(charm_src, charm_dest)
 
     def deploy(self, target, config_files, timeout=None):
@@ -30,7 +30,8 @@ class Deployer(object):
         deployer_dir = None
         try:
             deployer_dir = tempfile.mkdtemp()
-            self._stage_deployer_dir(deployer_dir)
+            for series in ["precise", "trusty"]:
+                self._stage_deployer_dir(deployer_dir, series)
             args = ["juju-deployer", "-vdWL"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
