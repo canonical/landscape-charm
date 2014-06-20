@@ -2,7 +2,7 @@
 
 ROOT="$( cd "$( dirname "$0" )" && pwd )"
 LS_PPA=`config-get repository`
-LS_PACKAGE=`ls -1 landscape-server_*.tar.gz`
+LS_PACKAGE=`ls -1 landscape-server_*.tar.gz || echo ""`
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
 LANDSCAPE_MAINTENANCE=/opt/canonical/landscape/maintenance.txt
