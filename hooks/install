@@ -56,8 +56,15 @@ setup_local_repo () {
 }
 
 install_landscape() {
-    apt_get update;
-    apt_get install landscape-server
+    apt_get update
+    # only install the hash-id package if we host the static service
+    config=$(config-get services)
+    if echo "$config" | grep -qw static; then
+        extra_packages="landscape-hashids"
+    else
+        extra_packages=""
+    fi
+    apt_get install --no-install-recommends landscape-server ntp $extra_packages
 }
 
 # $1 - optional additional source line to add
@@ -80,6 +87,7 @@ function apt_get() {
 # Workaround for: https://bugs.launchpad.net/juju/+bug/993034
 echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-proxy
 
+apt_get update
 apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
                 python-support wget pwgen apache2-mpm-worker \

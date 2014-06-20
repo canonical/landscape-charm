@@ -1,30 +1,30 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-22
+            charm: cs:precise/rabbitmq-server-27
         postgresql:
-            charm: cs:precise/postgresql-63
+            charm: cs:precise/postgresql-71
             constraints: mem=2048
             options:
-                extra-packages: python-apt postgresql-contrib postgresql-9.1-debversion
+                extra-packages: python-apt postgresql-contrib postgresql-.*-debversion
                 max_connections: 500
         haproxy:
-            charm: cs:precise/haproxy-28
+            charm: cs:precise/haproxy-31
             options:
                 enable_monitoring: True
                 monitoring_allowed_cidr: "0.0.0.0/0"
                 monitoring_password: "haproxy"
                 default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
+                # Don't deploy default haproxy service on port 80
+                services: ""
         apache2:
-            charm: cs:precise/apache2-19
+            charm: cs:precise/apache2-21
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
                 ssl_cert: SELFSIGNED
                 ssl_certlocation: apache2.cert
                 ssl_keylocation: apache2.key
-                vhost_https_template: include-base64://vhostssl.tmpl
-                vhost_http_template: include-base64://vhost.tmpl
 
 landscape:
     inherits: _common
@@ -51,6 +51,7 @@ landscape:
     relations:
         - [landscape, rabbitmq-server]
         - [landscape, haproxy]
+        - ["landscape:vhost-config", "apache2:vhost-config"]
         - ["landscape:db-admin", "postgresql:db-admin"]
         - ["haproxy:website", "apache2:reverseproxy"]
         - [landscape-msg, rabbitmq-server]
@@ -73,83 +74,3 @@ landscape-dense-maas:
         haproxy:
             to: lxc:0
 
-landscape-max:
-    inherits: _common
-    series: precise
-    services:
-        postgresql:
-            num_units: 2
-        juju-gui:
-            expose: True
-            charm: cs:precise/juju-gui-89
-        landscape:
-            branch: lp:~landscape/landscape-charm/stable
-            constraints: mem=2048
-            options:
-                landscape-password: "look-a-whole-new-password"
-                services: static combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync
-                repository: include-file://repo-file
-                license-file: include-file://license-file
-        landscape-msg:
-            branch: lp:~landscape/landscape-charm/stable
-            charm: landscape
-            constraints: mem=2048
-            options:
-                landscape-password: "look-a-whole-new-password"
-                services: msgserver
-                repository: include-file://repo-file
-                license-file: include-file://license-file
-        landscape-ping:
-            branch: lp:~landscape/landscape-charm/stable
-            charm: landscape
-            constraints: mem=2048
-            options:
-                landscape-password: "look-a-whole-new-password"
-                services: pingserver
-                repository: include-file://repo-file
-                license-file: include-file://license-file
-        landscape-app:
-            branch: lp:~landscape/landscape-charm/stable
-            charm: landscape
-            constraints: mem=2048
-            options:
-                landscape-password: "look-a-whole-new-password"
-                services: appserver
-                repository: include-file://repo-file
-                license-file: include-file://license-file
-    relations:
-        - [landscape, rabbitmq-server]
-        - [landscape, haproxy]
-        - ["landscape:db-admin", "postgresql:db-admin"]
-        - ["haproxy:website", "apache2:reverseproxy"]
-        - [landscape-msg, rabbitmq-server]
-        - [landscape-msg, haproxy]
-        - ["landscape-msg:db-admin", "postgresql:db-admin"]
-        - [landscape-ping, rabbitmq-server]
-        - [landscape-ping, haproxy]
-        - ["landscape-ping:db-admin", "postgresql:db-admin"]
-        - [landscape-app, rabbitmq-server]
-        - [landscape-app, haproxy]
-        - ["landscape-app:db-admin", "postgresql:db-admin"]
-
-landscape-max-dense-maas:
-    inherits: landscape-max
-    services:
-        postgresql:
-            to: ["lxc:0", "lxc:0"]
-        juju-gui:
-            to: lxc:0
-        apache2:
-            to: lxc:0
-        rabbitmq-server:
-            to: lxc:0
-        haproxy:
-            to: lxc:0
-        landscape:
-            to: lxc:0
-        landscape-app:
-            to: lxc:0
-        landscape-ping:
-            to: lxc:0
-        landscape-msg:
-            to: lxc:0

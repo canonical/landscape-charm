@@ -3,9 +3,11 @@ from configobj import ConfigObj
 import hooks
 import mocker
 import os
+import psycopg2
 import pycurl
 import stat
 import subprocess
+import tempfile
 import yaml
 
 
@@ -1481,3 +1483,205 @@ class TestHooksServiceMock(TestHooks):
         hooks.notify_website_relation()
         baseline = (("services", yaml.safe_dump(self.all_services)),)
         self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+    def test_notify_vhost_config_relation_specify_id(self):
+        """
+        notify the vhost-config relation on a separate ID.
+        """
+        hooks.notify_vhost_config_relation("foo/0")
+        with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
+    def test_notify_vhost_config_relation(self):
+        """notify the vhost-config relation on the "current" ID."""
+        hooks.notify_vhost_config_relation()
+        with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
+    def test_vhost_config_relation_changed_exit_no_configuration(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertEquals(len(hooks.juju._logs), 1)
+        self.assertIn('Database not ready yet', hooks.juju._logs[0])
+
+    def test_vhost_config_relation_changed_wait_apache_servername(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        self.mocker.replay()
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
+
+    def test_vhost_config_relation_changed_fail_root_url(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertIn(
+            'Waiting for database to become available, deferring',
+            hooks.juju._logs[-1])
+
+    def test_vhost_config_relation_changed_fail_root_url_db_update(self):
+        """vhost_config_relation_changed should error if db update fails"""
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+        self.assertRaises(psycopg2.Error, hooks.vhost_config_relation_changed)
+
+    def test_vhost_config_relation_changed_cert_not_provided(self):
+        """
+        Ensure vhost_relation_changed runs to completion.
+
+        Existing cert should be removed.
+        """
+        hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        mock_conn = self.mocker.mock()
+        mock_conn.close()
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive("host", "user", "password")
+        self.mocker.result(mock_conn)
+        change_root_url = self.mocker.replace(hooks.util.change_root_url)
+        change_root_url(
+            "database", "user", "password", "host", "https://foobar/")
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
+        self.assertFalse(os.path.exists(hooks.SSL_CERT_LOCATION))
+
+    def test_vhost_config_relation_changed_ssl_cert_provided(self):
+        """
+        Ensure vhost_relation_changed runs to completion.
+
+        Cert passed in to other side of relation should be written on disk.
+        """
+        hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        hooks.juju._incoming_relation_data += (
+            ("ssl_cert", base64.b64encode("foobar")),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        mock_conn = self.mocker.mock()
+        mock_conn.close()
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive("host", "user", "password")
+        self.mocker.result(mock_conn)
+        change_root_url = self.mocker.replace(hooks.util.change_root_url)
+        change_root_url(
+            "database", "user", "password", "host", "https://foobar/")
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
+        self.assertTrue(os.path.exists(hooks.SSL_CERT_LOCATION))
+        with open(hooks.SSL_CERT_LOCATION, 'r') as f:
+            self.assertEqual("foobar", f.read())
+
+
+class TestHooksUtils(TestHooks):
+    def test__setup_apache(self):
+        """
+        Responsible for setting up apache to serve static content.
+        - various 'a2*' commands need to be mocked and tested to ensure
+          proper parameters are passed.
+        - make sure we actually replace '@hostname@' with 'localhost' in the
+          site file we are installing.
+        - ensure new file has '.conf' extension.
+        """
+        tempdir = self.makeDir()
+        with open("%s/default.random_extension" % tempdir, 'w') as f:
+            f.write("HI!")
+        with open("%s/default2.conf" % tempdir, 'w') as f:
+            f.write("HI!")
+        # Replace dir, but leave basename to check that it has '.conf'
+        # (new requirement with Trusty apache2)
+        site_file = os.path.basename(hooks.LANDSCAPE_APACHE_SITE)
+        hooks.LANDSCAPE_APACHE_SITE = "%s/%s" % (tempdir, site_file)
+        _a2enmods = self.mocker.replace(hooks._a2enmods)
+        _a2dissite = self.mocker.replace(hooks._a2dissite)
+        _a2ensite = self.mocker.replace(hooks._a2ensite)
+        _service = self.mocker.replace(hooks._service)
+        _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+        _a2dissite("default.random_extension")
+        _a2dissite("default2.conf")
+        _a2ensite("landscape.conf")
+        _service("apache2", "restart")
+        self.mocker.replay()
+        hooks._setup_apache()
+        self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
+        with open("%s/landscape.conf" % tempdir, 'r') as f:
+            site_text = f.read()
+        self.assertFalse("@hostname@" in site_text)
+        self.assertTrue("localhost" in site_text)
