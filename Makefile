@@ -21,6 +21,9 @@ test-depends: verify-juju-test config/repo-file config/license-file config/vhost
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
 
+deploy-dense-maas: test-depends
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
+
 lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/* dev/update-charm-revision-numbers
