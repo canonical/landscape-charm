@@ -1,7 +1,7 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-27
+            charm: cs:precise/rabbitmq-server-28
         postgresql:
             charm: cs:precise/postgresql-73
             constraints: mem=2048
@@ -18,7 +18,7 @@ _common:
                 # Don't deploy default haproxy service on port 80
                 services: ""
         apache2:
-            charm: cs:precise/apache2-22
+            charm: cs:precise/apache2-24
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
