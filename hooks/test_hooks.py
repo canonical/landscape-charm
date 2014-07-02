@@ -105,6 +105,10 @@ class TestHooks(mocker.MockerTestCase):
             if "errorfiles" in value.keys():
                 value["errorfiles"] = []
 
+    def tearDown(self):
+        if "JUJU_RELATION" in os.environ:
+            del os.environ["JUJU_RELATION"]
+
     def assertFileContains(self, filename, text):
         """Make sure a string exists in a file."""
         with open(filename, "r") as fp:
@@ -881,6 +885,9 @@ class TestHooksService(TestHooks):
         maintenance_mock = self.mocker.replace(hooks._create_maintenance_user)
         maintenance_mock(new_password, host, admin, password)
         connection.close()
+        vhost_changed = self.mocker.replace(
+            hooks.vhost_config_relation_changed)
+        vhost_changed()
         self.mocker.replay()
 
         hooks.db_admin_relation_changed()
@@ -1514,12 +1521,14 @@ class TestHooksServiceMock(TestHooks):
 
     def test_vhost_config_relation_changed_exit_no_configuration(self):
         """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertEquals(len(hooks.juju._logs), 1)
         self.assertIn('Database not ready yet', hooks.juju._logs[0])
 
     def test_vhost_config_relation_changed_wait_apache_servername(self):
         """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
         _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
         self.mocker.result({
@@ -1533,9 +1542,11 @@ class TestHooksServiceMock(TestHooks):
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
+        del os.environ["JUJU_RELATION"]
 
     def test_vhost_config_relation_changed_fail_root_url(self):
         """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
         _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
         hooks.juju._incoming_relation_data += (("servername", "foobar"),)
@@ -1558,6 +1569,7 @@ class TestHooksServiceMock(TestHooks):
 
     def test_vhost_config_relation_changed_fail_root_url_db_update(self):
         """vhost_config_relation_changed should error if db update fails"""
+        os.environ["JUJU_RELATION"] = "vhost-config"
         _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
         hooks.juju._incoming_relation_data += (("servername", "foobar"),)
@@ -1581,6 +1593,7 @@ class TestHooksServiceMock(TestHooks):
 
         Existing cert should be removed.
         """
+        os.environ["JUJU_RELATION"] = "vhost-config"
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
         _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
@@ -1616,6 +1629,7 @@ class TestHooksServiceMock(TestHooks):
 
         Cert passed in to other side of relation should be written on disk.
         """
+        os.environ["JUJU_RELATION"] = "vhost-config"
         hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
         _get_config_obj = self.mocker.replace(hooks._get_config_obj)
         _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
