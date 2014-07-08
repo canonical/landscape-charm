@@ -1542,7 +1542,6 @@ class TestHooksServiceMock(TestHooks):
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
-        del os.environ["JUJU_RELATION"]
 
     def test_vhost_config_relation_changed_fail_root_url(self):
         """Ensure vhost_relation_changed deferrs if db is not up."""
