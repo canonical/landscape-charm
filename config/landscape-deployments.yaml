@@ -18,7 +18,7 @@ _common:
                 # Don't deploy default haproxy service on port 80
                 services: ""
         apache2:
-            charm: cs:precise/apache2-21
+            charm: cs:precise/apache2-22
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl

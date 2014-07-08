@@ -182,7 +182,8 @@ def db_admin_relation_changed():
         check_call("setup-landscape-server")
         juju.juju_log("Landscape database initialized!")
 
-    notify_vhost_config_relation()
+    # Fire dependent changed hooks
+    vhost_config_relation_changed()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
@@ -342,7 +343,13 @@ def vhost_config_relation_changed():
     out of apache (servername, certificate).  This data is necessary for
     informing clients of the correct URL and cert to use when connecting
     to the server.
+
+    This hook will no-op if called outside the context of a vhost_config
+    relation.
     """
+    if os.environ.get("JUJU_RELATION", "") != "vhost-config":
+        return
+
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
