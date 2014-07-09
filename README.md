@@ -51,11 +51,11 @@ details):
     $ vim license-file   # Put the license text in this file
     $ vim repo-file      # Put the URL part of an APT sources.list line here
 
-Now we are ready to deploy (the -v, -d, -W flags are optional, but nice). The
-"landscape" deployer target is the one you should start with. It uses 6
-machines plus the juju bootstrap node:
+Now we are ready to deploy (the -w 180, -v, -d, -W flags are optional, but
+nice).  The "landscape" deployer target is the one you should start with. It
+uses 6 machines plus the juju bootstrap node:
 
-    $ juju-deployer -vdW -c landscape-deployments.yaml landscape
+    $ juju-deployer -vdW -w 180 -c landscape-deployments.yaml landscape
 
 NOTE: After juju-deployer finishes, the deployment is not entirely ready yet.
 
