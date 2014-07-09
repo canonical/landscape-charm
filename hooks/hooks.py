@@ -344,6 +344,10 @@ def vhost_config_relation_changed():
     informing clients of the correct URL and cert to use when connecting
     to the server.
     """
+    # If this unit is not participating in a vhost-config relation, noop
+    if not juju.relation_ids("vhost-config"):
+        return
+
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
