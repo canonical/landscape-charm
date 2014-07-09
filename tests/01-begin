@@ -557,13 +557,6 @@ class LandscapeCronTests(BaseLandscapeTests):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    def test_maas_poller_cron(self):
-        """Verify that the maas_poller cron job runs without errors."""
-        script = "/opt/canonical/landscape/scripts/maas_poller.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
-
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
         frontend = find_address(juju_status(), "apache2")
