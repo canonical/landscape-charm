@@ -32,7 +32,7 @@ class Deployer(object):
             deployer_dir = tempfile.mkdtemp()
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-            args = ["juju-deployer", "-vdWL"]
+            args = ["juju-deployer", "-vdWL", "-w 180"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
             args.append(target)

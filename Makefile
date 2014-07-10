@@ -24,6 +24,9 @@ integration-test: test-depends
 deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin
 
+deploy: test-depends
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape tests/01-begin
+
 lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests/* dev/update-charm-revision-numbers
@@ -40,5 +43,6 @@ clean: clean-integration-test
 	test \
 	clean \
 	clean-integration-test \
-	update-charm-revision-numbers
+	update-charm-revision-numbers \
+	deploy
 	
