@@ -78,7 +78,7 @@ def setUpModule():
         dirname(dirname(abspath(__file__))),
         "config", "landscape-deployments.yaml")
     deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), [config_file],
-                    timeout=2000)
+                    timeout=3000)
 
     frontend = find_address(juju_status(), "apache2")
     good_content = "New user - Landscape"
