@@ -45,7 +45,7 @@
     RewriteRule ^/ajax http://{{ haproxy_asyncfrontend }}/ [P,L]
     RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]
     RewriteRule ^/api http://{{ haproxy_apiserver }}/ [P,L]
-    RewriteRule ^/attachment/(.*) http://{{ haproxy_static }}/attachment/$1 [P,L]
+    RewriteRule ^/attachment/(.*) http://{{ haproxy_msgserver }}/attachment/$1 [P,L]
     RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
