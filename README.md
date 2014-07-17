@@ -51,6 +51,11 @@ details):
     $ vim license-file   # Put the license text in this file
     $ vim repo-file      # Put the URL part of an APT sources.list line here
 
+Change the passwords used in the landscape-deployments.yaml file in the
+"monitoring_password" and "landscape-password" keys to new values:
+
+    $ vim landscape-deployments.yaml
+
 Now we are ready to deploy (the -v, -d, -W flags are optional, but nice). The
 "landscape" deployer target is the one you should start with. It uses 6
 machines plus the juju bootstrap node:
