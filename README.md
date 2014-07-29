@@ -130,6 +130,7 @@ The config/landscape-deployments.yaml deployer configuration file has two
 deployment targets available:
 
   * landscape
+  * landscape-dense
   * landscape-dense-maas
 
 Targets that start with an underscore should be ignored as they are used
@@ -156,15 +157,34 @@ There are three common scaling out options for this deployment:
  * add another database unit if you want database replication. The replication
    configuration happens automatically.
 
-Landscape dense target
-----------------------
-If you are using juju backed by the MAAS provider, and have big enough machines
-registered with MAAS, you can try out the landscape-dense-maas target.  It
-behaves like its "landscape" counterpart, but everything is deployed into the
-bootstrap node using LXC.
+"landscape-dense" target
+------------------------
+The "landscape-dense" target deploys everything on the bootstrap node in the
+following way:
+  * apache2, the frontend, is deployed directly on the bootstrap node,
+    "hulk-smashing" style
+  * the other services are deployed into containers
 
-The reason it only works with MAAS for now is that MAAS is the only provider so
-far that can offer external network connectivity to units deployed into LXC.
+On non-MAAS providers, containers do not get routable IP addresses. But the
+only service that needs to be reachable from the "outside" is the frontend, so
+it doesn't matter that, for example, postgresql or rabbitmq-server or any of
+the other services have private internal-only addresses. Apache2 can still
+see them and proxy connections as needed.
+
+You will need a big enough bootstrap machine for this deployment. Comfortable
+constraints are:
+  * 20Gb disk for deployment and OS (about half used for /var/lib)
+  * 10Gb of RAM
+
+"landscape-dense-maas" target
+-----------------------------
+The "landscape-dense-maas" target is just like the "landscape-dense" one,
+but everything is deployed using containers. Even the frontend.
+
+This works when MAAS is the provider because in this case containers get
+routable IP addresses, so the frontend can be inside a container too.
+
+The hardware constraints are the same as for the "landscape-dense" target.
 
 Customized deployments
 -----------------------
