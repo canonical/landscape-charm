@@ -162,7 +162,7 @@ There are three common scaling out options for this deployment:
 The "landscape-dense" target deploys everything on the bootstrap node in the
 following way:
   * apache2, the frontend, is deployed directly on the bootstrap node,
-    "hulk-smashing" style
+    using the co-location feature
   * the other services are deployed into containers
 
 On non-MAAS providers, containers do not get routable IP addresses. But the
