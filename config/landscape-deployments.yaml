@@ -58,6 +58,12 @@ landscape:
         - [landscape-msg, haproxy]
         - ["landscape-msg:db-admin", "postgresql:db-admin"]
 
+landscape-dense:
+    inherits: landscape-dense-maas
+    services:
+        apache2:
+            to: 0
+
 landscape-dense-maas:
     inherits: landscape
     services:
