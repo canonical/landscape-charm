@@ -232,7 +232,7 @@ class LandscapeServiceTests(BaseLandscapeTests):
         Specifically that it is reachable and that it responds
         correctly to requests.
         """
-        good_content = "ds8:messagesl;s11:server-uuid"
+        good_content = ["ds8:messagesl", "s11:server-uuid"]
         post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
                      "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
