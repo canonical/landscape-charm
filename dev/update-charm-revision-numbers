@@ -50,10 +50,10 @@ def replace_in_config(charms, series):
     be tested and checked in if successful.
 
     Look for lines like:
-      charm: cs:precise/juju-gui-83
+      charm: cs:trusty/juju-gui-83
 
     Or:
-      series: precise
+      series: trusty
     """
     filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
@@ -73,7 +73,7 @@ def get_options():
     description = "Put new charmstore descriptors into a deployer file."
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("charms", help="List charms to update", nargs='*')
-    parser.add_argument("--series", help="Charm series", default="precise")
+    parser.add_argument("--series", help="Charm series", default="trusty")
     return parser.parse_args()
 
 

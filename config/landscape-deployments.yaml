@@ -1,9 +1,9 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:precise/rabbitmq-server-28
+            charm: cs:trusty/rabbitmq-server-4
         postgresql:
-            charm: cs:precise/postgresql-74
+            charm: cs:trusty/postgresql-3
             constraints: mem=2048
             options:
                 extra-packages: python-apt postgresql-contrib postgresql-.*-debversion
@@ -18,7 +18,7 @@ _common:
                 # Don't deploy default haproxy service on port 80
                 services: ""
         apache2:
-            charm: cs:precise/apache2-24
+            charm: cs:trusty/apache2-4
             expose: True
             options:
                 enable_modules: proxy proxy_http proxy_balancer rewrite expires headers ssl
@@ -28,7 +28,7 @@ _common:
 
 landscape:
     inherits: _common
-    series: precise
+    series: trusty
     services:
         landscape:
             branch: lp:~landscape/landscape-charm/stable
