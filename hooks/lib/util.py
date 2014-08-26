@@ -5,6 +5,9 @@ Utility library for juju hooks
 from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
 from contextlib import closing
+from subprocess import check_output
+
+import os
 
 juju = Juju()
 
@@ -47,6 +50,29 @@ def create_user(user, password, host, admin_user, admin_password):
             conn.commit()
     finally:
         conn.close()
+
+
+def create_landscape_admin(db_user, db_password, db_host, admin_name,
+                           admin_email, admin_password):
+    """Create the first Landscape administrator."""
+    with closing(connect(database="landscape-standalone-main", host=db_host,
+                         user=db_user, password=db_password)) as conn:
+        cur = conn.cursor()
+        # make sure it's a blank account
+        cur.execute("SELECT COUNT(person.id),COUNT(account.id) FROM "
+                    "person,account")
+        result = cur.fetchall()[0]
+        if int(result[0]) == 0 and int(result[1]) == 0:
+            juju.juju_log("Creating first administrator")
+            env = os.environ.copy()
+            env["LANDSCAPE_CONFIG"] = "standalone"
+            cmd = ["./schema", "--create-lds-account-only", 
+                   "--admin-name \"%s\"" % admin_name,
+                   "--admin-email %s" % admin_email,
+                   "--admin-password \"%s\"" % admin_password]
+            output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
+        else:
+            juju.juju_Log("DB not empty, skipping first admin creation")
 
 
 def change_root_url(database, user, password, host, url):

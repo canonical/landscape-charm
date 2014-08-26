@@ -61,7 +61,6 @@ def _create_maintenance_user(password, host, admin, admin_password):
     util.create_user(
         "landscape_maintenance", password, host, admin, admin_password)
 
-# LANDSCAPE_CONFIG=standalone ./schema --create-lds-account-only --admin-name "Andreas Hasenack" --admin-email "andreas@canonical.com" --admin-password anothersecret --with-account-password secret --with-post-signup-message post-signup --with-system-email andreas.hasenack@canonical.com --with-root-url https://10.96.1.28/
 
 def _get_config_obj(config_source=None):
     """Create a ConfigObj based on reading the config file C{filename}.
@@ -182,6 +181,7 @@ def db_admin_relation_changed():
         _create_maintenance_user(password, host, admin, admin_password)
         check_call("setup-landscape-server")
         juju.juju_log("Landscape database initialized!")
+        _create_first_admin(user, password, host)
 
     # Fire dependent changed hooks
     vhost_config_relation_changed()
@@ -193,6 +193,22 @@ def db_admin_relation_changed():
     except Exception as e:
         juju.juju_log(str(e), level="DEBUG")
 
+
+def _create_first_admin(db_user, db_password, db_host):
+    first_admin_email = juju.config_get("admin-email")
+    first_admin_name = juju.config_get("admin-name")
+    first_admin_password = juju.config_get("admin-password")
+    account_title = juju.config_get("account-title")
+    registration_key = juju.config_get("registration-key")
+    if not (first_admin_email and first_admin_name and
+            first_admin_password):
+        # need all three if we want to create a first administrator
+        juju.juju_log("First admin creation not requested")
+        return
+    juju.juju_log("Creating first landscape administrator")
+    util.create_landscape_admin(db_user, db_password, db_host,
+        first_admin_email, first_admin_name, first_admin_password)
+    
 
 def amqp_relation_joined():
     juju.relation_set("username=landscape")
