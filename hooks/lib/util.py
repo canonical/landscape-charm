@@ -77,7 +77,7 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
                 cmd.append("--with-account-password \"%s\"" % registration_key)
             output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         else:
-            juju.juju_Log("DB not empty, skipping first admin creation")
+            juju.juju_log("DB not empty, skipping first admin creation")
 
 
 def change_root_url(database, user, password, host, url):
