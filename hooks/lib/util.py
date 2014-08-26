@@ -53,8 +53,7 @@ def create_user(user, password, host, admin_user, admin_password):
 
 
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
-                           admin_email, admin_password, account_title,
-                           registration_key):
+                           admin_email, admin_password):
     """Create the first Landscape administrator."""
     with closing(connect(database="landscape-standalone-main", host=db_host,
                          user=db_user, password=db_password)) as conn:
@@ -67,14 +66,9 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
             juju.juju_log("Creating first administrator")
             env = os.environ.copy()
             env["LANDSCAPE_CONFIG"] = "standalone"
-            cmd = ["./schema", "--create-lds-account-only", 
-                   "--admin-name", admin_name,
-                   "--admin-email", admin_email,
+            cmd = ["./schema", "--create-lds-account-only", "--admin-name",
+                   admin_name, "--admin-email", admin_email,
                    "--admin-password", admin_password]
-            if account_title:
-                cmd.append("--account-title", account_title)
-            if registration_key:
-                cmd.append("--with-account-password", registration_key)
             output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         else:
             juju.juju_log("DB not empty, skipping first admin creation")

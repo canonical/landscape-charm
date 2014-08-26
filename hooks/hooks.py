@@ -206,8 +206,7 @@ def _create_first_admin(db_user, db_password, db_host):
         juju.juju_log("First admin creation not requested")
         return
     util.create_landscape_admin(db_user, db_password, db_host,
-        first_admin_name, first_admin_email, first_admin_password,
-        account_title, registration_key)
+        first_admin_name, first_admin_email, first_admin_password)
     
 
 def amqp_relation_joined():
