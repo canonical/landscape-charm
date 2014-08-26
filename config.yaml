@@ -65,9 +65,3 @@ options:
     admin-password:
         description: Password of the account administrator.
         type: string
-    account-title:
-        description: Title of the Landscape account.
-        type: string
-    registration-key:
-        description: The registration key to use for this account.
-        type: string
