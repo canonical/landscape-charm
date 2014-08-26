@@ -26,6 +26,7 @@ import sys
 import yaml
 from subprocess import check_call
 
+# LANDSCAPE_CONFIG=standalone ./schema --create-lds-account-only --admin-name "Andreas Hasenack" --admin-email "andreas@canonical.com" --admin-password anothersecret --with-account-password secret --with-post-signup-message post-signup --with-system-email andreas.hasenack@canonical.com --with-root-url https://10.96.1.28/
 
 def _get_config_obj(config_source=None):
     """Create a ConfigObj based on reading the config file C{filename}.
