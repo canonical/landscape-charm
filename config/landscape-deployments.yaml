@@ -39,6 +39,10 @@ landscape:
                 services: static appserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync
                 repository: include-file://repo-file
                 license-file: include-file://license-file
+                # Optionally create the first admin:
+                #admin-name: Stan Peters
+                #admin-email: stan@example.com
+                #admin-password: pwd
         landscape-msg:
             branch: lp:~landscape/landscape-charm/stable
             charm: landscape
