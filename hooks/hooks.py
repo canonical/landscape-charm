@@ -205,9 +205,8 @@ def _create_first_admin(db_user, db_password, db_host):
         # need all three if we want to create a first administrator
         juju.juju_log("First admin creation not requested")
         return
-    juju.juju_log("Creating first landscape administrator")
     util.create_landscape_admin(db_user, db_password, db_host,
-        first_admin_email, first_admin_name, first_admin_password,
+        first_admin_name, first_admin_email, first_admin_password,
         account_title, registration_key)
     
 
