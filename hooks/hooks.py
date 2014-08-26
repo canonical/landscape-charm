@@ -207,7 +207,8 @@ def _create_first_admin(db_user, db_password, db_host):
         return
     juju.juju_log("Creating first landscape administrator")
     util.create_landscape_admin(db_user, db_password, db_host,
-        first_admin_email, first_admin_name, first_admin_password)
+        first_admin_email, first_admin_name, first_admin_password,
+        account_title, registration_key)
     
 
 def amqp_relation_joined():
