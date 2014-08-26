@@ -52,12 +52,12 @@ options:
             cycle.
     admin-name:
         description: |
-            Name of the account administrator. If this and the next two config
-            options are specified, then the standalone account will be created
-            as part of the deployment, and this person will be its
+            Name of the account administrator. If this, admin-email and
+            admin-password are specified, then the standalone account will be
+            created as part of the deployment, and this person will be its
             administrator. If not specified, Landscape will prompt for these
-            details when it is first accessed with a web browser.
-            Note that changing these values after deployment has no effect.
+            details when it is first accessed with a web browser.  Note that
+            changing these values after deployment has no effect.
         type: string
     admin-email:
         description: Email of the account administrator.
