@@ -9,22 +9,57 @@ sys.path.insert(0, os.path.dirname(__file__))
 from lib import util
 from lib.juju import Juju
 
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from configobj import ConfigObj, ConfigObjError
+from contextlib import closing
 from copy import deepcopy
 import cStringIO
 import datetime
 import grp
 import os
 import psutil
-import psycopg2
 import pwd
 import pycurl
 import re
 import shutil
 import sys
 import yaml
-from subprocess import check_call
+from subprocess import check_call, check_output, CalledProcessError, call
+
+
+SSL_CERT_LOCATION = "/etc/ssl/certs/landscape_server_ca.crt"
+
+
+def _get_installed_version(name):
+    """Returns the version string of name using dpkg-query or returns None"""
+    try:
+        version = check_output(
+            ["dpkg-query", "--show", "--showformat=${Version}", name])
+    except CalledProcessError:
+        juju.juju_log(
+            "Cannot determine version of %s. Package is not installed." %
+            name)
+        return None
+    return version
+
+
+def _create_maintenance_user(password, host, admin, admin_password):
+    """
+    Any LDS version prior to 14.01 needs a C{landscape_maintenance} database
+    user.  Create this user if needed with the provided password on the host
+    using the admin/admin_password credentials. Otherwise, do nothing.
+    """
+    version = _get_installed_version("landscape-server")
+    if version is None:
+        return
+
+    if call(["dpkg", "--compare-versions", version, "ge", "14.01"]) == 0:
+        # We are on 14.01 or greater. No landscape_maintenance needed
+        return
+
+    juju.juju_log("Creating landscape_maintenance user")
+    util.create_user(
+        "landscape_maintenance", password, host, admin, admin_password)
 
 # LANDSCAPE_CONFIG=standalone ./schema --create-lds-account-only --admin-name "Andreas Hasenack" --admin-email "andreas@canonical.com" --admin-password anothersecret --with-account-password secret --with-post-signup-message post-signup --with-system-email andreas.hasenack@canonical.com --with-root-url https://10.96.1.28/
 
@@ -64,6 +99,29 @@ def notify_website_relation():
             services=yaml.safe_dump(_get_services_haproxy()))
 
 
+def notify_vhost_config_relation(relation_id=None):
+    """
+    Notify the vhost-config relation.
+
+    This will mark it "ready to proceed".  If relation_id is specified
+    use that as the relation context, otherwise look up and notify all
+    vhost-config relations.
+    """
+    vhosts = []
+    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
+        vhosts.append({
+            "port": "443", "template": b64encode(handle.read())})
+    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
+        vhosts.append({
+            "port": "80", "template": b64encode(handle.read())})
+
+    relation_ids = [relation_id]
+    if relation_id is None:
+        relation_ids = juju.relation_ids("vhost-config")
+    for relation_id in relation_ids:
+        juju.relation_set(relation_id=relation_id, vhosts=yaml.dump(vhosts))
+
+
 def db_admin_relation_joined():
     pass
 
@@ -94,7 +152,7 @@ def db_admin_relation_changed():
     relation_count = len(juju.relation_list())
     if relation_count > 1:
         juju.juju_log(
-            "Our database is clustered with %s units."
+            "Our database is clustered with %s units. "
             "Ignoring any intermittent 'standalone' states."
             % relation_count)
         ignored_states.add("standalone")
@@ -107,12 +165,6 @@ def db_admin_relation_changed():
 
     juju.juju_log("Updating config due to database changes.")
 
-    update_config_settings(
-        {"stores": {"host": host, "port": "5432", "user": user,
-                    "password": password},
-         "schema": {"store_user": admin, "store_password": admin_password}},
-        outfile=LANDSCAPE_NEW_SERVICE_CONF)
-
     if not util.is_db_up("postgres", host, admin, admin_password):
         juju.juju_log(
             "Ignoring config changes. Because new service settings don't "
@@ -120,21 +172,19 @@ def db_admin_relation_changed():
         return
 
     # Changes are validated; db is up has write-accessible
-    shutil.copyfile(LANDSCAPE_NEW_SERVICE_CONF, LANDSCAPE_SERVICE_CONF)
+    update_config_settings(
+        {"stores": {"host": host, "port": "5432", "user": user,
+                    "password": password},
+         "schema": {"store_user": admin, "store_password": admin_password}})
 
-    try:
-        # Name as lock so we don't try to reuse it as a database connection
-        lock = util.connect_exclusive(host, admin, admin_password)
-    except psycopg2.Error:
-        # Another unit is performing database configuration.
-        pass
-    else:
-        try:
-            util.create_user(user, password, host, admin, admin_password)
-            check_call("setup-landscape-server")
-        finally:
-            juju.juju_log("Landscape database initialized!")
-            lock.close()
+    with closing(util.connect_exclusive(host, admin, admin_password)):
+        util.create_user(user, password, host, admin, admin_password)
+        _create_maintenance_user(password, host, admin, admin_password)
+        check_call("setup-landscape-server")
+        juju.juju_log("Landscape database initialized!")
+
+    # Fire dependent changed hooks
+    vhost_config_relation_changed()
 
     try:
         # Handle remove-relation db-admin.  This call will fail because
@@ -264,7 +314,7 @@ def _is_amqp_up():
         "hostname", unit_name=amqp_unit, relation_id=relid)
     password = juju.relation_get(
         "password", unit_name=amqp_unit, relation_id=relid)
-    if None in [host, password]:
+    if not host or not password:
         juju.juju_log(
             "Waiting for valid hostname/password values from amqp relation")
         return False
@@ -278,23 +328,91 @@ def amqp_relation_changed():
     password = juju.relation_get("password")
     host = juju.relation_get("hostname")
 
-    juju.juju_log("Using AMPQ server at %s" % host)
-
-    if password == "":
-        sys.exit(0)
+    juju.juju_log("Using AMQP server at %s" % host)
 
     update_config_settings(
         {"broker": {"password": password, "host": host, "user": "landscape"}})
 
     if _is_db_up():
-        config_changed()  # only restart when is_db_up and _is_amqp_up
+        config_changed()
+
+
+def vhost_config_relation_changed():
+    """Relate to apache to configure a vhost.
+
+    This hook will supply vhost configuration as well as read simple data
+    out of apache (servername, certificate).  This data is necessary for
+    informing clients of the correct URL and cert to use when connecting
+    to the server.
+    """
+    # If this unit is not participating in a vhost-config relation, noop
+    if not juju.relation_ids("vhost-config"):
+        return
+
+    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
+
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    try:
+        section = config_obj["stores"]
+        database = section["main"]
+        host = section["host"]
+        user = section["user"]
+        password = section["password"]
+    except KeyError:
+        juju.juju_log("Database not ready yet, deferring call")
+        sys.exit(0)
+
+    relids = juju.relation_ids("vhost-config")
+    if relids:
+        relid = relids[0]
+        apache2_unit = juju.relation_list(relid)[0]
+        apache_servername = juju.relation_get(
+            "servername", unit_name=apache2_unit, relation_id=relid)
+    else:
+        apache_servername = juju.relation_get("servername")
+
+    if not apache_servername:
+        juju.juju_log("Waiting for data from apache, deferring")
+        sys.exit(0)
+    apache_url = "https://%s/" % apache_servername
+
+    if not _is_db_up():
+        juju.juju_log("Waiting for database to become available, deferring.")
+        sys.exit(0)
+
+    with closing(util.connect_exclusive(host, user, password)):
+        juju.juju_log("Updating Landscape root_url: %s" % apache_url)
+        util.change_root_url(database, user, password, host, apache_url)
+
+    # This data may or may not be present, dependeing on if cert is self
+    # signed from apache.
+    ssl_cert = juju.relation_get(
+        "ssl_cert", unit_name=apache2_unit, relation_id=relid)
+    if ssl_cert:
+        juju.juju_log("Writing new SSL cert: %s" % SSL_CERT_LOCATION)
+        with open(SSL_CERT_LOCATION, 'w') as f:
+            f.write(str(b64decode(ssl_cert)))
+    else:
+        if os.path.exists(SSL_CERT_LOCATION):
+            os.remove(SSL_CERT_LOCATION)
+
+    # only starts services again if is_db_up and _is_amqp_up
+    config_changed()
 
 
 def config_changed():
+    """Update and restart services based on config setting changes.
+
+    This hook is called either by the config-changed hook or other hooks when
+    something has modified configuration values. Before any changes, we stop
+    all landscape services and call _set_maintenance to ensure we are in proper
+    maintenance state before attempting to enable any periodic processes or
+    services.
+    """
     _lsctl("stop")
     _install_license()
-    _enable_services()
     _set_maintenance()
+    _enable_services()
     _set_upgrade_schema()
 
     if _is_db_up() and _is_amqp_up():
@@ -334,14 +452,19 @@ def _service(service, action):
 
 def _setup_apache():
     """
-    Setup apache2 to serve static landscape content
+    Setup apache2 to serve static landscape content, removing everything else.
+
+    N.B. As of Trusty, sites must be named with '.conf' at the end.
+    Precise and Trusty can then both use a2ensite/a2dissite with 'file.conf'.
     """
     public = juju.unit_get("public-address")
     _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
-    _a2dissite("default")
+    sites_available = os.listdir(os.path.dirname(LANDSCAPE_APACHE_SITE))
+    for site in sites_available:
+        _a2dissite(site)
     shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
-    _a2ensite("landscape")
+    _a2ensite("landscape.conf")
     _service("apache2", "restart")
 
 
@@ -573,9 +696,14 @@ def _set_maintenance():
         with open(LANDSCAPE_MAINTENANCE, "w") as fp:
             fp.write("%s" % datetime.datetime.now())
     else:
+        # Only remove maintenance mode when we are sure the db is up
+        # otherwise cron scripts like maas-poller will traceback per lp:1272140
+        # Also validate is_amqp_up as well otherwise we receive
+        # twisted.internet.error.ConnectionRefusedError:
         if os.path.exists(LANDSCAPE_MAINTENANCE):
-            juju.juju_log("Remove unit from maintenance mode")
-            os.unlink(LANDSCAPE_MAINTENANCE)
+            if _is_db_up() and _is_amqp_up():
+                juju.juju_log("Remove unit from maintenance mode")
+                os.unlink(LANDSCAPE_MAINTENANCE)
 
 
 def _set_upgrade_schema():
@@ -631,16 +759,19 @@ SERVICE_PROXY = {
         "port": "8080",
         "errorfiles": deepcopy(ERROR_FILES)},
     "msgserver": {
-        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8090", "httpchk": "HEAD /index.html HTTP/1.0"
+        },
     "pingserver": {
-        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
+        "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"
+        },
     "combo-loader": {
         "port": "9070",
-        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0",
-        "errorfiles": deepcopy(ERROR_FILES)},
-    "async-frontend": {"port": "9090"},
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
+        },
+    "async-frontend": {
+        "port": "9090",
+        "service_options": ["timeout client 300000",
+                            "timeout server 300000"]},
     "apiserver": {"port": "9080"},
     "package-upload": {"port": "9100"},
     "package-search": {"port": "9090"}}
@@ -680,9 +811,8 @@ SERVICE_DEFAULT = {
     "static": None}
 
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
-LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape"
+LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape.conf"
 LANDSCAPE_LICENSE_DEST = "/etc/landscape/license.txt"
-LANDSCAPE_NEW_SERVICE_CONF = "/etc/landscape/service.conf.new"
 LANDSCAPE_SERVICE_CONF = "/etc/landscape/service.conf"
 LANDSCAPE_MAINTENANCE = "/opt/canonical/landscape/maintenance.txt"
 STORAGE_MOUNTPOINT = "/srv/juju/vol-0001"
@@ -697,7 +827,8 @@ if __name__ == "__main__":
         "data-relation-changed": data_relation_changed,
         "db-admin-relation-joined": db_admin_relation_joined,
         "db-admin-relation-changed": db_admin_relation_changed,
-        "website-relation-joined": website_relation_joined}
+        "website-relation-joined": website_relation_joined,
+        "vhost-config-relation-changed": vhost_config_relation_changed}
     hook = os.path.basename(sys.argv[0])
     # If the hook is unsupported, let it raise a KeyError and exit with error.
     hooks[hook]()

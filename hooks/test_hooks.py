@@ -3,9 +3,11 @@ from configobj import ConfigObj
 import hooks
 import mocker
 import os
+import psycopg2
 import pycurl
 import stat
 import subprocess
+import tempfile
 import yaml
 
 
@@ -95,8 +97,6 @@ class TestHooks(mocker.MockerTestCase):
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
         hooks.LANDSCAPE_SERVICE_CONF = self.makeFile()
         self._service_conf = open(hooks.LANDSCAPE_SERVICE_CONF, "w")
-        hooks.LANDSCAPE_NEW_SERVICE_CONF = self.makeFile()
-        self._new_service_conf = open(hooks.LANDSCAPE_NEW_SERVICE_CONF, "w")
         hooks._get_system_numcpu = lambda: 2
         hooks._get_system_ram = lambda: 2
         self.maxDiff = None
@@ -104,6 +104,10 @@ class TestHooks(mocker.MockerTestCase):
         for value in hooks.SERVICE_PROXY.values():
             if "errorfiles" in value.keys():
                 value["errorfiles"] = []
+
+    def tearDown(self):
+        if "JUJU_RELATION" in os.environ:
+            del os.environ["JUJU_RELATION"]
 
     def assertFileContains(self, filename, text):
         """Make sure a string exists in a file."""
@@ -141,6 +145,41 @@ class TestHooksService(TestHooks):
         hooks.juju.config["services"] = "jobhandler"
         result = hooks._get_services_haproxy()
         self.assertEqual(len(result), 0)
+
+    def test_wb_get_installed_version_error_when_not_installed(self):
+        """
+        L{_get_installed_version} will report an error when the dpkg-query
+        command fails due to specified package not being installed.
+        """
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "I-dont-exist"])
+        self.mocker.throw(subprocess.CalledProcessError(1, "Command failed"))
+        self.mocker.replay()
+
+        result = hooks._get_installed_version("I-dont-exist")
+        self.assertIsNone(result)
+        message = (
+            "Cannot determine version of I-dont-exist. Package is not "
+            "installed.")
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_wb_get_installed_version_success_when_installed(self):
+        """
+        When the requested package is installed, L{_get_installed_version} will
+        return the package version as reported by the dpkg-query command.
+        """
+        version_call = self.mocker.replace(hooks.check_output)
+        version_call(
+            ["dpkg-query", "--show", "--showformat=${Version}",
+             "I-exist"])
+        self.mocker.result("1.2.3+456")
+        self.mocker.replay()
+
+        result = hooks._get_installed_version("I-exist")
+        self.assertEqual("1.2.3+456", result)
 
     def test_wb_chown_sets_dir_and_file_ownership_to_landscape(self):
         """
@@ -189,6 +228,72 @@ class TestHooksService(TestHooks):
         # Directory mode changed to 777 and gid/uid set
         mode = os.stat(dir_name).st_mode
         self.assertEqual(mode & mode777, mode777)
+
+    def test_wb_create_maintenance_user_creates_on_lds_less_than_14_01(self):
+        """
+        C{landscape_maintenance} database user is created on installs with
+        versions less than 14.01.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result("14.00+bzr1919")
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
+        message = "Creating landscape_maintenance user"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_wb_create_maintenance_user_not_created_if_lds_not_installed(self):
+        """
+        C{landscape_maintenance} database user is not created when we are
+        unable to obtain installed version information for the landscape-server
+        package.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result(None)  # No version info found (not installed)
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.count(0)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
+
+    def test_wb_create_maintenance_user_not_created_on_14_01(self):
+        """
+        C{landscape_maintenance} database user is not created on installs with
+        versions 14.01 or greater.
+        """
+        user = "landscape_maintenance"
+        password = "asdf"
+        host = "postgres/0"
+        admin = "auto_db_admin"
+        admin_password = "abc123"
+
+        version_call = self.mocker.replace(hooks._get_installed_version)
+        version_call("landscape-server")
+        self.mocker.result("14.01")
+        create_user = self.mocker.replace(hooks.util.create_user)
+        create_user(user, password, host, admin, admin_password)
+        self.mocker.count(0)
+        self.mocker.replay()
+
+        hooks._create_maintenance_user(password, host, admin, admin_password)
 
     def test_amqp_relation_joined(self):
         """
@@ -777,7 +882,12 @@ class TestHooksService(TestHooks):
         create_user(new_user, new_password, host, admin, password)
         check_call = self.mocker.replace(hooks.check_call)
         check_call("setup-landscape-server")
+        maintenance_mock = self.mocker.replace(hooks._create_maintenance_user)
+        maintenance_mock(new_password, host, admin, password)
         connection.close()
+        vhost_changed = self.mocker.replace(
+            hooks.vhost_config_relation_changed)
+        vhost_changed()
         self.mocker.replay()
 
         hooks.db_admin_relation_changed()
@@ -801,6 +911,33 @@ class TestHooksService(TestHooks):
         self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
         hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/1"}
 
+        hooks.db_admin_relation_changed()
+
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.assertEqual(config_obj.keys(), [])
+
+    def test_db_admin_relation_changed_no_config_if_db_down(self):
+        """
+        db_admin_relation_changed does not update the service configuration
+        file if is_db_up() returns False.
+        """
+        self.addCleanup(
+            setattr, hooks.juju, "_incoming_relation_data", ())
+        hooks.juju._incoming_relation_data = {
+            "host": "postgres/0", "user": "auto_db_admin",
+            "password": "abc123", "allowed-units": "landscape/0",
+            "state": "standalone"}.items()
+        self.addCleanup(
+            setattr, hooks.juju, "config_get", hooks.juju.config_get)
+        hooks.juju.config_get = lambda x: ""
+
+        self.addCleanup(setattr, hooks.os, "environ", hooks.os.environ)
+        hooks.os.environ = {"JUJU_UNIT_NAME": "landscape/0"}
+
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("postgres", "postgres/0", "auto_db_admin", "abc123")
+        self.mocker.result(False)
+        self.mocker.replay()
         hooks.db_admin_relation_changed()
 
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
@@ -1035,9 +1172,80 @@ class TestHooksService(TestHooks):
         hooks.juju.config["maintenance"] = True
         hooks._set_maintenance()
         self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Putting unit into maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_only_removed_if_db_and_amqp_are(self):
+        """
+        When maintenance flag is set C{False} and both the database and amqp
+        are accessible, the maintenance file will be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+        data = [("stores", "main", "somedb"),
+                ("stores", "host", "somehost"),
+                ("stores", "user", "someuser"),
+                ("stores", "password", "somepassword")]
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        for section, key, value in data:
+            config_obj[section][key] = value
+        config_obj.write()
         hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up("somedb", "somehost", "someuser", "somepassword")
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+
         hooks._set_maintenance()
         self.assertFalse(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+        message = "Remove unit from maintenance mode"
+        self.assertIn(
+            message, hooks.juju._logs, "Not logged- %s" % message)
+
+    def test_maintenance_file_not_removed_if_db_is_not_up(self):
+        """
+        When maintenance flag is set C{False} and the database is not
+        accessible, the maintenance file will not be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+
+        hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
+
+    def test_maintenance_file_not_removed_if_amqp_is_not_up(self):
+        """
+        When maintenance flag is set C{False} and the AMQP service is not
+        accessible, the maintenance file will not be removed.
+        """
+        hooks.LANDSCAPE_MAINTENANCE = self.makeFile()
+        hooks.juju.config["maintenance"] = True
+        hooks._set_maintenance()  # Create the maintenance file
+
+        hooks.juju.config["maintenance"] = False
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        is_amqp_up = self.mocker.replace(hooks._is_amqp_up)
+        is_amqp_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+
+        hooks._set_maintenance()
+        self.assertTrue(os.path.exists(hooks.LANDSCAPE_MAINTENANCE))
 
     def test_is_db_up_with_db_configured(self):
         """Return True when the db is configured."""
@@ -1282,3 +1490,211 @@ class TestHooksServiceMock(TestHooks):
         hooks.notify_website_relation()
         baseline = (("services", yaml.safe_dump(self.all_services)),)
         self.assertEqual(baseline, hooks.juju._outgoing_relation_data)
+
+    def test_notify_vhost_config_relation_specify_id(self):
+        """
+        notify the vhost-config relation on a separate ID.
+        """
+        hooks.notify_vhost_config_relation("foo/0")
+        with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
+    def test_notify_vhost_config_relation(self):
+        """notify the vhost-config relation on the "current" ID."""
+        hooks.notify_vhost_config_relation()
+        with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
+    def test_vhost_config_relation_changed_exit_no_configuration(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertEquals(len(hooks.juju._logs), 1)
+        self.assertIn('Database not ready yet', hooks.juju._logs[0])
+
+    def test_vhost_config_relation_changed_wait_apache_servername(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        self.mocker.replay()
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
+
+    def test_vhost_config_relation_changed_fail_root_url(self):
+        """Ensure vhost_relation_changed deferrs if db is not up."""
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(False)
+        self.mocker.replay()
+        self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
+        self.assertIn(
+            'Waiting for database to become available, deferring',
+            hooks.juju._logs[-1])
+
+    def test_vhost_config_relation_changed_fail_root_url_db_update(self):
+        """vhost_config_relation_changed should error if db update fails"""
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+        self.assertRaises(psycopg2.Error, hooks.vhost_config_relation_changed)
+
+    def test_vhost_config_relation_changed_cert_not_provided(self):
+        """
+        Ensure vhost_relation_changed runs to completion.
+
+        Existing cert should be removed.
+        """
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        mock_conn = self.mocker.mock()
+        mock_conn.close()
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive("host", "user", "password")
+        self.mocker.result(mock_conn)
+        change_root_url = self.mocker.replace(hooks.util.change_root_url)
+        change_root_url(
+            "database", "user", "password", "host", "https://foobar/")
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
+        self.assertFalse(os.path.exists(hooks.SSL_CERT_LOCATION))
+
+    def test_vhost_config_relation_changed_ssl_cert_provided(self):
+        """
+        Ensure vhost_relation_changed runs to completion.
+
+        Cert passed in to other side of relation should be written on disk.
+        """
+        os.environ["JUJU_RELATION"] = "vhost-config"
+        hooks.SSL_CERT_LOCATION = tempfile.NamedTemporaryFile().name
+        _get_config_obj = self.mocker.replace(hooks._get_config_obj)
+        _get_config_obj(hooks.LANDSCAPE_SERVICE_CONF)
+        hooks.juju._incoming_relation_data += (("servername", "foobar"),)
+        hooks.juju._incoming_relation_data += (
+            ("ssl_cert", base64.b64encode("foobar")),)
+        self.mocker.result({
+            "stores": {
+                "main": "database",
+                "host": "host",
+                "user": "user",
+                "password": "password"}})
+        notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
+        notify_vhost(None)
+        is_db_up = self.mocker.replace(hooks._is_db_up)
+        is_db_up()
+        self.mocker.result(True)
+        mock_conn = self.mocker.mock()
+        mock_conn.close()
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive("host", "user", "password")
+        self.mocker.result(mock_conn)
+        change_root_url = self.mocker.replace(hooks.util.change_root_url)
+        change_root_url(
+            "database", "user", "password", "host", "https://foobar/")
+        config_changed = self.mocker.replace(hooks.config_changed)
+        config_changed()
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
+        self.assertTrue(os.path.exists(hooks.SSL_CERT_LOCATION))
+        with open(hooks.SSL_CERT_LOCATION, 'r') as f:
+            self.assertEqual("foobar", f.read())
+
+
+class TestHooksUtils(TestHooks):
+    def test__setup_apache(self):
+        """
+        Responsible for setting up apache to serve static content.
+        - various 'a2*' commands need to be mocked and tested to ensure
+          proper parameters are passed.
+        - make sure we actually replace '@hostname@' with 'localhost' in the
+          site file we are installing.
+        - ensure new file has '.conf' extension.
+        """
+        tempdir = self.makeDir()
+        with open("%s/default.random_extension" % tempdir, 'w') as f:
+            f.write("HI!")
+        with open("%s/default2.conf" % tempdir, 'w') as f:
+            f.write("HI!")
+        # Replace dir, but leave basename to check that it has '.conf'
+        # (new requirement with Trusty apache2)
+        site_file = os.path.basename(hooks.LANDSCAPE_APACHE_SITE)
+        hooks.LANDSCAPE_APACHE_SITE = "%s/%s" % (tempdir, site_file)
+        _a2enmods = self.mocker.replace(hooks._a2enmods)
+        _a2dissite = self.mocker.replace(hooks._a2dissite)
+        _a2ensite = self.mocker.replace(hooks._a2ensite)
+        _service = self.mocker.replace(hooks._service)
+        _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+        _a2dissite("default.random_extension")
+        _a2dissite("default2.conf")
+        _a2ensite("landscape.conf")
+        _service("apache2", "restart")
+        self.mocker.replay()
+        hooks._setup_apache()
+        self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
+        with open("%s/landscape.conf" % tempdir, 'r') as f:
+            site_text = f.read()
+        self.assertFalse("@hostname@" in site_text)
+        self.assertTrue("localhost" in site_text)

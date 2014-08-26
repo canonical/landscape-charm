@@ -2,9 +2,10 @@
 
 ROOT="$( cd "$( dirname "$0" )" && pwd )"
 LS_PPA=`config-get repository`
-LS_PACKAGE="landscape-server_*.tar.gz"
+LS_PACKAGE=`ls -1 landscape-server_*.tar.gz || echo ""`
 SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
 CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
+LANDSCAPE_MAINTENANCE=/opt/canonical/landscape/maintenance.txt
 
 die() {
     STATUS=$?
@@ -19,7 +20,7 @@ setup_local_repo () {
     ls $LS_PACKAGE || return;
 
     # Install needed tools for building
-    apt_get install devscripts bzr pbuilder
+    apt_get install dpkg-dev pbuilder
 
     TMP=$(mktemp -d)
     cp -f $LS_PACKAGE $TMP
@@ -55,8 +56,15 @@ setup_local_repo () {
 }
 
 install_landscape() {
-    apt_get update;
-    apt_get install landscape-server
+    apt_get update
+    # only install the hash-id package if we host the static service
+    config=$(config-get services)
+    if echo "$config" | grep -qw static; then
+        extra_packages="landscape-hashids"
+    else
+        extra_packages=""
+    fi
+    apt_get install --no-install-recommends landscape-server ntp $extra_packages
 }
 
 # $1 - optional additional source line to add
@@ -79,13 +87,24 @@ function apt_get() {
 # Workaround for: https://bugs.launchpad.net/juju/+bug/993034
 echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-proxy
 
+apt_get update
 apt_get install apt-transport-https
 apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
                 python-support wget pwgen apache2-mpm-worker \
                 python-psutil python-pycurl
 
 # Setup a local repository and build the server if supplied in the charm
-setup_local_repo || add_apt_sources
-install_landscape || die "Error installing landscape"
+if [ -n "$LS_PACKAGE" ]; then
+    setup_local_repo
+else
+    add_apt_sources
+fi
 
-exit 0
+# Set maintenance mode to prevent cron jobs until db relationship is setup
+MAINTENANCE_DIR=`dirname $LANDSCAPE_MAINTENANCE`
+echo "Setting maintenance mode until database is configured"
+mkdir -p $MAINTENANCE_DIR
+date > $LANDSCAPE_MAINTENANCE
+
+install_landscape || die "Error installing landscape"
+echo "Install complete"

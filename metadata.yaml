@@ -1,7 +1,7 @@
-name: landscape
-summary: Charm for installing and using Landscape.
+name: landscape-server
+summary: Charm for installing and using Landscape Dedicated Server.
 maintainer: Landscape Team <landscape-team@canonical.com>
-description: A multi server Landscape charm.
+description: A multi server Landscape Dedicated Server charm.
 categories:
   - app-servers
 requires:
@@ -23,3 +23,5 @@ provides:
     optional: true
   website:
     interface: http
+  vhost-config:
+    interface: apache-vhost-config
