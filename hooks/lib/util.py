@@ -68,13 +68,13 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
             env = os.environ.copy()
             env["LANDSCAPE_CONFIG"] = "standalone"
             cmd = ["./schema", "--create-lds-account-only", 
-                   "--admin-name \"%s\"" % admin_name,
-                   "--admin-email %s" % admin_email,
-                   "--admin-password \"%s\"" % admin_password]
+                   "--admin-name", admin_name,
+                   "--admin-email", admin_email,
+                   "--admin-password", admin_password]
             if account_title:
-                cmd.append("--account-title \"%s\"" % account_title)
+                cmd.append("--account-title", account_title)
             if registration_key:
-                cmd.append("--with-account-password \"%s\"" % registration_key)
+                cmd.append("--with-account-password", registration_key)
             output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         else:
             juju.juju_log("DB not empty, skipping first admin creation")
