@@ -28,7 +28,10 @@ class TestJuju(object):
             "license-file": "LICENSE_FILE_TEXT",
             "service-count": "msgserver:2 pingserver:1",
             "upgrade-schema": False,
-            "maintenance": False}
+            "maintenance": False,
+            "admin-name": None,
+            "admin-email": None,
+            "admin-password": None}
 
     def relation_set(self, *args, **kwargs):
         """
