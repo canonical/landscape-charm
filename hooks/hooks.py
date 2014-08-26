@@ -181,7 +181,6 @@ def db_admin_relation_changed():
         _create_maintenance_user(password, host, admin, admin_password)
         check_call("setup-landscape-server")
         juju.juju_log("Landscape database initialized!")
-        _create_first_admin(user, password, host)
 
     # Fire dependent changed hooks
     vhost_config_relation_changed()
@@ -194,20 +193,32 @@ def db_admin_relation_changed():
         juju.juju_log(str(e), level="DEBUG")
 
 
-def _create_first_admin(db_user, db_password, db_host):
+def _create_first_admin():
     first_admin_email = juju.config_get("admin-email")
     first_admin_name = juju.config_get("admin-name")
     first_admin_password = juju.config_get("admin-password")
-    account_title = juju.config_get("account-title")
-    registration_key = juju.config_get("registration-key")
     if not (first_admin_email and first_admin_name and
             first_admin_password):
         # need all three if we want to create a first administrator
-        juju.juju_log("First admin creation not requested")
         return
-    util.create_landscape_admin(db_user, db_password, db_host,
-        first_admin_name, first_admin_email, first_admin_password)
-    
+    juju.juju_log("First admin creation requested")
+    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
+    try:
+        section = config_obj["stores"]
+        database = section["main"]
+        db_host = section["host"]
+        db_user = section["user"]
+        db_password = section["password"]
+    except KeyError:
+        juju.juju_log("No DB configuration yet, bailing.")
+        return
+    if util.is_db_up(database, db_host, db_user, db_password):
+        with closing(util.connect_exclusive(host, db_user, db_password)):
+            util.create_landscape_admin(db_user, db_password, db_host,
+                first_admin_name, first_admin_email, first_admin_password)
+    else:
+        juju.juju_log("Can't talk to the DB yet, bailing.")
+
 
 def amqp_relation_joined():
     juju.relation_set("username=landscape")
@@ -429,6 +440,7 @@ def config_changed():
     _set_maintenance()
     _enable_services()
     _set_upgrade_schema()
+    _create_first_admin()
 
     if _is_db_up() and _is_amqp_up():
         _lsctl("start")
