@@ -96,6 +96,7 @@ class TestHooks(mocker.MockerTestCase):
     def setUp(self):
         hooks._lsctl = lambda x: True
         hooks.juju = TestJuju()
+        hooks.util.juju = hooks.juju
         hooks.LANDSCAPE_LICENSE_DEST = self.makeFile()
         hooks.LANDSCAPE_DEFAULT_FILE = self.makeFile()
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
@@ -176,6 +177,27 @@ class TestHooksService(TestHooks):
         self.assertIsNone(hooks._create_first_admin())
         self.assertEqual(messages, hooks.juju._logs)
 
+    def test_first_admin_not_created_if_account_not_empty(self):
+        """
+        The first administrator is not created if the account is not
+        empty.
+        """
+        db_user = "user"
+        db_password = "password"
+        db_host = "example.com"
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        message = "DB not empty, skipping first admin creation"
+
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(False)
+        self.mocker.replay()
+        hooks.util.create_landscape_admin(db_user, db_password, db_host,
+            admin_name, admin_email, admin_password)
+        self.assertEqual((message,), hooks.juju._logs)
+        
 
     def test__get_db_access_details(self):
         """

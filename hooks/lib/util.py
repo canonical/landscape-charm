@@ -5,7 +5,7 @@ Utility library for juju hooks
 from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
 from contextlib import closing
-from subprocess import check_output
+from subprocess import check_call
 
 import os
 
@@ -52,31 +52,37 @@ def create_user(user, password, host, admin_user, admin_password):
         conn.close()
 
 
+def account_is_empty(db_user, db_password, db_host):
+    """
+    Returns true if the person and account tables from the
+    landscape-standalone-main database are empty.
+    """
+    with closing(connect(database="landscape-standalone-main", host=db_host,
+                         user=db_user, password=db_password)) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(person.id),COUNT(account.id) FROM "
+                    "person,account")
+        result = cur.fetchall()[0]
+        return int(result[0]) == 0 and int(result[1]) == 0
+
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
     """
     Create the first Landscape administrator. If successful, returns
     the API credentials as a tuple (key, secret). Otherwise, None.
     """
-    with closing(connect(database="landscape-standalone-main", host=db_host,
-                         user=db_user, password=db_password)) as conn:
-        cur = conn.cursor()
-        # make sure it's a blank account
-        cur.execute("SELECT COUNT(person.id),COUNT(account.id) FROM "
-                    "person,account")
-        result = cur.fetchall()[0]
-        if int(result[0]) == 0 and int(result[1]) == 0:
-            juju.juju_log("Creating first administrator")
-            env = os.environ.copy()
-            env["LANDSCAPE_CONFIG"] = "standalone"
-            cmd = ["./schema", "--create-lds-account-only", "--admin-name",
-                   admin_name, "--admin-email", admin_email,
-                   "--admin-password", admin_password]
-            output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
-            # XXX parse "output"
-            return ("key", "secret")
-        else:
-            juju.juju_log("DB not empty, skipping first admin creation")
+    if account_is_empty(db_user, db_password, db_host):
+        juju.juju_log("Creating first administrator")
+        env = os.environ.copy()
+        env["LANDSCAPE_CONFIG"] = "standalone"
+        cmd = ["./schema", "--create-lds-account-only", "--admin-name",
+               admin_name, "--admin-email", admin_email,
+               "--admin-password", admin_password]
+        check_call(cmd, cwd="/opt/canonical/landscape", env=env)
+        juju.juju_log("Administrator called %s with email %s created" %
+            (admin_name, admin_email))
+    else:
+        juju.juju_log("DB not empty, skipping first admin creation")
 
 
 def change_root_url(database, user, password, host, url):
