@@ -160,6 +160,23 @@ class TestHooksService(TestHooks):
             self.assertEqual((message,), hooks.juju._logs)
             hooks.juju._logs = ()
 
+    def test_first_admin_not_created_if_no_db_config(self):
+        """
+        The first administrator is not created if there is no database
+        configuration in the service.conf file.
+        """
+        messages = ("First admin creation requested",
+                    "No DB configuration yet, bailing.")
+        hooks.juju.config["admin-name"] = "Foo Bar"
+        hooks.juju.config["admin-email"] = "foo@example.com"
+        hooks.juju.config["admin-password"] = "secret"
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj.write()
+        self.assertIsNone(hooks._create_first_admin())
+        self.assertEqual(messages, hooks.juju._logs)
+
+
     def test__get_db_access_details(self):
         """
         The _get_db_access_details() function returns the database name and
@@ -199,7 +216,6 @@ class TestHooksService(TestHooks):
         config_obj.clear()
         config_obj.write()
         self.assertIsNone(hooks._get_db_access_details())
-
 
     def test_get_services_non_proxied(self):
         """
