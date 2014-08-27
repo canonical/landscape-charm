@@ -65,6 +65,7 @@ def account_is_empty(db_user, db_password, db_host):
         result = cur.fetchall()[0]
         return int(result[0]) == 0 and int(result[1]) == 0
 
+
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
     """

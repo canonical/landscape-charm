@@ -197,7 +197,56 @@ class TestHooksService(TestHooks):
         hooks.util.create_landscape_admin(db_user, db_password, db_host,
             admin_name, admin_email, admin_password)
         self.assertEqual((message,), hooks.juju._logs)
-        
+
+    def test__create_first_admin_calls_create_landscape_admin(self):
+        """
+        When all conditions are met, _create_first_admin() calls
+        create_landscape_admin.
+        """
+        # juju log message we expect
+        message = "First admin creation requested"
+
+        # we have an admin user defined
+        first_admin_name = "Foo Bar"
+        first_admin_email = "foo@example.com"
+        first_admin_password = "secret"
+        hooks.juju.config["admin-name"] = first_admin_name
+        hooks.juju.config["admin-email"] = first_admin_email
+        hooks.juju.config["admin-password"] = first_admin_password
+
+        # we have the database access details
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        database = "mydb"
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+        stores = {"main": database, "host": db_host, "user": db_user,
+                  "password": db_password}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        # the db is up
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up(database, db_host, db_user, db_password)
+        self.mocker.result(True)
+
+        # we can connect
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive(db_host, db_user, db_password)
+        connection = self.mocker.mock()
+        self.mocker.result(connection)
+
+        # util.create_landscape_admin is called
+        create_landscape_admin = self.mocker.replace(
+            hooks.util.create_landscape_admin)
+        create_landscape_admin(db_user, db_password, db_host,
+            first_admin_name, first_admin_email, first_admin_password)
+        connection.close()
+        self.mocker.replay()
+
+        hooks._create_first_admin()
+        self.assertEqual((message,), hooks.juju._logs)
+
 
     def test__get_db_access_details(self):
         """
