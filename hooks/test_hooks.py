@@ -247,6 +247,41 @@ class TestHooksService(TestHooks):
         hooks._create_first_admin()
         self.assertEqual((message,), hooks.juju._logs)
 
+    def test__create_first_admin_bails_if_db_is_not_up(self):
+        """
+        The _create_first_admin() method gives up if the DB is not
+        accessible.
+        """
+        # juju log messages we expect
+        messages = ("First admin creation requested",
+                    "Can't talk to the DB yet, bailing.")
+        # we have an admin user defined
+        first_admin_name = "Foo Bar"
+        first_admin_email = "foo@example.com"
+        first_admin_password = "secret"
+        hooks.juju.config["admin-name"] = first_admin_name
+        hooks.juju.config["admin-email"] = first_admin_email
+        hooks.juju.config["admin-password"] = first_admin_password
+
+        # we have the database access details
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        database = "mydb"
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+        stores = {"main": database, "host": db_host, "user": db_user,
+                  "password": db_password}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        # the db is down, though
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up(database, db_host, db_user, db_password)
+        self.mocker.result(False)
+
+        self.mocker.replay()
+        hooks._create_first_admin()
+        self.assertEqual(messages, hooks.juju._logs)
 
     def test__get_db_access_details(self):
         """
