@@ -19,14 +19,13 @@ class Deployer(object):
         charm_dest = path.join(deployer_dir, series, "landscape")
         shutil.copytree(charm_src, charm_dest)
 
-    def deploy(self, target, config_files, timeout=None, update_charms=False):
+    def deploy(self, target, config_files, timeout=None):
         """
         Use juju-deployer to install `target` on current `juju env`
 
         @param target: target to deploye in the config file.
         @param config_files: list of config files to pass to deployer (-c)
         @param timeout: timeout in seconds (int or string is OK)
-        @param update_charms: update the charms before deploying (-u)
         """
         deployer_dir = None
         try:
@@ -34,8 +33,6 @@ class Deployer(object):
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
             args = ["juju-deployer", "-vdWL", "-w 180"]
-            if update_charms:
-                args.append("-u")
             for config_file in config_files:
                 args.extend(["-c", config_file])
             args.append(target)
