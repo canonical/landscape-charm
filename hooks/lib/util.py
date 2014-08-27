@@ -54,7 +54,10 @@ def create_user(user, password, host, admin_user, admin_password):
 
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
-    """Create the first Landscape administrator."""
+    """
+    Create the first Landscape administrator. If successful, returns
+    the API credentials as a tuple (key, secret). Otherwise, None.
+    """
     with closing(connect(database="landscape-standalone-main", host=db_host,
                          user=db_user, password=db_password)) as conn:
         cur = conn.cursor()
@@ -70,6 +73,8 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
                    admin_name, "--admin-email", admin_email,
                    "--admin-password", admin_password]
             output = check_output(cmd, cwd="/opt/canonical/landscape", env=env)
+            # XXX parse "output"
+            return ("key", "secret")
         else:
             juju.juju_log("DB not empty, skipping first admin creation")
 

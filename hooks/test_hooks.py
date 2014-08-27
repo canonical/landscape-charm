@@ -1,5 +1,6 @@
 import base64
 from configobj import ConfigObj
+from copy import deepcopy
 import hooks
 import mocker
 import os
@@ -139,6 +140,66 @@ UPGRADE_SCHEMA="no"
 
 
 class TestHooksService(TestHooks):
+
+    def test_first_admin_not_created_without_name_email_password(self):
+        """
+        Tests that the first admin is not created when only one or two of
+        name, email and password are given.
+        """
+        message = ("Not creating a Landscape administrator: need admin-email,"
+                   " admin-name and admin-password.")
+
+        # test all combinations
+        for n in range(7):
+            hooks.juju.config["admin-name"] = "Foo Bar" if n & 0b100 else None
+            hooks.juju.config["admin-email"] = ("foo@example.com" if n & 0b010
+                                                else None)
+            hooks.juju.config["admin-password"] = ("secret" if n & 0b001
+                                                   else None)
+            self.assertIsNone(hooks._create_first_admin())
+            self.assertEqual((message,), hooks.juju._logs)
+            hooks.juju._logs = ()
+
+    def test__get_db_access_details(self):
+        """
+        The _get_db_access_details() function returns the database name and
+        access details when all these keys exist in the landscape service
+        configuration file.
+        """
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        stores = {"main": "mydb", "host": "myhost", "user": "myuser",
+                  "password": "mypassword"}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        result = hooks._get_db_access_details()
+        database, db_host, db_user, db_password = result
+        self.assertEqual(database, stores["main"])
+        self.assertEqual(db_host, stores["host"])
+        self.assertEqual(db_user, stores["user"])
+        self.assertEqual(db_password, stores["password"])
+
+    def test_no_db_access_details_if_missing_config_key(self):
+        """
+        The _get_db_access_details() function returns None if any of
+        the needed configuration keys is missing.
+        """
+        full_config = {"main": "mydb", "host": "myhost", "user": "myuser",
+                       "password": "mypassword"}
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        # remove one key each time
+        for key in full_config:
+            data = deepcopy(full_config)
+            data.pop(key)
+            config_obj["stores"] = data
+            config_obj.write()
+            result = hooks._get_db_access_details()
+            self.assertIsNone(result)
+        # last try, with no data at all
+        config_obj.clear()
+        config_obj.write()
+        self.assertIsNone(hooks._get_db_access_details())
+
 
     def test_get_services_non_proxied(self):
         """

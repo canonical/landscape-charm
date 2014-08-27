@@ -193,15 +193,7 @@ def db_admin_relation_changed():
         juju.juju_log(str(e), level="DEBUG")
 
 
-def _create_first_admin():
-    first_admin_email = juju.config_get("admin-email")
-    first_admin_name = juju.config_get("admin-name")
-    first_admin_password = juju.config_get("admin-password")
-    if not (first_admin_email and first_admin_name and
-            first_admin_password):
-        # need all three if we want to create a first administrator
-        return
-    juju.juju_log("First admin creation requested")
+def _get_db_access_details():
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     try:
         section = config_obj["stores"]
@@ -210,12 +202,30 @@ def _create_first_admin():
         db_user = section["user"]
         db_password = section["password"]
     except KeyError:
+        return None
+    return (database, db_host, db_user, db_password)
+
+
+def _create_first_admin():
+    first_admin_email = juju.config_get("admin-email")
+    first_admin_name = juju.config_get("admin-name")
+    first_admin_password = juju.config_get("admin-password")
+    if not all((first_admin_email, first_admin_name, first_admin_password)):
+        juju.juju_log("Not creating a Landscape administrator: need "
+                      "admin-email, admin-name and admin-password.")
+        return None
+    juju.juju_log("First admin creation requested")
+    access_details = _get_db_access_details()
+    if not access_details:
         juju.juju_log("No DB configuration yet, bailing.")
-        return
+        return None
+    database, db_host, db_user, db_password = access_details
     if util.is_db_up(database, db_host, db_user, db_password):
         with closing(util.connect_exclusive(db_host, db_user, db_password)):
-            util.create_landscape_admin(db_user, db_password, db_host,
-                first_admin_name, first_admin_email, first_admin_password)
+            api_creds = util.create_landscape_admin(
+                db_user, db_password, db_host, first_admin_name,
+                first_admin_email, first_admin_password)
+            return api_creds
     else:
         juju.juju_log("Can't talk to the DB yet, bailing.")
 
@@ -377,16 +387,11 @@ def vhost_config_relation_changed():
 
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
 
-    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
-    try:
-        section = config_obj["stores"]
-        database = section["main"]
-        host = section["host"]
-        user = section["user"]
-        password = section["password"]
-    except KeyError:
+    access_details = _get_db_access_details()
+    if not access_details:
         juju.juju_log("Database not ready yet, deferring call")
         sys.exit(0)
+    database, host, user, password = access_details
 
     relids = juju.relation_ids("vhost-config")
     if relids:
@@ -754,17 +759,11 @@ def _is_db_up():
     """
     Return True if the database is accessible and read/write, False otherwise.
     """
-    config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
-    try:
-        section = config_obj["stores"]
-        database = section["main"]
-        host = section["host"]
-        user = section["user"]
-        password = section["password"]
-    except KeyError:
+    access_details = _get_db_access_details()
+    if not access_details:
         return False
-    else:
-        return util.is_db_up(database, host, user, password)
+    database, host, user, password = access_details
+    return util.is_db_up(database, host, user, password)
 
 
 ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
