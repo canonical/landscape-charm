@@ -323,6 +323,48 @@ class TestHooksService(TestHooks):
         config_obj.write()
         self.assertIsNone(hooks._get_db_access_details())
 
+    def test_create_landscape_admin_calls_schema_script(self):
+        """
+        The create_landscape_admin() method calls the landscape schema
+        script with the right parameters.
+        """
+        # we have an admin user defined
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+
+        # juju log messages we expect
+        messages = ("Creating first administrator",
+                    "Administrator called %s with email %s created" %
+                    (admin_name, admin_email))
+ 
+        # we have the database access details
+        database = "mydb"
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+
+        # account is empty
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(True)
+        
+        env = {}
+        hooks.util.os.environ = {}
+        env["LANDSCAPE_CONFIG"] = "standalone"
+        schema_call = self.mocker.replace(hooks.check_call)
+        cmd = ["./schema", "--create-lds-account-only", "--admin-name",
+               admin_name, "--admin-email", admin_email, "--admin-password",
+               admin_password]
+        schema_call(cmd, cwd="/opt/canonical/landscape", env=env)
+
+        self.mocker.replay()
+
+        hooks.util.create_landscape_admin(db_user, db_password, db_host,
+            admin_name, admin_email, admin_password)
+        self.assertEqual(messages, hooks.juju._logs)
+
+
     def test_get_services_non_proxied(self):
         """
         helper method should not break if non-proxied services are called for
