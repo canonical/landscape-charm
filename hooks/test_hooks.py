@@ -143,13 +143,13 @@ class TestHooksService(TestHooks):
 
     def test_first_admin_not_created_without_name_email_password(self):
         """
-        Tests that the first admin is not created when only one or two of
-        name, email and password are given.
+        The first admin is not created when only one or two of name, email and
+        password are given.
         """
         message = ("Not creating a Landscape administrator: need admin-email,"
                    " admin-name and admin-password.")
 
-        # test all combinations
+        # test all combinations except the one that would add an admin
         for n in range(7):
             hooks.juju.config["admin-name"] = "Foo Bar" if n & 0b100 else None
             hooks.juju.config["admin-email"] = ("foo@example.com" if n & 0b010
@@ -348,6 +348,7 @@ class TestHooksService(TestHooks):
         account_is_empty(db_user, db_password, db_host)
         self.mocker.result(True)
         
+        # schema script is called with the right parameters
         self.addCleanup(setattr, hooks.util.os, "environ", hooks.util.os.environ)
         hooks.util.os.environ = {}
         env = {"LANDSCAPE_CONFIG": "standalone"}

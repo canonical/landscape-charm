@@ -68,10 +68,7 @@ def account_is_empty(db_user, db_password, db_host):
 
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
-    """
-    Create the first Landscape administrator. If successful, returns
-    the API credentials as a tuple (key, secret). Otherwise, None.
-    """
+    """Create the first Landscape administrator with the given credentials."""
     if account_is_empty(db_user, db_password, db_host):
         juju.juju_log("Creating first administrator")
         env = os.environ.copy()

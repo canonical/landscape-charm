@@ -194,6 +194,10 @@ def db_admin_relation_changed():
 
 
 def _get_db_access_details():
+    """
+    Returns the main database access details as they are set in the landscape
+    service configuration file.
+    """
     config_obj = _get_config_obj(LANDSCAPE_SERVICE_CONF)
     try:
         section = config_obj["stores"]
@@ -207,6 +211,11 @@ def _get_db_access_details():
 
 
 def _create_first_admin():
+    """
+    If so requested by the presence of the right configuration keys,
+    tries to create the landscape first administrator and, as a consequence,
+    the standalone account too.
+    """
     first_admin_email = juju.config_get("admin-email")
     first_admin_name = juju.config_get("admin-name")
     first_admin_password = juju.config_get("admin-password")
