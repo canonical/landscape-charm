@@ -193,8 +193,9 @@ class TestHooksService(TestHooks):
         account_is_empty(db_user, db_password, db_host)
         self.mocker.result(False)
         self.mocker.replay()
-        hooks.util.create_landscape_admin(db_user, db_password, db_host,
-            admin_name, admin_email, admin_password)
+        hooks.util.create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
         self.assertEqual((message,), hooks.juju._logs)
 
     def test__create_first_admin_calls_create_landscape_admin(self):
@@ -206,12 +207,12 @@ class TestHooksService(TestHooks):
         message = "First admin creation requested"
 
         # we have an admin user defined
-        first_admin_name = "Foo Bar"
-        first_admin_email = "foo@example.com"
-        first_admin_password = "secret"
-        hooks.juju.config["admin-name"] = first_admin_name
-        hooks.juju.config["admin-email"] = first_admin_email
-        hooks.juju.config["admin-password"] = first_admin_password
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        hooks.juju.config["admin-name"] = admin_name
+        hooks.juju.config["admin-email"] = admin_email
+        hooks.juju.config["admin-password"] = admin_password
 
         # we have the database access details
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
@@ -238,8 +239,9 @@ class TestHooksService(TestHooks):
         # util.create_landscape_admin is called
         create_landscape_admin = self.mocker.replace(
             hooks.util.create_landscape_admin)
-        create_landscape_admin(db_user, db_password, db_host,
-            first_admin_name, first_admin_email, first_admin_password)
+        create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
         connection.close()
         self.mocker.replay()
 
@@ -255,12 +257,12 @@ class TestHooksService(TestHooks):
         messages = ("First admin creation requested",
                     "Can't talk to the DB yet, bailing.")
         # we have an admin user defined
-        first_admin_name = "Foo Bar"
-        first_admin_email = "foo@example.com"
-        first_admin_password = "secret"
-        hooks.juju.config["admin-name"] = first_admin_name
-        hooks.juju.config["admin-email"] = first_admin_email
-        hooks.juju.config["admin-password"] = first_admin_password
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        hooks.juju.config["admin-name"] = admin_name
+        hooks.juju.config["admin-email"] = admin_email
+        hooks.juju.config["admin-password"] = admin_password
 
         # we have the database access details
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
@@ -336,9 +338,8 @@ class TestHooksService(TestHooks):
         messages = ("Creating first administrator",
                     "Administrator called %s with email %s created" %
                     (admin_name, admin_email))
- 
+
         # we have the database access details
-        database = "mydb"
         db_host = "myhost"
         db_user = "myuser"
         db_password = "mypassword"
@@ -347,12 +348,13 @@ class TestHooksService(TestHooks):
         account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
         account_is_empty(db_user, db_password, db_host)
         self.mocker.result(True)
-        
+
         # schema script is called with the right parameters
-        self.addCleanup(setattr, hooks.util.os, "environ", hooks.util.os.environ)
+        self.addCleanup(setattr, hooks.util.os, "environ",
+                        hooks.util.os.environ)
         hooks.util.os.environ = {}
         env = {"LANDSCAPE_CONFIG": "standalone"}
-        schema_call = self.mocker.replace(hooks.util.check_call)
+        schema_call = self.mocker.replace(hooks.util.check_output)
         cmd = ["./schema", "--create-lds-account-only", "--admin-name",
                admin_name, "--admin-email", admin_email, "--admin-password",
                admin_password]
@@ -360,10 +362,10 @@ class TestHooksService(TestHooks):
 
         self.mocker.replay()
 
-        hooks.util.create_landscape_admin(db_user, db_password, db_host,
-            admin_name, admin_email, admin_password)
+        hooks.util.create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
         self.assertEqual(messages, hooks.juju._logs)
-
 
     def test_get_services_non_proxied(self):
         """
