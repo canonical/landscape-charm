@@ -5,7 +5,7 @@ Utility library for juju hooks
 from psycopg2 import connect, Error as psycopg2Error
 from juju import Juju
 from contextlib import closing
-from subprocess import check_call
+from subprocess import check_output
 
 import os
 
@@ -76,7 +76,11 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
         cmd = ["./schema", "--create-lds-account-only", "--admin-name",
                admin_name, "--admin-email", admin_email,
                "--admin-password", admin_password]
-        check_call(cmd, cwd="/opt/canonical/landscape", env=env)
+        # Throw stdout away, bceause when the call works, stdout will have API
+        # credentials, which we don't want in the juju logs. When the call
+        # fails, however, we want stderr because it will say why it failed, so
+        # let the exception be raised and stderr go through as usual.
+        check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         juju.juju_log("Administrator called %s with email %s created" %
             (admin_name, admin_email))
     else:
