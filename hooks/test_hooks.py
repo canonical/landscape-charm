@@ -348,10 +348,10 @@ class TestHooksService(TestHooks):
         account_is_empty(db_user, db_password, db_host)
         self.mocker.result(True)
         
-        env = {}
+        self.addCleanup(setattr, hooks.util.os, "environ", hooks.util.os.environ)
         hooks.util.os.environ = {}
-        env["LANDSCAPE_CONFIG"] = "standalone"
-        schema_call = self.mocker.replace(hooks.check_call)
+        env = {"LANDSCAPE_CONFIG": "standalone"}
+        schema_call = self.mocker.replace(hooks.util.check_call)
         cmd = ["./schema", "--create-lds-account-only", "--admin-name",
                admin_name, "--admin-email", admin_email, "--admin-password",
                admin_password]
