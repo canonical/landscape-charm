@@ -1,6 +1,5 @@
 import base64
 from configobj import ConfigObj
-from copy import deepcopy
 import hooks
 import mocker
 import os
@@ -312,7 +311,7 @@ class TestHooksService(TestHooks):
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         # remove one key each time
         for key in full_config:
-            data = deepcopy(full_config)
+            data = full_config.copy()
             data.pop(key)
             config_obj["stores"] = data
             config_obj.write()
