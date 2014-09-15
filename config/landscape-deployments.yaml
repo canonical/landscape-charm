@@ -1,7 +1,7 @@
 _common:
     services:
         rabbitmq-server:
-            charm: cs:trusty/rabbitmq-server-4
+            charm: cs:trusty/rabbitmq-server-7
         postgresql:
             charm: cs:trusty/postgresql-3
             constraints: mem=2048
