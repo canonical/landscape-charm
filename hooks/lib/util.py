@@ -7,9 +7,22 @@ from juju import Juju
 from contextlib import closing
 from subprocess import check_output
 
+import re
 import os
 
 juju = Juju()
+
+
+def is_email_valid(email):
+    """
+    Returns true if the given email is safe to use and has no "funny"
+    characters. We don't go overboard and look for an RFC compliant email
+    here.
+    
+    @param email: string containing the email to be validated
+    """
+    valid_email_re = r"^[\w.+-]+@[\w-]+\.[\w.]+$"
+    return re.search(valid_email_re, email) is not None
 
 
 def connect_exclusive(host, admin_user, admin_password):
@@ -70,6 +83,8 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
     """Create the first Landscape administrator with the given credentials."""
     if account_is_empty(db_user, db_password, db_host):
+        if not is_email_valid(admin_email):
+            raise ValueError("Invalid administrator email %s" % admin_email)
         juju.juju_log("Creating first administrator")
         env = os.environ.copy()
         env["LANDSCAPE_CONFIG"] = "standalone"
