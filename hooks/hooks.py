@@ -216,13 +216,16 @@ def _create_first_admin():
     tries to create the landscape first administrator and, as a consequence,
     the standalone account too.
     """
-    first_admin_email = juju.config_get("admin-email").encode("utf-8")
-    first_admin_name = juju.config_get("admin-name").encode("utf-8")
-    first_admin_password = juju.config_get("admin-password").encode("utf-8")
+    first_admin_email = juju.config_get("admin-email")
+    first_admin_name = juju.config_get("admin-name")
+    first_admin_password = juju.config_get("admin-password")
     if not all((first_admin_email, first_admin_name, first_admin_password)):
         juju.juju_log("Not creating a Landscape administrator: need "
                       "admin-email, admin-name and admin-password.")
         return None
+    first_admin_email = first_admin_email.encode("utf-8")
+    first_admin_name = first_adnim_name.encode("utf-8")
+    first_admin_password = first_admin_password.encode("utf-8")
     juju.juju_log("First admin creation requested")
     access_details = _get_db_access_details()
     if not access_details:
