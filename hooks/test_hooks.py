@@ -181,6 +181,24 @@ class TestHooksService(TestHooks):
         self.assertIsNone(hooks._create_first_admin())
         self.assertEqual(messages, hooks.juju._logs)
 
+    def test_email_syntax_check(self):
+        """
+        Invalid email addresses are flagged as such.
+        """
+        # some invalid choices
+        emails = ["invalidemail", "invalid@", "a@b", "a@b.",
+                  "`cat /etc/password`@example.com", "#foobar@example.com",
+                  "(foo)@example.com", "foo@(example).com",
+                  "'foo@example.com", "\"foo@example.com"]
+        for email in emails:
+            self.assertIs(hooks.util.is_email_valid(email), False)
+
+    def test_create_landscape_admin_checks_email_syntax(self):
+        """
+        The util.create_landscape_admin() method verifies if the email is
+        valid before attempting to create the admin.
+        """
+
     def test_first_admin_not_created_if_account_not_empty(self):
         """
         The first administrator is not created if the account is not
