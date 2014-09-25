@@ -9,6 +9,7 @@ import pycurl
 import stat
 import subprocess
 import tempfile
+import unittest
 import yaml
 
 
@@ -191,13 +192,29 @@ class TestHooksService(TestHooks):
                   "(foo)@example.com", "foo@(example).com",
                   "'foo@example.com", "\"foo@example.com"]
         for email in emails:
-            self.assertIs(hooks.util.is_email_valid(email), False)
+            self.assertIs(False, hooks.util.is_email_valid(email))
 
     def test_create_landscape_admin_checks_email_syntax(self):
         """
         The util.create_landscape_admin() method verifies if the email is
         valid before attempting to create the admin.
         """
+        db_user = "user"
+        db_password = "password"
+        db_host = "example.com"
+        admin_name = "Foo Bar"
+        admin_email = "foo'@bar"
+        admin_password = "secret"
+
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(True)
+        self.mocker.replay()
+        with unittest.TestCase.assertRaises(self, ValueError) as invalid_email:
+            hooks.util.create_landscape_admin(db_user, db_password, db_host,
+                admin_name, admin_email, admin_password)
+        self.assertEqual("Invalid administrator email %s" % admin_email,
+            invalid_email.exception.message)
 
     def test_first_admin_not_created_if_account_not_empty(self):
         """
