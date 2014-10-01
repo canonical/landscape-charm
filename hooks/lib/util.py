@@ -88,6 +88,9 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
         juju.juju_log("Creating first administrator")
         env = os.environ.copy()
         env["LANDSCAPE_CONFIG"] = "standalone"
+        admin_name = admin_name.encode("utf-8")
+        admin_email = admin_email.encode("utf-8")
+        admin_password = admin_password.encode("utf-8")
         cmd = ["./schema", "--create-lds-account-only", "--admin-name",
                admin_name, "--admin-email", admin_email,
                "--admin-password", admin_password]

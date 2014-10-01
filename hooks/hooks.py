@@ -223,9 +223,6 @@ def _create_first_admin():
         juju.juju_log("Not creating a Landscape administrator: need "
                       "admin-email, admin-name and admin-password.")
         return None
-    first_admin_email = first_admin_email.encode("utf-8")
-    first_admin_name = first_admin_name.encode("utf-8")
-    first_admin_password = first_admin_password.encode("utf-8")
     juju.juju_log("First admin creation requested")
     access_details = _get_db_access_details()
     if not access_details:
