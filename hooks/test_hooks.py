@@ -148,9 +148,6 @@ class TestHooksService(TestHooks):
         The first admin is not created when only one or two of name, email and
         password are given.
         """
-        message = ("Not creating a Landscape administrator: need admin-email,"
-                   " admin-name and admin-password.")
-        # all combinations that must fail
         admins = [("Foo Bar", "foo@example.com", None),
                   ("Foo Bar", None, "secret"),
                   (None, "foo@example.com", "secret")]
@@ -158,8 +155,7 @@ class TestHooksService(TestHooks):
             hooks.juju.config["admin-name"] = name
             hooks.juju.config["admin-email"] = email
             hooks.juju.config["admin-password"] = password
-            self.assertIsNone(hooks._create_first_admin())
-            self.assertEqual((message,), hooks.juju._logs)
+            self.assertFalse(hooks._create_first_admin())
             hooks.juju._logs = ()
 
     def test_first_admin_not_created_if_no_db_config(self):
@@ -175,7 +171,7 @@ class TestHooksService(TestHooks):
         config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
         config_obj["stores"] = {}
         config_obj.write()
-        self.assertIsNone(hooks._create_first_admin())
+        self.assertFalse(hooks._create_first_admin())
         self.assertEqual(messages, hooks.juju._logs)
 
     def test_email_syntax_check(self):
@@ -229,9 +225,10 @@ class TestHooksService(TestHooks):
         account_is_empty(db_user, db_password, db_host)
         self.mocker.result(False)
         self.mocker.replay()
-        hooks.util.create_landscape_admin(
+        admin_created = hooks.util.create_landscape_admin(
             db_user, db_password, db_host, admin_name, admin_email,
             admin_password)
+        self.assertFalse(admin_created)
         self.assertEqual((message,), hooks.juju._logs)
 
     def test__create_first_admin_calls_create_landscape_admin(self):
@@ -317,7 +314,8 @@ class TestHooksService(TestHooks):
         self.mocker.result(False)
 
         self.mocker.replay()
-        hooks._create_first_admin()
+        admin_created = hooks._create_first_admin()
+        self.assertFalse(admin_created)
         self.assertEqual(messages, hooks.juju._logs)
 
     def test__get_db_access_details(self):

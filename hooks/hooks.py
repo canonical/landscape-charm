@@ -222,20 +222,21 @@ def _create_first_admin():
     if not all((first_admin_email, first_admin_name, first_admin_password)):
         juju.juju_log("Not creating a Landscape administrator: need "
                       "admin-email, admin-name and admin-password.")
-        return None
+        return False
     juju.juju_log("First admin creation requested")
     access_details = _get_db_access_details()
     if not access_details:
         juju.juju_log("No DB configuration yet, bailing.")
-        return None
+        return False
     database, db_host, db_user, db_password = access_details
     if util.is_db_up(database, db_host, db_user, db_password):
         with closing(util.connect_exclusive(db_host, db_user, db_password)):
-            util.create_landscape_admin(
+            return util.create_landscape_admin(
                 db_user, db_password, db_host, first_admin_name,
                 first_admin_email, first_admin_password)
     else:
         juju.juju_log("Can't talk to the DB yet, bailing.")
+        return False
 
 
 def amqp_relation_joined():

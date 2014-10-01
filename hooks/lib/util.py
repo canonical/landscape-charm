@@ -81,7 +81,10 @@ def account_is_empty(db_user, db_password, db_host):
 
 def create_landscape_admin(db_user, db_password, db_host, admin_name,
                            admin_email, admin_password):
-    """Create the first Landscape administrator with the given credentials."""
+    """
+    Create the first Landscape administrator with the given credentials.
+    Returns True if the administrator was created, False otherwise.
+    """
     if account_is_empty(db_user, db_password, db_host):
         if not is_email_valid(admin_email):
             raise ValueError("Invalid administrator email %s" % admin_email)
@@ -101,8 +104,10 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
         check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         juju.juju_log("Administrator called %s with email %s created" %
             (admin_name, admin_email))
+        return True
     else:
         juju.juju_log("DB not empty, skipping first admin creation")
+        return False
 
 
 def change_root_url(database, user, password, host, url):
