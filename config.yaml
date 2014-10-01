@@ -50,7 +50,24 @@ options:
             schema (instead of just validating that it is correct).  This
             should only typically be enabled as part of a landscape maintenance
             cycle.
-        
-    
-
-
+    admin-name:
+        description: |
+            Name of the account administrator. If this, admin-email and
+            admin-password are specified, then the standalone account will be
+            created as part of the deployment, and this person will be its
+            administrator. If not specified, Landscape will prompt for these
+            details when it is first accessed with a web browser. Has no
+            effect if changed after a deployment.
+        type: string
+    admin-email:
+        description: |
+            Email of the account administrator. To have any effect, needs to
+            specified in conjunction with admin-name and admin-password. Has
+            no effect if changed after a deployment.
+        type: string
+    admin-password:
+        description: |
+            Password of the account administrator. To have any effect, needs
+            to be specified in conjunction with admin-name and admin-email.
+            Has no effect if changed after a deployment.
+        type: string

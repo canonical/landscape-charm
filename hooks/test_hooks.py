@@ -1,5 +1,6 @@
-import base64
 from configobj import ConfigObj
+from itertools import product
+import base64
 import hooks
 import mocker
 import os
@@ -8,6 +9,7 @@ import pycurl
 import stat
 import subprocess
 import tempfile
+import unittest
 import yaml
 
 
@@ -28,7 +30,10 @@ class TestJuju(object):
             "license-file": "LICENSE_FILE_TEXT",
             "service-count": "msgserver:2 pingserver:1",
             "upgrade-schema": False,
-            "maintenance": False}
+            "maintenance": False,
+            "admin-name": None,
+            "admin-email": None,
+            "admin-password": None}
 
     def relation_set(self, *args, **kwargs):
         """
@@ -92,6 +97,7 @@ class TestHooks(mocker.MockerTestCase):
     def setUp(self):
         hooks._lsctl = lambda x: True
         hooks.juju = TestJuju()
+        hooks.util.juju = hooks.juju
         hooks.LANDSCAPE_LICENSE_DEST = self.makeFile()
         hooks.LANDSCAPE_DEFAULT_FILE = self.makeFile()
         self._default_file = open(hooks.LANDSCAPE_DEFAULT_FILE, "w")
@@ -136,6 +142,264 @@ UPGRADE_SCHEMA="no"
 
 
 class TestHooksService(TestHooks):
+
+    def test_first_admin_not_created_without_name_email_password(self):
+        """
+        The first admin is not created when only one or two of name, email and
+        password are given.
+        """
+        admins = [("Foo Bar", "foo@example.com", None),
+                  ("Foo Bar", None, "secret"),
+                  (None, "foo@example.com", "secret")]
+        for name, email, password in admins:
+            hooks.juju.config["admin-name"] = name
+            hooks.juju.config["admin-email"] = email
+            hooks.juju.config["admin-password"] = password
+            self.assertFalse(hooks._create_first_admin())
+            hooks.juju._logs = ()
+
+    def test_first_admin_not_created_if_no_db_config(self):
+        """
+        The first administrator is not created if there is no database
+        configuration in the service.conf file.
+        """
+        messages = ("First admin creation requested",
+                    "No DB configuration yet, bailing.")
+        hooks.juju.config["admin-name"] = "Foo Bar"
+        hooks.juju.config["admin-email"] = "foo@example.com"
+        hooks.juju.config["admin-password"] = "secret"
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        config_obj["stores"] = {}
+        config_obj.write()
+        self.assertFalse(hooks._create_first_admin())
+        self.assertEqual(messages, hooks.juju._logs)
+
+    def test_email_syntax_check(self):
+        """
+        Invalid email addresses are flagged as such.
+        """
+        # some invalid choices
+        emails = ["invalidemail", "invalid@", "a@b", "a@b.",
+                  "`cat /etc/password`@example.com", "#foobar@example.com",
+                  "(foo)@example.com", "foo@(example).com",
+                  "'foo@example.com", "\"foo@example.com"]
+        for email in emails:
+            self.assertIs(False, hooks.util.is_email_valid(email))
+
+    def test_create_landscape_admin_checks_email_syntax(self):
+        """
+        The util.create_landscape_admin() method verifies if the email is
+        valid before attempting to create the admin.
+        """
+        db_user = "user"
+        db_password = "password"
+        db_host = "example.com"
+        admin_name = "Foo Bar"
+        admin_email = "foo'@bar"
+        admin_password = "secret"
+
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(True)
+        self.mocker.replay()
+        with unittest.TestCase.assertRaises(self, ValueError) as invalid_email:
+            hooks.util.create_landscape_admin(db_user, db_password, db_host,
+                admin_name, admin_email, admin_password)
+        self.assertEqual("Invalid administrator email %s" % admin_email,
+            invalid_email.exception.message)
+
+    def test_first_admin_not_created_if_account_not_empty(self):
+        """
+        The first administrator is not created if the account is not
+        empty.
+        """
+        db_user = "user"
+        db_password = "password"
+        db_host = "example.com"
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        message = "DB not empty, skipping first admin creation"
+
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(False)
+        self.mocker.replay()
+        admin_created = hooks.util.create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
+        self.assertFalse(admin_created)
+        self.assertEqual((message,), hooks.juju._logs)
+
+    def test__create_first_admin_calls_create_landscape_admin(self):
+        """
+        When all conditions are met, _create_first_admin() calls
+        create_landscape_admin.
+        """
+        # juju log message we expect
+        message = "First admin creation requested"
+
+        # we have an admin user defined
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        hooks.juju.config["admin-name"] = admin_name
+        hooks.juju.config["admin-email"] = admin_email
+        hooks.juju.config["admin-password"] = admin_password
+
+        # we have the database access details
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        database = "mydb"
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+        stores = {"main": database, "host": db_host, "user": db_user,
+                  "password": db_password}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        # the db is up
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up(database, db_host, db_user, db_password)
+        self.mocker.result(True)
+
+        # we can connect
+        connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
+        connect_exclusive(db_host, db_user, db_password)
+        connection = self.mocker.mock()
+        self.mocker.result(connection)
+
+        # util.create_landscape_admin is called
+        create_landscape_admin = self.mocker.replace(
+            hooks.util.create_landscape_admin)
+        create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
+        connection.close()
+        self.mocker.replay()
+
+        hooks._create_first_admin()
+        self.assertEqual((message,), hooks.juju._logs)
+
+    def test__create_first_admin_bails_if_db_is_not_up(self):
+        """
+        The _create_first_admin() method gives up if the DB is not
+        accessible.
+        """
+        # juju log messages we expect
+        messages = ("First admin creation requested",
+                    "Can't talk to the DB yet, bailing.")
+        # we have an admin user defined
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+        hooks.juju.config["admin-name"] = admin_name
+        hooks.juju.config["admin-email"] = admin_email
+        hooks.juju.config["admin-password"] = admin_password
+
+        # we have the database access details
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        database = "mydb"
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+        stores = {"main": database, "host": db_host, "user": db_user,
+                  "password": db_password}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        # the db is down, though
+        is_db_up = self.mocker.replace(hooks.util.is_db_up)
+        is_db_up(database, db_host, db_user, db_password)
+        self.mocker.result(False)
+
+        self.mocker.replay()
+        admin_created = hooks._create_first_admin()
+        self.assertFalse(admin_created)
+        self.assertEqual(messages, hooks.juju._logs)
+
+    def test__get_db_access_details(self):
+        """
+        The _get_db_access_details() function returns the database name and
+        access details when all these keys exist in the landscape service
+        configuration file.
+        """
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        stores = {"main": "mydb", "host": "myhost", "user": "myuser",
+                  "password": "mypassword"}
+        config_obj["stores"] = stores
+        config_obj.write()
+
+        result = hooks._get_db_access_details()
+        database, db_host, db_user, db_password = result
+        self.assertEqual(database, stores["main"])
+        self.assertEqual(db_host, stores["host"])
+        self.assertEqual(db_user, stores["user"])
+        self.assertEqual(db_password, stores["password"])
+
+    def test_no_db_access_details_if_missing_config_key(self):
+        """
+        The _get_db_access_details() function returns None if any of
+        the needed configuration keys is missing.
+        """
+        full_config = {"main": "mydb", "host": "myhost", "user": "myuser",
+                       "password": "mypassword"}
+        config_obj = ConfigObj(hooks.LANDSCAPE_SERVICE_CONF)
+        # remove one key each time
+        for key in full_config:
+            data = full_config.copy()
+            data.pop(key)
+            config_obj["stores"] = data
+            config_obj.write()
+            result = hooks._get_db_access_details()
+            self.assertIsNone(result)
+        # last try, with no data at all
+        config_obj.clear()
+        config_obj.write()
+        self.assertIsNone(hooks._get_db_access_details())
+
+    def test_create_landscape_admin_calls_schema_script(self):
+        """
+        The create_landscape_admin() method calls the landscape schema
+        script with the right parameters.
+        """
+        # we have an admin user defined
+        admin_name = "Foo Bar"
+        admin_email = "foo@example.com"
+        admin_password = "secret"
+
+        # juju log messages we expect
+        messages = ("Creating first administrator",
+                    "Administrator called %s with email %s created" %
+                    (admin_name, admin_email))
+
+        # we have the database access details
+        db_host = "myhost"
+        db_user = "myuser"
+        db_password = "mypassword"
+
+        # account is empty
+        account_is_empty = self.mocker.replace(hooks.util.account_is_empty)
+        account_is_empty(db_user, db_password, db_host)
+        self.mocker.result(True)
+
+        # schema script is called with the right parameters
+        self.addCleanup(setattr, hooks.util.os, "environ",
+                        hooks.util.os.environ)
+        hooks.util.os.environ = {}
+        env = {"LANDSCAPE_CONFIG": "standalone"}
+        schema_call = self.mocker.replace(hooks.util.check_output)
+        cmd = ["./schema", "--create-lds-account-only", "--admin-name",
+               admin_name, "--admin-email", admin_email, "--admin-password",
+               admin_password]
+        schema_call(cmd, cwd="/opt/canonical/landscape", env=env)
+
+        self.mocker.replay()
+
+        hooks.util.create_landscape_admin(
+            db_user, db_password, db_host, admin_name, admin_email,
+            admin_password)
+        self.assertEqual(messages, hooks.juju._logs)
 
     def test_get_services_non_proxied(self):
         """
