@@ -151,13 +151,9 @@ class TestHooksService(TestHooks):
         message = ("Not creating a Landscape administrator: need admin-email,"
                    " admin-name and admin-password.")
         # all combinations that must fail
-        admins = [(None, None, None),
-                  ("Foo Bar", None, None),
-                  ("Foo Bar", "foo@example.com", None),
+        admins = [("Foo Bar", "foo@example.com", None),
                   ("Foo Bar", None, "secret"),
-                  (None, "foo@example.com", None),
-                  (None, "foo@example.com", "secret"),
-                  (None, None, "secret")]
+                  (None, "foo@example.com", "secret")]
         for name, email, password in admins:
             hooks.juju.config["admin-name"] = name
             hooks.juju.config["admin-email"] = email
