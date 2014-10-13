@@ -103,10 +103,13 @@ def _get_haproxy_service_name():
     Find out what service name was used to deploy haproxy.
     """
     haproxy_relations = juju.relation_ids("website")
+    juju.juju_log("ACH: haproxy_relations: %s" % haproxy_relations)
     if not haproxy_relations:
         return None
     haproxy_relation_units = juju.relation_list(haproxy_relations[0])
-    haproxy_service = haproxy_relation_units[0].rsplit("/", 1)
+    juju.juju_log("ACH: haproxy-relation_units: %s" % haproxy_relation_units)
+    haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
+    juju.juju_log("ACH: haproxy_service: %s" % haproxy_service)
     return haproxy_service
 
 
@@ -124,6 +127,7 @@ def notify_vhost_config_relation(relation_id=None,
         contents = handle.read()
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
                           haproxy_service_name, contents)
+        juju.juju_log("ACH: new contents:\n%s" % contents)
         vhosts.append({
             "port": "443", "template": b64encode(contents)})
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
