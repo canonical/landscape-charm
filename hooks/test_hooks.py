@@ -1586,6 +1586,21 @@ class TestHooksService(TestHooks):
         haproxy_service_name = hooks._get_haproxy_service_name()
         self.assertEqual(haproxy_service_name, "landscapehaproxy")
 
+    def test__get_vhost_template(self):
+        """
+        The haproxy prefix in the template variables is replaced by the
+        name of the actual haproxy service that is part of the deployment.
+        """
+        template_file = "vhostssl.tmpl"
+        with open("%s/config/%s" % (hooks.ROOT, template_file), "r") as t:
+            original_template = t.read()
+        new_template = hooks._get_vhost_template(template_file,
+                                                 "landscape-haproxy")
+        self.assertIn("{{ haproxy_msgserver }}", original_template)
+        self.assertNotIn("{{ landscape-haproxy_msgserver }}",
+            original_template)
+        self.assertIn("{{ landscape-haproxy_msgserver }}", new_template)
+
 
 class TestHooksServiceMock(TestHooks):
 
@@ -1937,6 +1952,25 @@ class TestHooksServiceMock(TestHooks):
         with open(hooks.SSL_CERT_LOCATION, 'r') as f:
             self.assertEqual("foobar", f.read())
 
+    def test_vhost_config_relation_exits_if_haproxy_not_ready(self):
+        """
+        notify_vhost_config_relation() is not called if the haproxy relation
+        it not there.
+        """
+        def should_not_be_here(*args):
+            raise AssertionError("notify_vhost_config_relation() should not be "
+                            "called")
+
+        self.addCleanup(setattr, hooks, "vhost_config_relation_changed",
+            hooks.vhost_config_relation_changed)
+        hooks.notify_vhost_config_relation = should_not_be_here
+        get_haproxy_service_name = self.mocker.replace(
+            hooks._get_haproxy_service_name)
+        get_haproxy_service_name()
+        self.mocker.result(None)
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
+
 
 class TestHooksUtils(TestHooks):
     def test__setup_apache(self):
@@ -1973,19 +2007,4 @@ class TestHooksUtils(TestHooks):
             site_text = f.read()
         self.assertFalse("@hostname@" in site_text)
         self.assertTrue("localhost" in site_text)
-
-    def test__get_vhost_template(self):
-        """
-        The haproxy prefix in the template variables is replaced by the
-        name of the actual haproxy service that is part of the deployment.
-        """
-        template_file = "vhostssl.tmpl"
-        with open("%s/config/%s" % (hooks.ROOT, template_file), "r") as t:
-            original_template = t.read()
-        new_template = hooks._get_vhost_template(template_file,
-                                                 "landscape-haproxy")
-        self.assertIn("{{ haproxy_msgserver }}", original_template)
-        self.assertNotIn("{{ landscape-haproxy_msgserver }}",
-            original_template)
-        self.assertIn("{{ landscape-haproxy_msgserver }}", new_template)
 
