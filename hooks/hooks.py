@@ -98,7 +98,20 @@ def notify_website_relation():
             services=yaml.safe_dump(_get_services_haproxy()))
 
 
-def notify_vhost_config_relation(relation_id=None):
+def _get_haproxy_service_name():
+    """
+    Find out what service name was used to deploy haproxy.
+    """
+    haproxy_relations = juju.relation_ids("website")
+    if not haproxy_relations:
+        return None
+    haproxy_relation_units = juju.relation_list(haproxy_relations[0])
+    haproxy_service = haproxy_relation_units[0].rsplit("/", 1)
+    return haproxy_service
+
+
+def notify_vhost_config_relation(relation_id=None,
+                                 haproxy_service_name="haproxy"):
     """
     Notify the vhost-config relation.
 
@@ -108,11 +121,17 @@ def notify_vhost_config_relation(relation_id=None):
     """
     vhosts = []
     with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
+        contents = handle.read()
+        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
+                          haproxy_service_name, contents)
         vhosts.append({
-            "port": "443", "template": b64encode(handle.read())})
+            "port": "443", "template": b64encode(contents)})
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
+        contents = handle.read()
+        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
+                          haproxy_service_name, contents)
         vhosts.append({
-            "port": "80", "template": b64encode(handle.read())})
+            "port": "80", "template": b64encode(contents)})
 
     relation_ids = [relation_id]
     if relation_id is None:
@@ -394,7 +413,15 @@ def vhost_config_relation_changed():
     if not juju.relation_ids("vhost-config"):
         return
 
-    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
+    # If we are not related to haproxy yet, noop, because we need to know the
+    # haproxy service name so we can set the template variable to the correct
+    # name in the apache vhost template.
+    haproxy_service_name = _get_haproxy_service_name()        
+    if not haproxy_service_name:
+        return
+    
+    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None),
+                                 haproxy_service_name)
 
     access_details = _get_db_access_details()
     if not access_details:
