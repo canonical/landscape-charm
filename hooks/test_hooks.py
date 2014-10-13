@@ -1586,6 +1586,7 @@ class TestHooksService(TestHooks):
         haproxy_service_name = hooks._get_haproxy_service_name()
         self.assertEqual(haproxy_service_name, "landscapehaproxy")
 
+
 class TestHooksServiceMock(TestHooks):
 
     all_services = [
