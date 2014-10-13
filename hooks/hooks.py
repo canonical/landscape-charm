@@ -114,6 +114,18 @@ def _get_haproxy_service_name():
     return haproxy_service
 
 
+def _get_vhost_template(template_filename, haproxy_service_name):
+    """
+    Return the contents of the specified template with the haproxy service
+    name replaced.
+    """
+    with open("%s/config/%s" % (ROOT, template_filename), "r") as handle:
+        contents = handle.read()
+        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
+                          haproxy_service_name, contents)
+    return contents 
+
+
 def notify_vhost_config_relation(relation_id=None,
                                  haproxy_service_name="haproxy"):
     """
@@ -124,19 +136,10 @@ def notify_vhost_config_relation(relation_id=None,
     vhost-config relations.
     """
     vhosts = []
-    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
-        contents = handle.read()
-        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
-                          haproxy_service_name, contents)
-        vhosts.append({
-            "port": "443", "template": b64encode(contents)})
-    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
-        contents = handle.read()
-        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
-                          haproxy_service_name, contents)
-        vhosts.append({
-            "port": "80", "template": b64encode(contents)})
-
+    contents = _get_vhost_template("vhostssl.tmpl", haproxy_service_name)
+    vhosts.append({"port": "443", "template": b64encode(contents)})
+    contents = _get_vhost_template("vhost.tmpl", haproxy_service_name)
+    vhosts.append({"port": "80", "template": b64encode(contents)})
     relation_ids = [relation_id]
     if relation_id is None:
         relation_ids = juju.relation_ids("vhost-config")
