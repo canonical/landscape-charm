@@ -104,13 +104,10 @@ def _get_haproxy_service_name():
     according to the jinja requirements.
     """
     haproxy_relations = juju.relation_ids("website")
-    juju.juju_log("ACH: haproxy_relations: %s" % haproxy_relations)
     if not haproxy_relations:
         return None
     haproxy_relation_units = juju.relation_list(haproxy_relations[0])
-    juju.juju_log("ACH: haproxy-relation_units: %s" % haproxy_relation_units)
     haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
-    juju.juju_log("ACH: haproxy_service: %s" % haproxy_service)
     # jinja2 templates require python-type variables, remove all characters
     # that do not comply
     haproxy_service = re.sub("[^a-zA-Z0-9_]*", "", haproxy_service)
@@ -131,7 +128,6 @@ def notify_vhost_config_relation(relation_id=None,
         contents = handle.read()
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
                           haproxy_service_name, contents)
-        juju.juju_log("ACH: new contents:\n%s" % contents)
         vhosts.append({
             "port": "443", "template": b64encode(contents)})
     with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
