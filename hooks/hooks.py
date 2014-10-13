@@ -100,7 +100,8 @@ def notify_website_relation():
 
 def _get_haproxy_service_name():
     """
-    Find out what service name was used to deploy haproxy.
+    Find out what service name was used to deploy haproxy, and sanitize it
+    according to the jinja requirements.
     """
     haproxy_relations = juju.relation_ids("website")
     juju.juju_log("ACH: haproxy_relations: %s" % haproxy_relations)
@@ -110,6 +111,9 @@ def _get_haproxy_service_name():
     juju.juju_log("ACH: haproxy-relation_units: %s" % haproxy_relation_units)
     haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
     juju.juju_log("ACH: haproxy_service: %s" % haproxy_service)
+    # jinja2 templates require python-type variables, remove all characters
+    # that do not comply
+    haproxy_service = re.sub("[^a-zA-Z0-9_]*", "", haproxy_service)
     return haproxy_service
 
 
