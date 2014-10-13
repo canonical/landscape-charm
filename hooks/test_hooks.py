@@ -1578,6 +1578,13 @@ class TestHooksService(TestHooks):
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 
+    def test__get_haproxy_service_name(self):
+        """
+        _get_haproxy_service_name() returns the jinja-ready service name used
+        to deploy haproxy.
+        """
+        haproxy_service_name = hooks._get_haproxy_service_name()
+        self.assertEqual(haproxy_service_name, "landscapehaproxy")
 
 class TestHooksServiceMock(TestHooks):
 
