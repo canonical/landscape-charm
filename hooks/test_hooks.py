@@ -62,7 +62,10 @@ class TestJuju(object):
         Hardcode expected relation_list for tests.  Feel free to expand
         as more tests are added.
         """
-        return list(self._relation_list)
+        if relation_id == "website:1":
+            return ["landscape-haproxy/0"]
+        else:
+            return list(self._relation_list)
 
     def unit_get(self, *args):
         """
@@ -1802,7 +1805,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(None, hooks._get_haproxy_service_name())
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
@@ -1820,7 +1823,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(None, hooks._get_haproxy_service_name())
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(False)
@@ -1843,7 +1846,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(None, hooks._get_haproxy_service_name())
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
@@ -1868,7 +1871,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(None, hooks._get_haproxy_service_name())
         mock_conn = self.mocker.mock()
         mock_conn.close()
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
@@ -1906,7 +1909,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(None, hooks._get_haproxy_service_name())
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
