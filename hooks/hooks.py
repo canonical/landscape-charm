@@ -114,7 +114,7 @@ def _get_haproxy_service_name():
     haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
     # jinja2 templates require python-type variables, remove all characters
     # that do not comply
-    haproxy_service = re.sub("[^a-zA-Z0-9_]*", "", haproxy_service)
+    haproxy_service = re.sub("\W", "", haproxy_service)
     return haproxy_service
 
 
