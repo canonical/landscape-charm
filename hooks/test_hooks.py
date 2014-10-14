@@ -2007,4 +2007,3 @@ class TestHooksUtils(TestHooks):
             site_text = f.read()
         self.assertFalse("@hostname@" in site_text)
         self.assertTrue("localhost" in site_text)
-

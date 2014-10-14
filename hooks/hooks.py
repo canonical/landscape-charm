@@ -119,10 +119,7 @@ def _get_haproxy_service_name():
 
 
 def _get_vhost_template(template_filename, haproxy_service_name):
-    """
-    Return the contents of the specified template with the haproxy service
-    name replaced.
-    """
+    """Return the template contents with the provided haproxy service name."""
     with open("%s/config/%s" % (ROOT, template_filename), "r") as handle:
         contents = handle.read()
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
