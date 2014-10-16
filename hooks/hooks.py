@@ -127,14 +127,16 @@ def _get_vhost_template(template_filename, haproxy_service_name):
     return contents
 
 
-def notify_vhost_config_relation(relation_id=None,
-                                 haproxy_service_name="haproxy"):
+def notify_vhost_config_relation(haproxy_service_name, relation_id=None):
     """
     Notify the vhost-config relation.
 
     This will mark it "ready to proceed".  If relation_id is specified
     use that as the relation context, otherwise look up and notify all
     vhost-config relations.
+
+    The haproxy_service_name is needed so that the vhost template can be
+    adjusted with the correct jinja variable that apache will look for.
     """
     vhosts = []
     contents = _get_vhost_template("vhostssl.tmpl", haproxy_service_name)
@@ -428,8 +430,8 @@ def vhost_config_relation_changed():
     if not haproxy_service_name:
         return
 
-    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None),
-                                 haproxy_service_name)
+    notify_vhost_config_relation(haproxy_service_name,
+                                 os.environ.get("JUJU_RELATION_ID", None))
 
     access_details = _get_db_access_details()
     if not access_details:

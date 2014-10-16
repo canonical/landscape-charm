@@ -1785,7 +1785,7 @@ class TestHooksServiceMock(TestHooks):
         """
         notify the vhost-config relation on a separate ID.
         """
-        hooks.notify_vhost_config_relation("foo/0")
+        hooks.notify_vhost_config_relation("haproxy", "foo/0")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
@@ -1798,7 +1798,7 @@ class TestHooksServiceMock(TestHooks):
 
     def test_notify_vhost_config_relation(self):
         """notify the vhost-config relation on the "current" ID."""
-        hooks.notify_vhost_config_relation()
+        hooks.notify_vhost_config_relation("haproxy")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
@@ -1828,7 +1828,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None, hooks._get_haproxy_service_name())
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
@@ -1846,7 +1846,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None, hooks._get_haproxy_service_name())
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(False)
@@ -1869,7 +1869,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None, hooks._get_haproxy_service_name())
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
@@ -1894,7 +1894,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None, hooks._get_haproxy_service_name())
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         mock_conn = self.mocker.mock()
         mock_conn.close()
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
@@ -1932,7 +1932,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None, hooks._get_haproxy_service_name())
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
