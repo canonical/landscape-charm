@@ -18,7 +18,7 @@ def is_email_valid(email):
     Returns true if the given email is safe to use and has no "funny"
     characters. We don't go overboard and look for an RFC compliant email
     here.
-    
+
     @param email: string containing the email to be validated
     """
     valid_email_re = r"^[\w.+-]+@[\w-]+\.[\w.]+$"
@@ -103,7 +103,7 @@ def create_landscape_admin(db_user, db_password, db_host, admin_name,
         # let the exception be raised and stderr go through as usual.
         check_output(cmd, cwd="/opt/canonical/landscape", env=env)
         juju.juju_log("Administrator called %s with email %s created" %
-            (admin_name, admin_email))
+                      (admin_name, admin_email))
         return True
     else:
         juju.juju_log("DB not empty, skipping first admin creation")

@@ -1,5 +1,4 @@
 from configobj import ConfigObj
-from itertools import product
 import base64
 import hooks
 import mocker
@@ -62,7 +61,10 @@ class TestJuju(object):
         Hardcode expected relation_list for tests.  Feel free to expand
         as more tests are added.
         """
-        return list(self._relation_list)
+        if relation_id == "website:1":
+            return ["landscape-haproxy/0"]
+        else:
+            return list(self._relation_list)
 
     def unit_get(self, *args):
         """
@@ -204,9 +206,10 @@ class TestHooksService(TestHooks):
         self.mocker.replay()
         with unittest.TestCase.assertRaises(self, ValueError) as invalid_email:
             hooks.util.create_landscape_admin(db_user, db_password, db_host,
-                admin_name, admin_email, admin_password)
+                                              admin_name, admin_email,
+                                              admin_password)
         self.assertEqual("Invalid administrator email %s" % admin_email,
-            invalid_email.exception.message)
+                         invalid_email.exception.message)
 
     def test_first_admin_not_created_if_account_not_empty(self):
         """
@@ -1575,6 +1578,43 @@ class TestHooksService(TestHooks):
         self._service_conf.seek(0)
         self.assertFalse(hooks._is_db_up())
 
+    def test__get_haproxy_service_name(self):
+        """
+        _get_haproxy_service_name() returns the jinja-ready service name used
+        to deploy haproxy.
+        """
+        haproxy_service_name = hooks._get_haproxy_service_name()
+        self.assertEqual(haproxy_service_name, "landscapehaproxy")
+
+    def test_no_haproxy_service_name_if_not_related_to_haproxy(self):
+        """
+        _get_haproxy_service_name() returns None if we are not related to
+        haproxy.
+        """
+        def no_website_relation(relation_name):
+            return None
+
+        self.addCleanup(setattr, hooks.juju, "relation_ids",
+                        hooks.juju.relation_ids)
+        hooks.juju.relation_ids = no_website_relation
+        haproxy_service_name = hooks._get_haproxy_service_name()
+        self.assertIsNone(haproxy_service_name)
+
+    def test__get_vhost_template(self):
+        """
+        The haproxy prefix in the template variables is replaced by the
+        name of the actual haproxy service that is part of the deployment.
+        """
+        template_file = "vhostssl.tmpl"
+        with open("%s/config/%s" % (hooks.ROOT, template_file), "r") as t:
+            original_template = t.read()
+        new_template = hooks._get_vhost_template(template_file,
+                                                 "landscape-haproxy")
+        self.assertIn("{{ haproxy_msgserver }}", original_template)
+        self.assertNotIn("{{ landscape-haproxy_msgserver }}",
+                         original_template)
+        self.assertIn("{{ landscape-haproxy_msgserver }}", new_template)
+
 
 class TestHooksServiceMock(TestHooks):
 
@@ -1759,7 +1799,7 @@ class TestHooksServiceMock(TestHooks):
         """
         notify the vhost-config relation on a separate ID.
         """
-        hooks.notify_vhost_config_relation("foo/0")
+        hooks.notify_vhost_config_relation("haproxy", "foo/0")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
@@ -1772,7 +1812,7 @@ class TestHooksServiceMock(TestHooks):
 
     def test_notify_vhost_config_relation(self):
         """notify the vhost-config relation on the "current" ID."""
-        hooks.notify_vhost_config_relation()
+        hooks.notify_vhost_config_relation("haproxy")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
@@ -1802,7 +1842,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         self.mocker.replay()
         self.assertRaises(SystemExit, hooks.vhost_config_relation_changed)
         self.assertIn('Waiting for data from apache', hooks.juju._logs[-1])
@@ -1820,7 +1860,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(False)
@@ -1843,7 +1883,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
@@ -1868,7 +1908,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         mock_conn = self.mocker.mock()
         mock_conn.close()
         connect_exclusive = self.mocker.replace(hooks.util.connect_exclusive)
@@ -1906,7 +1946,7 @@ class TestHooksServiceMock(TestHooks):
                 "user": "user",
                 "password": "password"}})
         notify_vhost = self.mocker.replace(hooks.notify_vhost_config_relation)
-        notify_vhost(None)
+        notify_vhost(hooks._get_haproxy_service_name(), None)
         is_db_up = self.mocker.replace(hooks._is_db_up)
         is_db_up()
         self.mocker.result(True)
@@ -1925,6 +1965,25 @@ class TestHooksServiceMock(TestHooks):
         self.assertTrue(os.path.exists(hooks.SSL_CERT_LOCATION))
         with open(hooks.SSL_CERT_LOCATION, 'r') as f:
             self.assertEqual("foobar", f.read())
+
+    def test_vhost_config_relation_exits_if_haproxy_not_ready(self):
+        """
+        notify_vhost_config_relation() is not called if the haproxy relation
+        is not there.
+        """
+        def should_not_be_here(*args):
+            raise AssertionError("notify_vhost_config_relation() should not "
+                                 "be called")
+
+        self.addCleanup(setattr, hooks, "vhost_config_relation_changed",
+                        hooks.vhost_config_relation_changed)
+        hooks.notify_vhost_config_relation = should_not_be_here
+        get_haproxy_service_name = self.mocker.replace(
+            hooks._get_haproxy_service_name)
+        get_haproxy_service_name()
+        self.mocker.result(None)
+        self.mocker.replay()
+        hooks.vhost_config_relation_changed()
 
 
 class TestHooksUtils(TestHooks):

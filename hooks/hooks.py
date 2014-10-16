@@ -98,22 +98,51 @@ def notify_website_relation():
             services=yaml.safe_dump(_get_services_haproxy()))
 
 
-def notify_vhost_config_relation(relation_id=None):
+def _get_haproxy_service_name():
+    """
+    Find out what service name was used to deploy haproxy and sanitize it
+    according to the jinja requirements. The service name is used as a
+    variable name in the apache vhost jinja template.
+
+    For example, if haproxy is deployed as "landscape-haproxy", the apache
+    charm will transform that into landscapehaproxy.
+    """
+    haproxy_relations = juju.relation_ids("website")
+    if not haproxy_relations:
+        return None
+    haproxy_relation_units = juju.relation_list(haproxy_relations[0])
+    haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
+    # jinja2 templates require python-type variables, remove all characters
+    # that do not comply
+    haproxy_service = re.sub("\W", "", haproxy_service)
+    return haproxy_service
+
+
+def _get_vhost_template(template_filename, haproxy_service_name):
+    """Expand the template with the provided haproxy service name."""
+    with open("%s/config/%s" % (ROOT, template_filename), "r") as handle:
+        contents = handle.read()
+        contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
+                          haproxy_service_name, contents)
+    return contents
+
+
+def notify_vhost_config_relation(haproxy_service_name, relation_id=None):
     """
     Notify the vhost-config relation.
 
     This will mark it "ready to proceed".  If relation_id is specified
     use that as the relation context, otherwise look up and notify all
     vhost-config relations.
+
+    The haproxy_service_name is needed so that the vhost template can be
+    adjusted with the correct jinja variable that apache will look for.
     """
     vhosts = []
-    with open("%s/config/vhostssl.tmpl" % ROOT, 'r') as handle:
-        vhosts.append({
-            "port": "443", "template": b64encode(handle.read())})
-    with open("%s/config/vhost.tmpl" % ROOT, 'r') as handle:
-        vhosts.append({
-            "port": "80", "template": b64encode(handle.read())})
-
+    contents = _get_vhost_template("vhostssl.tmpl", haproxy_service_name)
+    vhosts.append({"port": "443", "template": b64encode(contents)})
+    contents = _get_vhost_template("vhost.tmpl", haproxy_service_name)
+    vhosts.append({"port": "80", "template": b64encode(contents)})
     relation_ids = [relation_id]
     if relation_id is None:
         relation_ids = juju.relation_ids("vhost-config")
@@ -394,7 +423,15 @@ def vhost_config_relation_changed():
     if not juju.relation_ids("vhost-config"):
         return
 
-    notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None))
+    # If we are not related to haproxy yet, noop, because we need to know the
+    # haproxy service name so we can set the template variable to the correct
+    # name in the apache vhost template.
+    haproxy_service_name = _get_haproxy_service_name()
+    if not haproxy_service_name:
+        return
+
+    notify_vhost_config_relation(haproxy_service_name,
+                                 os.environ.get("JUJU_RELATION_ID", None))
 
     access_details = _get_db_access_details()
     if not access_details:
