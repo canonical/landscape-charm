@@ -1586,6 +1586,20 @@ class TestHooksService(TestHooks):
         haproxy_service_name = hooks._get_haproxy_service_name()
         self.assertEqual(haproxy_service_name, "landscapehaproxy")
 
+    def test_no_haproxy_service_name_if_not_related_to_haproxy(self):
+        """
+        _get_haproxy_service_name() returns None if we are not related to
+        haproxy.
+        """
+        def no_website_relation(relation_name):
+            return None
+
+        self.addCleanup(setattr, hooks.juju, "relation_ids",
+                        hooks.juju.relation_ids)
+        hooks.juju.relation_ids = no_website_relation
+        haproxy_service_name = hooks._get_haproxy_service_name()
+        self.assertIsNone(haproxy_service_name)
+
     def test__get_vhost_template(self):
         """
         The haproxy prefix in the template variables is replaced by the
