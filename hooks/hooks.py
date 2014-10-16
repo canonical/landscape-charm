@@ -100,7 +100,7 @@ def notify_website_relation():
 
 def _get_haproxy_service_name():
     """
-    Find out what service name was used to deploy haproxy, and sanitize it
+    Find out what service name was used to deploy haproxy and sanitize it
     according to the jinja requirements. The service name is used as a
     variable name in the apache vhost jinja template.
 

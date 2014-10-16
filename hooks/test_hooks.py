@@ -1955,7 +1955,7 @@ class TestHooksServiceMock(TestHooks):
     def test_vhost_config_relation_exits_if_haproxy_not_ready(self):
         """
         notify_vhost_config_relation() is not called if the haproxy relation
-        it not there.
+        is not there.
         """
         def should_not_be_here(*args):
             raise AssertionError("notify_vhost_config_relation() should not "
