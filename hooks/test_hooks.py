@@ -1,5 +1,4 @@
 from configobj import ConfigObj
-from itertools import product
 import base64
 import hooks
 import mocker
@@ -207,9 +206,10 @@ class TestHooksService(TestHooks):
         self.mocker.replay()
         with unittest.TestCase.assertRaises(self, ValueError) as invalid_email:
             hooks.util.create_landscape_admin(db_user, db_password, db_host,
-                admin_name, admin_email, admin_password)
+                                              admin_name, admin_email,
+                                              admin_password)
         self.assertEqual("Invalid administrator email %s" % admin_email,
-            invalid_email.exception.message)
+                         invalid_email.exception.message)
 
     def test_first_admin_not_created_if_account_not_empty(self):
         """
@@ -1598,7 +1598,7 @@ class TestHooksService(TestHooks):
                                                  "landscape-haproxy")
         self.assertIn("{{ haproxy_msgserver }}", original_template)
         self.assertNotIn("{{ landscape-haproxy_msgserver }}",
-            original_template)
+                         original_template)
         self.assertIn("{{ landscape-haproxy_msgserver }}", new_template)
 
 
@@ -1958,11 +1958,11 @@ class TestHooksServiceMock(TestHooks):
         it not there.
         """
         def should_not_be_here(*args):
-            raise AssertionError("notify_vhost_config_relation() should not be "
-                            "called")
+            raise AssertionError("notify_vhost_config_relation() should not "
+                                 "be called")
 
         self.addCleanup(setattr, hooks, "vhost_config_relation_changed",
-            hooks.vhost_config_relation_changed)
+                        hooks.vhost_config_relation_changed)
         hooks.notify_vhost_config_relation = should_not_be_here
         get_haproxy_service_name = self.mocker.replace(
             hooks._get_haproxy_service_name)

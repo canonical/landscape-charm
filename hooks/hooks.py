@@ -124,7 +124,7 @@ def _get_vhost_template(template_filename, haproxy_service_name):
         contents = handle.read()
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
                           haproxy_service_name, contents)
-    return contents 
+    return contents
 
 
 def notify_vhost_config_relation(relation_id=None,
@@ -424,10 +424,10 @@ def vhost_config_relation_changed():
     # If we are not related to haproxy yet, noop, because we need to know the
     # haproxy service name so we can set the template variable to the correct
     # name in the apache vhost template.
-    haproxy_service_name = _get_haproxy_service_name()        
+    haproxy_service_name = _get_haproxy_service_name()
     if not haproxy_service_name:
         return
-    
+
     notify_vhost_config_relation(os.environ.get("JUJU_RELATION_ID", None),
                                  haproxy_service_name)
 
