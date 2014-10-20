@@ -1600,6 +1600,21 @@ class TestHooksService(TestHooks):
         haproxy_service_name = hooks._get_haproxy_service_name()
         self.assertIsNone(haproxy_service_name)
 
+    def test_no_haproxy_service_name_if_no_units_in_relation(self):
+        """
+        _get_haproxy_service_name() returns None if we are related to haproxy,
+        but that relation has no units.
+        """
+        def no_units(relation_id):
+            return []
+
+        self.addCleanup(setattr, hooks.juju, "relation_list",
+                        hooks.juju.relation_list)
+        hooks.juju.relation_list = no_units
+        haproxy_service_name = hooks._get_haproxy_service_name()
+        self.assertIsNone(haproxy_service_name)
+
+
     def test__get_vhost_template(self):
         """
         The haproxy prefix in the template variables is replaced by the
