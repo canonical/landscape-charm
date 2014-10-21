@@ -111,6 +111,8 @@ def _get_haproxy_service_name():
     if not haproxy_relations:
         return None
     haproxy_relation_units = juju.relation_list(haproxy_relations[0])
+    if not haproxy_relation_units:
+        return None
     haproxy_service = haproxy_relation_units[0].rsplit("/", 1)[0]
     # jinja2 templates require python-type variables, remove all characters
     # that do not comply
