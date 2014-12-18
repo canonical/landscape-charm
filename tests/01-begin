@@ -520,9 +520,16 @@ class LandscapeCronTests(BaseLandscapeTests):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    def test_process_profiles_cron(self):
-        """Verify that the process_profiles cron job runs without errors."""
-        script = "/opt/canonical/landscape/scripts/process_profiles.sh"
+    def test_landscape_profiles_cron(self):
+        """Verify that the landscape_profiles cron job runs without errors."""
+
+        # process_profiles -> landscape_profiles @ trunk r8238
+        find_cmd = (
+            "sudo ls /opt/canonical/landscape/scripts/landscape_profiles.sh"
+            "|| sudo ls /opt/canonical/landscape/scripts/process_profiles.sh")
+        cmd = ["juju", "run", "--unit", "landscape/0", find_cmd]
+        script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+
         output, status = self._run_cron(script)
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
