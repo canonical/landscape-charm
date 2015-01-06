@@ -2,9 +2,11 @@ options:
     repository:
         description: APT repository (URL only) to use for installing Landscape.
         type: string
+        default:
     license-file:
         description: License file for LDS.
         type: string
+        default:
     landscape-password:
         description: |
             The password to use for the landscape DB user. If you change this
@@ -59,15 +61,18 @@ options:
             details when it is first accessed with a web browser. Has no
             effect if changed after a deployment.
         type: string
+        default:
     admin-email:
         description: |
             Email of the account administrator. To have any effect, needs to
             specified in conjunction with admin-name and admin-password. Has
             no effect if changed after a deployment.
         type: string
+        default:
     admin-password:
         description: |
             Password of the account administrator. To have any effect, needs
             to be specified in conjunction with admin-name and admin-email.
             Has no effect if changed after a deployment.
         type: string
+        default:

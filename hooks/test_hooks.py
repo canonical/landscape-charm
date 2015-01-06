@@ -1614,7 +1614,6 @@ class TestHooksService(TestHooks):
         haproxy_service_name = hooks._get_haproxy_service_name()
         self.assertIsNone(haproxy_service_name)
 
-
     def test__get_vhost_template(self):
         """
         The haproxy prefix in the template variables is replaced by the
