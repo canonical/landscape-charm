@@ -814,7 +814,7 @@ def _is_db_up():
     return util.is_db_up(database, host, user, password)
 
 
-ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/static/offline/"
+ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/offline/"
 ERROR_FILES = [
     {"http_status": 403,
      "path": ERROR_PATH + "unauthorized-haproxy.html"},
