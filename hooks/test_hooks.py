@@ -12,6 +12,26 @@ import unittest
 import yaml
 
 
+class CurlStub(object):
+
+    urls = []
+
+    def __init__(self, result=None, infos=None, error=None):
+        pass
+
+    def setopt(self, option, value):
+        if option == pycurl.URL:
+            if "\n" in value or "\r" in value:
+                raise AssertionError("URL cannot contain linefeed or newline")
+            self.urls.append(value)
+
+    def perform(self):
+        pass
+
+    def close(self):
+        pass
+
+
 class TestJuju(object):
     """
     Testing object to intercept juju calls and inject data, or make sure
@@ -908,13 +928,20 @@ class TestHooksService(TestHooks):
         filename = self.makeFile()
         with open(filename, "w") as fp:
             fp.write("foobar")
-        output = hooks._download_file("file://%s" % filename)
+        output = hooks._download_file("file:///%s" % filename)
         self.assertIn("foobar", output)
+
+    def test__download_file_success_trailing_newline(self):
+        """Test that newlines are stripped before passing to curl. CVE-2014-8150."""
+        # put two newlines, since that could be a common pattern in a text
+        # file when using an editor
+        hooks._download_file("http://example.com/\n\n", Curl=CurlStub)
+        self.assertEqual(["http://example.com/"], CurlStub.urls)
 
     def test__download_file_failure(self):
         """The fail path of download file raises an exception."""
         self.assertRaises(
-            pycurl.error, hooks._download_file, "file://FOO/NO/EXIST")
+            pycurl.error, hooks._download_file, "file:///FOO/NO/EXIST")
 
     def test__replace_in_file(self):
         """
@@ -962,7 +989,7 @@ class TestHooksService(TestHooks):
         source = self.makeFile()
         with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
-        hooks.juju.config["license-file"] = "file://%s" % source
+        hooks.juju.config["license-file"] = "file:///%s" % source
         hooks._install_license()
         self.assertFileContains(
             hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
