@@ -501,11 +501,13 @@ def config_changed():
     notify_website_relation()
 
 
-def _download_file(url):
+def _download_file(url, Curl=pycurl.Curl):
     """ Download from a url and save to the filename given """
+    # Fix for CVE-2014-8150, urls cannot end with newline
+    url = url.rstrip()
     buf = cStringIO.StringIO()
     juju.juju_log("Fetching License: %s" % url)
-    curl = pycurl.Curl()
+    curl = Curl()
     curl.setopt(pycurl.URL, str(url))
     curl.setopt(pycurl.WRITEFUNCTION, buf.write)
     curl.perform()
