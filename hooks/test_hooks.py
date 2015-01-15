@@ -14,13 +14,16 @@ import yaml
 
 class CurlStub(object):
 
+    urls = []
+
     def __init__(self, result=None, infos=None, error=None):
         pass
 
     def setopt(self, option, value):
         if option == pycurl.URL:
-            if "\n" in value:
-                raise AssertionError("URL cannot contain newline")
+            if "\n" in value or "\r" in value:
+                raise AssertionError("URL cannot contain linefeed or newline")
+            self.urls.append(value)
 
     def perform(self):
         pass
@@ -933,6 +936,7 @@ class TestHooksService(TestHooks):
         # put two newlines, since that could be a common pattern in a text
         # file when using an editor
         hooks._download_file("http://example.com/\n\n", Curl=CurlStub)
+        self.assertEqual(["http://example.com/"], CurlStub.urls)
 
     def test__download_file_failure(self):
         """The fail path of download file raises an exception."""
