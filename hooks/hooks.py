@@ -141,9 +141,16 @@ def notify_vhost_config_relation(haproxy_service_name, relation_id=None):
     adjusted with the correct jinja variable that apache will look for.
     """
     vhosts = []
-    contents = _get_vhost_template("vhostssl.tmpl", haproxy_service_name)
+    vhostssl_template = "vhostssl.tmpl"
+    vhost_template = "vhost.tmpl"
+    if HAS_OLD_ERROR_PATH:
+        # This means we're installing a 14.10 or 13.09 release, with old
+        # apache setup.
+        vhostssl_template += ".legacy"
+        vhost_template += ".legacy"
+    contents = _get_vhost_template(vhostssl_template, haproxy_service_name)
     vhosts.append({"port": "443", "template": b64encode(contents)})
-    contents = _get_vhost_template("vhost.tmpl", haproxy_service_name)
+    contents = _get_vhost_template(vhost_template, haproxy_service_name)
     vhosts.append({"port": "80", "template": b64encode(contents)})
     relation_ids = [relation_id]
     if relation_id is None:
@@ -816,7 +823,10 @@ def _is_db_up():
     return util.is_db_up(database, host, user, password)
 
 
-ERROR_PATH = "/opt/canonical/landscape/canonical/landscape/offline/"
+ERROR_PATH_OLD = "/opt/canonical/landscape/canonical/landscape/static/offline/"
+ERROR_PATH_NEW = "/opt/canonical/landscape/canonical/landscape/offline/"
+HAS_OLD_ERROR_PATH = os.path.exists(ERROR_PATH_OLD)
+ERROR_PATH = ERROR_PATH_OLD if HAS_OLD_ERROR_PATH else ERROR_PATH_NEW
 ERROR_FILES = [
     {"http_status": 403,
      "path": ERROR_PATH + "unauthorized-haproxy.html"},
