@@ -36,19 +36,31 @@ landscape:
             options:
                 service-count: "2"
                 landscape-password: "look-a-different-password"
-                services: static appserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync msgserver
+                services: static appserver pingserver combo-loader async-frontend apiserver package-upload jobhandler package-search cron juju-sync
                 repository: include-file://repo-file
                 license-file: include-file://license-file
                 # Optionally create the first admin:
                 #admin-name: Stan Peters
                 #admin-email: stan@example.com
                 #admin-password: pwd
+        landscape-msg:
+            branch: lp:~landscape/landscape-charm/stable
+            charm: landscape
+            constraints: mem=2048
+            options:
+                landscape-password: "look-a-different-password"
+                services: msgserver
+                repository: include-file://repo-file
+                license-file: include-file://license-file
     relations:
         - [landscape, rabbitmq-server]
         - [landscape, haproxy]
         - ["landscape:vhost-config", "apache2:vhost-config"]
         - ["landscape:db-admin", "postgresql:db-admin"]
         - ["haproxy:website", "apache2:reverseproxy"]
+        - [landscape-msg, rabbitmq-server]
+        - [landscape-msg, haproxy]
+        - ["landscape-msg:db-admin", "postgresql:db-admin"]
 
 landscape-dense:
     inherits: landscape-dense-maas
