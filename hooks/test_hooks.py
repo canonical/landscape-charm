@@ -1851,6 +1851,25 @@ class TestHooksServiceMock(TestHooks):
         self.assertEqual(
             (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
 
+    def test_notify_vhost_config_relation_legacy_template(self):
+        """
+        If the landscape-server package being installed has offline pages
+        under the static dir, the legacy templates are used.
+        """
+        self.addCleanup(
+            setattr, hooks, "HAS_OLD_ERROR_PATH", hooks.HAS_OLD_ERROR_PATH)
+        hooks.HAS_OLD_ERROR_PATH = True
+        hooks.notify_vhost_config_relation("haproxy", "foo/0")
+        with open("%s/config/vhostssl.tmpl.legacy" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl.legacy" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
     def test_notify_vhost_config_relation(self):
         """notify the vhost-config relation on the "current" ID."""
         hooks.notify_vhost_config_relation("haproxy")
