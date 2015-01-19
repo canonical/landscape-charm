@@ -551,7 +551,10 @@ def _setup_apache():
     sites_available = os.listdir(os.path.dirname(LANDSCAPE_APACHE_SITE))
     for site in sites_available:
         _a2dissite(site)
-    shutil.copy("%s/hooks/conf/landscape-http" % ROOT, LANDSCAPE_APACHE_SITE)
+    conf_path = "%s/hooks/conf/landscape-http" % ROOT
+    if HAS_OLD_ERROR_PATH:
+        conf_path += ".legacy"
+    shutil.copy(conf_path, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)
     _a2ensite("landscape.conf")
     _service("apache2", "restart")
