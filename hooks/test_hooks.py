@@ -2115,4 +2115,4 @@ class TestHooksUtils(TestHooks):
         self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
         with open("%s/landscape.conf" % tempdir, 'r') as f:
             site_text = f.read()
-        self.assertTrue("/static/offline/unauthorized.html" in site_text)
+        self.assertIn("/static/offline/unauthorized.html", site_text)
