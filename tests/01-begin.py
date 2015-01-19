@@ -40,7 +40,7 @@ def check_url(url, good_content, post_data=None, header=None,
     output = ""
     if type(good_content) is not list:
         good_content = [good_content]
-    cmd = ["curl", url, "-k", "-L", "-s"]
+    cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
     if post_data:
         cmd.extend(["-d", post_data])
     if header:
