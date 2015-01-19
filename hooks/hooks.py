@@ -553,8 +553,6 @@ def _setup_apache():
         _a2dissite(site)
     conf_path = "%s/hooks/conf/landscape-http" % ROOT
     if HAS_OLD_ERROR_PATH:
-        import pdb
-        pdb.set_trace()
         conf_path += ".legacy"
     shutil.copy(conf_path, LANDSCAPE_APACHE_SITE)
     _replace_in_file(LANDSCAPE_APACHE_SITE, r"@hostname@", public)

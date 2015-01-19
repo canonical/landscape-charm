@@ -2082,6 +2082,7 @@ class TestHooksUtils(TestHooks):
             site_text = f.read()
         self.assertFalse("@hostname@" in site_text)
         self.assertTrue("localhost" in site_text)
+        self.assertTrue("/offline/unauthorized.html" in site_text)
 
     def test__setup_apache_legacy(self):
         """
@@ -2114,5 +2115,4 @@ class TestHooksUtils(TestHooks):
         self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
         with open("%s/landscape.conf" % tempdir, 'r') as f:
             site_text = f.read()
-        self.assertFalse("@hostname@" in site_text)
-        self.assertTrue("localhost" in site_text)
+        self.assertTrue("/static/offline/unauthorized.html" in site_text)
