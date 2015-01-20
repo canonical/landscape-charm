@@ -995,7 +995,7 @@ class TestHooksService(TestHooks):
             hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
 
     def test__install_license_url_with_trailing_whitespace(self):
-        """Install a license from a url with trailing newlines."""
+        """Install a license from a url with trailing whitespace."""
         source = self.makeFile()
         with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
@@ -1005,7 +1005,7 @@ class TestHooksService(TestHooks):
             hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
 
     def test__install_license_url_with_leading_whitespace(self):
-        """Install a license from a url with trailing newlines."""
+        """Install a license from a url with leading whitespace."""
         source = self.makeFile()
         with open(source, "w") as fp:
             fp.write("LICENSE_FILE_TEXT from curl")
