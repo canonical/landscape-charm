@@ -570,6 +570,10 @@ def _install_license():
     if not license_file:
         juju.juju_log("No license file given, skipping")
         return
+    else:
+        # Leading or trailing whitespace is nonsensical, so remove it.
+        license_file = license_file.strip()
+
     if re.match(license_file_re, license_file):
         license_file = _download_file(license_file)
 
