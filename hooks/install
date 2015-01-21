@@ -9,5 +9,5 @@ from lib.install import InstallHook
 
 
 if __name__ == "__main__":
-    install_hook = InstallHook()
-    sys.exit(install_hook.run())
+    hook = InstallHook()
+    sys.exit(hook())

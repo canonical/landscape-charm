@@ -1,24 +1,32 @@
 from charmhelpers import fetch
-from charmhelpers.core.hookenv import ERROR
 
-from lib.hook import Hook
+from lib.hook import Hook, HookError
+
+PACKAGES = ("landscape-server",)
 
 
 class InstallHook(Hook):
+    """Execute install hook logic."""
 
     def __init__(self, fetch=fetch, **kwargs):
         super(InstallHook, self).__init__(**kwargs)
-        self.fetch = fetch
+        self._fetch = fetch
 
-    def run(self):
-        self.log("Installing landscape-server")
-        config = self.config()
+    def _run(self):
+        self._hookenv.log("Installing landscape-server")
+        self._configure_sources()
+        self._install_packages()
+
+    def _configure_sources(self):
+        """Configure the extra APT sources to use."""
+        config = self._hookenv.config()
         source = config.get("source")
         if not source:
-            self.log("No source config parameter defined", level=ERROR)
-            return 1
-        self.fetch.add_source(source, config.get("key"))
-        self.fetch.apt_update(fatal=True)
-        packages = self.fetch.filter_installed_packages(["landscape-server"])
-        self.fetch.apt_install(packages, fatal=True)
-        return 0
+            raise HookError("No source config parameter defined")
+        self._fetch.add_source(source, config.get("key"))
+        self._fetch.apt_update(fatal=True)
+
+    def _install_packages(self):
+        """Install the needed packages."""
+        packages = self._fetch.filter_installed_packages(PACKAGES)
+        self._fetch.apt_install(packages, fatal=True)
