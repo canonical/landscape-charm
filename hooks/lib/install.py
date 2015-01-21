@@ -8,12 +8,13 @@ PACKAGES = ("landscape-server",)
 class InstallHook(Hook):
     """Execute install hook logic."""
 
+    _name = "install"
+
     def __init__(self, fetch=fetch, **kwargs):
         super(InstallHook, self).__init__(**kwargs)
         self._fetch = fetch
 
     def _run(self):
-        self._hookenv.log("Installing landscape-server")
         self._configure_sources()
         self._install_packages()
 
