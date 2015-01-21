@@ -1,5 +1,5 @@
 test:
-	trial hooks
+	@cd hooks && trial lib
 
 verify-juju-test:
 	@echo "Checking for ... "

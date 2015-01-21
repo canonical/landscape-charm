@@ -1,110 +1,13 @@
-#!/bin/bash -xe
+#!/usr/bin/python
+import sys
 
-ROOT="$( cd "$( dirname "$0" )" && pwd )"
-LS_PPA=`config-get repository`
-LS_PACKAGE=`ls -1 landscape-server_*.tar.gz || echo ""`
-SOURCES_FILE=/etc/apt/sources.list.d/landscape-devel-team.list
-CODENAME=$(cat /etc/lsb-release | grep CODENAME | sed 's/.*=//')
-LANDSCAPE_MAINTENANCE=/opt/canonical/landscape/maintenance.txt
+from lib import setup
 
-die() {
-    STATUS=$?
-    echo "ERROR: $1"
-    exit $STATUS 
-}
+setup.pre_install()
 
-setup_local_repo () {
-    # If deb files are in place in the charm directory, setup a local
-    # repository for installation
+from lib.install import InstallHook
 
-    ls $LS_PACKAGE || return;
 
-    # Install needed tools for building
-    apt_get install dpkg-dev pbuilder
-
-    TMP=$(mktemp -d)
-    cp -f $LS_PACKAGE $TMP
-
-    PWD=$(pwd)
-
-    # stage the source TGZ
-    cd $TMP
-    tar --strip=1 -xf $LS_PACKAGE
-    ver=$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2)
-    dch -v 9999:$ver development --distribution $(lsb_release -cs)
-
-    # Install dependencies for the local source.
-    /usr/lib/pbuilder/pbuilder-satisfydepends
-
-    # Actually build the package.
-    dpkg-buildpackage -us -uc
-
-    # Stage the file:// based apt repository
-    mv ../*.deb .
-    dpkg-scanpackages -m . /dev/null > Packages
-    cat Packages | bzip2 -9 > Packages.bz2
-    cat Packages | gzip -9 > Packages.gz
-    dpkg-scansources . > Sources
-    cat Sources | bzip2 -9 > Sources.bz2
-    cat Sources | gzip -9 > Sources.gz
-    apt-ftparchive release . > Release
-
-    # Add myh repository to apt
-    add_apt_sources "deb file://$TMP/ ./"
-
-    cd $PWD
-}
-
-install_landscape() {
-    apt_get update
-    # only install the hash-id package if we host the static service
-    config=$(config-get services)
-    if echo "$config" | grep -qw static; then
-        extra_packages="landscape-hashids"
-    else
-        extra_packages=""
-    fi
-    apt_get install --no-install-recommends landscape-server ntp $extra_packages
-}
-
-# $1 - optional additional source line to add
-add_apt_sources() {
-    cat > $SOURCES_FILE <<-EOMSG
-deb ${LS_PPA} ${CODENAME} main
-$1
-EOMSG
-    chmod go+r $SOURCES_FILE
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-key D394F4BC
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-key 4652B4E6
-}
-
-function apt_get() {
-    DEBIAN_FRONTEND=noninteractive apt-get \
-        --allow-unauthenticated -y \
-        -o Dpkg::Options::='--force-confold' $*;
-}
-
-# Workaround for: https://bugs.launchpad.net/juju/+bug/993034
-echo 'Acquire::https { Proxy "false"; };' >> /etc/apt/apt.conf.d/02juju-apt-proxy
-
-apt_get update
-apt_get install apt-transport-https
-apt_get install ntp dpkg-dev debhelper devscripts python-dev python-setuptools \
-                python-support wget pwgen apache2-mpm-worker \
-                python-psutil python-pycurl
-
-# Setup a local repository and build the server if supplied in the charm
-if [ -n "$LS_PACKAGE" ]; then
-    setup_local_repo
-else
-    add_apt_sources
-fi
-
-# Set maintenance mode to prevent cron jobs until db relationship is setup
-MAINTENANCE_DIR=`dirname $LANDSCAPE_MAINTENANCE`
-echo "Setting maintenance mode until database is configured"
-mkdir -p $MAINTENANCE_DIR
-date > $LANDSCAPE_MAINTENANCE
-
-install_landscape || die "Error installing landscape"
-echo "Install complete"
+if __name__ == "__main__":
+    install_hook = InstallHook()
+    sys.exit(install_hook.run())
