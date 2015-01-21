@@ -2,10 +2,10 @@ from charmhelpers.core.hookenv import ERROR
 
 from lib.install import InstallHook, PACKAGES
 from lib.tests.stubs import FetchStub
-from lib.tests.hook import HookTest
+from lib.tests.helpers import HookenvTest
 
 
-class InstallHookTest(HookTest):
+class InstallHookTest(HookenvTest):
 
     def setUp(self):
         super(InstallHookTest, self).setUp()

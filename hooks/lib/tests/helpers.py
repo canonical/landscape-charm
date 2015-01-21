@@ -3,11 +3,11 @@ from fixtures import TestWithFixtures, EnvironmentVariable, TempDir
 from lib.tests.stubs import HookenvStub
 
 
-class HookTest(TestWithFixtures):
-    """Helper for testes exercising L{Hook}-based classes."""
+class HookenvTest(TestWithFixtures):
+    """A test providing a L{HookenvStub} for simulating a hook context."""
 
     def setUp(self):
-        super(HookTest, self).setUp()
+        super(HookenvTest, self).setUp()
         # XXX The charmhelpers.core.hookenv.Config class grabs its path from
         #     the environment, so it's not very test-friendly. Should be fixed
         #     upstream.
