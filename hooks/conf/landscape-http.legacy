@@ -15,12 +15,11 @@ NameVirtualHost *:80
      Allow from all
      Require all granted
      Satisfy Any
-     ErrorDocument 403 /offline/unauthorized.html
-     ErrorDocument 404 /offline/notfound.html
+     ErrorDocument 403 /static/offline/unauthorized.html
+     ErrorDocument 404 /static/offline/notfound.html
    </Directory>
 
    Alias /static /opt/canonical/landscape/canonical/landscape/static
-   Alias /offline /opt/canonical/landscape/canonical/landscape/offline
    Alias /repository /var/lib/landscape/landscape-repository
    Alias /config /opt/canonical/landscape/apacheroot
    Alias /hash-id-databases /var/lib/landscape/hash-id-databases
@@ -58,9 +57,6 @@ NameVirtualHost *:80
      Header append Vary User-Agent env=!dont-vary
    </Location>
    <Location "/static">
-     Options -Indexes
-   </Location>
-   <Location "/offline">
      Options -Indexes
    </Location>
 </VirtualHost>

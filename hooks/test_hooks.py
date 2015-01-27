@@ -994,6 +994,26 @@ class TestHooksService(TestHooks):
         self.assertFileContains(
             hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
 
+    def test__install_license_url_with_trailing_whitespace(self):
+        """Install a license from a url with trailing whitespace."""
+        source = self.makeFile()
+        with open(source, "w") as fp:
+            fp.write("LICENSE_FILE_TEXT from curl")
+        hooks.juju.config["license-file"] = "file:///%s\n\n\n" % source
+        hooks._install_license()
+        self.assertFileContains(
+            hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
+
+    def test__install_license_url_with_leading_whitespace(self):
+        """Install a license from a url with leading whitespace."""
+        source = self.makeFile()
+        with open(source, "w") as fp:
+            fp.write("LICENSE_FILE_TEXT from curl")
+        hooks.juju.config["license-file"] = "\n\n\nfile:///%s" % source
+        hooks._install_license()
+        self.assertFileContains(
+            hooks.LANDSCAPE_LICENSE_DEST, "LICENSE_FILE_TEXT from curl")
+
     def test_handle_no_license(self):
         """Don't try to install the license when none was given."""
         hooks.juju.config["license-file"] = None
@@ -1851,6 +1871,25 @@ class TestHooksServiceMock(TestHooks):
         self.assertEqual(
             (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
 
+    def test_notify_vhost_config_relation_legacy_template(self):
+        """
+        If the landscape-server package being installed has offline pages
+        under the static dir, the legacy templates are used.
+        """
+        self.addCleanup(
+            setattr, hooks, "HAS_OLD_ERROR_PATH", hooks.HAS_OLD_ERROR_PATH)
+        hooks.HAS_OLD_ERROR_PATH = True
+        hooks.notify_vhost_config_relation("haproxy", "foo/0")
+        with open("%s/config/vhostssl.tmpl.legacy" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl.legacy" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
     def test_notify_vhost_config_relation(self):
         """notify the vhost-config relation on the "current" ID."""
         hooks.notify_vhost_config_relation("haproxy")
@@ -2028,6 +2067,7 @@ class TestHooksServiceMock(TestHooks):
 
 
 class TestHooksUtils(TestHooks):
+
     def test__setup_apache(self):
         """
         Responsible for setting up apache to serve static content.
@@ -2062,3 +2102,37 @@ class TestHooksUtils(TestHooks):
             site_text = f.read()
         self.assertFalse("@hostname@" in site_text)
         self.assertTrue("localhost" in site_text)
+        self.assertTrue("/offline/unauthorized.html" in site_text)
+
+    def test__setup_apache_legacy(self):
+        """
+        Use ".legacy" apache templates if the location of offline packages
+        is under the old static directory.
+        """
+        self.addCleanup(
+            setattr, hooks, "HAS_OLD_ERROR_PATH", hooks.HAS_OLD_ERROR_PATH)
+        hooks.HAS_OLD_ERROR_PATH = True
+        tempdir = self.makeDir()
+        with open("%s/default.random_extension" % tempdir, 'w') as f:
+            f.write("HI!")
+        with open("%s/default2.conf" % tempdir, 'w') as f:
+            f.write("HI!")
+        # Replace dir, but leave basename to check that it has '.conf'
+        # (new requirement with Trusty apache2)
+        site_file = os.path.basename(hooks.LANDSCAPE_APACHE_SITE)
+        hooks.LANDSCAPE_APACHE_SITE = "%s/%s" % (tempdir, site_file)
+        _a2enmods = self.mocker.replace(hooks._a2enmods)
+        _a2dissite = self.mocker.replace(hooks._a2dissite)
+        _a2ensite = self.mocker.replace(hooks._a2ensite)
+        _service = self.mocker.replace(hooks._service)
+        _a2enmods(["rewrite", "proxy_http", "ssl", "headers", "expires"])
+        _a2dissite("default.random_extension")
+        _a2dissite("default2.conf")
+        _a2ensite("landscape.conf")
+        _service("apache2", "restart")
+        self.mocker.replay()
+        hooks._setup_apache()
+        self.assertTrue(os.path.exists("%s/landscape.conf" % tempdir))
+        with open("%s/landscape.conf" % tempdir, 'r') as f:
+            site_text = f.read()
+        self.assertIn("/static/offline/unauthorized.html", site_text)

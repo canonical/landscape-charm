@@ -49,7 +49,6 @@
     RewriteRule ^/attachment/(.*) http://{{ haproxy_msgserver }}/attachment/$1 [P,L]
     RewriteRule ^/upload/(.*) http://{{ haproxy_packageupload }}/$1 [P,L]
     RewriteRule ^/(static.*) http://{{ haproxy_static }}/$1 [P,L]
-    RewriteRule ^/(offline.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(config.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(hash-id-databases.*) http://{{ haproxy_static }}/$1 [P,L]
     RewriteRule ^/(repository.*) http://{{ haproxy_static }}/$1 [P,L]
