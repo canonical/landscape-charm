@@ -1,3 +1,6 @@
+#!/usr/bin/make
+PYTHON := /usr/bin/env python
+
 test:
 	@cd hooks && trial lib
 
@@ -45,3 +48,11 @@ clean: clean-integration-test
 	clean-integration-test \
 	update-charm-revision-numbers \
 	deploy
+
+dev/charm_helpers_sync.py:
+	@mkdir -p dev
+	@bzr cat lp:charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py \
+        > dev/charm_helpers_sync.py
+
+sync: dev/charm_helpers_sync.py
+	$(PYTHON) dev/charm_helpers_sync.py -c charm-helpers.yaml
