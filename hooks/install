@@ -1,10 +1,6 @@
 #!/usr/bin/python
 import sys
 
-from lib import setup
-
-setup.pre_install()
-
 from lib.install import InstallHook
 
 
