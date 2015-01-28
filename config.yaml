@@ -1,8 +1,15 @@
 options:
-    repository:
-        description: APT repository (URL only) to use for installing Landscape.
+    source:
+        default: ppa:landscape/14.10
         type: string
+        description: |
+            APT repository to use for installing Landscape.
+    key:
         default:
+        type: string
+        description: |
+            Key ID to import to the apt keyring to support use with arbitary source
+            configuration from outside of Launchpad archives or PPA's.
     license-file:
         description: License file for LDS.
         type: string
