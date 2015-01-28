@@ -4,6 +4,10 @@ PYTHON := /usr/bin/env python
 test:
 	@cd hooks && trial lib
 
+ci-test:
+	./dev/ubuntu-deps
+	$(MAKE) test
+
 verify-juju-test:
 	@echo "Checking for ... "
 	@echo -n "juju-test: "
