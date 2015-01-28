@@ -3,6 +3,7 @@ from cStringIO import StringIO
 
 
 from lib.tests.helpers import TemplateTest
+from lib.tests.sample import SAMPLE_POSTGRESQL_RELATION_DATA
 
 
 class ServiceConfTest(TemplateTest):
@@ -14,17 +15,11 @@ class ServiceConfTest(TemplateTest):
         The service.conf template renders data about PostgreSQL configuration.
         """
         context = {
-            "db": [{
-                "database": "all",
-                "host": "1.2.3.4",
-                "password": "sekret",
-                "port": "5432",
-                "user": "admin"
-            }]
+            "db": [SAMPLE_POSTGRESQL_RELATION_DATA],
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
         config.readfp(buffer)
-        self.assertEqual("1.2.3.4:5432", config.get("stores", "host"))
-        self.assertEqual("admin", config.get("schema", "store_user"))
+        self.assertEqual("10.0.3.168:5432", config.get("stores", "host"))
+        self.assertEqual("db_admin_1", config.get("schema", "store_user"))
         self.assertEqual("sekret", config.get("schema", "store_password"))

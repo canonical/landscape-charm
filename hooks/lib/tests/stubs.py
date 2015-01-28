@@ -6,6 +6,7 @@ class HookenvStub(object):
 
     ip = "1.2.3.4"
     hook = "some-hook"
+    relid = None
 
     def __init__(self):
         self.messages = []
@@ -26,8 +27,29 @@ class HookenvStub(object):
 
     def relation_ids(self, reltype=None):
         if reltype:
-            return self.relations.get(reltype)
-        return self.relations
+            return self.relations.get(reltype, {}).keys()
+        relation_ids = []
+        for reltype in self.relations:
+            relation_ids.extend(self.relation_ids(reltype))
+        return relation_ids
+
+    def related_units(self, relid=None):
+        relid = relid or self.relid
+        if relid:
+            reltype = relid.split(":")[0]
+            return self.relations[reltype][relid].keys()
+        units = []
+        for reltype in self.relations:
+            for relid in self.relations[reltype]:
+                units.extend(self.related_units(relid))
+        return units
+
+    def relation_get(self, attribute=None, unit=None, rid=None):
+        reltype = rid.split(":")[0]
+        data = self.relations[reltype][rid][unit]
+        if attribute:
+            return data.get(attribute)
+        return data
 
 
 class FetchStub(object):

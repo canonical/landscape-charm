@@ -4,6 +4,8 @@ from charmhelpers.core.services.helpers import render_template
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRelation
 
+SERVICE_CONF = "/etc/landscape/service.conf"
+
 
 class ServicesHook(Hook):
     """Execute service configuration logic.
@@ -22,8 +24,7 @@ class ServicesHook(Hook):
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,
-                    source="service.conf",
-                    target="/etc/landscape/service.conf")
+                    source="service.conf", target=SERVICE_CONF)
             ],
         }])
         manager.manage()
