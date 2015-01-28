@@ -12,8 +12,6 @@ class HookError(Exception):
 class Hook(object):
     """Juju hook Abstraction, providing dependency injection for testing."""
 
-    _name = None  # MUST be set by sub-classes
-
     def __init__(self, hookenv=hookenv):
         """
         @param hookenv: The charm-helpers C{hookenv} module, will be replaced
@@ -26,7 +24,7 @@ class Hook(object):
 
         @return: An integer with the exit code for the hook.
         """
-        self._hookenv.log("Executing %s hook handler" % self._name)
+        self._hookenv.log("Invoke handler for %s" % self._hookenv.hook_name())
         try:
             self._run()
         except HookError, error:

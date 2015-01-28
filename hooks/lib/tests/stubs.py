@@ -1,18 +1,33 @@
-from charmhelpers.core.hookenv import cached, Config
+from charmhelpers.core.hookenv import Config
 
 
 class HookenvStub(object):
     """Provide a testable stub for C{charmhelpers.core.hookenv}."""
 
+    ip = "1.2.3.4"
+    hook = "some-hook"
+
     def __init__(self):
         self.messages = []
+        self.relations = {}
+        self._config = Config()
 
-    @cached
     def config(self):
-        return Config()
+        return self._config
 
     def log(self, message, level=None):
         self.messages.append((message, level))
+
+    def unit_private_ip(self):
+        return self.ip
+
+    def hook_name(self):
+        return self.hook
+
+    def relation_ids(self, reltype=None):
+        if reltype:
+            return self.relations.get(reltype)
+        return self.relations
 
 
 class FetchStub(object):
