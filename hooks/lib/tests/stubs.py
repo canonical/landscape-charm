@@ -1,4 +1,4 @@
-from charmhelpers.core.hookenv import cached, Config
+from charmhelpers.core.hookenv import Config
 
 
 class HookenvStub(object):
@@ -6,10 +6,10 @@ class HookenvStub(object):
 
     def __init__(self):
         self.messages = []
+        self._config = Config()
 
-    @cached
     def config(self):
-        return Config()
+        return self._config
 
     def log(self, message, level=None):
         self.messages.append((message, level))
