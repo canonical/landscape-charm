@@ -6,6 +6,7 @@ class HookenvStub(object):
 
     ip = "1.2.3.4"
     hook = "some-hook"
+    unit = "landscape-server/0"
     relid = None
 
     def __init__(self):
@@ -21,6 +22,9 @@ class HookenvStub(object):
 
     def unit_private_ip(self):
         return self.ip
+
+    def local_unit(self):
+        return self.unit
 
     def hook_name(self):
         return self.hook

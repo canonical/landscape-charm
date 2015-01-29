@@ -1,29 +1,21 @@
-from charmhelpers.core import hookenv
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.sample import SAMPLE_POSTGRESQL_RELATION_DATA
+from lib.tests.sample import SAMPLE_POSTGRESQL_UNIT_DATA
 from lib.services import ServicesHook, SERVICE_CONF
 
 
 class ServicesHookTest(HookenvTest):
 
+    with_hookenv_monkey_patch = True
+
     def setUp(self):
         super(ServicesHookTest, self).setUp()
         self.hook = ServicesHook(hookenv=self.hookenv)
-
-        # XXX Since charmhelpers doesn't use dependency injection, we need
-        # to monkey patch the real hookenv API and just have it behave like an
-        # injected HookenvStub.
-        for name in dir(self.hookenv):
-            attribute = getattr(self.hookenv, name)
-            if name.startswith("_") or not callable(attribute):
-                continue
-            self.addCleanup(setattr, hookenv, name, getattr(hookenv, name))
-            setattr(hookenv, name, attribute)
         self.renders = []
 
-        # XXX Same for the templating API.
+        # XXX Monkey patch the templating API, charmhelpers doesn't sport
+        #     any dependency injection here as well.
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
 
@@ -45,13 +37,13 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.relations = {
             "db": {
                 "db:1": {
-                    "postgresql/0": SAMPLE_POSTGRESQL_RELATION_DATA,
+                    "postgresql/0": SAMPLE_POSTGRESQL_UNIT_DATA,
                 }
             }
         }
         self.hook()
         context = {
-            "db": [SAMPLE_POSTGRESQL_RELATION_DATA],
+            "db": [SAMPLE_POSTGRESQL_UNIT_DATA],
         }
         [render] = self.renders
         self.assertEqual(

@@ -1,4 +1,4 @@
-SAMPLE_POSTGRESQL_RELATION_DATA = {
+SAMPLE_POSTGRESQL_UNIT_DATA = {
     "database": "all",
     "allowed-units": "landscape-server/0",
     "state": "standalone",
