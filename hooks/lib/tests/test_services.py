@@ -1,7 +1,7 @@
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.sample import SAMPLE_POSTGRESQL_UNIT_DATA
+from lib.tests.sample import SAMPLE_DB_UNIT_DATA
 from lib.services import ServicesHook, SERVICE_CONF
 
 
@@ -37,13 +37,13 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.relations = {
             "db": {
                 "db:1": {
-                    "postgresql/0": SAMPLE_POSTGRESQL_UNIT_DATA,
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
                 }
             }
         }
         self.hook()
         context = {
-            "db": [SAMPLE_POSTGRESQL_UNIT_DATA],
+            "db": [SAMPLE_DB_UNIT_DATA],
         }
         [render] = self.renders
         self.assertEqual(
