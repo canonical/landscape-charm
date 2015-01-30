@@ -4,3 +4,4 @@ include:
     - __init__
     - core
     - fetch
+    - contrib.hahelpers
