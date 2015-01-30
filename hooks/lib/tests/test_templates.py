@@ -3,7 +3,7 @@ from cStringIO import StringIO
 
 
 from lib.tests.helpers import TemplateTest
-from lib.tests.sample import SAMPLE_POSTGRESQL_UNIT_DATA
+from lib.tests.sample import SAMPLE_DB_UNIT_DATA
 
 
 class ServiceConfTest(TemplateTest):
@@ -15,7 +15,7 @@ class ServiceConfTest(TemplateTest):
         The service.conf template renders data about PostgreSQL configuration.
         """
         context = {
-            "db": [SAMPLE_POSTGRESQL_UNIT_DATA],
+            "db": [SAMPLE_DB_UNIT_DATA],
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
