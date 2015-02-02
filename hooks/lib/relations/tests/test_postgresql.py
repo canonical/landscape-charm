@@ -20,7 +20,7 @@ class PostgreSQLRequirerTest(HookenvTest):
 
     def test_local_unit_in_allowed_units(self):
         """
-        The L{PostgreSQLRequirer} is not ready if the local unit is in
+        The L{PostgreSQLRequirer} is not ready if the local unit is not in
         the 'allowed-units' list.
         """
         unit_data = SAMPLE_DB_UNIT_DATA.copy()
