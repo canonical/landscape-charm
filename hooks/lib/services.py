@@ -7,8 +7,9 @@ from charmhelpers.core.services.helpers import render_template
 from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
-from lib.relations.postgresql import PostgreSQLRelation
-from lib.relations.landscape import LandscapeRelation
+from lib.relations.postgresql import PostgreSQLRequirer
+from lib.relations.landscape import (
+    LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.callbacks.scripts import SchemaBootstrap
 
 SERVICE_CONF = "/etc/landscape/service.conf"
@@ -29,14 +30,25 @@ class ServicesHook(Hook):
         self._subprocess = subprocess
 
     def _run(self):
-        landscape = LandscapeRelation(cluster=self._cluster, host=self._host)
-        postgresql = PostgreSQLRelation()
+        leader_context = None
+
+        provided_data = []
+        if self._cluster.is_elected_leader(None):
+            # If we are the leader unit, provide our leader context to the
+            # other peer Landscape units using the landscape-ha relation.
+            leader_context = LandscapeLeaderContext(host=self._host)
+            provided_data.append(LandscapeProvider(leader_context))
+
+        required_data = [
+            LandscapeRequirer(leader_context),
+            PostgreSQLRequirer(),
+        ]
 
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
-            "provided_data": [landscape],
-            "required_data": [landscape, postgresql],
+            "provided_data": provided_data,
+            "required_data": required_data,
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,
