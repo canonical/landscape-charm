@@ -2,7 +2,7 @@ from charmhelpers.core.services.base import ServiceManager
 from charmhelpers.core.services.helpers import render_template
 
 from lib.hook import Hook
-from lib.relations.postgresql import PostgreSQLRelation
+from lib.relations.postgresql import PostgreSQLRequirer
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 
@@ -20,7 +20,7 @@ class ServicesHook(Hook):
             "service": "landscape",
             "ports": [],
             "provided_data": [],
-            "required_data": [PostgreSQLRelation()],
+            "required_data": [PostgreSQLRequirer()],
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,

@@ -26,7 +26,7 @@ class ServicesHookTest(HookenvTest):
         """
         self.hook()
         self.assertIn(
-            ("Incomplete relation: PostgreSQLRelation", "DEBUG"),
+            ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
             self.hookenv.messages)
 
     def test_db_relation_ready(self):
