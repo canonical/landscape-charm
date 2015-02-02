@@ -4,7 +4,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
-from lib.services import ServicesHook, SERVICE_CONF
+from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 
 
 class ServicesHookTest(HookenvTest):
@@ -76,10 +76,12 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
         }
-        [render] = self.renders
         self.assertEqual(
             ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
-            render)
+            self.renders[0])
+        self.assertEqual(
+            ("landscape-server", DEFAULT_FILE, context, "root", "root", 416),
+            self.renders[1])
         [call] = self.subprocess.calls
         self.assertEqual(
             ["/opt/canonical/landscape/schema", "--bootstrap"], call[0])
@@ -119,4 +121,4 @@ class ServicesHookTest(HookenvTest):
             },
         }
         self.hook()
-        self.assertEqual(1, len(self.renders))
+        self.assertEqual(2, len(self.renders))

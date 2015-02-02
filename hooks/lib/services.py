@@ -14,6 +14,7 @@ from lib.relations.landscape import (
 from lib.callbacks.scripts import SchemaBootstrap
 
 SERVICE_CONF = "/etc/landscape/service.conf"
+DEFAULT_FILE = "/etc/default/landscape-server"
 
 
 class ServicesHook(Hook):
@@ -36,7 +37,7 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(host=self._host)
 
         manager = ServiceManager([{
-            "service": "landscape",
+            "service": "landscape-appserver",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
@@ -51,6 +52,9 @@ class ServicesHook(Hook):
                 render_template(
                     owner="landscape", group="root", perms=0o640,
                     source="service.conf", target=SERVICE_CONF),
+                render_template(
+                    owner="root", group="root", perms=0o640,
+                    source="landscape-server", target=DEFAULT_FILE),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
         }])
