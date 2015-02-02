@@ -1,13 +1,12 @@
 import os
 
 from charmhelpers.core.services.helpers import RelationContext, StoredContext
-from charmhelpers.core import host
-from charmhelpers.contrib.hahelpers import cluster
+from charmhelpers.core import host, hookenv
 
 from lib.hook import HookError
 
 
-class LandscapeRelation(RelationContext):
+class LandscapeProvider(RelationContext):
     """Relation context for the 'landscape-ha' interface.
 
     This relation manages information that should flow between Landscape peer
@@ -24,20 +23,36 @@ class LandscapeRelation(RelationContext):
         "database-password",  # Password for the 'landscape' database user.
     ]
 
-    _leader_context = None
-
-    def __init__(self, cluster=cluster, host=host):
-        if cluster.is_elected_leader(None):
-            self._leader_context = LandscapeLeaderContext(host=host)
-        super(LandscapeRelation, self).__init__()
+    def __init__(self, leader_context):
+        self._leader_context = leader_context
 
     def provide_data(self):
-        if not self._leader_context:
-            return {}
         return self._leader_context
 
+
+class LandscapeRequirer(RelationContext):
+    """Relation context for the 'landscape-ha' interface.
+
+    This relation manages information that should flow between Landscape peer
+    units.
+
+    Currently it's used exclusively to propagate leader data, so its only key
+    is 'leader', which will be set either to local L{LandscapeLeaderContext}
+    data (if we are the leader), or to the data provided by the leader peer
+    unit using the relation.
+    """
+    name = "cluster"
+    interface = "landscape-ha"
+    required_keys = [
+        "database-password",  # Password for the 'landscape' database user.
+    ]
+
+    def __init__(self, leader_context):
+        self._leader_context = leader_context
+        super(LandscapeRequirer, self).__init__()
+
     def get_data(self):
-        super(LandscapeRelation, self).get_data()
+        super(LandscapeRequirer, self).get_data()
         data = self.pop(self.name, [])
         leader_count = len(data)
         if self._leader_context:
@@ -52,7 +67,14 @@ class LandscapeRelation(RelationContext):
 
     def is_ready(self):
         # The relation is considered ready only if we got leader data
-        return self._is_ready(self.get("leader", {}))
+        ready = self._is_ready(self.get("leader", {}))
+        if not ready:
+            # XXX copied from charmhelpers, it would be nice to extract it into
+            #     some standalone private method, for re-use in subclasses.
+            hookenv.log(
+                "Incomplete relation: {}".format(self.__class__.__name__),
+                hookenv.DEBUG)
+        return ready
 
 
 class LandscapeLeaderContext(StoredContext):

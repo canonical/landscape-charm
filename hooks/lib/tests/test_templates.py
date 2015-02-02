@@ -4,7 +4,7 @@ from cStringIO import StringIO
 
 from lib.tests.helpers import TemplateTest
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_CLUSTER_UNIT_DATA)
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA)
 
 
 class ServiceConfTest(TemplateTest):
@@ -17,7 +17,7 @@ class ServiceConfTest(TemplateTest):
         """
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
-            "leader": SAMPLE_CLUSTER_UNIT_DATA,
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
