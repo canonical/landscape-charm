@@ -26,24 +26,19 @@ class ServicesHook(Hook):
 
     def _run(self):
         leader_context = None
-
-        provided_data = []
         if self._cluster.is_elected_leader(None):
-            # If we are the leader unit, provide our leader context to the
-            # other peer Landscape units using the landscape-ha relation.
             leader_context = LandscapeLeaderContext(host=self._host)
-            provided_data.append(LandscapeProvider(leader_context))
-
-        required_data = [
-            LandscapeRequirer(leader_context),
-            PostgreSQLRequirer(),
-        ]
 
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
-            "provided_data": provided_data,
-            "required_data": required_data,
+            "provided_data": [
+                LandscapeProvider(leader_context),
+            ],
+            "required_data": [
+                LandscapeRequirer(leader_context),
+                PostgreSQLRequirer(),
+            ],
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,

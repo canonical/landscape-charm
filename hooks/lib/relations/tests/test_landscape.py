@@ -90,11 +90,19 @@ class LandscapeProviderTest(HookenvTest):
 
     def test_provide_data(self):
         """
-        The L{LandscapeProvider} class defines all keys that are required to
-        be set before we actually modify the relation.
+        The L{LandscapeProvider} data provider returns the leader context data
+        if available (i.e. if we are the leader).
         """
         relation = LandscapeProvider(SAMPLE_LEADER_CONTEXT_DATA)
         self.assertEqual(SAMPLE_LEADER_CONTEXT_DATA, relation.provide_data())
+
+    def test_provide_data_not_leader(self):
+        """
+        The L{LandscapeProvider} data provider returns an empty C{dict} if no
+        leader context is available (i.e. we're not the leader).
+        """
+        relation = LandscapeProvider(None)
+        self.assertEqual({}, relation.provide_data())
 
 
 class LandscapeLeaderContextTest(HookenvTest):

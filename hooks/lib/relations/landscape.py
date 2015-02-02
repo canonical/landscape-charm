@@ -7,15 +7,12 @@ from lib.hook import HookError
 
 
 class LandscapeProvider(RelationContext):
-    """Relation context for the 'landscape-ha' interface.
+    """Relation data provider for the 'landscape-ha' interface.
 
     This relation manages information that should flow between Landscape peer
     units.
 
-    Currently it's used exclusively to propagate leader data, so its only key
-    is 'leader', which will be set either to local L{LandscapeLeaderContext}
-    data (if we are the leader), or to the data provided by the leader peer
-    unit using the relation.
+    Currently it's used exclusively to propagate leader data.
     """
     name = "cluster"
     interface = "landscape-ha"
@@ -27,17 +24,14 @@ class LandscapeProvider(RelationContext):
         self._leader_context = leader_context
 
     def provide_data(self):
-        return self._leader_context
+        return self._leader_context or {}
 
 
 class LandscapeRequirer(RelationContext):
-    """Relation context for the 'landscape-ha' interface.
+    """Relation data requirer for the 'landscape-ha' interface.
 
-    This relation manages information that should flow between Landscape peer
-    units.
-
-    Currently it's used exclusively to propagate leader data, so its only key
-    is 'leader', which will be set either to local L{LandscapeLeaderContext}
+    This relation acquires information from other Landscape units. Its only
+    key is 'leader', which will be set either to the local leader context
     data (if we are the leader), or to the data provided by the leader peer
     unit using the relation.
     """
