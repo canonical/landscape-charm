@@ -15,7 +15,6 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
-
 provides:
   data:
     interface: block-storage
@@ -25,3 +24,6 @@ provides:
     interface: http
   vhost-config:
     interface: apache-vhost-config
+peers:
+  cluster:
+    interface: landscape-ha

@@ -1,4 +1,4 @@
-SAMPLE_POSTGRESQL_UNIT_DATA = {
+SAMPLE_DB_UNIT_DATA = {
     "database": "all",
     "allowed-units": "landscape-server/0",
     "state": "standalone",
@@ -7,4 +7,8 @@ SAMPLE_POSTGRESQL_UNIT_DATA = {
     "user": "db_admin_1",
     "password": "sekret",
     "port": "5432"
+}
+
+SAMPLE_CLUSTER_UNIT_DATA = {
+    "database-password": "landscape-sekret",
 }

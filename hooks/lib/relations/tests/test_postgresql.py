@@ -1,5 +1,5 @@
 from lib.tests.helpers import HookenvTest
-from lib.tests.sample import SAMPLE_POSTGRESQL_UNIT_DATA
+from lib.tests.sample import SAMPLE_DB_UNIT_DATA
 from lib.relations.postgresql import PostgreSQLRelation
 
 
@@ -23,7 +23,7 @@ class PostgreSQLRelationTest(HookenvTest):
         The L{PostgreSQLRelation} is not ready if the local unit is in
         the 'allowed-units' list.
         """
-        unit_data = SAMPLE_POSTGRESQL_UNIT_DATA.copy()
+        unit_data = SAMPLE_DB_UNIT_DATA.copy()
         unit_data["allowed-units"] = ""
         self.hookenv.relations = {
             "db": {
@@ -44,13 +44,13 @@ class PostgreSQLRelationTest(HookenvTest):
         The L{PostgreSQLRelation} is not ready if the remote postgres unit
         is not a 'master'.
         """
-        unit_data1 = SAMPLE_POSTGRESQL_UNIT_DATA.copy()
+        unit_data1 = SAMPLE_DB_UNIT_DATA.copy()
         unit_data1["host"] = "10.0.3.170"
         unit_data1["state"] = "hot standby"
-        unit_data2 = SAMPLE_POSTGRESQL_UNIT_DATA.copy()
+        unit_data2 = SAMPLE_DB_UNIT_DATA.copy()
         unit_data2["host"] = "10.0.3.169"
         unit_data2["state"] = "master"
-        unit_data3 = SAMPLE_POSTGRESQL_UNIT_DATA.copy()
+        unit_data3 = SAMPLE_DB_UNIT_DATA.copy()
         unit_data3["host"] = "10.0.3.171"
         unit_data3["state"] = "standalone"
         self.hookenv.relations = {
