@@ -1,7 +1,9 @@
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.sample import SAMPLE_DB_UNIT_DATA
+from lib.tests.stubs import ClusterStub, HostStub
+from lib.tests.sample import (
+    SAMPLE_DB_UNIT_DATA, SAMPLE_CLUSTER_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF
 
 
@@ -11,7 +13,10 @@ class ServicesHookTest(HookenvTest):
 
     def setUp(self):
         super(ServicesHookTest, self).setUp()
-        self.hook = ServicesHook(hookenv=self.hookenv)
+        self.cluster = ClusterStub()
+        self.host = HostStub()
+        self.hook = ServicesHook(
+            hookenv=self.hookenv, cluster=self.cluster, host=self.host)
         self.renders = []
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
@@ -38,12 +43,13 @@ class ServicesHookTest(HookenvTest):
             "db": {
                 "db:1": {
                     "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                }
+                },
             }
         }
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
+            "leader": SAMPLE_CLUSTER_UNIT_DATA,
         }
         [render] = self.renders
         self.assertEqual(
