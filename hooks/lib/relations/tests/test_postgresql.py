@@ -1,26 +1,26 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.sample import SAMPLE_DB_UNIT_DATA
-from lib.relations.postgresql import PostgreSQLRelation
+from lib.relations.postgresql import PostgreSQLRequirer
 
 
-class PostgreSQLRelationTest(HookenvTest):
+class PostgreSQLRequirerTest(HookenvTest):
 
     with_hookenv_monkey_patch = True
 
     def test_required_keys(self):
         """
-        The L{PostgreSQLRelation} class defines all keys that are required to
+        The L{PostgreSQLRequirer} class defines all keys that are required to
         be set on the db relation in order for the relation to be considered
         ready.
         """
         self.assertEqual(
             ["host", "port", "user", "password", "database",
              "allowed-units", "state"],
-            PostgreSQLRelation.required_keys)
+            PostgreSQLRequirer.required_keys)
 
     def test_local_unit_in_allowed_units(self):
         """
-        The L{PostgreSQLRelation} is not ready if the local unit is in
+        The L{PostgreSQLRequirer} is not ready if the local unit is in
         the 'allowed-units' list.
         """
         unit_data = SAMPLE_DB_UNIT_DATA.copy()
@@ -33,7 +33,7 @@ class PostgreSQLRelationTest(HookenvTest):
             }
         }
 
-        relation = PostgreSQLRelation(hookenv=self.hookenv)
+        relation = PostgreSQLRequirer(hookenv=self.hookenv)
         self.assertFalse(relation.is_ready())
         self.assertIn(
             ("landscape-server/0 not in allowed_units yet ([])", None),
@@ -41,7 +41,7 @@ class PostgreSQLRelationTest(HookenvTest):
 
     def test_discard_non_master_states(self):
         """
-        The L{PostgreSQLRelation} is not ready if the remote postgres unit
+        The L{PostgreSQLRequirer} is not ready if the remote postgres unit
         is not a 'master'.
         """
         unit_data1 = SAMPLE_DB_UNIT_DATA.copy()
@@ -62,7 +62,7 @@ class PostgreSQLRelationTest(HookenvTest):
                 }
             }
         }
-        relation = PostgreSQLRelation(hookenv=self.hookenv)
+        relation = PostgreSQLRequirer(hookenv=self.hookenv)
         self.assertTrue(relation.is_ready())
         self.assertIn(
             ("Discarding postgresql unit with invalid state 'hot standby' "

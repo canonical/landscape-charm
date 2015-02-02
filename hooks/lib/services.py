@@ -5,7 +5,7 @@ from charmhelpers.core.services.helpers import render_template
 from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
-from lib.relations.postgresql import PostgreSQLRelation
+from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.landscape import LandscapeRelation
 
 SERVICE_CONF = "/etc/landscape/service.conf"
@@ -25,13 +25,12 @@ class ServicesHook(Hook):
 
     def _run(self):
         landscape = LandscapeRelation(cluster=self._cluster, host=self._host)
-        postgresql = PostgreSQLRelation()
 
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
             "provided_data": [landscape],
-            "required_data": [landscape, postgresql],
+            "required_data": [landscape, PostgreSQLRequirer()],
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,
