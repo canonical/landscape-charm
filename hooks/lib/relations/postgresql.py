@@ -4,7 +4,7 @@ from charmhelpers.core.services.helpers import RelationContext
 from lib.relations.errors import UnitDataNotReadyError
 
 
-class PostgreSQLRelation(RelationContext):
+class PostgreSQLRequirer(RelationContext):
     """
     Relation context for the `pgsql` interface.
     """
@@ -21,7 +21,7 @@ class PostgreSQLRelation(RelationContext):
 
     def __init__(self, hookenv=hookenv):
         self._hookenv = hookenv
-        super(PostgreSQLRelation, self).__init__()
+        super(PostgreSQLRequirer, self).__init__()
 
     def _is_ready(self, unit_data):
         """Check that everything is green to start talking to PostgreSQL.
@@ -32,7 +32,7 @@ class PostgreSQLRelation(RelationContext):
         """
         # First call the superclass method to check that the required keys are
         # in the relation at all.
-        if not super(PostgreSQLRelation, self)._is_ready(unit_data):
+        if not super(PostgreSQLRequirer, self)._is_ready(unit_data):
             return False
 
         try:

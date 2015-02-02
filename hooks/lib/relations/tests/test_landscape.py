@@ -2,47 +2,42 @@ from yaml import dump
 from fixtures import TempDir
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.stubs import ClusterStub, HostStub
-from lib.tests.sample import SAMPLE_CLUSTER_UNIT_DATA
-from lib.relations.landscape import LandscapeRelation, LandscapeLeaderContext
+from lib.tests.stubs import HostStub
+from lib.tests.sample import SAMPLE_LEADER_CONTEXT_DATA
+from lib.relations.landscape import (
+    LandscapeRequirer, LandscapeProvider, LandscapeLeaderContext)
 from lib.hook import HookError
 
 
-class LandscapeRelationTest(HookenvTest):
+class LandscapeRequirerTest(HookenvTest):
 
     with_hookenv_monkey_patch = True
 
-    def setUp(self):
-        super(LandscapeRelationTest, self).setUp()
-        self.cluster = ClusterStub()
-        self.host = HostStub()
-
     def test_required_keys(self):
         """
-        The L{LandscapeRelation} class defines all keys that are required to
+        The L{LandscapeRequirer} class defines all keys that are required to
         be set on the cluster relation in order for the relation to be
         considered ready.
         """
         self.assertEqual(
-            ["database-password"], LandscapeRelation.required_keys)
+            ["database-password"], LandscapeRequirer.required_keys)
 
     def test_is_leader(self):
         """
-        When the unit is the leader, the L{LandscapeRelation} automatically
+        When the unit is the leader, the L{LandscapeRequirer} automatically
         provides our local information, even if there's no other peer unit
         related with us.
         """
-        relation = LandscapeRelation(cluster=self.cluster, host=self.host)
+        relation = LandscapeRequirer(SAMPLE_LEADER_CONTEXT_DATA)
         self.assertTrue(relation.is_ready())
-        self.assertEqual(SAMPLE_CLUSTER_UNIT_DATA, relation["leader"])
-        self.assertEqual(SAMPLE_CLUSTER_UNIT_DATA, relation.provide_data())
+        self.assertEqual(SAMPLE_LEADER_CONTEXT_DATA, relation["leader"])
 
     def test_is_not_leader(self):
         """
         When the unit is not the leader, it relies on the information provided
         by the remote unit acting as leader.
         """
-        leader_data = SAMPLE_CLUSTER_UNIT_DATA.copy()
+        leader_data = SAMPLE_LEADER_CONTEXT_DATA.copy()
         leader_data["password"] = "remote-sekret"
         self.hookenv.relations = {
             "cluster": {
@@ -51,11 +46,9 @@ class LandscapeRelationTest(HookenvTest):
                 }
             }
         }
-        self.cluster.leader = False
-        relation = LandscapeRelation(cluster=self.cluster, host=self.host)
+        relation = LandscapeRequirer(None)
         self.assertTrue(relation.is_ready())
         self.assertEqual(leader_data, relation["leader"])
-        self.assertEqual({}, relation.provide_data())
 
     def test_split_brain(self):
         """
@@ -63,7 +56,7 @@ class LandscapeRelationTest(HookenvTest):
         thinks to be the leader as well and has set the relation data, we raise
         an error.
         """
-        unit_data = SAMPLE_CLUSTER_UNIT_DATA.copy()
+        unit_data = SAMPLE_LEADER_CONTEXT_DATA.copy()
         self.hookenv.relations = {
             "cluster": {
                 "cluster:1": {
@@ -72,16 +65,36 @@ class LandscapeRelationTest(HookenvTest):
             }
         }
         self.assertRaises(
-            HookError, LandscapeRelation, cluster=self.cluster, host=self.host)
+            HookError, LandscapeRequirer, SAMPLE_LEADER_CONTEXT_DATA)
 
     def test_not_ready(self):
         """
         This dependency manager is not considered ready if the leader data is
         not available.
         """
-        self.cluster.leader = False
-        relation = LandscapeRelation(cluster=self.cluster, host=self.host)
+        relation = LandscapeRequirer(None)
         self.assertFalse(relation.is_ready())
+
+
+class LandscapeProviderTest(HookenvTest):
+
+    with_hookenv_monkey_patch = True
+
+    def test_required_keys(self):
+        """
+        The L{LandscapeProvider} class defines all keys that are required to
+        be set before we actually modify the relation.
+        """
+        self.assertEqual(
+            ["database-password"], LandscapeRequirer.required_keys)
+
+    def test_provide_data(self):
+        """
+        The L{LandscapeProvider} class defines all keys that are required to
+        be set before we actually modify the relation.
+        """
+        relation = LandscapeProvider(SAMPLE_LEADER_CONTEXT_DATA)
+        self.assertEqual(SAMPLE_LEADER_CONTEXT_DATA, relation.provide_data())
 
 
 class LandscapeLeaderContextTest(HookenvTest):
