@@ -8,6 +8,7 @@ from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
+from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.callbacks.scripts import SchemaBootstrap
@@ -32,7 +33,7 @@ class ServicesHook(Hook):
     def _run(self):
         leader_context = None
 
-        provided_data = []
+        provided_data = [RabbitMQProvider()]
         if self._cluster.is_elected_leader(None):
             # If we are the leader unit, provide our leader context to the
             # other peer Landscape units using the landscape-ha relation.
@@ -42,6 +43,7 @@ class ServicesHook(Hook):
         required_data = [
             LandscapeRequirer(leader_context),
             PostgreSQLRequirer(),
+            RabbitMQRequirer(),
         ]
 
         manager = ServiceManager([{

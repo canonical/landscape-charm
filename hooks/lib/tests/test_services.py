@@ -3,7 +3,7 @@ from charmhelpers.core import templating
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA)
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF
 
 
@@ -36,6 +36,23 @@ class ServicesHookTest(HookenvTest):
             ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
             self.hookenv.messages)
 
+    def test_amqp_relation_not_ready(self):
+        """
+        If the amqp relation doesn't provide the required keys, the services
+        hook doesn't try to change any configuration.
+        """
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+        }
+        self.hook()
+        self.assertIn(
+            ("Incomplete relation: RabbitMQRequirer", "DEBUG"),
+            self.hookenv.messages)
+
     def test_ready(self):
         """
         If all dependency managers are ready, the services hook bootstraps the
@@ -46,12 +63,18 @@ class ServicesHookTest(HookenvTest):
                 "db:1": {
                     "postgresql/0": SAMPLE_DB_UNIT_DATA,
                 },
-            }
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
         }
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
         }
         [render] = self.renders
         self.assertEqual(
@@ -87,6 +110,11 @@ class ServicesHookTest(HookenvTest):
             "db": {
                 "db:1": {
                     "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
                 },
             },
         }
