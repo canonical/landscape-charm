@@ -9,10 +9,11 @@ class HookenvStub(object):
     unit = "landscape-server/0"
     relid = None
 
-    def __init__(self):
+    def __init__(self, charm_dir):
         self.messages = []
         self.relations = {}
         self._config = Config()
+        self._charm_dir = charm_dir
 
     def config(self):
         return self._config
@@ -54,6 +55,9 @@ class HookenvStub(object):
         if attribute:
             return data.get(attribute)
         return data
+
+    def charm_dir(self):
+        return self._charm_dir
 
 
 class FetchStub(object):

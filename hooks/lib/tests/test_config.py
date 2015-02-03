@@ -1,23 +1,25 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import FetchStub, SubprocessStub
-from lib.install import InstallHook
+from lib.config import ConfigHook
 
 
-class InstallHookTest(HookenvTest):
+class ConfigHookTest(HookenvTest):
 
     def setUp(self):
-        super(InstallHookTest, self).setUp()
+        super(ConfigHookTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
-        self.hook = InstallHook(
+        self.hook = ConfigHook(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
 
     def test_run(self):
         """
-        The L{InstallHook} configures APT sources and install the needed
-        packages.
+        The L{ConfigHook} re-configures APT sources if the have changed.
         """
-        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        config = self.hookenv.config()
+        config["source"] = "ppa:landscape/14.10"
+        config.save()
+        config.load_previous()
+        config["source"] = "ppa:landscape/15.01"
         self.assertEqual(0, self.hook())
         self.assertTrue(len(self.fetch.sources) > 0)
-        self.assertTrue(len(self.fetch.installed) > 0)

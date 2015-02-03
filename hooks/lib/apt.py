@@ -1,0 +1,96 @@
+import os
+import glob
+import shutil
+import subprocess
+
+from charmhelpers import fetch
+from charmhelpers.core import hookenv
+
+from lib.hook import HookError
+
+PACKAGES = ("landscape-server",)
+PACKAGES_DEV = ("dpkg-dev", "pbuilder")
+TARBALL = "landscape-server_*.tar.gz"
+
+# Shell commands to build the debs and publish them in a local repository
+BUILD_LOCAL_ARCHIVE = """
+dch -v 9999:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
+    development --distribution $(lsb_release -cs) &&
+/usr/lib/pbuilder/pbuilder-satisfydepends &&
+dpkg-buildpackage -us -uc &&
+mv ../*.deb . &&
+dpkg-scanpackages -m . /dev/null > Packages &&
+cat Packages | bzip2 -9 > Packages.bz2 &&
+cat Packages | gzip -9 > Packages.gz &&
+dpkg-scansources . > Sources &&
+cat Sources | bzip2 -9 > Sources.bz2 &&
+cat Sources | gzip -9 > Sources.gz &&
+apt-ftparchive release . > Release
+"""
+
+
+class Apt(object):
+    """Perform APT-related tasks as setting sources and installing packages.
+
+    This is a thin facade around C{charmhelpers.fetch}, offering some
+    additional features, like building Landscape packages from a local
+    tarball.
+    """
+
+    def __init__(self, hookenv=hookenv, fetch=fetch, subprocess=subprocess):
+        self._hookenv = hookenv
+        self._fetch = fetch
+        self._subprocess = subprocess
+
+    def set_sources(self):
+        """Configure the extra APT sources to use."""
+        config = self._hookenv.config()
+        source = config.get("source")
+        if not source:
+            raise HookError("No source config parameter defined")
+
+        # Check if we're setting the source for the first time, or replacing
+        # an existing value. In the latter case we'll no-op if the value is the
+        # same or take care to remove it from sources.list if it's not.
+        previous_source = config.previous("source")
+        if previous_source is not None:
+            if previous_source == source:
+                return
+            self._subprocess.check_call(
+                ["add-apt-repository", "--remove", "--yes", previous_source])
+
+        self._fetch.add_source(source, config.get("key"))
+
+        tarball = self._get_local_tarball()
+        if tarball is not None:
+            self._build_local_archive(tarball)
+
+        self._fetch.apt_update(fatal=True)
+
+    def install_packages(self):
+        """Install the needed packages."""
+        packages = self._fetch.filter_installed_packages(PACKAGES)
+        self._fetch.apt_install(packages, fatal=True)
+
+    def _get_local_tarball(self):
+        """Return the local Landscape tarball if any, C{None} otherwise."""
+        matches = glob.glob(os.path.join(self._hookenv.charm_dir(), TARBALL))
+        return matches[0] if matches else None
+
+    def _build_local_archive(self, tarball):
+        """Build the debs from the given tarbal and publish them locally."""
+        packages = self._fetch.filter_installed_packages(PACKAGES_DEV)
+        self._fetch.apt_install(packages, fatal=True)
+
+        current_dir = os.getcwd()
+        build_dir = os.path.join(self._hookenv.charm_dir(), "build")
+        shutil.rmtree(build_dir, ignore_errors=True)
+        os.mkdir(build_dir)
+        os.chdir(build_dir)
+
+        self._subprocess.check_call(["tar", "--strip=1", "-xf", tarball])
+        self._subprocess.check_call(BUILD_LOCAL_ARCHIVE, shell=True)
+
+        self._fetch.add_source("deb file://%s/ ./" % build_dir)
+
+        os.chdir(current_dir)

@@ -26,7 +26,7 @@ class HookenvTest(TestWithFixtures):
         #     upstream.
         charm_dir = self.useFixture(TempDir())
         self.useFixture(EnvironmentVariable("CHARM_DIR", charm_dir.path))
-        self.hookenv = HookenvStub()
+        self.hookenv = HookenvStub(charm_dir.path)
 
         if self.with_hookenv_monkey_patch:
             self._monkey_patch_hookenv()
