@@ -44,10 +44,26 @@ class Apt(object):
 
     def set_sources(self):
         """Configure the extra APT sources to use."""
+        needs_update = False
+        if self._set_remote_source():
+            needs_update = True
+        if self._set_local_source():
+            needs_update = True
+        if needs_update:
+            self._fetch.apt_update(fatal=True)
+
+    def install_packages(self):
+        """Install the needed packages."""
+        packages = self._fetch.filter_installed_packages(PACKAGES)
+        self._fetch.apt_install(packages, fatal=True)
+
+    def _set_remote_source(self):
+        """Set the remote APT repository to use, if new or changed."""
         config = self._hookenv.config()
         source = config.get("source")
         if not source:
             raise HookError("No source config parameter defined")
+        previous_source = config.previous("source")
 
         # Check if we're setting the source for the first time, or replacing
         # an existing value. In the latter case we'll no-op if the value is the
@@ -55,30 +71,20 @@ class Apt(object):
         previous_source = config.previous("source")
         if previous_source is not None:
             if previous_source == source:
-                return
+                return False
             self._subprocess.check_call(
                 ["add-apt-repository", "--remove", "--yes", previous_source])
 
         self._fetch.add_source(source, config.get("key"))
 
+        return True
+
+    def _set_local_source(self):
+        """Set the local APT repository for the Landscape tarball, if any."""
         tarball = self._get_local_tarball()
-        if tarball is not None:
-            self._build_local_archive(tarball)
+        if tarball is None:
+            return False
 
-        self._fetch.apt_update(fatal=True)
-
-    def install_packages(self):
-        """Install the needed packages."""
-        packages = self._fetch.filter_installed_packages(PACKAGES)
-        self._fetch.apt_install(packages, fatal=True)
-
-    def _get_local_tarball(self):
-        """Return the local Landscape tarball if any, C{None} otherwise."""
-        matches = glob.glob(os.path.join(self._hookenv.charm_dir(), TARBALL))
-        return matches[0] if matches else None
-
-    def _build_local_archive(self, tarball):
-        """Build the debs from the given tarbal and publish them locally."""
         packages = self._fetch.filter_installed_packages(PACKAGES_DEV)
         self._fetch.apt_install(packages, fatal=True)
 
@@ -92,5 +98,11 @@ class Apt(object):
         self._subprocess.check_call(BUILD_LOCAL_ARCHIVE, shell=True)
 
         self._fetch.add_source("deb file://%s/ ./" % build_dir)
-
         os.chdir(current_dir)
+
+        return True
+
+    def _get_local_tarball(self):
+        """Return the local Landscape tarball if any, C{None} otherwise."""
+        matches = glob.glob(os.path.join(self._hookenv.charm_dir(), TARBALL))
+        return matches[0] if matches else None
