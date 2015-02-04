@@ -1931,7 +1931,8 @@ class TestHooksServiceMock(TestHooks):
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
             vhostssl_template = vhostssl_template.replace(
-                hooks.COMBO_LOADER_VHOST_ENTRY, "")
+                hooks.COMBO_LOADER_VHOST_ENTRY,
+                hooks.NO_COMBO_LOADER_VHOST_ENTRY)
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
             vhost_template = f.read()
         baseline = yaml.dump(

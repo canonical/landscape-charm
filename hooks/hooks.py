@@ -122,13 +122,18 @@ def _get_haproxy_service_name():
 COMBO_LOADER_VHOST_ENTRY = (
     "    RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]\n")
 
+NO_COMBO_LOADER_VHOST_ENTRY = (
+    "    RewriteRule "
+    "^/combo(.*) http://{{ haproxy_appserver }}/combo$1 [P,L]\n")
+
 
 def _get_vhost_template(template_filename, haproxy_service_name):
     """Expand the template with the provided haproxy service name."""
     with open("%s/config/%s" % (ROOT, template_filename), "r") as handle:
         contents = handle.read()
         if not HAS_COMBO_LOADER:
-            contents = contents.replace(COMBO_LOADER_VHOST_ENTRY, "")
+            contents = contents.replace(
+                COMBO_LOADER_VHOST_ENTRY, NO_COMBO_LOADER_VHOST_ENTRY)
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
                           haproxy_service_name, contents)
     return contents
