@@ -119,11 +119,16 @@ def _get_haproxy_service_name():
     haproxy_service = re.sub("\W", "", haproxy_service)
     return haproxy_service
 
+COMBO_LOADER_VHOST_ENTRY = (
+    "    RewriteRule ^/combo http://{{ haproxy_comboloader }}/ [P,L]\n")
+
 
 def _get_vhost_template(template_filename, haproxy_service_name):
     """Expand the template with the provided haproxy service name."""
     with open("%s/config/%s" % (ROOT, template_filename), "r") as handle:
         contents = handle.read()
+        if not HAS_COMBO_LOADER:
+            contents = contents.replace(COMBO_LOADER_VHOST_ENTRY, "")
         contents = re.sub(r"{{ haproxy_([^}]+) }}", r"{{ %s_\1 }}" %
                           haproxy_service_name, contents)
     return contents
@@ -654,6 +659,8 @@ def _get_requested_service_count():
         count = service_count
         if re.match(r"^.*:\d+$", service_count):
             (service, count) = service_count.split(":")
+            if service == "combo-loader" and not HAS_COMBO_LOADER:
+                continue
             result[service] = count
     return result
 
@@ -668,6 +675,8 @@ def _get_services_dict():
     result = {}
     requested = _get_requested_service_count()
     for service in _get_requested_services():
+        if service == "combo-loader" and not HAS_COMBO_LOADER:
+            continue
         args = [service]
         args.extend(SERVICE_COUNT[service])
         args.append(requested[service])
@@ -752,6 +761,8 @@ def _get_requested_services():
     config = juju.config_get()
     if "services" in config:
         for service in config["services"].split():
+            if service == "combo-loader" and not HAS_COMBO_LOADER:
+                continue
             if service not in SERVICE_DEFAULT:
                 juju.juju_log("Invalid Service: %s" % service)
                 raise Exception("Invalid Service: %s" % service)
@@ -857,10 +868,6 @@ SERVICE_PROXY = {
     "pingserver": {
         "port": "8070", "httpchk": "HEAD /ping HTTP/1.0"
         },
-    "combo-loader": {
-        "port": "9070",
-        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
-        },
     "async-frontend": {
         "port": "9090",
         "service_options": ["timeout client 300000",
@@ -868,6 +875,14 @@ SERVICE_PROXY = {
     "apiserver": {"port": "9080"},
     "package-upload": {"port": "9100"},
     "package-search": {"port": "9090"}}
+
+HAS_COMBO_LOADER = os.path.exists("/etc/init.d/landscape-combo-loader")
+if HAS_COMBO_LOADER:
+    SERVICE_PROXY["combo-loader"] = {
+        "port": "9070",
+        "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
+    }
+
 
 # Format is:
 #   [min, auto_max, hard_max]
@@ -879,7 +894,6 @@ SERVICE_COUNT = {
     "msgserver": [2, 8, 9],
     "pingserver": [1, 4, 9],
     "apiserver": [1, 2, 9],
-    "combo-loader": [1, 1, 1],
     "async-frontend": [1, 1, 1],
     "jobhandler": [1, 1, 1],
     "package-upload": [1, 1, 1],
@@ -887,13 +901,13 @@ SERVICE_COUNT = {
     "juju-sync": [1, 1, 1],
     "cron": [1, 1, 1],
     "static": [1, 1, 1]}
-
+if HAS_COMBO_LOADER:
+    SERVICE_COUNT["combo-loader"] = [1, 1, 1]
 
 SERVICE_DEFAULT = {
     "appserver": "RUN_APPSERVER",
     "msgserver": "RUN_MSGSERVER",
     "pingserver": "RUN_PINGSERVER",
-    "combo-loader": "RUN_COMBO_LOADER",
     "async-frontend": "RUN_ASYNC_FRONTEND",
     "apiserver": "RUN_APISERVER",
     "package-upload": "RUN_PACKAGEUPLOADSERVER",
@@ -902,6 +916,8 @@ SERVICE_DEFAULT = {
     "juju-sync": "RUN_JUJU_SYNC",
     "cron": "RUN_CRON",
     "static": None}
+if HAS_COMBO_LOADER:
+    SERVICE_DEFAULT["combo-loader"] = "RUN_COMBO_LOADER"
 
 LANDSCAPE_DEFAULT_FILE = "/etc/default/landscape-server"
 LANDSCAPE_APACHE_SITE = "/etc/apache2/sites-available/landscape.conf"
