@@ -79,8 +79,8 @@ class FetchStub(object):
         self.filtered.append(packages)
         return packages
 
-    def apt_install(self, packages, fatal=False):
-        self.installed.append((packages, fatal))
+    def apt_install(self, packages, options=None, fatal=False):
+        self.installed.append((packages, options, fatal))
 
 
 class ClusterStub(object):

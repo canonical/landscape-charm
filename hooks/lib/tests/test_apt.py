@@ -1,6 +1,6 @@
 import os
 
-from lib.apt import Apt, PACKAGES, BUILD_LOCAL_ARCHIVE
+from lib.apt import Apt, PACKAGES, BUILD_LOCAL_ARCHIVE, DEFAULT_INSTALL_OPTIONS
 from lib.hook import HookError
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
@@ -94,9 +94,24 @@ class AptTest(HookenvTest):
 
     def test_install(self):
         """
-        The install hook installs the required packages.
+        The C{install_packages} method installs the required packages.
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         self.assertEqual([PACKAGES], self.fetch.filtered)
-        self.assertEqual([(PACKAGES, True)], self.fetch.installed)
+        options = list(DEFAULT_INSTALL_OPTIONS)
+        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+
+    def test_install_with_local_tarball(self):
+        """
+        The C{install_packages} method allows unauthenticated packages if we
+        have a locally built repository.
+        """
+        tarball = os.path.join(
+            self.hookenv.charm_dir(), "landscape-server_1.2.3.tar.gz")
+        with open(tarball, "w") as fd:
+            fd.write("")
+        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        self.apt.install_packages()
+        options = list(DEFAULT_INSTALL_OPTIONS) + ["--allow-unauthenticated"]
+        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)

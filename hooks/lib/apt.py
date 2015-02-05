@@ -12,6 +12,10 @@ PACKAGES = ("landscape-server",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
+# XXX Default options taken from charmhelpers, there's no way to just
+#     extend them.
+DEFAULT_INSTALL_OPTIONS = ("--option=Dpkg::Options::=--force-confold",)
+
 # Shell commands to build the debs and publish them in a local repository
 BUILD_LOCAL_ARCHIVE = """
 dch -v 9999:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
@@ -54,8 +58,13 @@ class Apt(object):
 
     def install_packages(self):
         """Install the needed packages."""
+        options = list(DEFAULT_INSTALL_OPTIONS)
+        if self._get_local_tarball() is not None:
+            # We don't sign the locally built repository, so we need to tell
+            # apt-get that we don't care.
+            options.append("--allow-unauthenticated")
         packages = self._fetch.filter_installed_packages(PACKAGES)
-        self._fetch.apt_install(packages, fatal=True)
+        self._fetch.apt_install(packages, options=options, fatal=True)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
