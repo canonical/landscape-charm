@@ -162,6 +162,25 @@ RUN_PINGSERVER="yes"
 UPGRADE_SCHEMA="no"
             """)
 
+    def with_combo_loader(self):
+        """Tweak globals so they match a deployment with combo-loader."""
+        self.addCleanup(
+            setattr, hooks, "HAS_COMBO_LOADER", hooks.HAS_COMBO_LOADER)
+        self.addCleanup(
+            setattr, hooks, "SERVICE_PROXY", hooks.SERVICE_PROXY)
+        self.addCleanup(
+            setattr, hooks, "SERVICE_COUNT", hooks.SERVICE_COUNT)
+        self.addCleanup(
+            setattr, hooks, "SERVICE_DEFAULT", hooks.SERVICE_DEFAULT)
+
+        hooks.HAS_COMBO_LOADER = True
+        hooks.SERVICE_PROXY["combo-loader"] = {
+            "port": "9070",
+            "httpchk": "HEAD /?yui/scrollview/scrollview-min.js HTTP/1.0"
+        }
+        hooks.SERVICE_COUNT["combo-loader"] = [1, 1, 1]
+        hooks.SERVICE_DEFAULT["combo-loader"] = "RUN_COMBO_LOADER"
+
 
 class TestHooksService(TestHooks):
 
@@ -1399,7 +1418,7 @@ class TestHooksService(TestHooks):
         """
         hooks.juju.config["service-count"] = "0"
         result = hooks._get_requested_service_count()
-        self.assertEqual(len(result), 12)
+        self.assertEqual(len(result), 11)
         self.assertEqual(result["appserver"], "0")
 
         hooks.juju.config["service-count"] = "foo"
@@ -1425,11 +1444,22 @@ class TestHooksService(TestHooks):
         hooks.juju.config["service-count"] = (
             "juju-sync:-8 cron:XYZ BLAh BLAh:X")
         result = hooks._get_requested_service_count()
-        self.assertEqual(len(result), 12)
+        self.assertEqual(len(result), 11)
         self.assertEqual(result["juju-sync"], "AUTO")
         self.assertEqual(result["cron"], "AUTO")
         self.assertEqual(result["appserver"], "AUTO")
         self.assertNotIn("BLAh", result)
+
+    def test_get_requested_service_with_combo_loader(self):
+        """
+        If the installed landscape-server package has the combo-loader service,
+        that _get_requested_service_count() includes it.
+        """
+        self.with_combo_loader()
+        hooks.juju.config["service-count"] = "1"
+        result = hooks._get_requested_service_count()
+        self.assertEqual(len(result), 12)
+        self.assertEqual(result["combo-loader"], "1")
 
     def test_get_services_dict(self):
         """
@@ -1454,6 +1484,22 @@ class TestHooksService(TestHooks):
         result = hooks._get_services_dict()
         self.assertEqual(result, {"appserver": 3, "cron": 1})
 
+        # The combo-loader is skipped if not available.
+        hooks.juju.config["services"] = "appserver combo-loader"
+        hooks.juju.config["service-count"] = "AUTO"
+        result = hooks._get_services_dict()
+        self.assertEqual(result, {"appserver": 3})
+
+    def test_get_services_dict_with_combo_loader(self):
+        """
+        The services dict contains the combo-loader if available.
+        """
+        self.with_combo_loader()
+        hooks.juju.config["services"] = "appserver"
+        hooks.juju.config["service-count"] = "2"
+        result = hooks._get_services_dict()
+        self.assertEqual(result, {"appserver": 2})
+
     def test_get_requested_services(self):
         """
         "services" config is parsed into list.  Exceptions are raised for
@@ -1466,6 +1512,11 @@ class TestHooksService(TestHooks):
         hooks.juju.config["services"] = "appserver pingserver cron"
         result = hooks._get_requested_services()
         self.assertEqual(["appserver", "pingserver", "cron"], result)
+
+        # The combo-loader is skipped if not available
+        hooks.juju.config["services"] = "appserver combo-loader"
+        result = hooks._get_requested_services()
+        self.assertEqual(["appserver"], result)
 
         hooks.juju.config["services"] = "appserver pingserver cron foo"
         self.assertRaises(Exception, hooks._get_requested_services)
@@ -1860,9 +1911,28 @@ class TestHooksServiceMock(TestHooks):
         """
         notify the vhost-config relation on a separate ID.
         """
+        self.with_combo_loader()
         hooks.notify_vhost_config_relation("haproxy", "foo/0")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()
+        with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
+            vhost_template = f.read()
+        baseline = yaml.dump(
+            [{"port": "443", "template": base64.b64encode(vhostssl_template)},
+             {"port": "80", "template": base64.b64encode(vhost_template)}])
+        self.assertEqual(
+            (("vhosts", baseline),), hooks.juju._outgoing_relation_data)
+
+    def test_notify_vhost_config_relation_specify_id_no_combo_loader(self):
+        """
+        If there's no combo-loader the relevant vhost entry is skipped.
+        """
+        hooks.notify_vhost_config_relation("haproxy", "foo/0")
+        with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
+            vhostssl_template = f.read()
+            vhostssl_template = vhostssl_template.replace(
+                hooks.COMBO_LOADER_VHOST_ENTRY,
+                hooks.NO_COMBO_LOADER_VHOST_ENTRY)
         with open("%s/config/vhost.tmpl" % hooks.ROOT, 'r') as f:
             vhost_template = f.read()
         baseline = yaml.dump(
@@ -1876,6 +1946,7 @@ class TestHooksServiceMock(TestHooks):
         If the landscape-server package being installed has offline pages
         under the static dir, the legacy templates are used.
         """
+        self.with_combo_loader()
         self.addCleanup(
             setattr, hooks, "HAS_OLD_ERROR_PATH", hooks.HAS_OLD_ERROR_PATH)
         hooks.HAS_OLD_ERROR_PATH = True
@@ -1892,6 +1963,7 @@ class TestHooksServiceMock(TestHooks):
 
     def test_notify_vhost_config_relation(self):
         """notify the vhost-config relation on the "current" ID."""
+        self.with_combo_loader()
         hooks.notify_vhost_config_relation("haproxy")
         with open("%s/config/vhostssl.tmpl" % hooks.ROOT, 'r') as f:
             vhostssl_template = f.read()

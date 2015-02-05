@@ -379,8 +379,6 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
             cls.juju_status, "pingserver")
         cls.async_unit = find_landscape_unit_with_service(
             cls.juju_status, "async-frontend")
-        cls.combo_unit = find_landscape_unit_with_service(
-            cls.juju_status, "combo-loader")
 
     def run_command_on_unit(self, cmd, unit):
         output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
@@ -439,18 +437,6 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/ajax".format(self.frontend)
-        check_url(url, good_content)
-
-    def test_combo_unavailable_page(self):
-        """
-        Verify that the frontend shows the unstyled unavailable page for combo.
-        """
-        self.addCleanup(self.start_server, "landscape-combo-loader",
-                        self.combo_unit)
-        self.stop_server("landscape-combo-loader", self.combo_unit)
-        good_content = ["503 Service Unavailable",
-                        "No server is available to handle this request."]
-        url = "http://{}/combo".format(self.frontend)
         check_url(url, good_content)
 
 
