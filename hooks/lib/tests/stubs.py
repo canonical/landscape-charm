@@ -77,3 +77,21 @@ class FetchStub(object):
 
     def apt_install(self, packages, fatal=False):
         self.installed.append((packages, fatal))
+
+
+class ClusterStub(object):
+    """Testable stub for C{charmhelpers.contrib.hahelpers.cluster}."""
+
+    leader = True
+
+    def is_elected_leader(self, resource):
+        return self.leader
+
+
+class HostStub(object):
+    """Testable stub for C{charmhelpers.core.host}."""
+
+    password = "landscape-sekret"
+
+    def pwgen(self, length=None):
+        return self.password

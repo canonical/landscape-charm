@@ -8,3 +8,7 @@ SAMPLE_DB_UNIT_DATA = {
     "password": "sekret",
     "port": "5432"
 }
+
+SAMPLE_LEADER_CONTEXT_DATA = {
+    "database-password": "landscape-sekret",
+}
