@@ -115,8 +115,8 @@ class LandscapeLeaderContextTest(HookenvTest):
 
     def test_fresh(self):
         """
-        When created the for the first time, the L{LandscapeLeaderContext}
-        class generates new data.
+        When created for the first time, the L{LandscapeLeaderContext} class
+        generates new data.
         """
         context = LandscapeLeaderContext(host=self.host, path=self.path)
         self.assertEqual({"database-password": "landscape-sekret"}, context)
