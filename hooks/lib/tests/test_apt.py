@@ -86,6 +86,22 @@ class AptTest(HookenvTest):
              ("deb file://%s/build/ ./" % self.hookenv.charm_dir(), None)],
             self.fetch.sources)
 
+    def test_local_tarball_not_new(self):
+        """
+        If the landscape tarball hasn't changed, it won't be built.
+        """
+        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        tarball = os.path.join(
+            self.hookenv.charm_dir(), "landscape-server_1.2.3.tar.gz")
+        with open(tarball, "w") as fd:
+            fd.write("data")
+        self.apt.set_sources()
+
+        # Reset the recorded subprocess calls and run again
+        self.subprocess.calls[:] = []
+        self.apt.set_sources()
+        self.assertEqual([], self.subprocess.calls)
+
     def test_packages(self):
         """
         The C{PACKAGES} tuple holds the packages expected to get installed.

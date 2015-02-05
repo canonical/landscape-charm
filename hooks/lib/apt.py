@@ -94,6 +94,9 @@ class Apt(object):
         if tarball is None:
             return False
 
+        if not self._is_tarball_new(tarball):
+            return
+
         packages = self._fetch.filter_installed_packages(PACKAGES_DEV)
         self._fetch.apt_install(packages, fatal=True)
 
@@ -115,3 +118,13 @@ class Apt(object):
         """Return the local Landscape tarball if any, C{None} otherwise."""
         matches = glob.glob(os.path.join(self._hookenv.charm_dir(), TARBALL))
         return matches[0] if matches else None
+
+    def _is_tarball_new(self, tarball):
+        """Check if this is a new tarball and we need to build it."""
+        md5sum = tarball + ".m5sum"
+        code = os.system("md5sum -c %s > /dev/null 2>&1" % md5sum)
+        if code == 0:
+            return False
+        else:
+            os.system("md5sum %s > %s" % (tarball, md5sum))
+            return True
