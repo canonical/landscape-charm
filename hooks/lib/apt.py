@@ -95,7 +95,7 @@ class Apt(object):
             return False
 
         if not self._is_tarball_new(tarball):
-            return
+            return False
 
         packages = self._fetch.filter_installed_packages(PACKAGES_DEV)
         self._fetch.apt_install(packages, fatal=True)

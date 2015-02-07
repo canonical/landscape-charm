@@ -97,10 +97,12 @@ class AptTest(HookenvTest):
             fd.write("data")
         self.apt.set_sources()
 
-        # Reset the recorded subprocess calls and run again
+        # Reset the recorded sources and subprocess calls and run again
         self.subprocess.calls[:] = []
+        self.fetch.sources[:] = []
         self.apt.set_sources()
         self.assertEqual([], self.subprocess.calls)
+        self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
 
     def test_packages(self):
         """
