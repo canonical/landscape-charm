@@ -1,7 +1,7 @@
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.stubs import ClusterStub, HostStub
+from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF
@@ -15,12 +15,14 @@ class ServicesHookTest(HookenvTest):
         super(ServicesHookTest, self).setUp()
         self.cluster = ClusterStub()
         self.host = HostStub()
+        self.subprocess = SubprocessStub()
         self.hook = ServicesHook(
-            hookenv=self.hookenv, cluster=self.cluster, host=self.host)
-        self.renders = []
+            hookenv=self.hookenv, cluster=self.cluster, host=self.host,
+            subprocess=self.subprocess)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
+        self.renders = []
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
 
@@ -34,10 +36,10 @@ class ServicesHookTest(HookenvTest):
             ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
             self.hookenv.messages)
 
-    def test_db_relation_ready(self):
+    def test_ready(self):
         """
-        If the db relation provides the required keys, the services hook
-        rewrites the service configuration.
+        If all dependency managers are ready, the services hook bootstraps the
+        schema and rewrites the service configuration.
         """
         self.hookenv.relations = {
             "db": {
@@ -55,6 +57,9 @@ class ServicesHookTest(HookenvTest):
         self.assertEqual(
             ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
             render)
+        [call] = self.subprocess.calls
+        self.assertEqual(
+            ["/opt/canonical/landscape/schema", "--bootstrap"], call[0])
 
     def test_remote_leader_not_ready(self):
         """

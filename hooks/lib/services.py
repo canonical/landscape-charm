@@ -1,3 +1,5 @@
+import subprocess
+
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core.services.base import ServiceManager
@@ -8,6 +10,7 @@ from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
+from lib.callbacks.scripts import SchemaBootstrap
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 
@@ -19,10 +22,12 @@ class ServicesHook(Hook):
     all relation data we need in order to configure this Landscape unit, and
     proceed with the configuration if ready.
     """
-    def __init__(self, hookenv=hookenv, cluster=cluster, host=host):
+    def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
+                 subprocess=subprocess):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._cluster = cluster
         self._host = host
+        self._subprocess = subprocess
 
     def _run(self):
         leader_context = None
@@ -43,6 +48,7 @@ class ServicesHook(Hook):
                 render_template(
                     owner="landscape", group="root", perms=0o640,
                     source="service.conf", target=SERVICE_CONF),
+                SchemaBootstrap(subprocess=self._subprocess),
             ],
         }])
         manager.manage()

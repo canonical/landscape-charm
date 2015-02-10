@@ -37,7 +37,7 @@ deploy: test-depends
 lint:
 	flake8 --exclude=charmhelpers hooks
 	pyflakes3 tests dev/update-charm-revision-numbers
-	find . -name *.py -print0 | xargs -0 pep8
+	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 pep8
 	pep8 tests dev/update-charm-revision-numbers 
 
 clean: clean-integration-test

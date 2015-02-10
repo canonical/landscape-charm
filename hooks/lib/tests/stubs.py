@@ -95,3 +95,13 @@ class HostStub(object):
 
     def pwgen(self, length=None):
         return self.password
+
+
+class SubprocessStub(object):
+    """Testable stub for C{subprocess}."""
+
+    def __init__(self):
+        self.calls = []
+
+    def check_call(self, command, **kwargs):
+        self.calls.append((command, kwargs))
