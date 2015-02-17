@@ -2,7 +2,7 @@ from charmhelpers.core.services.helpers import RelationContext
 
 
 class RabbitMQProvider(RelationContext):
-    """Relation context for the `rabbitmq` interface."""
+    """Relation data provider feeding rabbitmq our vhost and username."""
     name = "amqp"
     interface = "rabbitmq"
     required_keys = [
@@ -17,7 +17,7 @@ class RabbitMQProvider(RelationContext):
 
 
 class RabbitMQRequirer(RelationContext):
-    """Relation context for the `rabbitmq` interface."""
+    """Relation data requirer getting auth details from rabbitmq."""
     name = "amqp"
     interface = "rabbitmq"
     required_keys = [

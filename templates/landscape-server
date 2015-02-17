@@ -10,28 +10,14 @@ RUN_ALL="no"
 # instead of "yes" or "no".
 # Currently, only msg, app and ping support this.
 RUN_APPSERVER="yes"
-RUN_ASYNC_FRONTEND="no"
-RUN_JOBHANDLER="no"
+RUN_ASYNC_FRONTEND="yes"
+RUN_JOBHANDLER="yes"
 RUN_MSGSERVER="no"
 RUN_PINGSERVER="no"
 RUN_APISERVER="no"
-RUN_COMBO_LOADER="no"
 RUN_PACKAGEUPLOADSERVER="no"
 RUN_JUJU_SYNC="no"
 RUN_PACKAGESEARCH="no"
 
 # To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
 RUN_CRON="no"
-
-# Run the schema upgrade procedure during package upgrades or not.
-# NOTE: if a schema upgrade is necessary, but this is set to
-# "no", the Landscape service WON'T (RE)START until the schema is
-# upgraded. In that case, the schema will need to be upgraded
-# manually by calling the setup-landscape-server script as root
-# after the package was upgraded.
-#
-# Only if this is set to "yes" will landscape-server upgrade the database schema.
-# Note that if you install the landscape-server-quickstart package and have this
-# setting commented, or set to no value, that package will set it to "yes".
-# Otherwise it will be left alone.
-#UPGRADE_SCHEMA="no"

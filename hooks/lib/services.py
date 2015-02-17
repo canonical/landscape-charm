@@ -11,7 +11,7 @@ from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
-from lib.callbacks.scripts import SchemaBootstrap
+from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 DEFAULT_FILE = "/etc/default/landscape-server"
@@ -37,7 +37,7 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(host=self._host)
 
         manager = ServiceManager([{
-            "service": "landscape-appserver",
+            "service": "landscape",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
@@ -57,5 +57,6 @@ class ServicesHook(Hook):
                     source="landscape-server", target=DEFAULT_FILE),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
+            "start": LSCtl(subprocess=self._subprocess),
         }])
         manager.manage()

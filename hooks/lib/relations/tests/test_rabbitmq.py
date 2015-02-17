@@ -8,7 +8,7 @@ class RabbitMQProviderTest(HookenvTest):
 
     def test_required_keys(self):
         """
-        The L{RabbitMQRelation} class defines all keys that are required to
+        The RabbitMQProvider class defines all keys that are required to
         be set on the db relation in order for the relation to be considered
         ready.
         """
@@ -17,8 +17,8 @@ class RabbitMQProviderTest(HookenvTest):
 
     def test_provide_data(self):
         """
-        The L{RabbitMQRelation} is not ready if the local unit is in
-        the 'allowed-units' list.
+        The RabbitMQProvider class feeds rabbitmq with the vhost and username
+        that Landscape requires.
         """
         relation = RabbitMQProvider()
         self.assertEqual(
@@ -32,7 +32,7 @@ class RabbitMQRequirerTest(HookenvTest):
 
     def test_required_keys(self):
         """
-        The L{RabbitMQRelation} class defines all keys that are required to
+        The RabbitMQRequirer class defines all keys that are required to
         be set on the db relation in order for the relation to be considered
         ready.
         """

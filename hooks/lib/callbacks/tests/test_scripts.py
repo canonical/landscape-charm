@@ -1,42 +1,38 @@
-import os
+from fixtures import TestWithFixtures
 
-from fixtures import TestWithFixtures, TempDir
-
-from lib.callbacks.scripts import SchemaBootstrap
+from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.tests.stubs import SubprocessStub
 
 
 class SchemaBootstrapTest(TestWithFixtures):
 
     def setUp(self):
         super(SchemaBootstrapTest, self).setUp()
-        self.tempdir = self.useFixture(TempDir())
-        self.callback = SchemaBootstrap(scripts_dir=self.tempdir.path)
-
-    def test_standalone_config(self):
-        """
-        The schema script is invoked with the LANDSCAPE_CONFIG environment
-        variable set to 'standalone'.
-        """
-        schema = self.tempdir.join("schema")
-        output = self.tempdir.join("output")
-        with open(schema, "w") as fd:
-            fd.write("#!/bin/sh\n"
-                     "echo -n $LANDSCAPE_CONFIG > %s\n" % output)
-        os.chmod(schema, 0755)
-        self.callback(None, None, None)
-        with open(output, "r") as fd:
-            self.assertEqual("standalone", fd.read())
+        self.subprocess = SubprocessStub()
+        self.callback = SchemaBootstrap(subprocess=self.subprocess)
 
     def test_options(self):
         """
         The schema script is invoked with the --bootstrap option.
         """
-        schema = self.tempdir.join("schema")
-        output = self.tempdir.join("output")
-        with open(schema, "w") as fd:
-            fd.write("#!/bin/sh\n"
-                     "echo -n $1 > %s\n" % output)
-        os.chmod(schema, 0755)
         self.callback(None, None, None)
-        with open(output, "r") as fd:
-            self.assertEqual("--bootstrap", fd.read())
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap"],
+            self.subprocess.calls[0][0])
+
+
+class LSCtlTest(TestWithFixtures):
+
+    def setUp(self):
+        super(LSCtlTest, self).setUp()
+        self.subprocess = SubprocessStub()
+        self.callback = LSCtl(subprocess=self.subprocess)
+
+    def test_start(self):
+        """
+        The schema script is invoked with the LANDSCAPE_CONFIG environment
+        variable set to 'standalone'.
+        """
+        self.callback(None, None, "start")
+        self.assertEqual(
+            ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])

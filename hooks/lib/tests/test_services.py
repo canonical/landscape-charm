@@ -82,9 +82,11 @@ class ServicesHookTest(HookenvTest):
         self.assertEqual(
             ("landscape-server", DEFAULT_FILE, context, "root", "root", 416),
             self.renders[1])
-        [call] = self.subprocess.calls
+        [call1, call2] = self.subprocess.calls
         self.assertEqual(
-            ["/opt/canonical/landscape/schema", "--bootstrap"], call[0])
+            ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
+        self.assertEqual(
+            ["/usr/bin/lsctl", "restart"], call2[0])
 
     def test_remote_leader_not_ready(self):
         """
