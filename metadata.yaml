@@ -24,6 +24,9 @@ provides:
     interface: http
   vhost-config:
     interface: apache-vhost-config
+  hosted:
+    interface: landscape-hosted
+    scope: container
 peers:
   cluster:
     interface: landscape-ha
