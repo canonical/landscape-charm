@@ -35,7 +35,7 @@ class LSCtl(ScriptCallback):
         action = event_name
         if event_name == "start":
             # XXX the 'start' event in the services framework is called after
-            #     config changes have been applied and it's semantics actually
+            #     config changes have been applied and its semantics actually
             #     maps to a 'restart' action.
             action = "restart"
         self._run(LSCTL, (action,))

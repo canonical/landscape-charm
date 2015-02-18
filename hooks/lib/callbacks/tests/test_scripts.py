@@ -30,9 +30,18 @@ class LSCtlTest(TestWithFixtures):
 
     def test_start(self):
         """
-        The schema script is invoked with the LANDSCAPE_CONFIG environment
-        variable set to 'standalone'.
+        The 'lsct' script is invoked with the 'restart' action if the event
+        name is 'start'.
         """
         self.callback(None, None, "start")
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])
+
+    def test_stop(self):
+        """
+        The 'lsct' script is invoked with the 'stop' action if the event name
+        is 'stop'.
+        """
+        self.callback(None, None, "stop")
+        self.assertEqual(
+            ["/usr/bin/lsctl", "stop"], self.subprocess.calls[0][0])
