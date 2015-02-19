@@ -30,7 +30,7 @@ class LSCtlTest(TestWithFixtures):
 
     def test_start(self):
         """
-        The 'lsct' script is invoked with the 'restart' action if the event
+        The 'lsctl' script is invoked with the 'restart' action if the event
         name is 'start'.
         """
         self.callback(None, None, "start")
@@ -39,7 +39,7 @@ class LSCtlTest(TestWithFixtures):
 
     def test_stop(self):
         """
-        The 'lsct' script is invoked with the 'stop' action if the event name
+        The 'lsctl' script is invoked with the 'stop' action if the event name
         is 'stop'.
         """
         self.callback(None, None, "stop")
