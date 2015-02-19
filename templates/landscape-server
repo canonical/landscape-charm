@@ -1,0 +1,22 @@
+# To run all Landscape services (including cron jobs) set this to "yes".
+# Alternatively, set this to a number between 1 and 9 to have that number
+# of services to start for each kind that supports this (currently, only
+# msg, ping and app support multiple instances).
+RUN_ALL="no"
+
+# To run only specific Landscape services set RUN_ALL to "no" and then
+# set the services you want to run to "yes".
+# If you want to start more than one copy of each service, use a number
+# instead of "yes" or "no". Currently, only msg, app and ping support this.
+RUN_APPSERVER="yes"
+RUN_ASYNC_FRONTEND="yes"
+RUN_JOBHANDLER="yes"
+RUN_MSGSERVER="no"
+RUN_PINGSERVER="no"
+RUN_APISERVER="no"
+RUN_PACKAGEUPLOADSERVER="no"
+RUN_JUJU_SYNC="no"
+RUN_PACKAGESEARCH="no"
+
+# To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
+RUN_CRON="no"

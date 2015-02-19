@@ -3,8 +3,8 @@ from charmhelpers.core import templating
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA)
-from lib.services import ServicesHook, SERVICE_CONF
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
+from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 
 
 class ServicesHookTest(HookenvTest):
@@ -36,6 +36,23 @@ class ServicesHookTest(HookenvTest):
             ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
             self.hookenv.messages)
 
+    def test_amqp_relation_not_ready(self):
+        """
+        If the amqp relation doesn't provide the required keys, the services
+        hook doesn't try to change any configuration.
+        """
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+        }
+        self.hook()
+        self.assertIn(
+            ("Incomplete relation: RabbitMQRequirer", "DEBUG"),
+            self.hookenv.messages)
+
     def test_ready(self):
         """
         If all dependency managers are ready, the services hook bootstraps the
@@ -46,20 +63,30 @@ class ServicesHookTest(HookenvTest):
                 "db:1": {
                     "postgresql/0": SAMPLE_DB_UNIT_DATA,
                 },
-            }
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
         }
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
         }
-        [render] = self.renders
         self.assertEqual(
             ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
-            render)
-        [call] = self.subprocess.calls
+            self.renders[0])
         self.assertEqual(
-            ["/opt/canonical/landscape/schema", "--bootstrap"], call[0])
+            ("landscape-server", DEFAULT_FILE, context, "root", "root", 416),
+            self.renders[1])
+        [call1, call2] = self.subprocess.calls
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
+        self.assertEqual(
+            ["/usr/bin/lsctl", "restart"], call2[0])
 
     def test_remote_leader_not_ready(self):
         """
@@ -89,6 +116,11 @@ class ServicesHookTest(HookenvTest):
                     "postgresql/0": SAMPLE_DB_UNIT_DATA,
                 },
             },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
         }
         self.hook()
-        self.assertEqual(1, len(self.renders))
+        self.assertEqual(2, len(self.renders))
