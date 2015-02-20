@@ -8,11 +8,13 @@ from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
+from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
-from lib.callbacks.scripts import SchemaBootstrap
+from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 
 SERVICE_CONF = "/etc/landscape/service.conf"
+DEFAULT_FILE = "/etc/default/landscape-server"
 
 
 class ServicesHook(Hook):
@@ -39,16 +41,22 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
+                RabbitMQProvider(),
             ],
             "required_data": [
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
+                RabbitMQRequirer(),
             ],
             "data_ready": [
                 render_template(
                     owner="landscape", group="root", perms=0o640,
                     source="service.conf", target=SERVICE_CONF),
+                render_template(
+                    owner="root", group="root", perms=0o640,
+                    source="landscape-server", target=DEFAULT_FILE),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
+            "start": LSCtl(subprocess=self._subprocess),
         }])
         manager.manage()

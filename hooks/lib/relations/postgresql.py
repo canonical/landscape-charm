@@ -28,7 +28,7 @@ class PostgreSQLRequirer(RelationContext):
 
         Beside the started L{RelationContext} check that all required keys are
         set in the relation, we want to ensure some extra constraints specific
-        to the postgresql charm (see its REAMDE.md file for details).
+        to the postgresql charm (see its README.md file for details).
         """
         # First call the superclass method to check that the required keys are
         # in the relation at all.
@@ -64,7 +64,7 @@ class PostgreSQLRequirer(RelationContext):
         PostgreSQL unit related, the client charm must only use units
         with state set to 'master' or 'hot standby'.".
         """
-        ignored_states = ["hot standby", "failover"]
+        ignored_states = set(["hot standby", "failover"])
 
         # XXX for now we support relating to at most one PostgreSQL service
         #     when we'll support sharding we'll want to account for more
@@ -76,7 +76,7 @@ class PostgreSQLRequirer(RelationContext):
             self._hookenv.log(
                 "The postgresql service is clustered with %s units. "
                 "Ignoring any intermittent 'standalone' states." % units_count)
-            ignored_states.append("standalone")
+            ignored_states.add("standalone")
 
         state = unit_data["state"]
         if state in ignored_states:
