@@ -16,7 +16,10 @@ update-charm-revision-numbers:
 		$(EXTRA_UPDATE_ARGUMENTS) \
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
-test-depends: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
+test-depends: verify-juju-test bundles
+
+bundles:
+	bzr co --lightweight lp:landscape-charm/bundles-trunk bundles
 
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
@@ -34,6 +37,7 @@ lint:
 	pep8 tests dev/update-charm-revision-numbers 
 
 clean: clean-integration-test
+	@rm -rf bundles
 
 .PHONY: lint \
 	test-depends \
