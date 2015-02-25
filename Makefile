@@ -28,7 +28,7 @@ deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py
 
 deploy: test-depends
-	SKIP_TESTS=1 DEPLOYER_TARGET=landscape tests/01-begin.py
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-scalable tests/01-begin.py
 
 lint:
 	flake8 --exclude=charmhelpers hooks
