@@ -18,6 +18,7 @@ from os import getenv, listdir
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
+from glob import glob
 
 log = logging.getLogger(__file__)
 
@@ -75,10 +76,7 @@ def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     deployer = jujulib.deployer.Deployer()
     charm_dir = dirname(dirname(abspath(__file__)))
-    bundles = []
-    for filename in listdir(join(charm_dir, "bundles")):
-        if filename.endswith(".yaml"):
-            bundles.append(join(charm_dir, "bundles", filename))
+    bundles = glob(join(charm_dir, "bundles", "*.yaml"))
     deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), bundles,
                     timeout=3000)
 

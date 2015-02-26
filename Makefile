@@ -11,15 +11,19 @@ verify-juju-test:
 		echo "installed"; \
 	fi 
 
-update-charm-revision-numbers:
-	dev/update-charm-revision-numbers \
+update-charm-revision-numbers: bundles
+	@dev/update-charm-revision-numbers \
 		$(EXTRA_UPDATE_ARGUMENTS) \
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: verify-juju-test bundles
 
 bundles:
-	bzr co --lightweight lp:landscape-charm/bundles-trunk bundles
+	@if [ -d bundles ]; then \
+	    bzr up bundles; \
+	else \
+	    bzr co lp:landscape-charm/bundles-trunk bundles; \
+	fi
 
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
@@ -36,7 +40,7 @@ lint:
 	find . -name *.py -print0 | xargs -0 pep8
 	pep8 tests dev/update-charm-revision-numbers 
 
-clean: clean-integration-test
+clean:
 	@rm -rf bundles
 
 .PHONY: lint \
@@ -46,6 +50,6 @@ clean: clean-integration-test
 	verify-juju-test \
 	test \
 	clean \
-	clean-integration-test \
 	update-charm-revision-numbers \
+	bundles \
 	deploy
