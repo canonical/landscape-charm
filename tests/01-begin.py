@@ -14,10 +14,11 @@ import yaml
 import jujulib.deployer
 
 from configparser import ConfigParser
-from os import getenv
+from os import getenv, listdir
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
+from glob import glob
 
 log = logging.getLogger(__file__)
 
@@ -74,10 +75,9 @@ def check_url(url, good_content, post_data=None, header=None,
 def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     deployer = jujulib.deployer.Deployer()
-    config_file = join(
-        dirname(dirname(abspath(__file__))),
-        "config", "landscape-deployments.yaml")
-    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), [config_file],
+    charm_dir = dirname(dirname(abspath(__file__)))
+    bundles = glob(join(charm_dir, "bundles", "*.yaml"))
+    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), bundles,
                     timeout=3000)
 
     frontend = find_address(juju_status(), "apache2")
