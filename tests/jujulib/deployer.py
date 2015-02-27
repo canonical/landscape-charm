@@ -31,7 +31,7 @@ class Deployer(object):
         - lp:landscape
         """
         landscape_dir = path.join("deployer_dir", series, "landscape")
-        local_yaml = {"_landscape-charm-common": {
+        local_yaml = {"_common": {
             "services": {
                 "landscape": { "charm": "lp:landscape-charm" }}}}
 
@@ -41,11 +41,11 @@ class Deployer(object):
         if path.exists(path.join(CHARM_SRC, "config", "license-file")):
             options["license-file"] = "include-file://license-file"
         if options:
-            local_yaml["services"]["landscape"]["options"] = options
+            local_yaml["_common"]["services"]["landscape"]["options"] = options
 
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
-            local_yaml[target] = {"inherits": "_landscape-charm-common"}
+            local_yaml[target] = {"inherits": "_common"}
         local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
         with open(local_yaml_file, "w") as outfile:
             outfile.write(yaml.dump(local_yaml))
