@@ -22,8 +22,8 @@ class Deployer(object):
 
     def _create_local_yaml(self, deployer_dir, series, config_files):
         """
-        Create a local yaml file to adjust settings in the deployed charm.
-        Return the created file name to the caller.
+        Create a local yaml file to adjust settings in the bundle.  Return the
+        created file name to the caller.
 
         @param deployer_dir: directory where we have staged the charms.
         @param series: ubuntu series bing used.
@@ -51,6 +51,7 @@ class Deployer(object):
             landscape_service["options"] = options
 
         for config in config_files:
+            # as per bundle spec, target name == filename
             target = path.basename(config).rstrip(".yaml")
             local_yaml[target] = {"services": {}}
             for service in ["landscape-msg", "landscape"]:
