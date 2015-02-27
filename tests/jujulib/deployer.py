@@ -40,10 +40,11 @@ class Deployer(object):
 
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
+            local_yaml[target] = {"services": {}}
             for service in ["landscape-msg", "landscape"]:
-                local_yaml[target] = {"services": {service: {
+                local_yaml[target]["services"][service] = {
                     "charm": "landscape",
-                    "branch": "lp:landscape-charm"}}}
+                    "branch": "lp:landscape-charm"}
                 if options:
                     local_yaml[target]["services"][service]["options"] = \
                         options
