@@ -45,7 +45,7 @@ class Deployer(object):
                     "charm": "",
                     "branch": "lp:landscape-charm"}}}
                 if options:
-                    local_yaml["services"][target][service]["options"] = \
+                    local_yaml[target]["services"][service]["options"] = \
                         options
         local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
         with open(local_yaml_file, "w") as outfile:
