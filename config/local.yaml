@@ -1,0 +1,24 @@
+# juju-deployer overrides file. Allows us to test the charm in this
+# branch, rather than pull from the charm store (cs:) as the bundles
+# specify.
+#
+# charm: lp:landcape-charm tells deployer to bzr branch the
+# charm first, or use a directory named after the service name, if that
+# is there.  We stage the directory to make deployer think it's
+# already done that work.
+#
+
+_landscape-charm-common:
+    services:
+        landscape:
+            charm: lp:landscape-charm
+        landscape-msg:
+            charm: lp:landscape-charm
+
+# Need one section for each bundle name:
+landscape-dense-maas:
+    inherits: _landscape-charm-common
+landscape-dense:
+    inherits: _landscape-charm-common
+landscape-config:
+    inherits: _landscape-charm-common
