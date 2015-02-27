@@ -24,33 +24,40 @@ class Deployer(object):
         """
         Create a local yaml file to adjust settings in the deployed charm.
         Return the created file name to the caller.
+
+        @param deployer_dir: directory where we have staged the charms.
+        @param series: ubuntu series bing used.
+        @param config_files: config file names are used to determine what
+                             bundles will be deployed, and thus what
+                             stanzas to override in the local.yaml.
         
-        Respects:
+        Respects and accounts for these files:
         - config/repo-file
         - config/license-file
-        - lp:landscape
         """
         landscape_dir = path.join(deployer_dir, series, "landscape")
+        local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
         local_yaml = {}
+        landscape_service = {
+            "charm": "landscape",
+            "branch": "lp:landscape-charm"}
         options = {}
         if path.exists(path.join(CHARM_SRC, "config", "repo-file")):
             options["repository"] = "include-file://repo-file"
         if path.exists(path.join(CHARM_SRC, "config", "license-file")):
             options["license-file"] = "include-file://license-file"
+        # Can't include a blank options section, deployer will choke
+        if options:
+            landscape_service["options"] = options
 
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
             local_yaml[target] = {"services": {}}
             for service in ["landscape-msg", "landscape"]:
-                local_yaml[target]["services"][service] = {
-                    "charm": "landscape",
-                    "branch": "lp:landscape-charm"}
-                if options:
-                    local_yaml[target]["services"][service]["options"] = \
-                        options
-        local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
-        with open(local_yaml_file, "w") as outfile:
-            outfile.write(yaml.dump(local_yaml, default_flow_style=False))
+                local_yaml[target]["services"][service] = landscape_service
+
+        with open(local_yaml_file, "w") as f:
+            f.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
     def deploy(self, target, config_files, timeout=None):
