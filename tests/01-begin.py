@@ -77,6 +77,7 @@ def setUpModule():
     deployer = jujulib.deployer.Deployer()
     charm_dir = dirname(dirname(abspath(__file__)))
     bundles = glob(join(charm_dir, "bundles", "*.yaml"))
+    bundles.append(join("config", "local.yaml"))
     deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), bundles,
                     timeout=3000)
 
