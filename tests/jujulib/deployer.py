@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import yaml
 
+CHARM_SRC = path.dirname(path.dirname(path.dirname(__file__)))
 
 class Deployer(object):
     """
@@ -16,22 +17,36 @@ class Deployer(object):
 
     def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
-        charm_src = path.dirname(path.dirname(path.dirname(__file__)))
         charm_dest = path.join(deployer_dir, series, "landscape")
-        shutil.copytree(charm_src, charm_dest)
+        shutil.copytree(CHARM_SRC, charm_dest)
 
     def _create_local_yaml(self, deployer_dir, series, config_files):
         """
         Create a local yaml file to adjust settings in the deployed charm.
         Return the created file name to the caller.
+        
+        Respects:
+        - config/repo-file
+        - config/license-file
+        - lp:landscape
         """
+        landscape_dir = path.join("deployer_dir", series, "landscape")
         local_yaml = {"_landscape-charm-common": {
             "services": {
                 "landscape": { "charm": "lp:landscape-charm" }}}}
+
+        options = {}
+        if path.exists(path.join(CHARM_SRC, "config", "repo-file")):
+            options["repository"] = "include-file://repo-file"
+        if path.exists(path.join(CHARM_SRC, "config", "license-file")):
+            options["license-file"] = "include-file://license-file"
+        if options:
+            local_yaml["services"]["landscape"]["options"] = options
+
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
             local_yaml[target] = {"inherits": "_landscape-charm-common"}
-        local_yaml_file = path.join(deployer_dir, "local.yaml")
+        local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
         with open(local_yaml_file, "w") as outfile:
             outfile.write(yaml.dump(local_yaml))
         return local_yaml_file
