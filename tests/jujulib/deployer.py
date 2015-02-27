@@ -7,6 +7,7 @@ import yaml
 
 CHARM_SRC = path.dirname(path.dirname(path.dirname(__file__)))
 
+
 class Deployer(object):
     """
     Simple wrapper around juju-deployer.  It's designed to copy the current
@@ -30,7 +31,7 @@ class Deployer(object):
         @param config_files: config file names are used to determine what
                              bundles will be deployed, and thus what
                              stanzas to override in the local.yaml.
-        
+
         Respects and accounts for these files:
         - config/repo-file
         - config/license-file

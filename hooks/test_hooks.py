@@ -951,7 +951,10 @@ class TestHooksService(TestHooks):
         self.assertIn("foobar", output)
 
     def test__download_file_success_trailing_newline(self):
-        """Test that newlines are stripped before passing to curl. CVE-2014-8150."""
+        """
+        Test that newlines are stripped before passing to curl.
+        CVE-2014-8150.
+        """
         # put two newlines, since that could be a common pattern in a text
         # file when using an editor
         hooks._download_file("http://example.com/\n\n", Curl=CurlStub)
