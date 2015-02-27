@@ -14,7 +14,7 @@ import yaml
 import jujulib.deployer
 
 from configparser import ConfigParser
-from os import getenv, listdir
+from os import getenv
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
@@ -77,7 +77,6 @@ def setUpModule():
     deployer = jujulib.deployer.Deployer()
     charm_dir = dirname(dirname(abspath(__file__)))
     bundles = glob(join(charm_dir, "bundles", "*.yaml"))
-    bundles.append(join("config", "local.yaml"))
     deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), bundles,
                     timeout=3000)
 

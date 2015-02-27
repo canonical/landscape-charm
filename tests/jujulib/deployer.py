@@ -1,8 +1,9 @@
-from os import path
-import tempfile
-import shutil
 import logging
+from os import path
+import shutil
 import subprocess
+import tempfile
+import yaml
 
 
 class Deployer(object):
@@ -19,6 +20,22 @@ class Deployer(object):
         charm_dest = path.join(deployer_dir, series, "landscape")
         shutil.copytree(charm_src, charm_dest)
 
+    def _create_local_yaml(self, deployer_dir, series, config_files):
+        """
+        Create a local yaml file to adjust settings in the deployed charm.
+        Return the created file name to the caller.
+        """
+        local_yaml = {"_landscape-charm-common": {
+            "services": {
+                "landscape": { "charm": "lp:landscape-charm" }}}}
+        for config in config_files:
+            target = path.basename(config).rstrip(".yaml")
+            local_yaml[target] = {"inherits": "_landscape-charm-common"}
+        local_yaml_file = path.join(deployer_dir, "local.yaml")
+        with open(local_yaml_file, "w") as outfile:
+            outfile.write(yaml.dump(local_yaml))
+        return local_yaml_file
+
     def deploy(self, target, config_files, timeout=None):
         """
         Use juju-deployer to install `target` on current `juju env`
@@ -32,6 +49,8 @@ class Deployer(object):
             deployer_dir = tempfile.mkdtemp()
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
+            config_files.append(self._create_local_yaml(
+                deployer_dir, series, config_files))
             args = ["juju-deployer", "-vdWL", "-w 180"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
