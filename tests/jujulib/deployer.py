@@ -41,14 +41,14 @@ class Deployer(object):
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
             for service in ["landscape-msg", "landscape"]:
-                local_yaml[target] = {service: {
+                local_yaml[target] = {"services": {service: {
                     "charm": "",
-                    "branch": "lp:landscape-charm"}}
+                    "branch": "lp:landscape-charm"}}}
                 if options:
                     local_yaml[target][service]["options"] = options
         local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
         with open(local_yaml_file, "w") as outfile:
-            outfile.write(yaml.dump(local_yaml))
+            outfile.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
     def deploy(self, target, config_files, timeout=None):
