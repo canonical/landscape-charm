@@ -30,7 +30,7 @@ class Deployer(object):
         - config/license-file
         - lp:landscape
         """
-        landscape_dir = path.join("deployer_dir", series, "landscape")
+        landscape_dir = path.join(deployer_dir, series, "landscape")
         local_yaml = {"_common": {
             "services": {
                 "landscape": { "charm": "lp:landscape-charm" }}}}
