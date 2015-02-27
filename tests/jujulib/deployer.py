@@ -38,9 +38,6 @@ class Deployer(object):
         if path.exists(path.join(CHARM_SRC, "config", "license-file")):
             options["license-file"] = "include-file://license-file"
 
-        if options:
-            local_yaml["_common"]["services"]["landscape"]["options"] = options
-
         for config in config_files:
             target = path.basename(config).rstrip(".yaml")
             for service in ["landscape-msg", "landscape"]:
