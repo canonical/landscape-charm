@@ -56,6 +56,9 @@ class HookenvStub(object):
             return data.get(attribute)
         return data
 
+    def relation_set(self, rid=None, relation_settings=None, **kwargs):
+        self.relations[rid] = relation_settings
+
     def charm_dir(self):
         return self._charm_dir
 
