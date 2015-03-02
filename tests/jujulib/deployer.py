@@ -3,6 +3,7 @@ from os import path
 import shutil
 import subprocess
 import tempfile
+
 import yaml
 
 CHARM_SRC = path.dirname(path.dirname(path.dirname(__file__)))
@@ -27,7 +28,7 @@ class Deployer(object):
         created file name to the caller.
 
         @param deployer_dir: directory where we have staged the charms.
-        @param series: ubuntu series bing used.
+        @param series: ubuntu series being used.
         @param config_files: config file names are used to determine what
                              bundles will be deployed, and thus what
                              stanzas to override in the local.yaml.
@@ -75,8 +76,8 @@ class Deployer(object):
             deployer_dir = tempfile.mkdtemp()
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-            config_files.append(self._create_local_yaml(
-                deployer_dir, series, config_files))
+                config_files.append(self._create_local_yaml(
+                    deployer_dir, series, config_files))
             args = ["juju-deployer", "-vdWL", "-w 180"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
