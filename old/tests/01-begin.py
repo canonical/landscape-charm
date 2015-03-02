@@ -1,0 +1,578 @@
+#!/usr/bin/python3
+"""
+This test creates a real landscape deployment, and runs some checks against it.
+
+FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
+       lp:1281577 is addressed.
+"""
+
+import json
+import logging
+import sys
+import unittest
+import yaml
+import jujulib.deployer
+
+from configparser import ConfigParser
+from os import getenv, listdir
+from os.path import dirname, abspath, join, splitext, basename
+from subprocess import check_output, STDOUT, CalledProcessError, PIPE
+from time import sleep
+from glob import glob
+
+log = logging.getLogger(__file__)
+
+
+def check_url(url, good_content, post_data=None, header=None,
+              interval=5, attempts=2, retry_unavailable=False):
+    """
+    Polls the given URL looking for the specified good_content.  If
+    not found in the timeout period, will assert.  If found, returns
+    the output matching.
+
+    @param url: URL to poll
+    @param good_content: string we are looking for, or list of strings
+    @param post_data: optional POST data string
+    @param header: optional request header string
+    @param interval: number of seconds between polls
+    @param attempts: how many times we should poll
+    @param retry_unavailable: if host is unavailable, retry (default: False)
+    """
+    output = ""
+    if type(good_content) is not list:
+        good_content = [good_content]
+    cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
+    if post_data:
+        cmd.extend(["-d", post_data])
+    if header:
+        cmd.extend(["-H", header])
+    for _ in range(attempts):
+        try:
+            output = check_output(cmd).decode("utf-8").strip()
+        except CalledProcessError as e:
+            if not retry_unavailable:
+                raise
+            status = e.returncode
+            # curl: rc=7, host is unavailable, this can happen
+            #       when apache is being restarted, for instance
+            if status == 7:
+                log.info("Unavailable, retrying: {}".format(url))
+            else:
+                raise
+        if all(content in output for content in good_content):
+            return output
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        sleep(interval)
+    msg = """Content Not found!
+    url:{}
+    good_content:{}
+    output:{}
+    """
+    raise AssertionError(msg.format(url, good_content, output))
+
+
+def setUpModule():
+    """Deploys Landscape via the charm. All the tests use this deployment."""
+    deployer = jujulib.deployer.Deployer()
+    charm_dir = dirname(dirname(abspath(__file__)))
+    bundles = glob(join(charm_dir, "bundles", "*.yaml"))
+    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), bundles,
+                    timeout=3000)
+
+    frontend = find_address(juju_status(), "apache2")
+    good_content = "New user - Landscape"
+    log.info("Polling. Waiting for app server: {}".format(frontend))
+    check_url("https://{}/".format(frontend), good_content, interval=30,
+              attempts=10, retry_unavailable=True)
+
+
+def juju_status():
+    """Return a juju status structure."""
+    cmd = ["juju", "status", "--format=json"]
+    output = check_output(cmd).decode("utf-8").strip()
+    return json.loads(output)
+
+
+def get_service_config(service_name):
+    """
+    Returns the configuration of the given service. Raises an error if
+    the service is not there.
+
+    @param juju_status: dictionary representing the juju status output.
+    @param service_name: string representing the service we are looking for.
+    """
+    cmd = ["juju", "get", "--format=yaml", service_name]
+    output = check_output(cmd).decode("utf-8").strip()
+    return yaml.load(output)
+
+
+def find_address(juju_status, service_name):
+    """
+    Find the first unit of service_name in the given juju status dictionary.
+    Doesn't handle subordinates, sorry.
+
+    @param juju_status: dictionary representing the juju status output.
+    @param service_name: String representing the name of the service.
+    """
+    services = juju_status["services"]
+    if service_name not in services:
+        raise ServiceOrUnitNotFound(service_name)
+    service = services[service_name]
+    units = service.get("units", {})
+    unit_keys = list(sorted(units.keys()))
+    if unit_keys:
+        public_address = units[unit_keys[0]].get("public-address", "")
+        return public_address
+    else:
+        raise ServiceOrUnitNotFound(service_name)
+
+
+def find_landscape_unit_with_service(juju_status, wanted_service):
+    """
+    Find the first landscape unit that has the specified service on it.
+
+    @param juju_status: dictionary representing the juju status output.
+    @param wanted_service: string representing the landscape service we
+                           are looking for.
+    """
+    services = juju_status["services"]
+    for service_name in services:
+        if not service_name.startswith("landscape"):
+            continue
+        config = get_service_config(service_name)
+        landscape_services = config["settings"]["services"]["value"]
+        if wanted_service not in landscape_services:
+            continue
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            return unit_keys[0]
+    raise ServiceOrUnitNotFound(wanted_service)
+
+
+def get_landscape_units(juju_status):
+    """
+    Return a list of all the landscape service units.
+
+    @param juju_status: dictionary representing the juju status output.
+    """
+    landscape_units = []
+    services = juju_status["services"]
+    for service_name in services:
+        if not service_name.startswith("landscape"):
+            continue
+        service = services[service_name]
+        units = service.get("units", {})
+        unit_keys = list(sorted(units.keys()))
+        if unit_keys:
+            landscape_units.extend(unit_keys)
+    if not landscape_units:
+        raise ServiceOrUnitNotFound("landscape")
+    return landscape_units
+
+
+def get_landscape_service_conf(unit):
+    """Fetch the contents of service.conf from the given unit."""
+    cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
+           "2>/dev/null"]
+    output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+    return output
+
+
+class ServiceOrUnitNotFound(Exception):
+    """
+    Exception thrown if a service cannot be found in the deployment or has
+    no units.
+    """
+
+    def __init__(self, service_name):
+        self.service_name = service_name
+
+
+@unittest.skipIf(
+    getenv("SKIP_TESTS", None), "Requested to skip all tests.")
+class BaseLandscapeTests(unittest.TestCase):
+    """
+    Base class with some commonality between all test classes.
+    """
+
+    maxDiff = None
+
+    def __str__(self):
+        file_name = splitext(basename(__file__))[0]
+        return "{} ({}.{})".format(
+            self._testMethodName, file_name, self.__class__.__name__)
+
+
+class LandscapeServiceTests(BaseLandscapeTests):
+    """
+    Class hosting all the tests we want to run against a Landscape deployment.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        """Prepares juju_status which many tests use."""
+        cls.juju_status = juju_status()
+        cls.frontend = find_address(cls.juju_status, "apache2")
+
+    def test_app(self):
+        """Verify that the APP service is up.
+
+        Specifically that it is reachable and that it presents the new
+        user form.
+        """
+        good_content = "New user - Landscape"
+        check_url("https://{}/".format(self.frontend), good_content)
+
+    def test_msg(self):
+        """Verify that the MSG service is up.
+
+        Specifically that it is reachable and that it responds
+        correctly to requests.
+        """
+        good_content = ["ds8:messagesl", "s11:server-uuid"]
+        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
+                     "sequencei0;;")
+        header = "X-MESSAGE-API: 3.1"
+        check_url("https://{}/message-system".format(self.frontend),
+                  good_content, post_data, header)
+
+    def test_ping(self):
+        """Verify that the PING service is up.
+
+        Specifically that it is reachable and that it responds
+        correctly to a ping request without an ID.
+        """
+        good_content = "ds5:errors19:provide insecure_id;"
+        check_url("http://{}/ping".format(self.frontend), good_content)
+
+    def test_combo(self):
+        """Verify that the COMBO service is up.
+
+        Specifically that it is reachable and returns the expected text.
+        """
+        good_content = "Licensed under the BSD License"
+        url = ("http://{}/combo?yui/scrollview/scrollview-min.js".format(
+               self.frontend))
+        check_url(url, good_content)
+
+    def test_api(self):
+        """Verify that the API service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Query API Service"
+        check_url("https://{}/api".format(self.frontend), good_content)
+
+    def test_ajax(self):
+        """Verify that the AJAX srevice is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Async frontend for landscape"
+        check_url("https://{}/ajax".format(self.frontend), good_content)
+
+    def test_upload(self):
+        """Verify that the PACKAGE UPLOAD service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        good_content = "Landscape package upload service"
+        # ending / is important because of the way we wrote this RewriteRule
+        url = "https://{}/upload/".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_static(self):
+        """Verify that the STATIC service is up.
+
+        Specifically, that we can reach a file that is hosted on the static
+        server/unit.
+        """
+        good_content = "ubuntu.woff"
+        url = "https://{}/static/fonts/ubuntu-font.css".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_hash_id_databases(self):
+        """Verify that the hash-id-databases are available.
+
+        Specifically, that the directory can be listed and that the default
+        hash-id-database files are there. The cron job that populates this
+        with the actual uuid-named files might or might not have run yet.
+        """
+        good_content = "precise_amd64"
+        url = "https://{}/hash-id-databases".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_ssh(self):
+        """Verify that the landscape/0 unit can be reached via ssh."""
+        good_content = "buffers/cache"
+        output = check_output(["juju", "ssh", "landscape/0", "free -m"],
+                              stderr=STDOUT).decode("utf-8")
+        self.assertIn(good_content, output)
+
+
+class LandscapeServiceConfigTests(BaseLandscapeTests):
+
+    @classmethod
+    def setUpClass(cls):
+        """Prepare landscape_service_conf which will be used by the tests."""
+        landscape_units = []
+        cls.juju_status = juju_status()
+        cls.landscape_service_conf = []
+        landscape_units = get_landscape_units(cls.juju_status)
+        for unit in landscape_units:
+            config = ConfigParser()
+            config.read_string(get_landscape_service_conf(unit))
+            cls.landscape_service_conf.append(config)
+
+    def test_no_broker_defaults(self):
+        """Verify that [broker] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [broker] section don't remain at their default values.
+        """
+        for config in self.landscape_service_conf:
+            broker = config["broker"]
+            self.assertNotEqual(broker["host"], "localhost")
+            self.assertNotEqual(broker["password"], "landscape")
+
+    def test_no_stores_defaults(self):
+        """Verify that [store] has no default values.
+
+        This test verifies that the host and password configuration keys
+        from the [stores] section don't remain at their default values.
+        """
+        for config in self.landscape_service_conf:
+            stores = config["stores"]
+            self.assertNotEqual(stores["password"], "landscape")
+            self.assertNotEqual(stores["host"], "localhost")
+
+    def test_no_schema_defaults(self):
+        """Verify that [schema] has no default values.
+
+        This test verifies that the store_user and store_password
+        configuration keys from the [schema] section don't remain at their
+        default values.
+        """
+        for config in self.landscape_service_conf:
+            schema = config["schema"]
+            self.assertNotEqual(schema["store_user"], "superuser")
+            # default service.conf doesn't ship with a store_password in this
+            # section, so this tests that a) it exists; b) it's not empty
+            self.assertNotEqual(len(schema["store_password"]), 0)
+
+
+class LandscapeErrorPagesTests(BaseLandscapeTests):
+
+    @classmethod
+    def setUpClass(cls):
+        """Prepares juju_status and other attributes that many tests use."""
+        cls.juju_status = juju_status()
+        cls.frontend = find_address(cls.juju_status, "apache2")
+        cls.app_unit = find_landscape_unit_with_service(
+            cls.juju_status, "appserver")
+        cls.msg_unit = find_landscape_unit_with_service(
+            cls.juju_status, "msgserver")
+        cls.ping_unit = find_landscape_unit_with_service(
+            cls.juju_status, "pingserver")
+        cls.async_unit = find_landscape_unit_with_service(
+            cls.juju_status, "async-frontend")
+
+    def run_command_on_unit(self, cmd, unit):
+        output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
+        return output.decode("utf-8").strip()
+
+    def stop_server(self, name, unit):
+        cmd = "sudo service %s stop" % name
+        self.run_command_on_unit(cmd, unit)
+
+    def start_server(self, name, unit):
+        cmd = "sudo service %s start" % name
+        self.run_command_on_unit(cmd, unit)
+
+    def test_app_unavailable_page(self):
+        """
+        Verify that the frontend shows the styled unavailable page for app.
+        """
+        self.addCleanup(self.start_server, "landscape-appserver",
+                        self.app_unit)
+        self.stop_server("landscape-appserver", self.app_unit)
+        good_content = "please phone us"
+        url = "https://{}/".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_msg_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for msg.
+        """
+        self.addCleanup(self.start_server, "landscape-msgserver",
+                        self.msg_unit)
+        self.stop_server("landscape-msgserver", self.msg_unit)
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "https://{}/message-system".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_ping_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for ping.
+        """
+        self.addCleanup(self.start_server, "landscape-pingserver",
+                        self.ping_unit)
+        self.stop_server("landscape-pingserver", self.ping_unit)
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "http://{}/ping".format(self.frontend)
+        check_url(url, good_content)
+
+    def test_async_unavailable_page(self):
+        """
+        Verify that the frontend shows the unstyled unavailable page for async.
+        """
+        self.addCleanup(self.start_server, "landscape-async-frontend",
+                        self.async_unit)
+        self.stop_server("landscape-async-frontend", self.async_unit)
+        good_content = ["503 Service Unavailable",
+                        "No server is available to handle this request."]
+        url = "https://{}/ajax".format(self.frontend)
+        check_url(url, good_content)
+
+
+class LandscapeCronTests(BaseLandscapeTests):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.juju_status = juju_status()
+        cls.cron_unit = find_landscape_unit_with_service(
+            cls.juju_status, "cron")
+        cls._stop_cron(cls.cron_unit)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._start_cron(cls.cron_unit)
+
+    def _sanitize_ssh_output(self, output,
+                             remove_text=["sudo: unable to resolve",
+                                          "Warning: Permanently added"]):
+        """Strip some common warning messages from ssh output.
+
+        @param output: output to sanitize
+        @param remove_text: list of text that, if found at the beginning of
+                            the a output line, will have that line removed
+                            entirely.
+        """
+        new_output = []
+        for line in output.split("\n"):
+            if any(line.startswith(remove) for remove in remove_text):
+                continue
+            new_output.append(line)
+        return "\n".join(new_output)
+
+    def _run_cron(self, script):
+        status = 0
+        cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
+               "2>&1"]
+        try:
+            # The sanitize is a workaround for lp:1328269
+            output = self._sanitize_ssh_output(
+                check_output(cmd, stderr=PIPE).decode("utf-8").strip())
+        except CalledProcessError as e:
+            output = e.output.decode("utf-8").strip()
+            status = e.returncode
+        # these jobs currently don't set their exit status to non-zero
+        # if they fail, they just print things to stdout/stderr
+        return (output, status)
+
+    def test_maintenance_cron(self):
+        """Verify that the maintenance cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/maintenance.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_update_security_db_cron(self):
+        """Verify that the update_security_db cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/update_security_db.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_update_alerts_cron(self):
+        """Verify that the update_alerts cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/update_alerts.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_landscape_profiles_cron(self):
+        """Verify that the landscape_profiles cron job runs without errors."""
+
+        # process_profiles renamed to landscape_profiles on trunk @ r8238
+        find_cmd = (
+            "sudo ls /opt/canonical/landscape/scripts/landscape_profiles.sh"
+            " || sudo ls /opt/canonical/landscape/scripts/process_profiles.sh")
+        cmd = ["juju", "run", "--unit", "landscape/0", find_cmd]
+        script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_process_alerts_cron(self):
+        """Verify that the process_alerts cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/process_alerts.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    @unittest.skipIf(getenv("SKIP_SLOW_TESTS", None),
+                     "Requested to skip slow tests.")
+    def test_hash_id_databases_cron(self):
+        """Verify that the hash_id_databases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_meta_releases_cron(self):
+        """Verify that the meta_releases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/meta_releases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_sync_lds_releases_cron(self):
+        """Verify that the sync_lds_releases cron job runs without errors."""
+        script = "/opt/canonical/landscape/scripts/sync_lds_releases.sh"
+        output, status = self._run_cron(script)
+        self.assertEqual(output, "")
+        self.assertEqual(status, 0)
+
+    def test_root_url_is_set(self):
+        """root_url should be set in the postgres db."""
+        frontend = find_address(juju_status(), "apache2")
+        psql_cmd = "sudo -u postgres psql -At landscape-standalone-main " \
+            "-c \"select encode(key, 'escape'),encode(value, 'escape') " \
+            "from system_configuration where key='landscape.root_url'\" " \
+            " 2>/dev/null"
+        cmd = ["juju", "run", "--unit", "postgresql/0", psql_cmd]
+        output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
+        self.assertIn(frontend, output)
+
+    @staticmethod
+    def _stop_cron(unit):
+        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
+        check_output(cmd, stderr=PIPE)
+
+    @staticmethod
+    def _start_cron(unit):
+        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
+        check_output(cmd, stderr=PIPE)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+    unittest.main(verbosity=2)
