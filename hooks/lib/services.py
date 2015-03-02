@@ -9,6 +9,7 @@ from charmhelpers.contrib.hahelpers import cluster
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
+from lib.relations.haproxy import HAProxyProvider
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
@@ -41,6 +42,7 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
+                HAProxyProvider(),
                 RabbitMQProvider(),
             ],
             "required_data": [
