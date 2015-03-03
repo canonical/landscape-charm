@@ -22,26 +22,26 @@ class Deployer(object):
         charm_dest = path.join(deployer_dir, series, "landscape")
         shutil.copytree(CHARM_SRC, charm_dest)
 
-    def _create_local_yaml(self, deployer_dir, series, config_files):
+    def _create_local_yaml(self, tmpdir, config_files):
         """
         Create a local yaml file to adjust settings in the bundle.  Return the
         created file name to the caller.
 
-        @param deployer_dir: directory where we have staged the charms.
-        @param series: ubuntu series being used.
+        @param tmpdir: directory where we can write a yaml file.
         @param config_files: config file names are used to determine what
-                             bundles will be available for deployment.
+            bundles will be available for deployment.  This is important
+            since overrides are deployer target specific. We have to know
+            what targets are available, in order to override them.
 
         Respects and accounts for these files:
         - config/repo-file
         - config/license-file
         """
-        landscape_dir = path.join(deployer_dir, series, "landscape")
         # Will be appened to end of 'config_files' list.  This will in turn
         # be specified last on the juju-deployer command line, and will be able
         # to overwrite charm settings.  For instance we can use it to add a
         # custom license-file to the deployment.
-        local_yaml_file = path.join(landscape_dir, "config", "99-local.yaml")
+        local_yaml_file = path.join(tmpdir, "99-local.yaml")
         local_yaml = {}
         landscape_service = {
             "charm": "landscape",
@@ -77,10 +77,13 @@ class Deployer(object):
         deployer_dir = None
         try:
             deployer_dir = tempfile.mkdtemp()
+            # Stage deployer directory for all supported series, even though
+            # typically in a deploy attempt only one series is used.  Since
+            # it's determined by a bundle, we have to be ready for whatever.
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-                config_files.append(self._create_local_yaml(
-                    deployer_dir, series, config_files))
+            config_files.append(
+                self._create_local_yaml(deployer_dir, config_files))
             args = ["juju-deployer", "-vdWL", "-w 180"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
