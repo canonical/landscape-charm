@@ -30,15 +30,18 @@ class Deployer(object):
         @param deployer_dir: directory where we have staged the charms.
         @param series: ubuntu series being used.
         @param config_files: config file names are used to determine what
-                             bundles will be deployed, and thus what
-                             stanzas to override in the local.yaml.
+                             bundles will be available for deployment.
 
         Respects and accounts for these files:
         - config/repo-file
         - config/license-file
         """
         landscape_dir = path.join(deployer_dir, series, "landscape")
-        local_yaml_file = path.join(landscape_dir, "config", "local.yaml")
+        # Will be appened to end of 'config_files' list.  This will in turn
+        # be specified last on the juju-deployer command line, and will be able
+        # to overwrite charm settings.  For instance we can use it to add a
+        # custom license-file to the deployment.
+        local_yaml_file = path.join(landscape_dir, "config", "99-local.yaml")
         local_yaml = {}
         landscape_service = {
             "charm": "landscape",
