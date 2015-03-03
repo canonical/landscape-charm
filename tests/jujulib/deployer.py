@@ -43,20 +43,28 @@ class Deployer(object):
         # custom license-file to the deployment.
         local_yaml_file = path.join(tmpdir, "99-local.yaml")
         local_yaml = {}
-        landscape_service = {
-            "charm": "landscape",
-            "branch": "lp:landscape-charm"}
+
+        # overridden options in landscape-charm, with the filename in the
+        # config dir that we read.
+        override_options = {"repository": "repo-file",
+                            "license-file": "license-file"}
+
+        # Base data structure for the landscape-charm that we will fill out
+        # with options.
+        landscape_service = {"charm": "landscape",
+                             "branch": "lp:landscape-charm"}
         options = {}
-        if path.exists(path.join(CHARM_SRC, "config", "repo-file")):
-            options["repository"] = "include-file://repo-file"
-        if path.exists(path.join(CHARM_SRC, "config", "license-file")):
-            options["license-file"] = "include-file://license-file"
+        for option, filename in override_options.items():
+            filepath = path.join(CHARM_SRC, "config", filename)
+            if path.exists(filepath):
+                options[option] = "include-file://%s" % filepath
+
         # Can't include a blank options section, deployer will choke
         if options:
             landscape_service["options"] = options
 
         for config in config_files:
-            # as per bundle spec, target name == filename
+            # target name == filename in our bundles branches.
             target = path.basename(config).rstrip(".yaml")
             local_yaml[target] = {"services": {}}
             for service in ["landscape-msg", "landscape"]:
