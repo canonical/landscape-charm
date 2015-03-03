@@ -37,7 +37,7 @@ class Deployer(object):
         - config/repo-file
         - config/license-file
         """
-        # Will be appened to end of 'config_files' list.  This will in turn
+        # Will be appended to end of 'config_files' list.  This will in turn
         # be specified last on the juju-deployer command line, and will be able
         # to overwrite charm settings.  For instance we can use it to add a
         # custom license-file to the deployment.
