@@ -36,6 +36,22 @@ class ServicesHookTest(HookenvTest):
             ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
             self.hookenv.messages)
 
+    def test_website_relation_provide(self):
+        """
+        If we're running the website-relation-joined hook, the HAProxyProvider
+        is run and the remote relation is set accordingly.
+        """
+        self.hookenv.hook = "website-relation-joined"
+        self.hook()
+        # Assert that the HAProxyProvider has run by checking that it set the
+        # relation with the dict returned by HAProxyProvider.provide_data (the
+        # only key of that dict is 'services'). The ID of relation being set
+        # is None because we're running in the website-relation-joined hook
+        # and are using the default relation ID (which in a real-world
+        # relation-set run will resolve to the relation for the http
+        # interface).
+        self.assertIn("services", self.hookenv.relations[None])
+
     def test_amqp_relation_not_ready(self):
         """
         If the amqp relation doesn't provide the required keys, the services
