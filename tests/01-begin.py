@@ -14,7 +14,7 @@ import yaml
 import jujulib.deployer
 
 from configparser import ConfigParser
-from os import getenv, listdir
+from os import getenv
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep

@@ -87,7 +87,7 @@ def main():
         charm = _get_charm(charm_name, series=options.series)
         print("#   {}: {}".format(charm_name, charm.revision))
         charms.append(charm)
-    
+
     for filename in glob(join("bundles", "*.yaml")):
         replace_in_config(filename, charms, series=options.series)
 
