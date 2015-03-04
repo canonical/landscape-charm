@@ -87,8 +87,6 @@ class HAProxyProvider(RelationContext):
         Servers and backends are supposed to be filled by calling code.
 
         @param name: The base name of the frontend service.
-        @param extra_service_options: Service options not included in the
-           common ones (see SERVICE_OPTIONS_COMMON).
         """
         return {
             "service_name": "landscape-%s" % name,
@@ -113,7 +111,7 @@ class HAProxyProvider(RelationContext):
         """Return a server 4-tuple, as expected by the HAProxy charm.
 
         @param name: The base name of the server, it will be expanded with
-            the local unit name to make each searver have a unique name.
+            the local unit name to make each server have a unique name.
         """
         server_ip = self._hookenv.unit_private_ip()
         unit_name = self._hookenv.local_unit()
