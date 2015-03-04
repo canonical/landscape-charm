@@ -98,7 +98,12 @@ class HAProxyProvider(RelationContext):
         }
 
     def _backend(self, name, servers):
-        """Return a backend configuration using the given name and servers."""
+        """Return a backend for the service with the given name and servers.
+
+        @param name: Which backend service to use. Possible values are 'api',
+            'message' or 'ping'.
+        @param servers: List of servers belonging to this backend.
+        """
         return {
             "backend_name": "landscape-%s" % name,
             "servers": servers,

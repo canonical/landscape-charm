@@ -20,7 +20,7 @@ class HAProxyProviderTest(HookenvTest):
     def test_provide_data(self):
         """
         The HAProxyProvider class feeds haproxy with the services that this
-        Landscape unit runs.
+        Landscape unit runs. By default all services are run.
         """
         relation = HAProxyProvider()
         data = relation.provide_data()
