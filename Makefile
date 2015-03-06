@@ -18,12 +18,19 @@ verify-juju-test:
 		echo "installed"; \
 	fi 
 
-update-charm-revision-numbers:
-	dev/update-charm-revision-numbers \
+update-charm-revision-numbers: bundles
+	@dev/update-charm-revision-numbers \
 		$(EXTRA_UPDATE_ARGUMENTS) \
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
-test-depends: verify-juju-test config/repo-file config/license-file config/vhostssl.tmpl config/vhost.tmpl
+test-depends: verify-juju-test bundles
+
+bundles:
+	@if [ -d bundles ]; then \
+	    bzr up bundles; \
+	else \
+	    bzr co lp:landscape-charm/bundles-trunk bundles; \
+	fi
 
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
@@ -32,7 +39,7 @@ deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py
 
 deploy: test-depends
-	SKIP_TESTS=1 DEPLOYER_TARGET=landscape tests/01-begin.py
+	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-scalable tests/01-begin.py
 
 lint:
 	flake8 --exclude=charmhelpers hooks
@@ -40,7 +47,8 @@ lint:
 	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 pep8
 	pep8 tests dev/update-charm-revision-numbers 
 
-clean: clean-integration-test
+clean:
+	@rm -rf bundles
 
 .PHONY: lint \
 	test-depends \
@@ -49,8 +57,8 @@ clean: clean-integration-test
 	verify-juju-test \
 	test \
 	clean \
-	clean-integration-test \
 	update-charm-revision-numbers \
+	bundles \
 	deploy
 
 dev/charm_helpers_sync.py:

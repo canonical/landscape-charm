@@ -6,6 +6,8 @@ import re
 import sys
 from urllib.request import urlopen
 from yaml import load
+from glob import glob
+from os.path import join
 
 
 class Charm(object):
@@ -43,7 +45,7 @@ def _get_charm(charm_name, series):
         raise
 
 
-def replace_in_config(charms, series):
+def replace_in_config(filename, charms, series):
     """
     Iterate over each charm, replacing all occurences of old charm store
     urls with new versions.  Intent is to leave file in a state that can
@@ -55,7 +57,6 @@ def replace_in_config(charms, series):
     Or:
       series: trusty
     """
-    filename = "config/landscape-deployments.yaml"
     for line in fileinput.input(filename, inplace=1):
         pattern = "^(\s*)series:\s.*$"
         line = re.sub(pattern, r"\1series: %s" % series, line)
@@ -64,8 +65,7 @@ def replace_in_config(charms, series):
             line = re.sub(pattern, charm.store_url, line)
         sys.stdout.write(line)
 
-    print("#")
-    print("# New config written, use `bzr diff` to see changes (if any)")
+    print("# Config written, use `bzr diff %s` to see any changes" % filename)
 
 
 def get_options():
@@ -87,7 +87,9 @@ def main():
         charm = _get_charm(charm_name, series=options.series)
         print("#   {}: {}".format(charm_name, charm.revision))
         charms.append(charm)
-    replace_in_config(charms, series=options.series)
+
+    for filename in glob(join("bundles", "*.yaml")):
+        replace_in_config(filename, charms, series=options.series)
 
     sys.exit(0)
 
