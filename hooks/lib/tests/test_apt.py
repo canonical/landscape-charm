@@ -76,9 +76,11 @@ class AptTest(HookenvTest):
             fd.write("")
         self.apt.set_sources()
 
+        build_dir = os.path.join(self.hookenv.charm_dir(), "build")
+
         self.assertEqual(
-            [(["tar", "--strip=1", "-xf", tarball], {}),
-             (BUILD_LOCAL_ARCHIVE, {"shell": True})],
+            [(["tar", "--strip=1", "-xf", tarball],  {"cwd": build_dir}),
+             (BUILD_LOCAL_ARCHIVE, {"shell": True, "cwd": build_dir})],
             self.subprocess.calls)
 
         self.assertEqual(

@@ -19,5 +19,5 @@ class InstallHookTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.assertEqual(0, self.hook())
-        self.assertTrue(len(self.fetch.sources) > 0)
-        self.assertTrue(len(self.fetch.installed) > 0)
+        self.assertNotEqual([], self.fetch.sources)
+        self.assertNotEqual([], self.fetch.installed)

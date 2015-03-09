@@ -101,17 +101,16 @@ class Apt(object):
         packages = self._fetch.filter_installed_packages(PACKAGES_DEV)
         self._fetch.apt_install(packages, fatal=True)
 
-        current_dir = os.getcwd()
         build_dir = os.path.join(self._hookenv.charm_dir(), "build")
         shutil.rmtree(build_dir, ignore_errors=True)
         os.mkdir(build_dir)
-        os.chdir(build_dir)
 
-        self._subprocess.check_call(["tar", "--strip=1", "-xf", tarball])
-        self._subprocess.check_call(BUILD_LOCAL_ARCHIVE, shell=True)
+        self._subprocess.check_call(
+            ["tar", "--strip=1", "-xf", tarball], cwd=build_dir)
+        self._subprocess.check_call(
+            BUILD_LOCAL_ARCHIVE, shell=True, cwd=build_dir)
 
         self._fetch.add_source("deb file://%s/ ./" % build_dir)
-        os.chdir(current_dir)
 
         return True
 
