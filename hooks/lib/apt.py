@@ -1,5 +1,6 @@
-import os
 import glob
+import hashlib
+import os
 import shutil
 import subprocess
 
@@ -121,10 +122,18 @@ class Apt(object):
 
     def _is_tarball_new(self, tarball):
         """Check if this is a new tarball and we need to build it."""
-        md5sum = tarball + ".m5sum"
-        code = os.system("md5sum -c %s > /dev/null 2>&1" % md5sum)
-        if code == 0:
-            return False
-        else:
-            os.system("md5sum %s > %s" % (tarball, md5sum))
-            return True
+        with open(tarball, "r") as fd:
+            digest = hashlib.md5(fd.read()).hexdigest()
+
+        md5sum = tarball + ".md5sum"
+        if os.path.exists(md5sum):
+            with open(md5sum, "r") as fd:
+                if fd.read() == digest:
+                    # The checksum matches, so it's not a new tarball
+                    return False
+
+        # Update the md5sum file, since this is a new tarball.
+        with open(md5sum, "w") as fd:
+            fd.write(digest)
+
+        return True
