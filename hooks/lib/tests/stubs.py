@@ -9,10 +9,11 @@ class HookenvStub(object):
     unit = "landscape-server/0"
     relid = None
 
-    def __init__(self):
+    def __init__(self, charm_dir):
         self.messages = []
         self.relations = {}
         self._config = Config()
+        self._charm_dir = charm_dir
 
     def config(self):
         return self._config
@@ -58,6 +59,9 @@ class HookenvStub(object):
     def relation_set(self, rid=None, relation_settings=None, **kwargs):
         self.relations[rid] = relation_settings
 
+    def charm_dir(self):
+        return self._charm_dir
+
 
 class FetchStub(object):
     """Provide a testable stub for C{charmhelpers.fetch}."""
@@ -78,8 +82,8 @@ class FetchStub(object):
         self.filtered.append(packages)
         return packages
 
-    def apt_install(self, packages, fatal=False):
-        self.installed.append((packages, fatal))
+    def apt_install(self, packages, options=None, fatal=False):
+        self.installed.append((packages, options, fatal))
 
 
 class ClusterStub(object):
