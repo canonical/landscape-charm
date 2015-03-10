@@ -1,4 +1,6 @@
 import os
+from random import SystemRandom
+from string import letters, digits
 
 from charmhelpers.core.services.helpers import RelationContext, StoredContext
 from charmhelpers.core import host, hookenv
@@ -74,10 +76,24 @@ class LandscapeRequirer(RelationContext):
 class LandscapeLeaderContext(StoredContext):
     """Hold information for the Landscape unit acting as a leader."""
 
+    @staticmethod
+    def _generate_secret_token():
+        """
+        Generate a string with 1024 bits of entropy.
+
+        Using 172 * the 62 possible alphanumerics [a-z][A-Z][0-9] provides:
+        math.log(62, 2) * 172 ~= 1024 bits of entropy.
+        """
+        random_chooser = SystemRandom()
+        alphanumerics = letters[0:52] + digits
+        return "".join(random_chooser.choice(alphanumerics)
+                       for _ in range(172))
+
     def __init__(self, host=host, path="landscape-leader-context.yaml"):
         if os.path.exists(path):
             data = self.read_context(path)
         else:
-            data = {"database-password": host.pwgen()}
+            data = {"database-password": host.pwgen(),
+                    "secret-token": self._generate_secret_token()}
             self.store_context(path, data)
         self.update(data)

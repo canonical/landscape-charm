@@ -29,3 +29,5 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual("landscape-sekret", config.get("stores", "password"))
         self.assertEqual("10.0.3.170", config.get("broker", "host"))
         self.assertEqual("guessme", config.get("broker", "password"))
+        self.assertEqual(
+            "landscape-token", config.get("global", "secret-token"))

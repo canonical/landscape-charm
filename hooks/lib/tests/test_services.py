@@ -1,5 +1,6 @@
 from charmhelpers.core import templating
 
+from lib.relations.landscape import LandscapeLeaderContext
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
@@ -25,6 +26,13 @@ class ServicesHookTest(HookenvTest):
         self.renders = []
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
+
+        # Monkey-patch generate_secret_token() to return a pre-set value.
+        self.addCleanup(
+            setattr, LandscapeLeaderContext, "_generate_secret_token",
+            LandscapeLeaderContext._generate_secret_token)
+        LandscapeLeaderContext._generate_secret_token = (
+            lambda _: SAMPLE_LEADER_CONTEXT_DATA["secret-token"])
 
     def test_db_relation_not_ready(self):
         """
@@ -92,6 +100,7 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
         }
+
         self.assertEqual(
             ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
             self.renders[0])
