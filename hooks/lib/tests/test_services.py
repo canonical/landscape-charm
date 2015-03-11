@@ -1,6 +1,5 @@
 from charmhelpers.core import templating
 
-from lib.relations.landscape import LandscapeLeaderContext
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (

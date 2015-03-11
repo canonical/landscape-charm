@@ -1,6 +1,4 @@
 import os
-from random import SystemRandom
-from string import letters, digits
 
 from charmhelpers.core.services.helpers import RelationContext, StoredContext
 from charmhelpers.core import host, hookenv
