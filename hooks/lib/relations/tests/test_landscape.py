@@ -122,8 +122,7 @@ class LandscapeLeaderContextTest(HookenvTest):
         self.assertItemsEqual(
             ["database-password", "secret-token"], context.keys())
         self.assertEqual("landscape-sekret", context["database-password"])
-        # Secret token is a newly generated random string 172 bytes long.
-        self.assertEqual(172, len(context["secret-token"]))
+        self.assertEqual("landscape-token", context["secret-token"])
 
     def test_stored(self):
         """
@@ -135,9 +134,3 @@ class LandscapeLeaderContextTest(HookenvTest):
         context = LandscapeLeaderContext(host=self.host, path=self.path)
         self.assertEqual({"database-password": "old-sekret",
                           "secret-token": "old-token"}, context)
-
-    def test_generate_secret_token(self):
-        """generate_secret_token creates a length 172 string."""
-        context = LandscapeLeaderContext(host=self.host, path=self.path)
-        random_string = context._generate_secret_token()
-        self.assertEqual(172, len(random_string))

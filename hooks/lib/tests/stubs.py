@@ -95,9 +95,13 @@ class HostStub(object):
     """Testable stub for C{charmhelpers.core.host}."""
 
     password = "landscape-sekret"
+    secret_token = "landscape-token"
 
     def pwgen(self, length=None):
-        return self.password
+        if length == 172:
+            return self.secret_token
+        else:
+            return self.password
 
 
 class SubprocessStub(object):

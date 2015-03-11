@@ -27,13 +27,6 @@ class ServicesHookTest(HookenvTest):
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
 
-        # Monkey-patch generate_secret_token() to return a pre-set value.
-        self.addCleanup(
-            setattr, LandscapeLeaderContext, "_generate_secret_token",
-            LandscapeLeaderContext._generate_secret_token)
-        LandscapeLeaderContext._generate_secret_token = (
-            lambda _: SAMPLE_LEADER_CONTEXT_DATA["secret-token"])
-
     def test_db_relation_not_ready(self):
         """
         If the db relation doesn't provide the required keys, the services hook
