@@ -92,6 +92,7 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
         }
+
         self.assertEqual(
             ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
             self.renders[0])

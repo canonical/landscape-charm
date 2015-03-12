@@ -119,13 +119,18 @@ class LandscapeLeaderContextTest(HookenvTest):
         generates new data.
         """
         context = LandscapeLeaderContext(host=self.host, path=self.path)
-        self.assertEqual({"database-password": "landscape-sekret"}, context)
+        self.assertItemsEqual(
+            ["database-password", "secret-token"], context.keys())
+        self.assertEqual("landscape-sekret", context["database-password"])
+        self.assertEqual("landscape-token", context["secret-token"])
 
     def test_stored(self):
         """
         When re-created, the L{LandscapeLeaderContext} class loads stored data.
         """
         with open(self.path, "w") as fd:
-            fd.write(dump({"database-password": "old-sekret"}))
+            fd.write(dump({"database-password": "old-sekret",
+                           "secret-token": "old-token"}))
         context = LandscapeLeaderContext(host=self.host, path=self.path)
-        self.assertEqual({"database-password": "old-sekret"}, context)
+        self.assertEqual({"database-password": "old-sekret",
+                          "secret-token": "old-token"}, context)

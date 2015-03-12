@@ -10,6 +10,7 @@ SAMPLE_DB_UNIT_DATA = {
 
 SAMPLE_LEADER_CONTEXT_DATA = {
     "database-password": "landscape-sekret",
+    "secret-token": "landscape-token",
 }
 
 SAMPLE_AMQP_UNIT_DATA = {

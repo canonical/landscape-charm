@@ -78,6 +78,7 @@ class LandscapeLeaderContext(StoredContext):
         if os.path.exists(path):
             data = self.read_context(path)
         else:
-            data = {"database-password": host.pwgen()}
+            data = {"database-password": host.pwgen(),
+                    "secret-token": host.pwgen(length=172)}
             self.store_context(path, data)
         self.update(data)
