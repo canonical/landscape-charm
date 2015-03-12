@@ -30,4 +30,4 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual("10.0.3.170", config.get("broker", "host"))
         self.assertEqual("guessme", config.get("broker", "password"))
         self.assertEqual(
-            "landscape-token", config.get("global", "secret-token"))
+            "landscape-token", config.get("landscape", "secret-token"))
