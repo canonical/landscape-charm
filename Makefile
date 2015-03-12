@@ -29,7 +29,7 @@ bundles:
 	@if [ -d bundles ]; then \
 	    bzr up bundles; \
 	else \
-	    bzr co lp:landscape-charm/bundles-trunk bundles; \
+	    bzr co lp:~davidpbritton/landscape-charm/bundles-trunk-new-charm; \
 	fi
 
 integration-test: test-depends
