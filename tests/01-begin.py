@@ -553,7 +553,7 @@ class LandscapeCronTests(BaseLandscapeTests):
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
         frontend = find_address(juju_status(), "haproxy")
-        psql_cmd = "sudo -u postgres psql -At landscape-standalone-main " \
+        psql_cmd = "sudo -u postgres psql -At landscape-main " \
             "-c \"select encode(key, 'escape'),encode(value, 'escape') " \
             "from system_configuration where key='landscape.root_url'\" " \
             " 2>/dev/null"
