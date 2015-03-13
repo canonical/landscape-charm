@@ -18,6 +18,7 @@ from os import getenv
 from os.path import dirname, abspath, join, splitext, basename
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from time import sleep
+from glob import glob
 
 log = logging.getLogger(__file__)
 
@@ -74,13 +75,12 @@ def check_url(url, good_content, post_data=None, header=None,
 def setUpModule():
     """Deploys Landscape via the charm. All the tests use this deployment."""
     deployer = jujulib.deployer.Deployer()
-    config_file = join(
-        dirname(dirname(abspath(__file__))),
-        "config", "landscape-deployments.yaml")
-    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape"), [config_file],
+    charm_dir = dirname(dirname(abspath(__file__)))
+    bundles = glob(join(charm_dir, "bundles", "*.yaml"))
+    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape-scalable"), bundles,
                     timeout=3000)
 
-    frontend = find_address(juju_status(), "apache2")
+    frontend = find_address(juju_status(), "haproxy")
     good_content = "New user - Landscape"
     log.info("Polling. Waiting for app server: {}".format(frontend))
     check_url("https://{}/".format(frontend), good_content, interval=30,
@@ -215,7 +215,7 @@ class LandscapeServiceTests(BaseLandscapeTests):
     def setUpClass(cls):
         """Prepares juju_status which many tests use."""
         cls.juju_status = juju_status()
-        cls.frontend = find_address(cls.juju_status, "apache2")
+        cls.frontend = find_address(cls.juju_status, "haproxy")
 
     def test_app(self):
         """Verify that the APP service is up.
@@ -370,7 +370,7 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
     def setUpClass(cls):
         """Prepares juju_status and other attributes that many tests use."""
         cls.juju_status = juju_status()
-        cls.frontend = find_address(cls.juju_status, "apache2")
+        cls.frontend = find_address(cls.juju_status, "haproxy")
         cls.app_unit = find_landscape_unit_with_service(
             cls.juju_status, "appserver")
         cls.msg_unit = find_landscape_unit_with_service(
@@ -379,8 +379,6 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
             cls.juju_status, "pingserver")
         cls.async_unit = find_landscape_unit_with_service(
             cls.juju_status, "async-frontend")
-        cls.combo_unit = find_landscape_unit_with_service(
-            cls.juju_status, "combo-loader")
 
     def run_command_on_unit(self, cmd, unit):
         output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
@@ -439,18 +437,6 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/ajax".format(self.frontend)
-        check_url(url, good_content)
-
-    def test_combo_unavailable_page(self):
-        """
-        Verify that the frontend shows the unstyled unavailable page for combo.
-        """
-        self.addCleanup(self.start_server, "landscape-combo-loader",
-                        self.combo_unit)
-        self.stop_server("landscape-combo-loader", self.combo_unit)
-        good_content = ["503 Service Unavailable",
-                        "No server is available to handle this request."]
-        url = "http://{}/combo".format(self.frontend)
         check_url(url, good_content)
 
 
@@ -566,7 +552,7 @@ class LandscapeCronTests(BaseLandscapeTests):
 
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
-        frontend = find_address(juju_status(), "apache2")
+        frontend = find_address(juju_status(), "haproxy")
         psql_cmd = "sudo -u postgres psql -At landscape-standalone-main " \
             "-c \"select encode(key, 'escape'),encode(value, 'escape') " \
             "from system_configuration where key='landscape.root_url'\" " \
