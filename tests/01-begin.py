@@ -81,7 +81,11 @@ def setUpModule():
                     timeout=3000)
 
     frontend = find_address(juju_status(), "apache2")
-    good_content = "New user - Landscape"
+
+    # Make sure the app server is up.
+    # Note: It should match the new-standalone-user form, the
+    #       login form, and not the maintenance page.
+    good_content = "passphrase"
     log.info("Polling. Waiting for app server: {}".format(frontend))
     check_url("https://{}/".format(frontend), good_content, interval=30,
               attempts=10, retry_unavailable=True)
@@ -222,8 +226,11 @@ class LandscapeServiceTests(BaseLandscapeTests):
 
         Specifically that it is reachable and that it presents the new
         user form.
+
+        Note: It should match the new-standalone-user form, the
+        login form, and not the maintenance page.
         """
-        good_content = "New user - Landscape"
+        good_content = "passphrase"
         check_url("https://{}/".format(self.frontend), good_content)
 
     def test_msg(self):
