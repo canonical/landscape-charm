@@ -7,12 +7,6 @@ categories:
 requires:
   db:
     interface: pgsql
-  db-proxy:
-    interface: pgsql
-  db-admin:
-    interface: pgsql
-  db-admin-proxy:
-    interface: pgsql
   amqp:
     interface: rabbitmq
 provides:
@@ -22,8 +16,6 @@ provides:
     optional: true
   website:
     interface: http
-  vhost-config:
-    interface: apache-vhost-config
   hosted:
     interface: landscape-hosted
     scope: container
