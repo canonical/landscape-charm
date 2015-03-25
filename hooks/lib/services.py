@@ -35,7 +35,8 @@ class ServicesHook(Hook):
     def _run(self):
         leader_context = None
         if self._cluster.is_elected_leader(None):
-            leader_context = LandscapeLeaderContext(host=self._host)
+            leader_context = LandscapeLeaderContext(
+                host=self._host, hookenv=hookenv)
 
         manager = ServiceManager([{
             "service": "landscape",

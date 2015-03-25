@@ -13,6 +13,13 @@ SAMPLE_LEADER_CONTEXT_DATA = {
     "secret-token": "landscape-token",
 }
 
+SAMPLE_LEADER_CONTEXT_DATA_WITH_OPENID = {
+    "database-password": "landscape-sekret",
+    "secret-token": "landscape-token",
+    "openid-provider-url": "http://openid-host/",
+    "openid-logout-url": "http://openid-host/logout",
+}
+
 SAMPLE_AMQP_UNIT_DATA = {
     "hostname": "10.0.3.170",
     "password": "guessme",

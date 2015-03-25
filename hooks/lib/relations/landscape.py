@@ -18,6 +18,7 @@ class LandscapeProvider(RelationContext):
     interface = "landscape-ha"
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
+        "secret-token",       # Landscape-wide secret token.
     ]
 
     def __init__(self, leader_context):
@@ -39,6 +40,7 @@ class LandscapeRequirer(RelationContext):
     interface = "landscape-ha"
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
+        "secret-token",       # Landscape-wide secret token.
     ]
 
     def __init__(self, leader_context):
@@ -74,11 +76,27 @@ class LandscapeRequirer(RelationContext):
 class LandscapeLeaderContext(StoredContext):
     """Hold information for the Landscape unit acting as a leader."""
 
-    def __init__(self, host=host, path="landscape-leader-context.yaml"):
+    def __init__(self, host=host, path="landscape-leader-context.yaml",
+                 hookenv=None):
+        changed = False
+
         if os.path.exists(path):
             data = self.read_context(path)
         else:
             data = {"database-password": host.pwgen(),
                     "secret-token": host.pwgen(length=172)}
+            changed = True
+
+        if hookenv is not None:
+            config = hookenv.config()
+        else:
+            config = {}
+        for key in ["openid-provider-url", "openid-logout-url"]:
+            if key in config:
+                if key not in data or data[key] != config[key]:
+                    changed = True
+                    data[key] = config[key]
+        if changed:
             self.store_context(path, data)
+
         self.update(data)
