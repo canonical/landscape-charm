@@ -83,7 +83,7 @@ def setUpModule():
     frontend = find_address(juju_status(), "haproxy")
 
     # Make sure the app server is up.
-    # Note: In order to work on a new server or a server with the 
+    # Note: In order to work on a new server or a server with the
     #       first admin user already created, this phrase should match
     #       the new-standalone-user form, the login form, and not
     #       the maintenance page.
@@ -229,7 +229,7 @@ class LandscapeServiceTests(BaseLandscapeTests):
         Specifically that it is reachable and that it presents the new
         user form.
 
-        Note: In order to work on a new server or a server with the 
+        Note: In order to work on a new server or a server with the
           first admin user already created, this phrase should match
           the new-standalone-user form, the login form, and not
           the maintenance page.

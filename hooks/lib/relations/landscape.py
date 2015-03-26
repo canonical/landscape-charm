@@ -83,5 +83,4 @@ class LandscapeLeaderContext(StoredContext):
             data = {"database-password": host.pwgen(),
                     "secret-token": host.pwgen(length=172)}
             self.store_context(path, data)
-
         self.update(data)
