@@ -109,8 +109,6 @@ class LandscapeProviderTest(HookenvTest):
 
 class LandscapeLeaderContextTest(HookenvTest):
 
-    with_hookenv_monkey_patch = True
-
     def setUp(self):
         super(LandscapeLeaderContextTest, self).setUp()
         self.host = HostStub()
@@ -138,22 +136,3 @@ class LandscapeLeaderContextTest(HookenvTest):
         context = LandscapeLeaderContext(host=self.host, path=self.path)
         self.assertEqual({"database-password": "old-sekret",
                           "secret-token": "old-token"}, context)
-
-    def test_openid_configuration(self):
-        """
-        When openid configuration is provided in the hook environment,
-        it is passed on with the leader context.
-        """
-        self.hookenv.config = lambda: {
-            "openid-provider-url": "http://openid-url/",
-            "openid-logout-url": "http://openid-url/logout",
-        }
-
-        context = LandscapeLeaderContext(
-            host=self.host, path=self.path, hookenv=self.hookenv)
-        self.assertItemsEqual(
-            ["database-password", "secret-token",
-             "openid-provider-url", "openid-logout-url"], context.keys())
-        self.assertEqual("http://openid-url/", context["openid-provider-url"])
-        self.assertEqual(
-            "http://openid-url/logout", context["openid-logout-url"])

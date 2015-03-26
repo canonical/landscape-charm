@@ -4,8 +4,7 @@ from cStringIO import StringIO
 
 from lib.tests.helpers import TemplateTest
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA,
-    SAMPLE_LEADER_CONTEXT_DATA_WITH_OPENID, SAMPLE_AMQP_UNIT_DATA)
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
 
 
 class ServiceConfTest(TemplateTest):
@@ -22,6 +21,7 @@ class ServiceConfTest(TemplateTest):
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {},
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
@@ -45,7 +45,11 @@ class ServiceConfTest(TemplateTest):
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA_WITH_OPENID,
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {
+                "openid-provider-url": "http://openid-host/",
+                "openid-logout-url": "http://openid-host/logout",
+            },
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
