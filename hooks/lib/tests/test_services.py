@@ -5,6 +5,7 @@ from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
+from lib.relations import haproxy
 
 
 class ServicesHookTest(HookenvTest):
@@ -41,6 +42,12 @@ class ServicesHookTest(HookenvTest):
         If we're running the website-relation-joined hook, the HAProxyProvider
         is run and the remote relation is set accordingly.
         """
+        def stub_get_error_files():
+            return []
+
+        original_get_error_files = haproxy.get_error_files
+        haproxy.get_error_files = stub_get_error_files
+
         self.hookenv.hook = "website-relation-joined"
         self.hook()
         # Assert that the HAProxyProvider has run by checking that it set the
@@ -51,6 +58,9 @@ class ServicesHookTest(HookenvTest):
         # relation-set run will resolve to the relation for the http
         # interface).
         self.assertIn("services", self.hookenv.relations[None])
+
+        # Restore the monkey patched error_files
+        haproxy.get_error_files = original_get_error_files
 
     def test_amqp_relation_not_ready(self):
         """
