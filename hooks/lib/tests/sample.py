@@ -17,3 +17,8 @@ SAMPLE_AMQP_UNIT_DATA = {
     "hostname": "10.0.3.170",
     "password": "guessme",
 }
+
+SAMPLE_CONFIG_OPENID_DATA = {
+    "openid-provider-url": "http://openid-host/",
+    "openid-logout-url": "http://openid-host/logout",
+}

@@ -3,7 +3,8 @@ from charmhelpers.core import templating
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
+    SAMPLE_CONFIG_OPENID_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 
 
@@ -91,6 +92,7 @@ class ServicesHookTest(HookenvTest):
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "config": {},
         }
 
         self.assertEqual(
@@ -104,6 +106,36 @@ class ServicesHookTest(HookenvTest):
             ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], call2[0])
+
+    def test_ready_with_openid_configuration(self):
+        """
+        OpenID configuration is passed in to service.conf generation if
+        it is set in the hook configuration.
+        """
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
+        }
+        self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
+        self.hook()
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "config": SAMPLE_CONFIG_OPENID_DATA,
+        }
+
+        self.assertEqual(
+            ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
+            self.renders[0])
 
     def test_remote_leader_not_ready(self):
         """

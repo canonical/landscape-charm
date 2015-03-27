@@ -19,8 +19,9 @@ class LandscapeRequirerTest(HookenvTest):
         be set on the cluster relation in order for the relation to be
         considered ready.
         """
-        self.assertEqual(
-            ["database-password"], LandscapeRequirer.required_keys)
+        self.assertItemsEqual(
+            ["database-password", "secret-token"],
+            LandscapeRequirer.required_keys)
 
     def test_is_leader(self):
         """
@@ -85,8 +86,9 @@ class LandscapeProviderTest(HookenvTest):
         The L{LandscapeProvider} class defines all keys that are required to
         be set before we actually modify the relation.
         """
-        self.assertEqual(
-            ["database-password"], LandscapeRequirer.required_keys)
+        self.assertItemsEqual(
+            ["database-password", "secret-token"],
+            LandscapeRequirer.required_keys)
 
     def test_provide_data(self):
         """

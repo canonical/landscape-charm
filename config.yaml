@@ -14,6 +14,16 @@ options:
         description: License file for LDS.
         type: string
         default:
+    openid-provider-url:
+        default:
+        type: string
+        description: |
+            OpenID provider URL to use for authentication to Landscape.
+    openid-logout-url:
+        default:
+        type: string
+        description: |
+            OpenID provider URL to use to log out of Landscape.
     admin-name:
         description: |
             Name of the account administrator. If this, admin-email and

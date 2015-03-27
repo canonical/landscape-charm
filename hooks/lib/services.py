@@ -49,6 +49,7 @@ class ServicesHook(Hook):
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
+                {"config": hookenv.config()},
             ],
             "data_ready": [
                 render_template(

@@ -18,6 +18,7 @@ class LandscapeProvider(RelationContext):
     interface = "landscape-ha"
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
+        "secret-token",       # Landscape-wide secret token.
     ]
 
     def __init__(self, leader_context):
@@ -39,6 +40,7 @@ class LandscapeRequirer(RelationContext):
     interface = "landscape-ha"
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
+        "secret-token",       # Landscape-wide secret token.
     ]
 
     def __init__(self, leader_context):

@@ -11,14 +11,17 @@ class ServiceConfTest(TemplateTest):
 
     template_filename = "service.conf"
 
-    def test_render_stores(self):
+    def test_render(self):
         """
-        The service.conf template renders data about PostgreSQL configuration.
+        The service.conf template renders data about generic Landscape
+        configuration which includes PostgreSQL configuration, AMQP
+        configuration, secret token and no OpenID settings by default.
         """
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {},
         }
         buffer = StringIO(self.template.render(context))
         config = ConfigParser()
@@ -31,3 +34,29 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual("guessme", config.get("broker", "password"))
         self.assertEqual(
             "landscape-token", config.get("landscape", "secret-token"))
+        self.assertFalse(config.has_option("landscape", "openid-provider-url"))
+        self.assertFalse(config.has_option("landscape", "openid-logout-url"))
+
+    def test_render_with_openid(self):
+        """
+        When OpenID configuration is present in the leader context,
+        openid-related options are set.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {
+                "openid-provider-url": "http://openid-host/",
+                "openid-logout-url": "http://openid-host/logout",
+            },
+        }
+        buffer = StringIO(self.template.render(context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual(
+            "http://openid-host/",
+            config.get("landscape", "openid-provider-url"))
+        self.assertEqual(
+            "http://openid-host/logout",
+            config.get("landscape", "openid-logout-url"))
