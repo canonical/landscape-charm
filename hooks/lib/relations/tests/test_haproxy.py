@@ -110,10 +110,12 @@ class HAProxyProviderTest(HookenvTest):
 
         expected = [
                 {"http_status": "403", "content": fake_content_b64},
-                {"http_status": "500", "content": fake_content_b64},
-                {"http_status": "502", "content": fake_content_b64},
-                {"http_status": "503", "content": fake_content_b64},
-                {"http_status": "504", "content": fake_content_b64},]
+                # TODO: Uncomment the following lines once #1437366 is fixed.
+                #{"http_status": "500", "content": fake_content_b64},
+                #{"http_status": "502", "content": fake_content_b64},
+                #{"http_status": "503", "content": fake_content_b64},
+                #{"http_status": "504", "content": fake_content_b64},
+                ]
 
         result = haproxy.get_error_files(location=temp_dir)
         self.assertItemsEqual(expected, result)
