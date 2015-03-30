@@ -128,13 +128,14 @@ def get_error_files(location=OFFLINE_CONTENT):
     """Return the errorfiles configuration."""
 
     error_to_files_map = {
-        "403": os.path.join(location, "unauthorized-haproxy.html"),
+        # Add 503 only for now since that's what the integration tests check.
+        "503": os.path.join(location, "unplanned-offline-haproxy.html"),
         # TODO: Due to bug #1437366 the command line call to "relation-set"
         # will fail by reaching MAX_ARGS if too many errorfiles are set. Until
         # fixed let's set only one errorfile to assert it works.
+        #"403": os.path.join(location, "unauthorized-haproxy.html"),
         #"500": os.path.join(location, "exception-haproxy.html"),
         #"502": os.path.join(location, "unplanned-offline-haproxy.html"),
-        #"503": os.path.join(location, "unplanned-offline-haproxy.html"),
         #"504": os.path.join(location, "timeout-haproxy.html"),
         }
 
