@@ -34,7 +34,8 @@ class ServicesHook(Hook):
 
     def _run(self):
         leader_context = None
-        if self._cluster.is_elected_leader(None):
+        is_leader = self._cluster.is_elected_leader(None)
+        if is_leader:
             leader_context = LandscapeLeaderContext(host=self._host)
 
         manager = ServiceManager([{
@@ -49,7 +50,8 @@ class ServicesHook(Hook):
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
-                {"config": hookenv.config()},
+                {"config": hookenv.config(),
+                 "is_leader": is_leader},
             ],
             "data_ready": [
                 render_template(

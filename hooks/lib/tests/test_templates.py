@@ -60,3 +60,38 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual(
             "http://openid-host/logout",
             config.get("landscape", "openid-logout-url"))
+
+
+class LandscapeDefaultsTest(TemplateTest):
+
+    template_filename = "landscape-server"
+
+    def test_render(self):
+        """
+        The landscape-server template renders Landscape default configuration
+        in /etc/default/landscape-server, which configures services to run
+        on a particular unit.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {},
+            "is_leader": True,
+        }
+        buffer = StringIO(self.template.render(context)).readlines()
+        self.assertIn('RUN_CRON="yes"\n', buffer)
+
+    def test_render_on_non_leader(self):
+        """
+        On a non-leader unit, cron scripts are not enabled by default.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "config": {},
+            "is_leader": False,
+        }
+        buffer = StringIO(self.template.render(context)).readlines()
+        self.assertIn('RUN_CRON="no"\n', buffer)

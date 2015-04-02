@@ -93,6 +93,7 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "config": {},
+            "is_leader": True,
         }
 
         self.assertEqual(
@@ -131,6 +132,7 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "config": SAMPLE_CONFIG_OPENID_DATA,
+            "is_leader": True,
         }
 
         self.assertEqual(

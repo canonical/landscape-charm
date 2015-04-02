@@ -19,4 +19,8 @@ RUN_JUJU_SYNC="no"
 RUN_PACKAGESEARCH="no"
 
 # To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
+{% if is_leader %}
+RUN_CRON="yes"
+{% else %}
 RUN_CRON="no"
+{% endif %}
