@@ -58,7 +58,7 @@ class ServicesHook(Hook):
                     owner="landscape", group="root", perms=0o640,
                     source="service.conf", target=SERVICE_CONF),
                 render_template(
-                    owner="root", group="root", perms=0o640,
+                    owner="landscape", group="root", perms=0o640,
                     source="landscape-server", target=DEFAULT_FILE),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
