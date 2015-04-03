@@ -12,7 +12,8 @@ from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import HAProxyProvider
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
-from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.relations.hosted import HostedRequirer
+from lib.callbacks.scripts import EnsureConfigDir, SchemaBootstrap, LSCtl
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 DEFAULT_FILE = "/etc/default/landscape-server"
@@ -50,6 +51,7 @@ class ServicesHook(Hook):
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
+                HostedRequirer(),
                 {"config": hookenv.config(),
                  "is_leader": is_leader},
             ],
@@ -60,6 +62,7 @@ class ServicesHook(Hook):
                 render_template(
                     owner="landscape", group="root", perms=0o640,
                     source="landscape-server", target=DEFAULT_FILE),
+                EnsureConfigDir(subprocess=self._subprocess),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
             "start": LSCtl(subprocess=self._subprocess),

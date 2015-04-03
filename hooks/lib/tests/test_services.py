@@ -4,7 +4,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_CONFIG_OPENID_DATA)
+    SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 
 
@@ -92,6 +92,7 @@ class ServicesHookTest(HookenvTest):
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": True,
         }
@@ -103,11 +104,16 @@ class ServicesHookTest(HookenvTest):
             ("landscape-server", DEFAULT_FILE, context,
              "landscape", "root", 416),
             self.renders[1])
-        [call1, call2] = self.subprocess.calls
+        [call1, call2, call3] = self.subprocess.calls
         self.assertEqual(
-            ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
+            ["/bin/sh", "-c",
+             "if ! [ -e /opt/canonical/landscape/configs/standalone ]; " +
+             "then ln -s /opt/canonical/landscape/configs/standalone " +
+             "/opt/canonical/landscape/configs/standalone; fi"], call1[0])
         self.assertEqual(
-            ["/usr/bin/lsctl", "restart"], call2[0])
+            ["/usr/bin/landscape-schema", "--bootstrap"], call2[0])
+        self.assertEqual(
+            ["/usr/bin/lsctl", "restart"], call3[0])
 
     def test_ready_with_openid_configuration(self):
         """
@@ -133,6 +139,7 @@ class ServicesHookTest(HookenvTest):
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "config": SAMPLE_CONFIG_OPENID_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
             "is_leader": True,
         }
 
