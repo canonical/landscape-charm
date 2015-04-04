@@ -5,6 +5,8 @@ import yaml
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
+from lib.assets import OFFLINE_FOLDER
+
 SERVICE_PORTS = {
     "http": 80,
     "https": 443,
@@ -43,8 +45,6 @@ SERVER_OPTIONS = [
     "maxconn 50",
 ]
 
-OFFLINE_CONTENT = "/opt/canonical/landscape/canonical/landscape/offline"
-
 
 class HAProxyProvider(RelationContext):
     """Relation data provider feeding haproxy service configuration."""
@@ -53,8 +53,9 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, hookenv=hookenv):
+    def __init__(self, hookenv=hookenv, offline_folder=OFFLINE_FOLDER):
         self._hookenv = hookenv
+        self._offline_folder = offline_folder
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -96,7 +97,7 @@ class HAProxyProvider(RelationContext):
             "service_host": "0.0.0.0",
             "service_port": SERVICE_PORTS[name],
             "service_options": SERVICE_OPTIONS[name],
-            "errorfiles": get_error_files()
+            "errorfiles": self._get_error_files()
         }
 
     def _backend(self, name, servers):
@@ -123,34 +124,36 @@ class HAProxyProvider(RelationContext):
         server_port = SERVER_PORTS[name]
         return (server_name, server_ip, server_port, SERVER_OPTIONS)
 
+    def _get_error_files(self):
+        """Return the errorfiles configuration."""
 
-def get_error_files(location=OFFLINE_CONTENT):
-    """Return the errorfiles configuration."""
+        location = self._offline_folder
 
-    error_to_files_map = {
-        # Add 503 only for now since that's what the integration tests check.
-        "503": os.path.join(location, "unplanned-offline-haproxy.html"),
-        # TODO: Due to bug #1437366 the command line call to "relation-set"
-        # will fail by reaching MAX_ARGS if too many errorfiles are set. Until
-        # fixed let's set only one errorfile to assert it works.
-        #"403": os.path.join(location, "unauthorized-haproxy.html"),
-        #"500": os.path.join(location, "exception-haproxy.html"),
-        #"502": os.path.join(location, "unplanned-offline-haproxy.html"),
-        #"504": os.path.join(location, "timeout-haproxy.html"),
-        }
+        error_to_files_map = {
+            # Add 503 only for now since that's what the integration tests
+            # check.
+            "503": os.path.join(location, "unplanned-offline-haproxy.html"),
+            # TODO: Due to bug #1437366 the command line call to "relation-set"
+            # will fail by reaching MAX_ARGS if too many errorfiles are set.
+            # Until fixed let's set only one errorfile to assert it works.
+            #"403": os.path.join(location, "unauthorized-haproxy.html"),
+            #"500": os.path.join(location, "exception-haproxy.html"),
+            #"502": os.path.join(location, "unplanned-offline-haproxy.html"),
+            #"504": os.path.join(location, "timeout-haproxy.html"),
+            }
 
-    result = []
+        result = []
 
-    for error_code, path in error_to_files_map.items():
-        content = None
-        with open(path, "r") as thefile:
-            content = thefile.read()
+        for error_code, path in error_to_files_map.items():
+            content = None
+            with open(path, "r") as thefile:
+                content = thefile.read()
 
-        assert content is not None, "Errorfile '%s' was not found!" % path
+            assert content is not None, "Errorfile '%s' was not found!" % path
 
-        entry = {}
-        entry["http_status"] = error_code
-        entry["content"] = base64.b64encode(content)
-        result.append(entry)
+            entry = {}
+            entry["http_status"] = error_code
+            entry["content"] = base64.b64encode(content)
+            result.append(entry)
 
-    return result
+        return result
