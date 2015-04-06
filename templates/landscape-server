@@ -19,6 +19,7 @@ RUN_JUJU_SYNC="no"
 RUN_PACKAGESEARCH="no"
 
 # To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
+# Cron jobs should run only on a single unit (usually the leader).
 {% if is_leader %}
 RUN_CRON="yes"
 {% else %}

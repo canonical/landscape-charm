@@ -73,10 +73,6 @@ class LandscapeDefaultsTest(TemplateTest):
         on a particular unit.
         """
         context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "config": {},
             "is_leader": True,
         }
         buffer = StringIO(self.template.render(context)).readlines()
@@ -87,10 +83,6 @@ class LandscapeDefaultsTest(TemplateTest):
         On a non-leader unit, cron scripts are not enabled by default.
         """
         context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "config": {},
             "is_leader": False,
         }
         buffer = StringIO(self.template.render(context)).readlines()
