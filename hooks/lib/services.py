@@ -9,7 +9,7 @@ from charmhelpers.contrib.hahelpers import cluster
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
-from lib.relations.haproxy import HAProxyProvider
+from lib.relations.haproxy import HAProxyProvider, OFFLINE_FOLDER
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
@@ -26,11 +26,12 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
-                 subprocess=subprocess):
+                 subprocess=subprocess, offline_dir=OFFLINE_FOLDER):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._cluster = cluster
         self._host = host
         self._subprocess = subprocess
+        self._offline_dir = offline_dir
 
     def _run(self):
         leader_context = None
@@ -43,7 +44,7 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(),
+                HAProxyProvider(offline_dir=self._offline_dir),
                 RabbitMQProvider(),
             ],
             "required_data": [

@@ -6,6 +6,7 @@ from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_OPENID_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
+from lib.tests.offline_fixture import OfflineDir
 
 
 class ServicesHookTest(HookenvTest):
@@ -17,9 +18,10 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
+        self.offline_dir = self.useFixture(OfflineDir()).path
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess)
+            subprocess=self.subprocess, offline_dir=self.offline_dir)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
