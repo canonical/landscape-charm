@@ -9,6 +9,7 @@ from fixtures import TestWithFixtures, EnvironmentVariable, TempDir
 from charmhelpers.core import hookenv
 
 from lib.tests.stubs import HookenvStub
+from lib.relations.haproxy import ERRORFILES_MAP
 
 
 class HookenvTest(TestWithFixtures):
@@ -64,7 +65,7 @@ class TemplateTest(TestWithFixtures):
 
 class ErrorFilesTestMixin(object):
 
-    def setup_error_files(self, errorfiles_map):
+    def setup_error_files(self, errorfiles_map=ERRORFILES_MAP):
         """
         @param errorfiles_map: a map of error codes to filenames to return.
         """

@@ -2,6 +2,8 @@ import base64
 import os
 import yaml
 
+from lib.hook import HookError
+
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
@@ -64,9 +66,9 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, hookenv=hookenv, offline_folder=OFFLINE_FOLDER):
+    def __init__(self, hookenv=hookenv, offline_dir=OFFLINE_FOLDER):
         self._hookenv = hookenv
-        self._offline_folder = offline_folder
+        self._offline_dir = offline_dir
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -137,22 +139,21 @@ class HAProxyProvider(RelationContext):
 
     def _get_error_files(self):
         """Return the errorfiles configuration."""
-
-        location = self._offline_folder
-
         result = []
 
         for error_code, file_name in ERRORFILES_MAP.items():
             content = None
-            path = os.path.join(location, file_name)
-            with open(path, "r") as error_file:
-                content = error_file.read()
+            path = os.path.join(self._offline_dir, file_name)
 
-            assert content is not None, "Errorfile '%s' was not found!" % path
+            try:
+                with open(path, "r") as error_file:
+                    content = error_file.read()
+            except IOError as error:
+                raise HookError(
+                    "Could not read '%s' (%s)!" % (path, str(error)))
 
-            entry = {}
-            entry["http_status"] = error_code
-            entry["content"] = base64.b64encode(content)
+            entry = {"http_status": error_code,
+                     "content": base64.b64encode(content)}
             result.append(entry)
 
         return result
