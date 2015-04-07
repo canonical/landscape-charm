@@ -20,7 +20,7 @@ class ServicesHookTest(HookenvTest, ErrorFilesTestMixin):
         self.error_files_folder = self.setup_error_files(ERRORFILES_MAP)
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess, offline_folder=self.error_files_folder)
+            subprocess=self.subprocess, offline_dir=self.error_files_folder)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
