@@ -1,14 +1,9 @@
-import os
 import subprocess
 
 from charmhelpers.core.services.base import ManagerCallback
 
 LSCTL = "/usr/bin/lsctl"
 SCHEMA = "/usr/bin/landscape-schema"
-SHELL = "/bin/sh"
-
-CONFIGS_DIR = "/opt/canonical/landscape/configs"
-STANDALONE_DIR = os.path.join(CONFIGS_DIR, "standalone")
 
 
 class ScriptCallback(ManagerCallback):
@@ -22,28 +17,6 @@ class ScriptCallback(ManagerCallback):
         command = [name]
         command += options
         self._subprocess.check_call(command)
-
-
-class EnsureConfigDir(ScriptCallback):
-    """Ensure that the config dir for the configured deployment mode exists.
-
-    XXX This is a temporary workaround till we'll make the Landscape server
-        code always look at the common same location for configuration files.
-    """
-    def __call__(self, manager, service_name, event_name):
-        service = manager.get_service(service_name)
-
-        # Lookup the deployment mode
-        for data in service.get("required_data"):
-            if "hosted" in data:
-                deployment_mode = data["hosted"][0]["deployment-mode"]
-                break
-
-        # Create a symlink for the config directory
-        config_link = os.path.join(CONFIGS_DIR, deployment_mode)
-        self._run(
-            SHELL, ("-c", "if ! [ -e %s ]; then ln -s %s %s; fi" % (
-                config_link, STANDALONE_DIR, config_link)))
 
 
 class SchemaBootstrap(ScriptCallback):

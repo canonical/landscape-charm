@@ -1,3 +1,5 @@
+import os
+
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
@@ -104,16 +106,12 @@ class ServicesHookTest(HookenvTest):
             ("landscape-server", DEFAULT_FILE, context,
              "landscape", "root", 416),
             self.renders[1])
-        [call1, call2, call3] = self.subprocess.calls
+        [call1, call2] = self.subprocess.calls
+        self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
         self.assertEqual(
-            ["/bin/sh", "-c",
-             "if ! [ -e /opt/canonical/landscape/configs/standalone ]; " +
-             "then ln -s /opt/canonical/landscape/configs/standalone " +
-             "/opt/canonical/landscape/configs/standalone; fi"], call1[0])
+            ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
         self.assertEqual(
-            ["/usr/bin/landscape-schema", "--bootstrap"], call2[0])
-        self.assertEqual(
-            ["/usr/bin/lsctl", "restart"], call3[0])
+            ["/usr/bin/lsctl", "restart"], call2[0])
 
     def test_ready_with_openid_configuration(self):
         """
