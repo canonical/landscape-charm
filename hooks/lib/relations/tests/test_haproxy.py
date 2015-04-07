@@ -6,10 +6,11 @@ from base64 import b64encode
 from lib.relations.haproxy import (
     HAProxyProvider, SERVER_OPTIONS, ERRORFILES_MAP)
 from lib.hook import HookError
-from lib.tests.helpers import HookenvTest, ErrorFilesTestMixin
+from lib.tests.helpers import HookenvTest
+from lib.tests.offline_fixture import OfflineDir
 
 
-class HAProxyProviderTest(HookenvTest, ErrorFilesTestMixin):
+class HAProxyProviderTest(HookenvTest):
 
     with_hookenv_monkey_patch = True
 
@@ -27,7 +28,7 @@ class HAProxyProviderTest(HookenvTest, ErrorFilesTestMixin):
         The HAProxyProvider class feeds haproxy with the services that this
         Landscape unit runs. By default all services are run.
         """
-        offline_dir = self.setup_error_files(ERRORFILES_MAP)
+        offline_dir = self.useFixture(OfflineDir()).path
         relation = HAProxyProvider(offline_dir=offline_dir)
 
         expected_errorfiles = []
@@ -90,8 +91,9 @@ class HAProxyProviderTest(HookenvTest, ErrorFilesTestMixin):
 
     def test_files_cannot_be_read(self):
         """
+        In case a file specified in the errorfiles map cannot be read, the
+        _get_error_files method raises a HookError.
         """
-        import ipdb; ipdb.set_trace()
         offline_dir = tempfile.mkdtemp()  # Do not creat the files.
         provider = HAProxyProvider(offline_dir=offline_dir)
 

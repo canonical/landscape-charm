@@ -1,6 +1,4 @@
 import os
-import shutil
-import tempfile
 
 from jinja2 import FileSystemLoader, Environment
 
@@ -9,7 +7,6 @@ from fixtures import TestWithFixtures, EnvironmentVariable, TempDir
 from charmhelpers.core import hookenv
 
 from lib.tests.stubs import HookenvStub
-from lib.relations.haproxy import ERRORFILES_MAP
 
 
 class HookenvTest(TestWithFixtures):
@@ -61,20 +58,3 @@ class TemplateTest(TestWithFixtures):
         templates_dir = os.path.join(charm_dir, "templates")
         loader = Environment(loader=FileSystemLoader(templates_dir))
         self.template = loader.get_template(self.template_filename)
-
-
-class ErrorFilesTestMixin(object):
-
-    def setup_error_files(self, errorfiles_map=ERRORFILES_MAP):
-        """
-        @param errorfiles_map: a map of error codes to filenames to return.
-        """
-        temp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, temp_dir)
-
-        for _, filename in errorfiles_map.items():
-            fake_content = "Fake %s" % filename
-            with open(os.path.join(temp_dir, filename), "w") as fake_file:
-                fake_file.write(fake_content)
-
-        return temp_dir

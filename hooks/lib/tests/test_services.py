@@ -1,14 +1,14 @@
 from charmhelpers.core import templating
 
-from lib.tests.helpers import HookenvTest, ErrorFilesTestMixin
+from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
-from lib.relations.haproxy import ERRORFILES_MAP
+from lib.tests.offline_fixture import OfflineDir
 
 
-class ServicesHookTest(HookenvTest, ErrorFilesTestMixin):
+class ServicesHookTest(HookenvTest):
 
     with_hookenv_monkey_patch = True
 
@@ -17,7 +17,7 @@ class ServicesHookTest(HookenvTest, ErrorFilesTestMixin):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
-        self.error_files_folder = self.setup_error_files(ERRORFILES_MAP)
+        self.error_files_folder = self.useFixture(OfflineDir()).path
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
             subprocess=self.subprocess, offline_dir=self.error_files_folder)
