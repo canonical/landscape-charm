@@ -5,8 +5,6 @@ import yaml
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
-from lib.assets import OFFLINE_FOLDER
-
 SERVICE_PORTS = {
     "http": 80,
     "https": 443,
@@ -44,8 +42,6 @@ SERVER_OPTIONS = [
     "fall 5",
     "maxconn 50",
 ]
-
-
 ERRORFILES_MAP = {
     # Add 503 only for now since that's what the integration tests
     # check.
@@ -57,7 +53,8 @@ ERRORFILES_MAP = {
     #"500": "exception-haproxy.html",
     #"502": "unplanned-offline-haproxy.html",
     #"504": "timeout-haproxy.html",
-    }
+}
+OFFLINE_FOLDER = "/opt/canonical/landscape/canonical/landscape/offline"
 
 
 class HAProxyProvider(RelationContext):

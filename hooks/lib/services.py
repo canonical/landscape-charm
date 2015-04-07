@@ -9,11 +9,10 @@ from charmhelpers.contrib.hahelpers import cluster
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
-from lib.relations.haproxy import HAProxyProvider
+from lib.relations.haproxy import HAProxyProvider, OFFLINE_FOLDER
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
-from lib.assets import OFFLINE_FOLDER
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 DEFAULT_FILE = "/etc/default/landscape-server"
