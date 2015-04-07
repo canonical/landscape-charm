@@ -48,3 +48,16 @@ options:
             Has no effect if changed after a deployment.
         type: string
         default:
+    ssl_cert:
+        type: string
+        description: |
+            base64 encoded SSL certificate to use for the landscape server.
+            It will be passed verbatim to the haproxy charm. If not set, a
+            self-signed certificated will be generated instead.
+        default: ""
+    ssl_key:
+        type: string
+        description: |
+            base64 encoded private key for the default SSL certificate. If ssl_cert
+            is unset, this will be ignored.
+        default: ""
