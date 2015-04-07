@@ -17,10 +17,10 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
-        self.error_files_folder = self.useFixture(OfflineDir()).path
+        self.offline_dir = self.useFixture(OfflineDir()).path
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess, offline_dir=self.error_files_folder)
+            subprocess=self.subprocess, offline_dir=self.offline_dir)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.

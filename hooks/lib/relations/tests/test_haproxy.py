@@ -1,7 +1,7 @@
-import tempfile
 import yaml
 
 from base64 import b64encode
+from fixtures import TempDir
 
 from lib.relations.haproxy import (
     HAProxyProvider, SERVER_OPTIONS, ERRORFILES_MAP)
@@ -94,7 +94,7 @@ class HAProxyProviderTest(HookenvTest):
         In case a file specified in the errorfiles map cannot be read, the
         provide_data method raises a HookError.
         """
-        offline_dir = tempfile.mkdtemp()  # Do not creat the files.
+        offline_dir = self.useFixture(TempDir()).path
         provider = HAProxyProvider(offline_dir=offline_dir)
 
         self.assertRaises(HookError, provider.provide_data)
