@@ -22,7 +22,8 @@ class HostedRequirer(RelationContext):
 
     def get_data(self):
         super(HostedRequirer, self).get_data()
-        if self.get(self.name) is None:
+        data = self.get(self.name)
+        if data is None:
             # This means that we're not currently related to landscape-hosted,
             # so we set the deployment mode to standalone.
             self.update({self.name: [{"deployment-mode": "standalone"}]})
@@ -30,8 +31,7 @@ class HostedRequirer(RelationContext):
             # We're related to landscape-hosted, and it's safe to assume that
             # there's exactly one unit we're related to, since landscape-hosted
             # is a subordinate charm.
-            [data] = self.get(self.name)
-            deployment_mode = data["deployment-mode"]
+            deployment_mode = data[0]["deployment-mode"]
             if deployment_mode not in DEPLOYMENT_MODES:
                 raise HookError(
                     "Invalid deployment-mode '%s'" % deployment_mode)
