@@ -1,4 +1,3 @@
-import base64
 import os
 import shutil
 import tempfile
@@ -65,21 +64,16 @@ class TemplateTest(TestWithFixtures):
 
 class ErrorFilesTestMixin(object):
 
-    def setup_error_files(self):
+    def setup_error_files(self, errorfiles_map):
+        """
+        @param errorfiles_map: a map of error codes to filenames to return.
+        """
         temp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, temp_dir)
 
-        error_file_names = ["unauthorized-haproxy.html",
-                            "exception-haproxy.html",
-                            "unplanned-offline-haproxy.html",
-                            "timeout-haproxy.html"]
-
-        fake_content = "Fake."
-
-        self.fake_content_b64 = base64.b64encode(fake_content)
-
-        for filename in error_file_names:
-            with open(os.path.join(temp_dir, filename), "w") as thefile:
-                thefile.write(fake_content)
+        for _, filename in errorfiles_map.items():
+            fake_content = "Fake %s" % filename
+            with open(os.path.join(temp_dir, filename), "w") as fake_file:
+                fake_file.write(fake_content)
 
         return temp_dir

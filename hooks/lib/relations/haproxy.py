@@ -46,6 +46,20 @@ SERVER_OPTIONS = [
 ]
 
 
+ERRORFILES_MAP = {
+    # Add 503 only for now since that's what the integration tests
+    # check.
+    "503": "unplanned-offline-haproxy.html",
+    # TODO: Due to bug #1437366 the command line call to "relation-set"
+    # will fail by reaching MAX_ARGS if too many errorfiles are set.
+    # Until fixed let's set only one errorfile to assert it works.
+    #"403": "unauthorized-haproxy.html",
+    #"500": "exception-haproxy.html",
+    #"502": "unplanned-offline-haproxy.html",
+    #"504": "timeout-haproxy.html",
+    }
+
+
 class HAProxyProvider(RelationContext):
     """Relation data provider feeding haproxy service configuration."""
 
@@ -129,25 +143,13 @@ class HAProxyProvider(RelationContext):
 
         location = self._offline_folder
 
-        error_to_files_map = {
-            # Add 503 only for now since that's what the integration tests
-            # check.
-            "503": os.path.join(location, "unplanned-offline-haproxy.html"),
-            # TODO: Due to bug #1437366 the command line call to "relation-set"
-            # will fail by reaching MAX_ARGS if too many errorfiles are set.
-            # Until fixed let's set only one errorfile to assert it works.
-            #"403": os.path.join(location, "unauthorized-haproxy.html"),
-            #"500": os.path.join(location, "exception-haproxy.html"),
-            #"502": os.path.join(location, "unplanned-offline-haproxy.html"),
-            #"504": os.path.join(location, "timeout-haproxy.html"),
-            }
-
         result = []
 
-        for error_code, path in error_to_files_map.items():
+        for error_code, file_name in ERRORFILES_MAP.items():
             content = None
-            with open(path, "r") as thefile:
-                content = thefile.read()
+            path = os.path.join(location, file_name)
+            with open(path, "r") as error_file:
+                content = error_file.read()
 
             assert content is not None, "Errorfile '%s' was not found!" % path
 

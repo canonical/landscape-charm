@@ -5,7 +5,7 @@ from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
-from lib.relations import haproxy
+from lib.relations.haproxy import ERRORFILES_MAP
 
 
 class ServicesHookTest(HookenvTest, ErrorFilesTestMixin):
@@ -17,7 +17,7 @@ class ServicesHookTest(HookenvTest, ErrorFilesTestMixin):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
-        self.error_files_folder = self.setup_error_files()
+        self.error_files_folder = self.setup_error_files(ERRORFILES_MAP)
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
             subprocess=self.subprocess, offline_folder=self.error_files_folder)

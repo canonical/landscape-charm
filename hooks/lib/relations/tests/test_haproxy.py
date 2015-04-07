@@ -1,6 +1,8 @@
 import yaml
+from base64 import b64encode
 
-from lib.relations.haproxy import HAProxyProvider, SERVER_OPTIONS
+from lib.relations.haproxy import (HAProxyProvider, SERVER_OPTIONS,
+    ERRORFILES_MAP)
 from lib.tests.helpers import HookenvTest, ErrorFilesTestMixin
 
 
@@ -22,18 +24,25 @@ class HAProxyProviderTest(HookenvTest, ErrorFilesTestMixin):
         The HAProxyProvider class feeds haproxy with the services that this
         Landscape unit runs. By default all services are run.
         """
-        offline_dir = self.setup_error_files()
+        offline_dir = self.setup_error_files(ERRORFILES_MAP)
         relation = HAProxyProvider(offline_folder=offline_dir)
 
-        expected_errorfiles = [
-                {"http_status": "503", "content": self.fake_content_b64},
+        expected_errorfiles = []
+
+        for error_code, filename in ERRORFILES_MAP.items():
+            expected_content = b64encode("Fake %s" % filename)
+            expected_errorfiles.append(
+                {"http_status": error_code, "content": expected_content})
+
+#        expected_errorfiles = [
+#                {"http_status": "503", "content": self.fake_content_b64},
                 # TODO: Uncomment the following lines once #1437366 is fixed.
                 #{"http_status": "403", "content": fake_content_b64},
                 #{"http_status": "500", "content": fake_content_b64},
                 #{"http_status": "502", "content": fake_content_b64},
                 #{"http_status": "503", "content": fake_content_b64},
                 #{"http_status": "504", "content": fake_content_b64},
-                ]
+#                ]
 
         data = relation.provide_data()
 
