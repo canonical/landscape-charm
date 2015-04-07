@@ -1,8 +1,8 @@
 import yaml
 from base64 import b64encode
 
-from lib.relations.haproxy import (HAProxyProvider, SERVER_OPTIONS,
-    ERRORFILES_MAP)
+from lib.relations.haproxy import (
+    HAProxyProvider, SERVER_OPTIONS, ERRORFILES_MAP)
 from lib.tests.helpers import HookenvTest, ErrorFilesTestMixin
 
 

@@ -83,7 +83,7 @@ def setUpModule():
     frontend = find_address(juju_status(), "haproxy")
 
     # Make sure the app server is up.
-    # Note: In order to work on a new server or a server with the 
+    # Note: In order to work on a new server or a server with the
     #       first admin user already created, this phrase should match
     #       the new-standalone-user form, the login form, and not
     #       the maintenance page.
@@ -147,7 +147,6 @@ def find_landscape_unit_with_service(juju_status, wanted_service):
         if not service_name.startswith("landscape"):
             continue
         config = get_service_config(service_name)
-        import ipdb; ipdb.set_trace()
         landscape_services = config["settings"]["services"]["value"]
         if wanted_service not in landscape_services:
             continue
@@ -230,7 +229,7 @@ class LandscapeServiceTests(BaseLandscapeTests):
         Specifically that it is reachable and that it presents the new
         user form.
 
-        Note: In order to work on a new server or a server with the 
+        Note: In order to work on a new server or a server with the
           first admin user already created, this phrase should match
           the new-standalone-user form, the login form, and not
           the maintenance page.
