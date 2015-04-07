@@ -6,12 +6,13 @@ DEPLOYMENT_MODES = ("standalone", "edge", "staging", "production")
 
 
 class HostedRequirer(RelationContext):
-    """Relation data requirer for the 'landscape-hosted' interface.
+    """Relation data requirer for the 'hosted' interface.
 
-    This relation acquires information from other Landscape units. Its only
-    key is 'leader', which will be set either to the local leader context
-    data (if we are the leader), or to the data provided by the leader peer
-    unit using the relation.
+    This relation acquires information from the landscape-hosted subordinate,
+    which will affect local configuration (for instance 'deployment-mode').
+
+    If we're not related to any landscape-hosted subordinate, then this data
+    manager will simply fall back to stock data setting a 'standalone' mode.
     """
     name = "hosted"
     interface = "landscape-hosted"

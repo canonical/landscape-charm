@@ -1,5 +1,7 @@
 import os
 
+from fixtures import TempDir
+
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
@@ -8,6 +10,7 @@ from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
+from lib.tests.offline_fixture import OfflineDir
 
 
 class ServicesHookTest(HookenvTest):
@@ -19,9 +22,12 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
+        self.offline_dir = self.useFixture(OfflineDir())
+        self.configs_dir = self.useFixture(TempDir())
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess)
+            subprocess=self.subprocess, offline_dir=self.offline_dir.path,
+            configs_dir=self.configs_dir.path)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
@@ -107,11 +113,37 @@ class ServicesHookTest(HookenvTest):
              "landscape", "root", 416),
             self.renders[1])
         [call1, call2] = self.subprocess.calls
-        self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
         self.assertEqual(
             ["/usr/bin/landscape-schema", "--bootstrap"], call1[0])
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], call2[0])
+
+    def test_ready_with_non_standalone_deployment_mode(self):
+        """
+        If deployment-mode is set to 'edge' an appropriate config symlink will
+        be created
+        """
+        hosted_data = SAMPLE_HOSTED_DATA.copy()
+        hosted_data["deployment-mode"] = "edge"
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/0": hosted_data,
+                },
+            },
+        }
+        self.hook()
+        self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
 
     def test_ready_with_openid_configuration(self):
         """
