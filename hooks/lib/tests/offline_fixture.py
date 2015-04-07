@@ -3,6 +3,7 @@ from fixtures import TempDir
 
 from lib.relations.haproxy import ERRORFILES_MAP
 
+
 class OfflineDir(TempDir):
     """Temporary offline dir populated with sample data."""
 
