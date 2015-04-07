@@ -33,7 +33,7 @@ class HAProxyProviderTest(HookenvTest):
 
         expected_errorfiles = []
 
-        for error_code, filename in ERRORFILES_MAP.items():
+        for error_code, filename in sorted(ERRORFILES_MAP.items()):
             expected_content = b64encode("Fake %s" % filename)
             expected_errorfiles.append(
                 {"http_status": error_code, "content": expected_content})
@@ -92,9 +92,9 @@ class HAProxyProviderTest(HookenvTest):
     def test_files_cannot_be_read(self):
         """
         In case a file specified in the errorfiles map cannot be read, the
-        _get_error_files method raises a HookError.
+        provide_data method raises a HookError.
         """
         offline_dir = tempfile.mkdtemp()  # Do not creat the files.
         provider = HAProxyProvider(offline_dir=offline_dir)
 
-        self.assertRaises(HookError, provider._get_error_files)
+        self.assertRaises(HookError, provider.provide_data)

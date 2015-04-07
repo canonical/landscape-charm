@@ -141,7 +141,7 @@ class HAProxyProvider(RelationContext):
         """Return the errorfiles configuration."""
         result = []
 
-        for error_code, file_name in ERRORFILES_MAP.items():
+        for error_code, file_name in sorted(ERRORFILES_MAP.items()):
             content = None
             path = os.path.join(self._offline_dir, file_name)
 
