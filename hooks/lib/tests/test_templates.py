@@ -77,9 +77,6 @@ class LandscapeDefaultsTest(TemplateTest):
         on a particular unit.
         """
         context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": True,
@@ -92,9 +89,6 @@ class LandscapeDefaultsTest(TemplateTest):
         On a non-leader unit, cron scripts are not enabled by default.
         """
         context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": False,
