@@ -73,7 +73,6 @@ class Apt(object):
         source = config.get("source")
         if not source:
             raise HookError("No source config parameter defined")
-        previous_source = config.previous("source")
 
         # Check if we're setting the source for the first time, or replacing
         # an existing value. In the latter case we'll no-op if the value is the
