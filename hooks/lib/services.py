@@ -12,7 +12,10 @@ from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import HAProxyProvider, OFFLINE_FOLDER
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
+from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.callbacks.filesystem import CONFIGS_DIR, EnsureConfigDir
+
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 DEFAULT_FILE = "/etc/default/landscape-server"
@@ -26,11 +29,13 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
-                 subprocess=subprocess, offline_dir=OFFLINE_FOLDER):
+                 subprocess=subprocess, configs_dir=CONFIGS_DIR,
+                 offline_dir=OFFLINE_FOLDER):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._cluster = cluster
         self._host = host
         self._subprocess = subprocess
+        self._configs_dir = configs_dir
         self._offline_dir = offline_dir
 
     def _run(self):
@@ -51,6 +56,7 @@ class ServicesHook(Hook):
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
+                HostedRequirer(),
                 {"config": hookenv.config(),
                  "is_leader": is_leader},
             ],
@@ -61,6 +67,7 @@ class ServicesHook(Hook):
                 render_template(
                     owner="landscape", group="root", perms=0o640,
                     source="landscape-server", target=DEFAULT_FILE),
+                EnsureConfigDir(configs_dir=self._configs_dir),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
             "start": LSCtl(subprocess=self._subprocess),

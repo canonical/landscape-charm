@@ -22,3 +22,7 @@ SAMPLE_CONFIG_OPENID_DATA = {
     "openid-provider-url": "http://openid-host/",
     "openid-logout-url": "http://openid-host/logout",
 }
+
+SAMPLE_HOSTED_DATA = {
+    "deployment-mode": "standalone",
+}
