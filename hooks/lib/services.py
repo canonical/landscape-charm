@@ -14,7 +14,7 @@ from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
-from lib.callbacks.fs import CONFIGS_DIR, EnsureConfigDir
+from lib.callbacks.filesystem import CONFIGS_DIR, EnsureConfigDir
 
 
 SERVICE_CONF = "/etc/landscape/service.conf"

@@ -5,7 +5,7 @@ from fixtures import TempDir
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.tests.helpers import HookenvTest
-from lib.callbacks.fs import EnsureConfigDir
+from lib.callbacks.filesystem import EnsureConfigDir
 
 
 class EnsureConfigDirTest(HookenvTest):
@@ -19,8 +19,7 @@ class EnsureConfigDirTest(HookenvTest):
 
     def test_options(self):
         """
-        The callback invokes a shell command to create a config dir symlink
-        if needed.
+        The callback creates a config dir symlink if needed.
         """
         manager = ServiceManager([{
             "service": "landscape",

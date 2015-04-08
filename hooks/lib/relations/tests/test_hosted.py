@@ -10,7 +10,7 @@ class HostedRequirerTest(HookenvTest):
 
     def test_required_keys(self):
         """
-        The L{HostedRequirer} class defines all keys that are required to
+        The HostedRequirer class defines all keys that are required to
         be set on the cluster relation in order for the relation to be
         considered ready.
         """

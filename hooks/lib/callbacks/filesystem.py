@@ -10,7 +10,7 @@ CONFIGS_DIR = "/opt/canonical/landscape/configs"
 class EnsureConfigDir(ManagerCallback):
     """Ensure that the config dir for the configured deployment mode exists.
 
-    XXX This is a temporary workaround till we'll make the Landscape server
+    XXX This is a temporary workaround till we make the Landscape server
         code always look at the same location for configuration files.
     """
     def __init__(self, configs_dir=CONFIGS_DIR):

@@ -98,7 +98,7 @@ class LandscapeDefaultsTest(TemplateTest):
 
     def test_render_juju_sync(self):
         """
-        If the landspape-server unit is the leader and we're in standalone
+        If the landscape-server unit is the leader and we're in standalone
         mode, juju-sync will be run.
         """
         context = {
@@ -114,7 +114,7 @@ class LandscapeDefaultsTest(TemplateTest):
 
     def test_render_juju_sync_not_leader(self):
         """
-        If the landspape-server unit is not the leader, juju-sync
+        If the landscape-server unit is not the leader, juju-sync
         won't be run.
         """
         context = {
