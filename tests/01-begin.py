@@ -378,7 +378,6 @@ class LandscapeServiceConfigTests(BaseLandscapeTests):
             self.assertNotEqual(len(schema["store_password"]), 0)
 
 
-@unittest.skip("no unavailable pages yet")
 class LandscapeErrorPagesTests(BaseLandscapeTests):
 
     @classmethod
@@ -386,14 +385,8 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         """Prepares juju_status and other attributes that many tests use."""
         cls.juju_status = juju_status()
         cls.frontend = find_address(cls.juju_status, "haproxy")
-        cls.app_unit = find_landscape_unit_with_service(
-            cls.juju_status, "appserver")
-        cls.msg_unit = find_landscape_unit_with_service(
-            cls.juju_status, "msgserver")
-        cls.ping_unit = find_landscape_unit_with_service(
-            cls.juju_status, "pingserver")
-        cls.async_unit = find_landscape_unit_with_service(
-            cls.juju_status, "async-frontend")
+        cls.landscape_units = get_landscape_units(cls.juju_status)
+        cls.first_unit = cls.landscape_units[0]
 
     def run_command_on_unit(self, cmd, unit):
         output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
@@ -409,46 +402,49 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
 
     def test_app_unavailable_page(self):
         """
-        Verify that the frontend shows the styled unavailable page for app.
+        Verify that the frontend shows the styled unavailable page.
         """
         self.addCleanup(self.start_server, "landscape-appserver",
-                        self.app_unit)
-        self.stop_server("landscape-appserver", self.app_unit)
+                        self.first_unit)
+        self.stop_server("landscape-appserver", self.first_unit)
         good_content = "please phone us"
         url = "https://{}/".format(self.frontend)
         check_url(url, good_content)
 
+    @unittest.skip
     def test_msg_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for msg.
         """
         self.addCleanup(self.start_server, "landscape-msgserver",
-                        self.msg_unit)
-        self.stop_server("landscape-msgserver", self.msg_unit)
+                        self.first_unit)
+        self.stop_server("landscape-msgserver", self.first_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/message-system".format(self.frontend)
         check_url(url, good_content)
 
+    @unittest.skip
     def test_ping_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for ping.
         """
         self.addCleanup(self.start_server, "landscape-pingserver",
-                        self.ping_unit)
-        self.stop_server("landscape-pingserver", self.ping_unit)
+                        self.first_unit)
+        self.stop_server("landscape-pingserver", self.first_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "http://{}/ping".format(self.frontend)
         check_url(url, good_content)
 
+    @unittest.skip
     def test_async_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for async.
         """
         self.addCleanup(self.start_server, "landscape-async-frontend",
-                        self.async_unit)
-        self.stop_server("landscape-async-frontend", self.async_unit)
+                        self.first_unit)
+        self.stop_server("landscape-async-frontend", self.first_unit)
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/ajax".format(self.frontend)

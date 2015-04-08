@@ -1,4 +1,8 @@
+import base64
+import os
 import yaml
+
+from lib.hook import HookError
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
@@ -40,6 +44,19 @@ SERVER_OPTIONS = [
     "fall 5",
     "maxconn 50",
 ]
+ERRORFILES_MAP = {
+    # Add 503 only for now since that's what the integration tests
+    # check.
+    "503": "unplanned-offline-haproxy.html",
+    # TODO: Due to bug #1437366 the command line call to "relation-set"
+    # will fail by reaching MAX_ARGS if too many errorfiles are set.
+    # Until fixed let's set only one errorfile to assert it works.
+    #"403": "unauthorized-haproxy.html",
+    #"500": "exception-haproxy.html",
+    #"502": "unplanned-offline-haproxy.html",
+    #"504": "timeout-haproxy.html",
+}
+OFFLINE_FOLDER = "/opt/canonical/landscape/canonical/landscape/offline"
 
 
 class HAProxyProvider(RelationContext):
@@ -47,11 +64,11 @@ class HAProxyProvider(RelationContext):
 
     name = "website"
     interface = "http"
-    required_keys = [
-        "services"]
+    required_keys = ["services"]
 
-    def __init__(self, hookenv=hookenv):
+    def __init__(self, hookenv=hookenv, offline_dir=OFFLINE_FOLDER):
         self._hookenv = hookenv
+        self._offline_dir = offline_dir
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -93,6 +110,7 @@ class HAProxyProvider(RelationContext):
             "service_host": "0.0.0.0",
             "service_port": SERVICE_PORTS[name],
             "service_options": SERVICE_OPTIONS[name],
+            "errorfiles": self._get_error_files()
         }
 
     def _backend(self, name, servers):
@@ -118,3 +136,24 @@ class HAProxyProvider(RelationContext):
         server_name = "landscape-%s-%s" % (name, unit_name.replace("/", "-"))
         server_port = SERVER_PORTS[name]
         return (server_name, server_ip, server_port, SERVER_OPTIONS)
+
+    def _get_error_files(self):
+        """Return the errorfiles configuration."""
+        result = []
+
+        for error_code, file_name in sorted(ERRORFILES_MAP.items()):
+            content = None
+            path = os.path.join(self._offline_dir, file_name)
+
+            try:
+                with open(path, "r") as error_file:
+                    content = error_file.read()
+            except IOError as error:
+                raise HookError(
+                    "Could not read '%s' (%s)!" % (path, str(error)))
+
+            entry = {"http_status": error_code,
+                     "content": base64.b64encode(content)}
+            result.append(entry)
+
+        return result

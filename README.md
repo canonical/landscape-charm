@@ -90,5 +90,5 @@ end-to-end integration testing.  This is how you proceed with running
 them:
 
     # Make sure your JUJU_ENV is *not* bootstrapped, and:
-    $ sudo apt-get install python-pyscopg2 python-mocker python-psutil
+    $ sudo apt-get install python-psycopg2 python-mocker python-psutil
     $ JUJU_ENV=<env> make integration-test
