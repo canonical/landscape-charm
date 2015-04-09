@@ -115,13 +115,6 @@ class HAProxyProviderTest(HookenvTest):
         result = provider._get_ssl_certificate()
         self.assertEqual(["DEFAULT"], result)
 
-    def test_wb_get_ssl_certificate_fails_for_missing_key(self):
-        """If the _get_ssl_certificate method is called with an ssl_cert config
-        set but no ssl_key, and error is raised."""
-        self.hookenv.config()["ssl_cert"] = "Whatever"
-        provider = HAProxyProvider(hookenv=self.hookenv)
-        self.assertRaises(HookError, provider._get_ssl_certificate)
-
     def test_wb_get_ssl_certificate_fails_for_missing_cert(self):
         """If the _get_ssl_certificate method is called with an ssl_key config
         set but no ssl_cert, and error is raised."""
