@@ -17,7 +17,8 @@ from os import getenv
 from subprocess import check_output, STDOUT, CalledProcessError, PIPE
 from glob import glob
 
-from helpers import (check_url, juju_status, find_address, get_landscape_units,
+from helpers import (
+    check_url, juju_status, find_address, get_landscape_units,
     get_landscape_service_conf, find_landscape_unit_with_service,
     BaseLandscapeTests)
 
@@ -44,6 +45,7 @@ def setUpModule():
     log.info("Polling. Waiting for app server: {}".format(frontend))
     check_url("https://{}/".format(frontend), good_content, interval=30,
               attempts=10, retry_unavailable=True)
+
 
 class LandscapeServiceTests(BaseLandscapeTests):
     """
