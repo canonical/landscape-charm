@@ -169,6 +169,10 @@ class HAProxyProvider(RelationContext):
         ssl_cert = config.get("ssl_cert", "")
         ssl_key = config.get("ssl_key", "")
 
+        if ssl_cert == "" and ssl_key != "":
+            # There shouldn't be a key if there is no cert defined. Error out.
+            raise HookError("ssl_key is specified but ssl_cert is missing!")
+
         if ssl_cert == "":
             # If no SSL certificate is specified, simply return "DEFAULT".
             self._hookenv.log("No SSL configuration keys found, asking "
