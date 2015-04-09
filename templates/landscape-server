@@ -15,7 +15,11 @@ RUN_MSGSERVER="yes"
 RUN_PINGSERVER="yes"
 RUN_APISERVER="yes"
 RUN_PACKAGEUPLOADSERVER="no"
+{% if is_leader and hosted[0]["deployment-mode"] == "standalone" %}
+RUN_JUJU_SYNC="yes"
+{% else %}
 RUN_JUJU_SYNC="no"
+{% endif %}
 RUN_PACKAGESEARCH="no"
 
 # To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
