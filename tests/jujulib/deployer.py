@@ -47,7 +47,9 @@ class Deployer(object):
         # overridden options in landscape-charm, with the filename in the
         # config dir that we read.
         override_options = {"source": "repo-file",
-                            "license-file": "license-file"}
+                            "license-file": "license-file",
+                            "ssl_cert": "ssl-cert",
+                            "ssl_key": "ssl-key"}
 
         # Base data structure for the landscape-charm that we will fill out
         # with options.
