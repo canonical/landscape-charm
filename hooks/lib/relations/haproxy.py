@@ -169,11 +169,13 @@ class HAProxyProvider(RelationContext):
         ssl_cert = config.get("ssl_cert", "")
         ssl_key = config.get("ssl_key", "")
 
-        if ssl_cert is "":
+        if ssl_cert == "":
             # If no SSL certificate is specified, simply return "DEFAULT".
+            self._hookenv.log("No SSL configuration keys found, asking "
+                              "HAproxy to use the 'DEFAULT' certificate.")
             return ["DEFAULT"]
 
-        if ssl_key is "":
+        if ssl_key == "":
             # A cert is specified, but no key. Error out.
             raise HookError("ssl_cert is specified but ssl_key is missing!")
 
@@ -185,6 +187,9 @@ class HAProxyProvider(RelationContext):
                             "is not valid base64.")
 
         decoded_pem = "%s\n%s" % (decoded_cert, decoded_key)
+
+        self._hookenv.log("Asking HAproxy to use the supplied 'ssl_cert' and "
+                          "'ssl_key' parameters.")
 
         # Return the base64 encoded pem.
         return [base64.b64encode(decoded_pem)]
