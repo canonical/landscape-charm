@@ -94,12 +94,13 @@ class LandscapeSSLTests(BaseLandscapeTests):
         # filter some of the output (it print non-error messages on stderr).
         ps = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
         with open(os.devnull, 'w') as dev_null:
-            output = subprocess.check_output(
+            output = subprocess.check_output(  # output is bytes
                 ['openssl', 's_client', '-connect', url],
-                stdin=ps.stdout, stderr=dev_null).decode("utf-8")
+                stdin=ps.stdout, stderr=dev_null)
+        ps.stdout.close()  # Close the pipe fd
         ps.wait()  # This closes the subprocess sending the newline.
 
-        obtained_certificate = self._strip_certificate(output)
+        obtained_certificate = self._strip_certificate(output.decode("utf-8"))
 
         expected_crt = None
         # Use the base64 encoded version as a reference in case it's not the
@@ -107,8 +108,8 @@ class LandscapeSSLTests(BaseLandscapeTests):
         with open(CONFIG_CERT_FILE, "r") as fd:
             expected_crt = fd.read()
 
-        expected_crt = base64.b64decode(expected_crt)
-        expected_crt = self._strip_certificate(expected_crt)
+        expected_crt = base64.b64decode(expected_crt)  # expected_crt is bytes
+        expected_crt = self._strip_certificate(expected_crt.decode("utf-8"))
 
         self.assertEqual(expected_crt, obtained_certificate)
 
