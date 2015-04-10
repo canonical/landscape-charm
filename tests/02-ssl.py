@@ -73,7 +73,7 @@ class LandscapeSSLTests(BaseLandscapeTests):
 
     def _strip_certificate(self, certificate):
         """
-        A helper to get just the certificate froma string, without headers.
+        A helper to get just the certificate from a string, without headers.
         A regex might be nicer, but this works and is easy to read.
         """
         certificate = certificate.split("BEGIN CERTIFICATE-----")[1]
@@ -89,7 +89,7 @@ class LandscapeSSLTests(BaseLandscapeTests):
         url = "%s:443" % self.frontend
 
         # Call openssl s_client connect to get the actual certificate served.
-        # The command line program is a bit arcahic and therefore we need
+        # The command line program is a bit archaic and therefore we need
         # to do a few things like send it a newline char (a user "return"), and
         # filter some of the output (it print non-error messages on stderr).
         ps = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
