@@ -25,7 +25,7 @@ log = logging.getLogger(__file__)
 CHARM_DIR = dirname(dirname(abspath(__file__)))
 
 CONFIG_CERT_FILE = join(CHARM_DIR, "config", "ssl-cert")
-CONFIG_KEY_FILE = join(CHARM_DIR, "config", "ssl-cert")
+CONFIG_KEY_FILE = join(CHARM_DIR, "config", "ssl-key")
 
 
 def setUpModule():

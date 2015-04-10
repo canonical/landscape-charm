@@ -58,6 +58,6 @@ options:
     ssl_key:
         type: string
         description: |
-            base64 encoded private key for the default SSL certificate. If ssl_cert
-            is unset, this will be ignored.
+            base64 encoded private key for the default SSL certificate. If
+            ssl_cert is not set, this will be ignored.
         default: ""
