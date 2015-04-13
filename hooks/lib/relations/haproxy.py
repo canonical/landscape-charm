@@ -159,38 +159,40 @@ class HAProxyProvider(RelationContext):
         return result
 
     def _get_ssl_certificate(self):
-        """
-        Get the PEM certificate to send to HAproxy through the relation.
+        """Get the PEM certificate to send to HAproxy through the relation.
 
         In case no certificate is defined, we send the "DEFAULT" keyword
         instead.
         """
         config = self._hookenv.config()
-        ssl_cert = config.get("ssl_cert", "")
-        ssl_key = config.get("ssl_key", "")
+        ssl_cert = config.get("ssl-cert", "")
+        ssl_key = config.get("ssl-key", "")
 
         if ssl_cert == "":
             # If no SSL certificate is specified, simply return "DEFAULT".
-            self._hookenv.log("No SSL configuration keys found, asking "
-                              "HAproxy to use the 'DEFAULT' certificate.")
+            self._hookenv.log(
+                "No SSL configuration keys found, asking HAproxy to use the"
+                " 'DEFAULT' certificate.")
             return ["DEFAULT"]
 
         if ssl_key == "":
             # A cert is specified, but no key. Error out.
-            raise HookError("'ssl_cert' is specified but 'ssl_key' is "
-                            "missing!")
+            raise HookError(
+                "'ssl_cert' is specified but 'ssl-key' is missing!")
 
         try:
             decoded_cert = base64.b64decode(ssl_cert)
             decoded_key = base64.b64decode(ssl_key)
         except TypeError:
-            raise HookError("The supplied 'ssl_cert' or 'ssl_key' parameter "
-                            "is not valid base64.")
+            raise HookError(
+                "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
+                " base64.")
 
         decoded_pem = "%s\n%s" % (decoded_cert, decoded_key)
 
-        self._hookenv.log("Asking HAproxy to use the supplied 'ssl_cert' and "
-                          "'ssl_key' parameters.")
+        self._hookenv.log(
+            "Asking HAproxy to use the supplied 'ssl-cert' and 'ssl-key'"
+            " parameters.")
 
         # Return the base64 encoded pem.
         return [base64.b64encode(decoded_pem)]

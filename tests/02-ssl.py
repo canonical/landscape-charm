@@ -1,6 +1,5 @@
 #!/usr/bin/python3
-"""
-SSL functional tests for the landscape-charm.
+"""SSL functional tests for the landscape-charm.
 
 They are in a separate module because while bootstrapping a juju environment
 takes time, this guarantees no side-effects introduced by other tests (SSL is
@@ -72,8 +71,8 @@ class LandscapeSSLTests(BaseLandscapeTests):
         cls.frontend = find_address(cls.juju_status, "haproxy")
 
     def _strip_certificate(self, certificate):
-        """
-        A helper to get just the certificate from a string, without headers.
+        """A helper to get just the certificate from a string, without headers.
+
         A regex might be nicer, but this works and is easy to read.
         """
         certificate = certificate.split("BEGIN CERTIFICATE-----")[1]

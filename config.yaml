@@ -51,11 +51,11 @@ options:
     ssl_cert:
         type: string
         description: |
-            base64 encoded SSL certificate to use for the landscape server.
+            base64 encoded SSL certificate to use for the Landscape server.
             It will be passed verbatim to the haproxy charm. If not set, a
-            self-signed certificated will be generated instead.
+            self-signed certificated will be used instead.
         default: ""
-    ssl_key:
+    ssl-key:
         type: string
         description: |
             base64 encoded private key for the default SSL certificate. If

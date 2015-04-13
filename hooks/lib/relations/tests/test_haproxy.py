@@ -31,10 +31,10 @@ class HAProxyProviderTest(HookenvTest):
         offline_dir = self.useFixture(OfflineDir()).path
         relation = HAProxyProvider(offline_dir=offline_dir)
 
-        # Provide some fake ssl_cert and ssl_key config entries
+        # Provide some fake ssl-cert and ssl-key config entries
         config = self.hookenv.config()
-        config["ssl_cert"] = base64.b64encode("a cert")
-        config["ssl_key"] = base64.b64encode("a key")
+        config["ssl-cert"] = base64.b64encode("a cert")
+        config["ssl-key"] = base64.b64encode("a key")
 
         expected_certs = [base64.b64encode("a cert\na key")]
 
@@ -108,7 +108,7 @@ class HAProxyProviderTest(HookenvTest):
 
     def test_wb_get_ssl_certificate_returns_default_without_ssl_cert(self):
         """
-        If no "ssl_cert" is specified, the _get_ssl_certificate method returns
+        If no "ssl-cert" is specified, the _get_ssl_certificate method returns
         ["DEFAULT"].
         """
         provider = HAProxyProvider()
@@ -117,12 +117,12 @@ class HAProxyProviderTest(HookenvTest):
 
     def test_wb_get_ssl_certificate_returns_cert_and_key_pem(self):
         """
-        When passed both a cert and a key, the _get_ssl_certificate method
+        When passed both a cert and a key, the _get_ssl-certificate method
         will returns an equivalent base64-encoded pem.
         """
         config = self.hookenv.config()
-        config["ssl_cert"] = base64.b64encode("a cert")
-        config["ssl_key"] = base64.b64encode("a key")
+        config["ssl-cert"] = base64.b64encode("a cert")
+        config["ssl-key"] = base64.b64encode("a key")
         provider = HAProxyProvider(hookenv=self.hookenv)
         [result] = provider._get_ssl_certificate()
 
@@ -133,22 +133,22 @@ class HAProxyProviderTest(HookenvTest):
     def test_wb_get_ssl_certificates_raises_hookerror_for_invalid_b64(self):
         """
         Should the user pass a non-base64 encoded string to the config, the
-        _get_ssl_certificate method raises a HookError.
+        _get_ssl-certificate method raises a HookError.
         """
         config = self.hookenv.config()
-        config["ssl_cert"] = "a cert"  # Not b64 encoded!
-        config["ssl_key"] = base64.b64encode("a key")
+        config["ssl-cert"] = "a cert"  # Not b64 encoded!
+        config["ssl-key"] = base64.b64encode("a key")
 
         provider = HAProxyProvider(hookenv=self.hookenv)
         self.assertRaises(HookError, provider._get_ssl_certificate)
 
     def test_wb_get_ssl_certificates_raises_hookerror_for_missing_key(self):
         """
-        If an 'ssl_cert' config entry is present but no 'ssl_key' is, the
-        _get_ssl_certificate method raises a HookError.
+        If an 'ssl-cert' config entry is present but no 'ssl-key' is, the
+        _get_ssl-certificate method raises a HookError.
         """
         config = self.hookenv.config()
-        config["ssl_cert"] = base64.b64encode("a cert")
-        # Not setting 'ssl_key'
+        config["ssl-cert"] = base64.b64encode("a cert")
+        # Not setting 'ssl-key'
         provider = HAProxyProvider(hookenv=self.hookenv)
         self.assertRaises(HookError, provider._get_ssl_certificate)
