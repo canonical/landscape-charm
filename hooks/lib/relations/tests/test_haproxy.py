@@ -146,6 +146,8 @@ class HAProxyProviderTest(HookenvTest):
 
     def test_provide_data_raises_hookerror_for_invalid_b64_cert(self):
         """
+        When passed a cert that is not valid b64, the provide_data method
+        raises a HookError.
         """
         config = self.hookenv.config()
         config["ssl-cert"] = "a cert"  # Not b64 encoded!
@@ -162,12 +164,30 @@ class HAProxyProviderTest(HookenvTest):
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
 
-        #error = self.assertRaises(HookError, provider.provide_data)
-        #import ipdb; ipdb.set_trace()
-        #self.assertEqual("", str(error.exception))
+    def test_provide_data_raises_hookerror_for_invalid_b64_key(self):
+        """
+        When passed a key that is not valid b64, the provide_data method
+        raises a HookError.
+        """
+        config = self.hookenv.config()
+        config["ssl-cert"] = base64.b64encode("a cert")
+        config["ssl-key"] = "something"  # Not base64 encoded!
+
+        provider = HAProxyProvider(
+            offline_dir=self.offline_dir, hookenv=self.hookenv)
+
+        expected = (
+            "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
+            " base64.")
+
+        with self.assertRaises(HookError) as error:
+            provider.provide_data()
+        self.assertEqual(expected, str(error.exception))
 
     def test_wb_get_ssl_certificates_raises_hookerror_for_missing_key(self):
         """
+        When an ssl-cert config key is present but no ssl-key was specified,
+        the provide_data method raises a HookError.
         """
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
