@@ -34,15 +34,20 @@ def setUpModule():
     # Copy the fixture base64 encoded certificate and key to the right place in
     # the config directory.
 
+    ssl_cert = None
     if not exists(CONFIG_CERT_FILE):
-        subprocess.check_call(
-            ["cp", join(CHARM_DIR, "tests", "ssl", "server.crt.base64"),
-             CONFIG_CERT_FILE])
+        with open(join(CHARM_DIR, "tests", "ssl", "server.crt"), "r") as fd:
+            ssl_cert = fd.read()
+        ssl_cert_b64 = base64.b64encode(ssl_cert)
+        with open(CONFIG_CERT_FILE, "w") as fd:
+            fd.write(ssl_cert_b64)
 
     if not exists(CONFIG_KEY_FILE):
-        subprocess.check_call(
-            ["cp", join(CHARM_DIR, "tests", "ssl", "server.key.base64"),
-             CONFIG_KEY_FILE])
+        with open(join(CHARM_DIR, "tests", "ssl", "server.key"), "r") as fd:
+            ssl_cert = fd.read()
+        ssl_cert_b64 = base64.b64encode(ssl_cert)
+        with open(CONFIG_KEY_FILE, "w") as fd:
+            fd.write(ssl_cert_b64)
 
     # Grab the bundles and actually deploy the environment.
     bundles = glob(join(CHARM_DIR, "bundles", "*.yaml"))
