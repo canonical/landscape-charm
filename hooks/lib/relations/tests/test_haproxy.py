@@ -9,6 +9,8 @@ from lib.hook import HookError
 from lib.tests.helpers import HookenvTest
 from lib.tests.offline_fixture import OfflineDir
 
+HTTPS_INDEX = 1
+
 
 class HAProxyProviderTest(HookenvTest):
 
@@ -118,8 +120,7 @@ class HAProxyProviderTest(HookenvTest):
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
-        [https_service] = [service for service in services
-                           if service["service_name"] == "landscape-https"]
+        https_service = services[HTTPS_INDEX]
 
         self.assertEqual(["DEFAULT"], https_service["crts"])
 
@@ -137,8 +138,7 @@ class HAProxyProviderTest(HookenvTest):
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
-        [https_service] = [service for service in services
-                           if service["service_name"] == "landscape-https"]
+        https_service = services[HTTPS_INDEX]
 
         expected = "a cert\na key"
         decoded_result = base64.b64decode(https_service["crts"][0])
@@ -184,7 +184,7 @@ class HAProxyProviderTest(HookenvTest):
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
 
-    def test_wb_get_ssl_certificates_raises_hookerror_for_missing_key(self):
+    def test_provide_data_raises_hookerror_for_missing_key(self):
         """
         When an ssl-cert config key is present but no ssl-key was specified,
         the provide_data method raises a HookError.
