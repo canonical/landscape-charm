@@ -154,7 +154,15 @@ class HAProxyProviderTest(HookenvTest):
         provider = HAProxyProvider(
             offline_dir=self.offline_dir, hookenv=self.hookenv)
 
-        error = self.assertRaises(HookError, provider.provide_data)
+        expected = (
+            "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
+            " base64.")
+
+        with self.assertRaises(HookError) as error:
+            provider.provide_data()
+        self.assertEqual(expected, str(error.exception))
+
+        #error = self.assertRaises(HookError, provider.provide_data)
         #import ipdb; ipdb.set_trace()
         #self.assertEqual("", str(error.exception))
 
@@ -167,6 +175,8 @@ class HAProxyProviderTest(HookenvTest):
         provider = HAProxyProvider(
             offline_dir=self.offline_dir, hookenv=self.hookenv)
 
-        error = self.assertRaises(HookError, provider.provide_data)
-        #import ipdb; ipdb.set_trace()
-        #self.assertEqual("", str(error.exception))
+        expected = "'ssl-cert' is specified but 'ssl-key' is missing!"
+
+        with self.assertRaises(HookError) as error:
+            provider.provide_data()
+        self.assertEqual(expected, str(error.exception))

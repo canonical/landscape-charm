@@ -178,7 +178,7 @@ class HAProxyProvider(RelationContext):
         if ssl_key == "":
             # A cert is specified, but no key. Error out.
             raise HookError(
-                "'ssl_cert' is specified but 'ssl-key' is missing!")
+                "'ssl-cert' is specified but 'ssl-key' is missing!")
 
         try:
             decoded_cert = base64.b64decode(ssl_cert)
