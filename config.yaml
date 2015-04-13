@@ -48,7 +48,7 @@ options:
             Has no effect if changed after a deployment.
         type: string
         default:
-    ssl_cert:
+    ssl-cert:
         type: string
         description: |
             base64 encoded SSL certificate to use for the Landscape server.
