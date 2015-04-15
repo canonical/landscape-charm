@@ -36,18 +36,18 @@ def setUpModule():
 
     ssl_cert = None
     if not exists(CONFIG_CERT_FILE):
-        with open(join(CHARM_DIR, "tests", "ssl", "server.crt"), "r") as fd:
+        with open(join(CHARM_DIR, "tests", "ssl", "server.crt"), "rb") as fd:
             ssl_cert = fd.read()
         ssl_cert_b64 = base64.b64encode(ssl_cert)
-        with open(CONFIG_CERT_FILE, "w") as fd:
+        with open(CONFIG_CERT_FILE, "wb") as fd:
             fd.write(ssl_cert_b64)
 
     if not exists(CONFIG_KEY_FILE):
-        with open(join(CHARM_DIR, "tests", "ssl", "server.key"), "r") as fd:
-            ssl_cert = fd.read()
-        ssl_cert_b64 = base64.b64encode(ssl_cert)
-        with open(CONFIG_KEY_FILE, "w") as fd:
-            fd.write(ssl_cert_b64)
+        with open(join(CHARM_DIR, "tests", "ssl", "server.key"), "rb") as fd:
+            ssl_key = fd.read()
+        ssl_key_b64 = base64.b64encode(ssl_key)
+        with open(CONFIG_KEY_FILE, "wb") as fd:
+            fd.write(ssl_key_b64)
 
     # Grab the bundles and actually deploy the environment.
     bundles = glob(join(CHARM_DIR, "bundles", "*.yaml"))
@@ -109,7 +109,7 @@ class LandscapeSSLTests(BaseLandscapeTests):
         expected_crt = None
         # Use the base64 encoded version as a reference in case it's not the
         # fixtures one but a real cert.
-        with open(CONFIG_CERT_FILE, "r") as fd:
+        with open(CONFIG_CERT_FILE, "rb") as fd:
             expected_crt = fd.read()
 
         expected_crt = base64.b64decode(expected_crt)  # expected_crt is bytes
