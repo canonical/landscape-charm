@@ -32,6 +32,7 @@ class ServicesHook(Hook):
                  subprocess=subprocess, configs_dir=CONFIGS_DIR,
                  offline_dir=OFFLINE_FOLDER):
         super(ServicesHook, self).__init__(hookenv=hookenv)
+        self._hookenv = hookenv
         self._cluster = cluster
         self._host = host
         self._subprocess = subprocess
@@ -42,7 +43,8 @@ class ServicesHook(Hook):
         leader_context = None
         is_leader = self._cluster.is_elected_leader(None)
         if is_leader:
-            leader_context = LandscapeLeaderContext(host=self._host)
+            leader_context = LandscapeLeaderContext(
+                host=self._host, hookenv=self._hookenv)
 
         manager = ServiceManager([{
             "service": "landscape",
