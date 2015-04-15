@@ -19,6 +19,7 @@ class LandscapeProvider(RelationContext):
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
         "secret-token",       # Landscape-wide secret token.
+        "leader-ip",          # The leader unit's private address.
     ]
 
     def __init__(self, leader_context):
@@ -41,6 +42,7 @@ class LandscapeRequirer(RelationContext):
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
         "secret-token",       # Landscape-wide secret token.
+        "leader-ip",          # The leader unit's private address.
     ]
 
     def __init__(self, leader_context):
@@ -81,6 +83,7 @@ class LandscapeLeaderContext(StoredContext):
             data = self.read_context(path)
         else:
             data = {"database-password": host.pwgen(),
-                    "secret-token": host.pwgen(length=172)}
+                    "secret-token": host.pwgen(length=172),
+                    "leader-ip": hookenv.unit_get("private-address")}
             self.store_context(path, data)
         self.update(data)

@@ -20,7 +20,6 @@ RUN_JUJU_SYNC="yes"
 {% else %}
 RUN_JUJU_SYNC="no"
 {% endif %}
-RUN_PACKAGESEARCH="no"
 
 # To run cron jobs on this server when RUN_ALL="no" set RUN_CRON to "yes".
 # Cron jobs should run only on a single unit (usually the leader).
@@ -28,4 +27,11 @@ RUN_PACKAGESEARCH="no"
 RUN_CRON="yes"
 {% else %}
 RUN_CRON="no"
+{% endif %}
+
+# Package search should only be run on a single unit (the leader).
+{% if is_leader %}
+RUN_PACKAGESEARCH="yes"
+{% else %}
+RUN_PACKAGESEARCH="no"
 {% endif %}

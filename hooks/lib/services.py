@@ -52,6 +52,7 @@ class ServicesHook(Hook):
                 HAProxyProvider(offline_dir=self._offline_dir),
                 RabbitMQProvider(),
             ],
+            # Required data is available to the render_template calls below.
             "required_data": [
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
