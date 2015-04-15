@@ -65,6 +65,49 @@ class ServiceConfTest(TemplateTest):
             "http://openid-host/logout",
             config.get("landscape", "openid-logout-url"))
 
+    def test_render_with_package_search_on_leader(self):
+        """
+        The serice.conf file on the leader has a package-search host set
+        to localhost.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {},
+            "is_leader": True,
+        }
+        buffer = StringIO(self.template.render(context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("localhost", config.get("package-search", "host"))
+        self.assertEqual("9250", config.get("package-search", "port"))
+        self.assertEqual(
+            "main package resource-1", config.get("package-search", "stores"))
+        self.assertEqual(
+            "/srv/landscape.canonical.com/var/landscape-package-search.pid",
+            config.get("package-search", "pid-path"))
+        self.assertEqual(
+            "1000", config.get("package-search", "account-threshold"))
+
+    def test_render_with_package_search_on_non_leader(self):
+        """
+        The serice.conf file on a non-leader unit has a package-search host set
+        to the leader's IP address.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {},
+            "is_leader": False,
+        }
+        buffer = StringIO(self.template.render(context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("1.2.3.4", config.get("package-search", "host"))
 
 class LandscapeDefaultsTest(TemplateTest):
 
@@ -144,3 +187,34 @@ class LandscapeDefaultsTest(TemplateTest):
         }
         buffer = StringIO(self.template.render(context)).readlines()
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
+
+    def test_render_package_search(self):
+        """
+        If the landscape-server unit is the leader, package-search will be run.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {},
+            "is_leader": True,
+        }
+        buffer = StringIO(self.template.render(context)).readlines()
+        self.assertIn('RUN_PACKAGESEARCH="yes"\n', buffer)
+
+    def test_render_package_search_not_leader(self):
+        """
+        If the landscape-server unit is not the leader, package-search will 
+        not be run.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {},
+            "is_leader": False,
+        }
+        buffer = StringIO(self.template.render(context)).readlines()
+        self.assertIn('RUN_PACKAGESEARCH="no"\n', buffer)
