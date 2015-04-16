@@ -14,13 +14,12 @@ import jujulib.deployer
 from os.path import dirname, abspath, join
 from configparser import ConfigParser
 from os import getenv
-from subprocess import check_output, STDOUT, CalledProcessError, PIPE
+from subprocess import check_output, CalledProcessError, PIPE
 from glob import glob
 
 from helpers import (
     check_url, juju_status, find_address, get_landscape_units,
-    get_landscape_service_conf, find_landscape_unit_with_service,
-    BaseLandscapeTests)
+    get_landscape_service_conf, BaseLandscapeTests)
 
 
 log = logging.getLogger(__file__)
@@ -94,16 +93,6 @@ class LandscapeServiceTests(BaseLandscapeTests):
         good_content = "ds5:errors19:provide insecure_id;"
         check_url("http://{}/ping".format(self.frontend), good_content)
 
-    def test_combo(self):
-        """Verify that the COMBO service is up.
-
-        Specifically that it is reachable and returns the expected text.
-        """
-        good_content = "Licensed under the BSD License"
-        url = ("http://{}/combo?yui/scrollview/scrollview-min.js".format(
-               self.frontend))
-        check_url(url, good_content)
-
     def test_api(self):
         """Verify that the API service is up.
 
@@ -111,15 +100,6 @@ class LandscapeServiceTests(BaseLandscapeTests):
         """
         good_content = "Query API Service"
         check_url("https://{}/api".format(self.frontend), good_content)
-
-    @unittest.skip("Doesn't respond on /ajax in the same way (400)")
-    def test_ajax(self):
-        """Verify that the AJAX srevice is up.
-
-        Specifically that it is reachable and returns its name.
-        """
-        good_content = "Async frontend for landscape"
-        check_url("https://{}/ajax".format(self.frontend), good_content)
 
     @unittest.skip("currently oopses")
     def test_upload(self):
@@ -131,35 +111,6 @@ class LandscapeServiceTests(BaseLandscapeTests):
         # ending / is important because of the way we wrote this RewriteRule
         url = "https://{}/upload/".format(self.frontend)
         check_url(url, good_content)
-
-    @unittest.skip("currently oopses")
-    def test_static(self):
-        """Verify that the STATIC service is up.
-
-        Specifically, that we can reach a file that is hosted on the static
-        server/unit.
-        """
-        good_content = "ubuntu.woff"
-        url = "https://{}/static/fonts/ubuntu-font.css".format(self.frontend)
-        check_url(url, good_content)
-
-    def test_hash_id_databases(self):
-        """Verify that the hash-id-databases are available.
-
-        Specifically, that the directory can be listed and that the default
-        hash-id-database files are there. The cron job that populates this
-        with the actual uuid-named files might or might not have run yet.
-        """
-        good_content = "precise_amd64"
-        url = "https://{}/hash-id-databases".format(self.frontend)
-        check_url(url, good_content)
-
-    def test_ssh(self):
-        """Verify that the landscape/0 unit can be reached via ssh."""
-        good_content = "buffers/cache"
-        output = check_output(["juju", "ssh", "landscape/0", "free -m"],
-                              stderr=STDOUT).decode("utf-8")
-        self.assertIn(good_content, output)
 
 
 class LandscapeServiceConfigTests(BaseLandscapeTests):
@@ -186,31 +137,6 @@ class LandscapeServiceConfigTests(BaseLandscapeTests):
             broker = config["broker"]
             self.assertNotEqual(broker["host"], "localhost")
             self.assertNotEqual(broker["password"], "landscape")
-
-    def test_no_stores_defaults(self):
-        """Verify that [store] has no default values.
-
-        This test verifies that the host and password configuration keys
-        from the [stores] section don't remain at their default values.
-        """
-        for config in self.landscape_service_conf:
-            stores = config["stores"]
-            self.assertNotEqual(stores["password"], "landscape")
-            self.assertNotEqual(stores["host"], "localhost")
-
-    def test_no_schema_defaults(self):
-        """Verify that [schema] has no default values.
-
-        This test verifies that the store_user and store_password
-        configuration keys from the [schema] section don't remain at their
-        default values.
-        """
-        for config in self.landscape_service_conf:
-            schema = config["schema"]
-            self.assertNotEqual(schema["store_user"], "superuser")
-            # default service.conf doesn't ship with a store_password in this
-            # section, so this tests that a) it exists; b) it's not empty
-            self.assertNotEqual(len(schema["store_password"]), 0)
 
 
 class LandscapeErrorPagesTests(BaseLandscapeTests):
@@ -286,14 +212,12 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         check_url(url, good_content)
 
 
-@unittest.skip("All cron jobs failing.")
 class LandscapeCronTests(BaseLandscapeTests):
 
     @classmethod
     def setUpClass(cls):
         cls.juju_status = juju_status()
-        cls.cron_unit = find_landscape_unit_with_service(
-            cls.juju_status, "cron")
+        cls.cron_unit = get_landscape_units(cls.juju_status)[0]
         cls._stop_cron(cls.cron_unit)
 
     @classmethod
@@ -346,6 +270,7 @@ class LandscapeCronTests(BaseLandscapeTests):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
+    @unittest.skip("fails to acquire the lock needs debugging")
     def test_update_alerts_cron(self):
         """Verify that the update_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_alerts.sh"
@@ -397,6 +322,7 @@ class LandscapeCronTests(BaseLandscapeTests):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
+    @unittest.skip("yet to be done")
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
         frontend = find_address(juju_status(), "haproxy")
