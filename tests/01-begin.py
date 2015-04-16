@@ -20,7 +20,7 @@ from glob import glob
 from helpers import (
     check_url, juju_status, find_address, get_landscape_units,
     get_landscape_service_conf, find_landscape_unit_with_service,
-    BaseLandscapeTests)
+    BaseLandscapeTests, run_command_on_unit)
 
 
 log = logging.getLogger(__file__)
@@ -223,17 +223,13 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         cls.landscape_units = get_landscape_units(cls.juju_status)
         cls.first_unit = cls.landscape_units[0]
 
-    def run_command_on_unit(self, cmd, unit):
-        output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
-        return output.decode("utf-8").strip()
-
     def stop_server(self, name, unit):
         cmd = "sudo service %s stop" % name
-        self.run_command_on_unit(cmd, unit)
+        run_command_on_unit(cmd, unit)
 
     def start_server(self, name, unit):
         cmd = "sudo service %s start" % name
-        self.run_command_on_unit(cmd, unit)
+        run_command_on_unit(cmd, unit)
 
     def test_app_unavailable_page(self):
         """
@@ -417,6 +413,21 @@ class LandscapeCronTests(BaseLandscapeTests):
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
         check_output(cmd, stderr=PIPE)
+
+
+class LandscapeSSLCertificateTests(BaseLandscapeTests):
+
+    @classmethod
+    def setUpClass(cls):
+        """Prepares juju_status and other attributes that many tests use."""
+        cls.juju_status = juju_status()
+        cls.first_unit = get_landscape_units(cls.juju_status)[0]
+
+    def test_ssl_certificate_is_in_place(self):
+        """The SSL certificate was written to the correct location."""
+        ssl_cert = run_command_on_unit(
+            "cat /etc/ssl/certs/landscape_server_ca.crt", self.first_unit)
+        self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
 if __name__ == "__main__":

@@ -110,7 +110,7 @@ class HAProxyProvider(RelationContext):
             "service_host": "0.0.0.0",
             "service_port": SERVICE_PORTS[name],
             "service_options": SERVICE_OPTIONS[name],
-            "errorfiles": self._get_error_files()
+            "errorfiles": self._errorfiles()
         }
 
     def _backend(self, name, servers):
@@ -137,7 +137,7 @@ class HAProxyProvider(RelationContext):
         server_port = SERVER_PORTS[name]
         return (server_name, server_ip, server_port, SERVER_OPTIONS)
 
-    def _get_error_files(self):
+    def _errorfiles(self):
         """Return the errorfiles configuration."""
         result = []
 
@@ -196,3 +196,11 @@ class HAProxyProvider(RelationContext):
 
         # Return the base64 encoded pem.
         return [base64.b64encode(decoded_pem)]
+
+
+class HAProxyRequirer(RelationContext):
+    """Relation data provider feeding haproxy service configuration."""
+
+    name = "website"
+    interface = "http"
+    required_keys = ["public-address", "ssl_cert"]
