@@ -50,6 +50,9 @@ class WriteCustomSSLCertificate(ManagerCallback):
         # Lookup the SSL certificates
         for data in service.get("required_data"):
             if "website" in data:
+                # We arbitrarily grab the SSL certificate from the first
+                # haproxy unit we're related to. All other units will expose
+                # the same certificate.
                 haproxy_ssl_cert = data["website"][0]["ssl_cert"]
             if "config" in data:
                 config_ssl_cert = data["config"].get("ssl-cert")

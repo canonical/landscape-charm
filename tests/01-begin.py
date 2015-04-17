@@ -424,7 +424,12 @@ class LandscapeSSLCertificateTests(BaseLandscapeTests):
         cls.first_unit = get_landscape_units(cls.juju_status)[0]
 
     def test_ssl_certificate_is_in_place(self):
-        """The SSL certificate was written to the correct location."""
+        """
+        The landscape-server charm looks at the SSL certificate set on the
+        relation with haproxy and writes it on disk in the location that
+        the application expects (it will need it when generating client
+        configuration for Autopilot deployments).
+        """
         ssl_cert = run_command_on_unit(
             "cat /etc/ssl/certs/landscape_server_ca.crt", self.first_unit)
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
