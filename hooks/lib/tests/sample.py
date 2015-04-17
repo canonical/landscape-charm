@@ -14,6 +14,7 @@ SAMPLE_DB_UNIT_DATA = {
 SAMPLE_LEADER_CONTEXT_DATA = {
     "database-password": "landscape-sekret",
     "secret-token": "landscape-token",
+    "leader-ip": "1.2.3.4",
 }
 
 SAMPLE_WEBSITE_UNIT_DATA = {

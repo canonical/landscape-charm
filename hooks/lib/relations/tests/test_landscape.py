@@ -20,7 +20,7 @@ class LandscapeRequirerTest(HookenvTest):
         considered ready.
         """
         self.assertItemsEqual(
-            ["database-password", "secret-token"],
+            ["database-password", "secret-token", "leader-ip"],
             LandscapeRequirer.required_keys)
 
     def test_is_leader(self):
@@ -87,8 +87,8 @@ class LandscapeProviderTest(HookenvTest):
         be set before we actually modify the relation.
         """
         self.assertItemsEqual(
-            ["database-password", "secret-token"],
-            LandscapeRequirer.required_keys)
+            ["database-password", "secret-token", "leader-ip"],
+            LandscapeProvider.required_keys)
 
     def test_provide_data(self):
         """
@@ -120,11 +120,14 @@ class LandscapeLeaderContextTest(HookenvTest):
         When created for the first time, the L{LandscapeLeaderContext} class
         generates new data.
         """
-        context = LandscapeLeaderContext(host=self.host, path=self.path)
+        context = LandscapeLeaderContext(host=self.host, path=self.path,
+                                         hookenv=self.hookenv)
         self.assertItemsEqual(
-            ["database-password", "secret-token"], context.keys())
+            ["database-password", "secret-token", "leader-ip"], context.keys())
         self.assertEqual("landscape-sekret", context["database-password"])
         self.assertEqual("landscape-token", context["secret-token"])
+        # The IP is coming from the HookenvStub class used by self.hookenv
+        self.assertEqual("1.2.3.4", context["leader-ip"])
 
     def test_stored(self):
         """
@@ -132,7 +135,10 @@ class LandscapeLeaderContextTest(HookenvTest):
         """
         with open(self.path, "w") as fd:
             fd.write(dump({"database-password": "old-sekret",
-                           "secret-token": "old-token"}))
-        context = LandscapeLeaderContext(host=self.host, path=self.path)
+                           "secret-token": "old-token",
+                           "leader-ip": "old-ip"}))
+        context = LandscapeLeaderContext(
+                host=self.host, path=self.path, hookenv=self.hookenv)
         self.assertEqual({"database-password": "old-sekret",
-                          "secret-token": "old-token"}, context)
+                          "secret-token": "old-token",
+                          "leader-ip": "old-ip"}, context)

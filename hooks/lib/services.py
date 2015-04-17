@@ -34,6 +34,7 @@ class ServicesHook(Hook):
                  subprocess=subprocess, configs_dir=CONFIGS_DIR,
                  offline_dir=OFFLINE_FOLDER, ssl_certs_dir=SSL_CERTS_DIR):
         super(ServicesHook, self).__init__(hookenv=hookenv)
+        self._hookenv = hookenv
         self._cluster = cluster
         self._host = host
         self._subprocess = subprocess
@@ -45,7 +46,8 @@ class ServicesHook(Hook):
         leader_context = None
         is_leader = self._cluster.is_elected_leader(None)
         if is_leader:
-            leader_context = LandscapeLeaderContext(host=self._host)
+            leader_context = LandscapeLeaderContext(
+                host=self._host, hookenv=self._hookenv)
 
         manager = ServiceManager([{
             "service": "landscape",
@@ -55,6 +57,7 @@ class ServicesHook(Hook):
                 HAProxyProvider(offline_dir=self._offline_dir),
                 RabbitMQProvider(),
             ],
+            # Required data is available to the render_template calls below.
             "required_data": [
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
