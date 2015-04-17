@@ -88,7 +88,7 @@ class LandscapeProviderTest(HookenvTest):
         """
         self.assertItemsEqual(
             ["database-password", "secret-token", "leader-ip"],
-            LandscapeRequirer.required_keys)
+            LandscapeProvider.required_keys)
 
     def test_provide_data(self):
         """
