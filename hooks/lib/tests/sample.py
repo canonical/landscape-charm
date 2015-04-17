@@ -1,3 +1,6 @@
+import base64
+
+
 SAMPLE_DB_UNIT_DATA = {
     "database": "all",
     "allowed-units": "landscape-server/0",
@@ -11,6 +14,11 @@ SAMPLE_DB_UNIT_DATA = {
 SAMPLE_LEADER_CONTEXT_DATA = {
     "database-password": "landscape-sekret",
     "secret-token": "landscape-token",
+}
+
+SAMPLE_WEBSITE_UNIT_DATA = {
+    "public-address": "1.2.3.4",
+    "ssl_cert": base64.b64encode("<ssl data>"),
 }
 
 SAMPLE_AMQP_UNIT_DATA = {

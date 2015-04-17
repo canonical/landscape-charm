@@ -4,7 +4,7 @@ import yaml
 from fixtures import TempDir
 
 from lib.relations.haproxy import (
-    HAProxyProvider, SERVER_OPTIONS, ERRORFILES_MAP)
+    HAProxyProvider, HAProxyRequirer, SERVER_OPTIONS, ERRORFILES_MAP)
 from lib.hook import HookError
 from lib.tests.helpers import HookenvTest
 from lib.tests.offline_fixture import OfflineDir
@@ -200,3 +200,17 @@ class HAProxyProviderTest(HookenvTest):
         with self.assertRaises(HookError) as error:
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
+
+
+class HAProxyRequirerTest(HookenvTest):
+
+    with_hookenv_monkey_patch = True
+
+    def test_required_keys(self):
+        """
+        The HAProxyRequirer class defines all keys that are required to
+        be set on the db relation in order for the relation to be considered
+        ready.
+        """
+        self.assertEqual(
+            ["public-address", "ssl_cert"], HAProxyRequirer.required_keys)

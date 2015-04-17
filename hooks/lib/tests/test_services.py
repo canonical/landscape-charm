@@ -8,7 +8,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA)
+    SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA, SAMPLE_WEBSITE_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 from lib.tests.offline_fixture import OfflineDir
 
@@ -24,10 +24,12 @@ class ServicesHookTest(HookenvTest):
         self.subprocess = SubprocessStub()
         self.offline_dir = self.useFixture(OfflineDir())
         self.configs_dir = self.useFixture(TempDir())
+        self.ssl_certs_dir = self.useFixture(TempDir())
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
             subprocess=self.subprocess, offline_dir=self.offline_dir.path,
-            configs_dir=self.configs_dir.path)
+            configs_dir=self.configs_dir.path,
+            ssl_certs_dir=self.ssl_certs_dir.path)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
@@ -94,12 +96,18 @@ class ServicesHookTest(HookenvTest):
                     "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
                 },
             },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
+                },
+            },
         }
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "website": [SAMPLE_WEBSITE_UNIT_DATA],
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": True,
@@ -136,6 +144,11 @@ class ServicesHookTest(HookenvTest):
                     "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
                 },
             },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
+                },
+            },
             "hosted": {
                 "hosted:1": {
                     "landscape-hosted/0": hosted_data,
@@ -144,6 +157,32 @@ class ServicesHookTest(HookenvTest):
         }
         self.hook()
         self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
+
+    def test_ready_write_ssl_cert(self):
+        """
+        When the data is ready the custom SSL certificate data gets
+        written on disk.
+        """
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
+                },
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
+                },
+            },
+        }
+        self.hook()
+        self.assertTrue(
+            os.path.exists(self.ssl_certs_dir.join("landscape_server_ca.crt")))
 
     def test_ready_with_openid_configuration(self):
         """
@@ -161,6 +200,11 @@ class ServicesHookTest(HookenvTest):
                     "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
                 },
             },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
+                },
+            },
         }
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
@@ -168,6 +212,7 @@ class ServicesHookTest(HookenvTest):
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "website": [SAMPLE_WEBSITE_UNIT_DATA],
             "config": SAMPLE_CONFIG_OPENID_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "is_leader": True,
@@ -208,6 +253,11 @@ class ServicesHookTest(HookenvTest):
             "amqp": {
                 "amqp:1": {
                     "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
+                },
+            },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
                 },
             },
         }
