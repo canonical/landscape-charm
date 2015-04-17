@@ -126,6 +126,8 @@ class LandscapeLeaderContextTest(HookenvTest):
             ["database-password", "secret-token", "leader-ip"], context.keys())
         self.assertEqual("landscape-sekret", context["database-password"])
         self.assertEqual("landscape-token", context["secret-token"])
+        # The IP is coming from the HookenvStub class used by self.hookenv
+        self.assertEqual("1.2.3.4", context["leader-ip"])
 
     def test_stored(self):
         """

@@ -96,10 +96,13 @@ class ServiceConfTest(TemplateTest):
         The serice.conf file on a non-leader unit has a package-search host set
         to the leader's IP address.
         """
+        leader_context = SAMPLE_LEADER_CONTEXT_DATA.copy()
+        leader_context["leader-ip"] = "1.2.3.4"
+
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "leader": leader_context,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": False,
