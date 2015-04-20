@@ -172,7 +172,7 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "https://{}/".format(self.frontend)
         check_url(url, good_content)
 
-    @unittest.skip
+    @unittest.expectedFailure
     def test_msg_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for msg.
@@ -185,7 +185,7 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         url = "https://{}/message-system".format(self.frontend)
         check_url(url, good_content)
 
-    @unittest.skip
+    @unittest.expectedFailure
     def test_ping_unavailable_page(self):
         """
         Verify that the frontend shows the unstyled unavailable page for ping.
@@ -196,19 +196,6 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "http://{}/ping".format(self.frontend)
-        check_url(url, good_content)
-
-    @unittest.skip
-    def test_async_unavailable_page(self):
-        """
-        Verify that the frontend shows the unstyled unavailable page for async.
-        """
-        self.addCleanup(self.start_server, "landscape-async-frontend",
-                        self.first_unit)
-        self.stop_server("landscape-async-frontend", self.first_unit)
-        good_content = ["503 Service Unavailable",
-                        "No server is available to handle this request."]
-        url = "https://{}/ajax".format(self.frontend)
         check_url(url, good_content)
 
 
@@ -322,7 +309,7 @@ class LandscapeCronTests(BaseLandscapeTests):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skip("yet to be done")
+    @unittest.expectedFailure
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
         frontend = find_address(juju_status(), "haproxy")
