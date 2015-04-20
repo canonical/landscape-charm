@@ -9,12 +9,14 @@ from charmhelpers.contrib.hahelpers import cluster
 from lib.hook import Hook
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
-from lib.relations.haproxy import HAProxyProvider, OFFLINE_FOLDER
+from lib.relations.haproxy import (
+    HAProxyProvider, HAProxyRequirer, OFFLINE_FOLDER)
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
-from lib.callbacks.filesystem import CONFIGS_DIR, EnsureConfigDir
+from lib.callbacks.filesystem import (
+    CONFIGS_DIR, SSL_CERTS_DIR, EnsureConfigDir, WriteCustomSSLCertificate)
 
 
 SERVICE_CONF = "/etc/landscape/service.conf"
@@ -30,19 +32,22 @@ class ServicesHook(Hook):
     """
     def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
                  subprocess=subprocess, configs_dir=CONFIGS_DIR,
-                 offline_dir=OFFLINE_FOLDER):
+                 offline_dir=OFFLINE_FOLDER, ssl_certs_dir=SSL_CERTS_DIR):
         super(ServicesHook, self).__init__(hookenv=hookenv)
+        self._hookenv = hookenv
         self._cluster = cluster
         self._host = host
         self._subprocess = subprocess
         self._configs_dir = configs_dir
         self._offline_dir = offline_dir
+        self._ssl_certs_dir = ssl_certs_dir
 
     def _run(self):
         leader_context = None
         is_leader = self._cluster.is_elected_leader(None)
         if is_leader:
-            leader_context = LandscapeLeaderContext(host=self._host)
+            leader_context = LandscapeLeaderContext(
+                host=self._host, hookenv=self._hookenv)
 
         manager = ServiceManager([{
             "service": "landscape",
@@ -52,10 +57,12 @@ class ServicesHook(Hook):
                 HAProxyProvider(offline_dir=self._offline_dir),
                 RabbitMQProvider(),
             ],
+            # Required data is available to the render_template calls below.
             "required_data": [
                 LandscapeRequirer(leader_context),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
+                HAProxyRequirer(),
                 HostedRequirer(),
                 {"config": hookenv.config(),
                  "is_leader": is_leader},
@@ -68,6 +75,7 @@ class ServicesHook(Hook):
                     owner="landscape", group="root", perms=0o640,
                     source="landscape-server", target=DEFAULT_FILE),
                 EnsureConfigDir(configs_dir=self._configs_dir),
+                WriteCustomSSLCertificate(ssl_certs_dir=self._ssl_certs_dir),
                 SchemaBootstrap(subprocess=self._subprocess),
             ],
             "start": LSCtl(subprocess=self._subprocess),

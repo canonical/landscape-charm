@@ -151,6 +151,12 @@ def get_landscape_service_conf(unit):
     return output
 
 
+def run_command_on_unit(cmd, unit):
+    """Run the given command on the given unit and return the output."""
+    output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
+    return output.decode("utf-8").strip()
+
+
 class ServiceOrUnitNotFound(Exception):
     """
     Exception thrown if a service cannot be found in the deployment or has

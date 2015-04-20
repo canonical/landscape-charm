@@ -19,6 +19,7 @@ class LandscapeProvider(RelationContext):
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
         "secret-token",       # Landscape-wide secret token.
+        "leader-ip",          # The leader unit's private address.
     ]
 
     def __init__(self, leader_context):
@@ -41,6 +42,7 @@ class LandscapeRequirer(RelationContext):
     required_keys = [
         "database-password",  # Password for the 'landscape' database user.
         "secret-token",       # Landscape-wide secret token.
+        "leader-ip",          # The leader unit's private address.
     ]
 
     def __init__(self, leader_context):
@@ -76,11 +78,13 @@ class LandscapeRequirer(RelationContext):
 class LandscapeLeaderContext(StoredContext):
     """Hold information for the Landscape unit acting as a leader."""
 
-    def __init__(self, host=host, path="landscape-leader-context.yaml"):
+    def __init__(self, host=host, path="landscape-leader-context.yaml",
+                 hookenv=hookenv):
         if os.path.exists(path):
             data = self.read_context(path)
         else:
             data = {"database-password": host.pwgen(),
-                    "secret-token": host.pwgen(length=172)}
+                    "secret-token": host.pwgen(length=172),
+                    "leader-ip": hookenv.unit_private_ip()}
             self.store_context(path, data)
         self.update(data)

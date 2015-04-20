@@ -72,33 +72,35 @@ class HAProxyProvider(RelationContext):
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
-        return {"services": yaml.safe_dump([self._http(), self._https()])}
+        return {
+            "services": yaml.safe_dump([self._get_http(), self._get_https()])
+        }
 
-    def _http(self):
+    def _get_http(self):
         """Return the service configuration for the HTTP frontend."""
-        service = self._service("http")
+        service = self._get_service("http")
         service.update({
-            "servers": [self._server("appserver")],
+            "servers": [self._get_server("appserver")],
             "backends": [
-                self._backend("ping", [self._server("pingserver")]),
+                self._get_backend("ping", [self._get_server("pingserver")]),
             ]
         })
         return service
 
-    def _https(self):
+    def _get_https(self):
         """Return the service configuration for the HTTPS frontend."""
-        service = self._service("https")
+        service = self._get_service("https")
         service.update({
             "crts": self._get_ssl_certificate(),
-            "servers": [self._server("appserver")],
+            "servers": [self._get_server("appserver")],
             "backends": [
-                self._backend("message", [self._server("message-server")]),
-                self._backend("api", [self._server("api")]),
+                self._get_backend("message", [self._get_server("message-server")]),
+                self._get_backend("api", [self._get_server("api")]),
             ],
         })
         return service
 
-    def _service(self, name):
+    def _get_service(self, name):
         """Return a basic service configuration, with no servers or backends.
 
         Servers and backends are supposed to be filled by calling code.
@@ -113,7 +115,7 @@ class HAProxyProvider(RelationContext):
             "errorfiles": self._get_error_files()
         }
 
-    def _backend(self, name, servers):
+    def _get_backend(self, name, servers):
         """Return a backend for the service with the given name and servers.
 
         @param name: Which backend service to use. Possible values are 'api',
@@ -125,7 +127,7 @@ class HAProxyProvider(RelationContext):
             "servers": servers,
         }
 
-    def _server(self, name):
+    def _get_server(self, name):
         """Return a server 4-tuple, as expected by the HAProxy charm.
 
         @param name: The base name of the server, it will be expanded with
@@ -196,3 +198,11 @@ class HAProxyProvider(RelationContext):
 
         # Return the base64 encoded pem.
         return [base64.b64encode(decoded_pem)]
+
+
+class HAProxyRequirer(RelationContext):
+    """Relation data provider feeding haproxy service configuration."""
+
+    name = "website"
+    interface = "http"
+    required_keys = ["public-address", "ssl_cert"]
