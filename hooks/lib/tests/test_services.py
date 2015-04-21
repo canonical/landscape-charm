@@ -37,15 +37,32 @@ class ServicesHookTest(HookenvTest):
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
 
+        # Setup sample relation data for the "common" happy case (an LDS
+        # deployment with postgresql, haproxy and rabbitmq-server).
+        self.hookenv.relations = {
+            "db": {
+                "db:1": {
+                    "postgresql/0": SAMPLE_DB_UNIT_DATA.copy(),
+                },
+            },
+            "amqp": {
+                "amqp:1": {
+                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA.copy(),
+                },
+            },
+            "website": {
+                "website:1": {
+                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA.copy(),
+                },
+            },
+        }
+
     def test_db_relation_not_ready(self):
         """
         If the db relation doesn't provide the required keys, the services hook
         doesn't try to change any configuration.
         """
-        self.hook()
-        self.assertIn(
-            ("Incomplete relation: PostgreSQLRequirer", "DEBUG"),
-            self.hookenv.messages)
+        self.hookenv.relations.clear()
 
     def test_website_relation_provide(self):
         """
@@ -68,13 +85,7 @@ class ServicesHookTest(HookenvTest):
         If the amqp relation doesn't provide the required keys, the services
         hook doesn't try to change any configuration.
         """
-        self.hookenv.relations = {
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-        }
+        self.hookenv.relations.pop("amqp")
         self.hook()
         self.assertIn(
             ("Incomplete relation: RabbitMQRequirer", "DEBUG"),
@@ -85,23 +96,6 @@ class ServicesHookTest(HookenvTest):
         If all dependency managers are ready, the services hook bootstraps the
         schema and rewrites the service configuration.
         """
-        self.hookenv.relations = {
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-            "amqp": {
-                "amqp:1": {
-                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
-                },
-            },
-            "website": {
-                "website:1": {
-                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
-                },
-            },
-        }
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
@@ -133,28 +127,13 @@ class ServicesHookTest(HookenvTest):
         """
         hosted_data = SAMPLE_HOSTED_DATA.copy()
         hosted_data["deployment-mode"] = "edge"
-        self.hookenv.relations = {
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-            "amqp": {
-                "amqp:1": {
-                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
-                },
-            },
-            "website": {
-                "website:1": {
-                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
-                },
-            },
+        self.hookenv.relations.update({
             "hosted": {
                 "hosted:1": {
                     "landscape-hosted/0": hosted_data,
                 },
             },
-        }
+        })
         self.hook()
         self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
 
@@ -163,23 +142,6 @@ class ServicesHookTest(HookenvTest):
         When the data is ready the custom SSL certificate data gets
         written on disk.
         """
-        self.hookenv.relations = {
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-            "amqp": {
-                "amqp:1": {
-                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
-                },
-            },
-            "website": {
-                "website:1": {
-                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
-                },
-            },
-        }
         self.hook()
         self.assertTrue(
             os.path.exists(self.ssl_certs_dir.join("landscape_server_ca.crt")))
@@ -189,23 +151,6 @@ class ServicesHookTest(HookenvTest):
         OpenID configuration is passed in to service.conf generation if
         it is set in the hook configuration.
         """
-        self.hookenv.relations = {
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-            "amqp": {
-                "amqp:1": {
-                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
-                },
-            },
-            "website": {
-                "website:1": {
-                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
-                },
-            },
-        }
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
         context = {
@@ -239,27 +184,12 @@ class ServicesHookTest(HookenvTest):
         along with the rest of required relations, then we're good.
         """
         self.cluster.leader = False
-        self.hookenv.relations = {
+        self.hookenv.relations.update({
             "cluster": {
                 "cluster:1": {
                     "landscape/0": SAMPLE_LEADER_CONTEXT_DATA,
                 },
             },
-            "db": {
-                "db:1": {
-                    "postgresql/0": SAMPLE_DB_UNIT_DATA,
-                },
-            },
-            "amqp": {
-                "amqp:1": {
-                    "rabbitmq-server/0": SAMPLE_AMQP_UNIT_DATA,
-                },
-            },
-            "website": {
-                "website:1": {
-                    "haproxy/0": SAMPLE_WEBSITE_UNIT_DATA,
-                },
-            },
-        }
+        })
         self.hook()
         self.assertEqual(2, len(self.renders))

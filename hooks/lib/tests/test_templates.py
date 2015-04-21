@@ -1,7 +1,6 @@
 from ConfigParser import ConfigParser
 from cStringIO import StringIO
 
-
 from lib.tests.helpers import TemplateTest
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
@@ -12,20 +11,24 @@ class ServiceConfTest(TemplateTest):
 
     template_filename = "service.conf"
 
+    def setUp(self):
+        super(ServiceConfTest, self).setUp()
+        self.context = {
+            "db": [SAMPLE_DB_UNIT_DATA.copy()],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA.copy()],
+            "leader": SAMPLE_LEADER_CONTEXT_DATA.copy(),
+            "hosted": [SAMPLE_HOSTED_DATA.copy()],
+            "config": {},
+            "is_leader": False,
+        }
+
     def test_render(self):
         """
         The service.conf template renders data about generic Landscape
         configuration which includes PostgreSQL configuration, AMQP
         configuration, secret token and no OpenID settings by default.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-        }
-        buffer = StringIO(self.template.render(context))
+        buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("10.0.3.168:5432", config.get("stores", "host"))
@@ -45,17 +48,12 @@ class ServiceConfTest(TemplateTest):
         When OpenID configuration is present in the leader context,
         openid-related options are set.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {
-                "openid-provider-url": "http://openid-host/",
-                "openid-logout-url": "http://openid-host/logout",
-            },
-        }
-        buffer = StringIO(self.template.render(context))
+        config = self.context["config"]
+        config.update({
+            "openid-provider-url": "http://openid-host/",
+            "openid-logout-url": "http://openid-host/logout",
+        })
+        buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual(
@@ -67,18 +65,11 @@ class ServiceConfTest(TemplateTest):
 
     def test_render_with_package_search_on_leader(self):
         """
-        The serice.conf file on the leader has a package-search host set
+        The service.conf file on the leader has a package-search host set
         to localhost.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": True,
-        }
-        buffer = StringIO(self.template.render(context))
+        self.context["is_leader"] = True
+        buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("localhost", config.get("package-search", "host"))
@@ -96,50 +87,41 @@ class ServiceConfTest(TemplateTest):
         The serice.conf file on a non-leader unit has a package-search host set
         to the leader's IP address.
         """
-        leader_context = SAMPLE_LEADER_CONTEXT_DATA.copy()
-        leader_context["leader-ip"] = "1.2.3.4"
-
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": leader_context,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": False,
-        }
-        buffer = StringIO(self.template.render(context))
+        self.context["leader"]["leader-ip"] = "1.2.3.4"
+        buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("1.2.3.4", config.get("package-search", "host"))
+
 
 class LandscapeDefaultsTest(TemplateTest):
 
     template_filename = "landscape-server"
 
-    def test_render(self):
-        """
-        The landscape-server template renders Landscape default configuration
-        in /etc/default/landscape-server, which configures services to run
-        on a particular unit.
-        """
-        context = {
-            "hosted": [SAMPLE_HOSTED_DATA],
+    def setUp(self):
+        super(LandscapeDefaultsTest, self).setUp()
+        self.context = {
+            "hosted": [SAMPLE_HOSTED_DATA.copy()],
             "config": {},
             "is_leader": True,
         }
-        buffer = StringIO(self.template.render(context)).readlines()
+
+    def test_render_on_leader(self):
+        """
+        The landscape-server template renders Landscape default configuration
+        in /etc/default/landscape-server, which configures services to run
+        on a particular unit. On leader units cron jobs and juju-sync are on.
+        """
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_CRON="yes"\n', buffer)
+        self.assertIn('RUN_JUJU_SYNC="yes"\n', buffer)
 
     def test_render_on_non_leader(self):
         """
         On a non-leader unit, cron scripts are not enabled by default.
         """
-        context = {
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": False,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        self.context["is_leader"] = False
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_CRON="no"\n', buffer)
 
     def test_render_juju_sync(self):
@@ -147,15 +129,7 @@ class LandscapeDefaultsTest(TemplateTest):
         If the landscape-server unit is the leader and we're in standalone
         mode, juju-sync will be run.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": True,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_JUJU_SYNC="yes"\n', buffer)
 
     def test_render_juju_sync_not_leader(self):
@@ -163,61 +137,31 @@ class LandscapeDefaultsTest(TemplateTest):
         If the landscape-server unit is not the leader, juju-sync
         won't be run.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": False,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        self.context["is_leader"] = False
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
 
     def test_render_juju_sync_not_standalone(self):
         """
         If the deployment mode is not standalone, juju-sync won't be run.
         """
-        hosted_data = SAMPLE_HOSTED_DATA.copy()
+        hosted_data = self.context["hosted"][0]
         hosted_data["deployment-mode"] = "production"
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [hosted_data],
-            "config": {},
-            "is_leader": True,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
 
     def test_render_package_search(self):
         """
         If the landscape-server unit is the leader, package-search will be run.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": True,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_PACKAGESEARCH="yes"\n', buffer)
 
     def test_render_package_search_not_leader(self):
         """
-        If the landscape-server unit is not the leader, package-search will 
+        If the landscape-server unit is not the leader, package-search will
         not be run.
         """
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "config": {},
-            "is_leader": False,
-        }
-        buffer = StringIO(self.template.render(context)).readlines()
+        self.context["is_leader"] = False
+        buffer = StringIO(self.template.render(self.context)).readlines()
         self.assertIn('RUN_PACKAGESEARCH="no"\n', buffer)
