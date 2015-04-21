@@ -5,7 +5,7 @@ from cStringIO import StringIO
 from lib.tests.helpers import TemplateTest
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_HOSTED_DATA)
+    SAMPLE_HOSTED_DATA, SAMPLE_WEBSITE_UNIT_DATA)
 
 
 class ServiceConfTest(TemplateTest):
@@ -21,6 +21,7 @@ class ServiceConfTest(TemplateTest):
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
@@ -48,6 +49,7 @@ class ServiceConfTest(TemplateTest):
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {
@@ -73,6 +75,7 @@ class ServiceConfTest(TemplateTest):
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
             "leader": SAMPLE_LEADER_CONTEXT_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
@@ -102,6 +105,7 @@ class ServiceConfTest(TemplateTest):
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
             "leader": leader_context,
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
@@ -111,6 +115,48 @@ class ServiceConfTest(TemplateTest):
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("1.2.3.4", config.get("package-search", "host"))
+
+    def test_render_with_haproxy_address_as_root_url(self):
+        """
+        The service.conf file has root-url set to the haproxy public IP if the
+        config doesn't have a root-url entry.
+        """
+        haproxy_context = SAMPLE_WEBSITE_UNIT_DATA.copy()
+        haproxy_context["public-address"] = "4.3.2.1"
+
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": haproxy_context,
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {},
+            "is_leader": False,
+        }
+        buffer = StringIO(self.template.render(context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("4.3.2.1", config.get("global", "root-url"))
+
+    def test_render_with_config_provided_root_url(self):
+        """
+        The service.conf file has root-url set to the content of the root-url
+        charm config option if it is specified.
+        """
+        context = {
+            "db": [SAMPLE_DB_UNIT_DATA],
+            "amqp": [SAMPLE_AMQP_UNIT_DATA],
+            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
+            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "hosted": [SAMPLE_HOSTED_DATA],
+            "config": {"root-url": "8.8.8.8"},
+            "is_leader": False,
+        }
+        buffer = StringIO(self.template.render(context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("8.8.8.8", config.get("global", "root-url"))
+
 
 class LandscapeDefaultsTest(TemplateTest):
 
