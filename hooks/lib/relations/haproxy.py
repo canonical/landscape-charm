@@ -94,7 +94,8 @@ class HAProxyProvider(RelationContext):
             "crts": self._get_ssl_certificate(),
             "servers": [self._get_server("appserver")],
             "backends": [
-                self._get_backend("message", [self._get_server("message-server")]),
+                self._get_backend(
+                    "message", [self._get_server("message-server")]),
                 self._get_backend("api", [self._get_server("api")]),
             ],
         })

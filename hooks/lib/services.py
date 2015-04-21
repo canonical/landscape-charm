@@ -6,7 +6,7 @@ from charmhelpers.core.services.base import ServiceManager
 from charmhelpers.core.services.helpers import render_template
 from charmhelpers.contrib.hahelpers import cluster
 
-from lib.hook import Hook
+from lib.hook import Hook, HookError
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import (
@@ -49,6 +49,12 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
+        charm_config = hookenv.config()
+        # Make sure the root-url config key (if set) is an actual URL.
+        root_url = charm_config.get("root-url")
+        if root_url:
+            self._validate_url(root_url)
+
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
@@ -64,7 +70,7 @@ class ServicesHook(Hook):
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"config": hookenv.config(),
+                {"config": charm_config,
                  "is_leader": is_leader},
             ],
             "data_ready": [
@@ -81,3 +87,17 @@ class ServicesHook(Hook):
             "start": LSCtl(subprocess=self._subprocess),
         }])
         manager.manage()
+
+    def _validate_url(self, value):
+        """
+        A helper to validate a string is a URL suitable to use as root-url.
+        """
+        ends_with_slash = value.endswith("/")
+        has_protocol = value.startswith("http")
+        is_url = (value.find("://") != -1)
+
+        if not ends_with_slash or not has_protocol or not is_url:
+            raise HookError(
+                "The 'root-url' configuration value is not a valid URL."
+                " Please make sure it is of the form"
+                " 'http[s]://<hostname>/'")

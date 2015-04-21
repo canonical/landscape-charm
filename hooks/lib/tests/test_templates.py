@@ -104,18 +104,18 @@ class ServiceConfTest(TemplateTest):
         buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
-        self.assertEqual("4.3.2.1", config.get("global", "root-url"))
+        self.assertEqual("https://4.3.2.1/", config.get("global", "root-url"))
 
     def test_render_with_config_provided_root_url(self):
         """
         The service.conf file has root-url set to the content of the root-url
         charm config option if it is specified.
         """
-        self.context["config"]["root-url"] = "8.8.8.8"
+        self.context["config"]["root-url"] = "https://8.8.8.8/"
         buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
         config.readfp(buffer)
-        self.assertEqual("8.8.8.8", config.get("global", "root-url"))
+        self.assertEqual("https://8.8.8.8/", config.get("global", "root-url"))
 
 
 class LandscapeDefaultsTest(TemplateTest):
