@@ -37,7 +37,7 @@ class ServicesHookTest(HookenvTest):
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
 
-        # Setup sample relation data for the "common" happy case (and LDS
+        # Setup sample relation data for the "common" happy case (an LDS
         # deployment with postgresql, haproxy and rabbitmq-server).
         self.hookenv.relations = {
             "db": {
