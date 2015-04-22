@@ -40,7 +40,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	juju test --set-e -p SKIP_SLOW_TESTS,JUJU_HOME,JUJU_ENV -v --timeout 3000s
+	juju test --set-e -p SKIP_SLOW_TESTS,USE_LDS_TRUNK_PPA,JUJU_HOME,JUJU_ENV -v --timeout 3000s
 
 integration-test-dense-maas: test-depends
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
