@@ -58,6 +58,8 @@ class EnvironmentFixture(Fixture):
             self._deployment.load(self._get_bundle())
             self._deployment.setup(timeout=self._timeout)
             self._deployment.sentry.wait(self._timeout)
+        self._stopped_landscape_services = []
+        self.addCleanup(self._restore_stopped_landscape_services)
 
     def get_haproxy_public_address(self, unit=0):
         """Return the public address of the given haproxy unit."""
@@ -65,8 +67,12 @@ class EnvironmentFixture(Fixture):
         return unit.info["public-address"]
 
     def stop_landscape_service(self, service, unit=0):
-        """Stop the given Landscape service on the given unit."""
+        """Stop the given Landscape service on the given unit.
+
+        The service being stopped will be automatically restarted upon cleanUp.
+        """
         self._control_landscape_service("stop", service, unit)
+        self._stopped_landscape_services.append((service, unit))
 
     def start_landscape_service(self, service, unit=0):
         """Start the given Landscape service on the given unit."""
@@ -97,10 +103,15 @@ class EnvironmentFixture(Fixture):
 
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
-        output, code = unit.run("sudo service %s %action" % (service, action))
+        unit = self._deployment.sentry.unit["landscape/%d" % unit]
+        output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
+
+    def _restore_stopped_landscape_services(self):
+        """Automatically restore any service that was stopped."""
+        for service, unit in self._stopped_landscape_services:
+            self.start_landscape_service(service, unit=unit)
 
 
 @unittest.skipIf(
