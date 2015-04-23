@@ -13,6 +13,7 @@ from lib.relations.haproxy import (
     HAProxyProvider, HAProxyRequirer, OFFLINE_FOLDER)
 from lib.relations.landscape import (
     LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
+from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.filesystem import (
@@ -60,12 +61,12 @@ class ServicesHook(Hook):
             # Required data is available to the render_template calls below.
             "required_data": [
                 LandscapeRequirer(leader_context),
+                ConfigRequirer(self._hookenv),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"config": hookenv.config(),
-                 "is_leader": is_leader},
+                {"is_leader": is_leader},
             ],
             "data_ready": [
                 render_template(

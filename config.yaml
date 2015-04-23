@@ -48,6 +48,12 @@ options:
             Has no effect if changed after a deployment.
         type: string
         default:
+    root-url:
+        description: |
+            The root URL for this landscape deployment. If left blank the public
+            IP of the first related HAproxy unit will be used instead.
+        type: string
+        default: ""
     ssl-cert:
         type: string
         description: |
