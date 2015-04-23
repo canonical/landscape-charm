@@ -144,10 +144,11 @@ class OneLandscapeUnitTest(TestWithFixtures):
 
 
 class OneLandscapeUnitNoCronTest(TestWithFixtures):
-    """Host all the tests to run with cron jobs disabled.
+    """Host all the tests that expects the cron daemon to be stopped.
 
-    The deployment will the minimal one from OneLandscapeUnitTest, but with
-    cron jobs disabled.
+    The deployment will the same minimal one from OneLandscapeUnitTest, but
+    the cron daemon will be stopped, so Landscape cron jobs in particular
+    won't be run.
     """
     cron_unit = "landscape/0"
 

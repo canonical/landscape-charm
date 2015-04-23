@@ -39,6 +39,10 @@ DEFAULT_BUNDLE_CONTEXT = {
 
 
 class EnvironmentFixture(Fixture):
+    """Set the initial environment by passing the testing bundle to Amulet.
+
+    This fixture also acts as API for driving Amulet as needed by the tests.
+    """
 
     _timeout = 1500
     _series = "trusty"
@@ -87,12 +91,21 @@ class EnvironmentFixture(Fixture):
             lstrip_blocks=True, keep_trailing_newline=True)
         context = DEFAULT_BUNDLE_CONTEXT.copy()
 
-        # If we want the lds-trunk PPA, let's add the relevant keys
-        if os.environ.get("USE_LDS_TRUNK_PPA"):
-            secrets_dir = os.path.join(charm_dir, "secrets")
-            with open(os.path.join(secrets_dir, "lds-trunk-ppa"), "r") as fd:
-                lds_trunk_ppa = yaml.safe_load(fd.read())
-            context["landscape"].update(lds_trunk_ppa)
+        # If we want an alternate PPA, let's add the relevant keys
+        source = os.environ.get("LS_CHARM_SOURCE")
+        if source:
+            if source == "lds-trunk-ppa":
+                # We want the lds-trunk PPA, let's grab its details from
+                # the secrets directory
+                secrets_dir = os.path.join(charm_dir, "secrets")
+                with open(os.path.join(secrets_dir, "lds-trunk-ppa")) as fd:
+                    extra_config = yaml.safe_load(fd.read())
+            else:
+                extra_config = {
+                    "source": source,
+                    "key": os.environ.get("LS_CHARM_KEY", "4652B4E6")
+                }
+            context["landscape"].update(extra_config)
 
         # Add instance-specific configuration tweaks
         for service, options in self._config.items():
