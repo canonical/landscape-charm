@@ -88,7 +88,7 @@ class EnvironmentFixture(Fixture):
         # If we want an alternate PPA, let's add the relevant keys
         source = os.environ.get("LS_CHARM_SOURCE")
         if source:
-            if source == "trunk":
+            if source == "lds-trunk-ppa":
                 # We want the lds-trunk PPA, let's grab its details from
                 # the secrets directory
                 secrets_dir = os.path.join(charm_dir, "secrets")
