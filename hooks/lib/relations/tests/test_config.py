@@ -2,9 +2,8 @@ from lib.tests.helpers import HookenvTest
 from lib.relations.config import ConfigRequirer
 from lib.hook import HookError
 
-class ServicesHookTest(HookenvTest):
 
-    with_hookenv_monkey_patch = True
+class ServicesHookTest(HookenvTest):
 
     def test_root_url_is_set_and_invalid(self):
         """
