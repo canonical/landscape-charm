@@ -16,7 +16,7 @@ class ServiceConfTest(TemplateTest):
         self.context = {
             "db": [SAMPLE_DB_UNIT_DATA.copy()],
             "amqp": [SAMPLE_AMQP_UNIT_DATA.copy()],
-            "haproxy": SAMPLE_WEBSITE_UNIT_DATA,
+            "website": [SAMPLE_WEBSITE_UNIT_DATA.copy()],
             "leader": SAMPLE_LEADER_CONTEXT_DATA.copy(),
             "hosted": [SAMPLE_HOSTED_DATA.copy()],
             "config": {},
@@ -99,7 +99,7 @@ class ServiceConfTest(TemplateTest):
         The service.conf file has root-url set to the haproxy public IP if the
         config doesn't have a root-url entry.
         """
-        self.context["haproxy"]["public-address"] = "4.3.2.1"
+        self.context["website"][0]["public-address"] = "4.3.2.1"
 
         buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
