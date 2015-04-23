@@ -1,4 +1,5 @@
 
+
 def is_valid_url(value):
     """
     A helper to validate a string is a URL suitable to use as root-url.
