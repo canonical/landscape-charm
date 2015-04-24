@@ -13,8 +13,8 @@ options:
     license-file:
         description: |
             License file for LDS, either as a base64-encoded string containing
-	    the actual license file data, or a file://, http:// or https:// URL
-	    pointing to the license file for download.
+            the actual license file data, or a file://, http:// or https:// URL
+            pointing to the license file for download.
         type: string
         default:
     openid-provider-url:
