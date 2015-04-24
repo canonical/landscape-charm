@@ -4,6 +4,7 @@ import os
 import base64
 import urllib2
 
+import charmhelpers.core.host
 from charmhelpers.core.services.base import ManagerCallback
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
@@ -76,25 +77,25 @@ class WriteLicenseFile(ManagerCallback):
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
 
-        license_file = None
+        license_file_value = None
 
         # Lookup the deployment mode
         for data in service.get("required_data"):
             if "config" in data:
-                license_file = data["config"].get("license-file")
+                license_file_value = data["config"].get("license-file")
                 break
 
-        if license_file is None:
+        if license_file_value is None:
             return
 
-        if (license_file.startswith("file://") or
-                license_file.startswith("http://") or
-                license_file.startswith("https://")):
-            license_file = urllib2.urlopen(license_file)
+        if (license_file_value.startswith("file://") or
+                license_file_value.startswith("http://") or
+                license_file_value.startswith("https://")):
+            license_file = urllib2.urlopen(license_file_value)
             license_data = license_file.read()
         else:
-            license_data = base64.b64decode(license_file)
+            license_data = base64.b64decode(license_file_value)
 
-        with open(self.LICENSE_FILE, "w") as new_license_file:
-            new_license_file.write(license_data)
-
+        charmhelpers.core.host.write_file(
+            self.LICENSE_FILE, license_data,
+            owner="landscape", group="root", perms=0o640)

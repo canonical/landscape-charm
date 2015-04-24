@@ -7,6 +7,8 @@ from fixtures import TempDir
 
 from charmhelpers.core.services.base import ServiceManager
 
+import charmhelpers.core.host
+
 from lib.tests.helpers import HookenvTest
 from lib.callbacks.filesystem import (
     EnsureConfigDir,
@@ -85,6 +87,14 @@ class WriteLicenseFileTest(HookenvTest):
     def setUp(self):
         super(WriteLicenseFileTest, self).setUp()
         self.callback = WriteLicenseFile()
+        self.addCleanup(setattr, charmhelpers.core.host, "write_file",
+                        charmhelpers.core.host.write_file)
+        self.write_file_calls = []
+
+        def write_file(*args, **kwargs):
+            path, content = args
+            self.write_file_calls.append((path, content, kwargs))
+        charmhelpers.core.host.write_file = write_file
 
     def test_license_file_data(self):
         """
@@ -92,21 +102,21 @@ class WriteLicenseFileTest(HookenvTest):
         the base64-encoded value, it is decoded and written
         into a license file on the unit.
         """
-        with tempfile.NamedTemporaryFile() as license_target_file:
-            self.callback.LICENSE_FILE = license_target_file.name
+        license_data = 'Test license data'
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": base64.b64encode(license_data)
+                }},
+            ],
+        }])
+        self.callback(manager, "landscape", None)
 
-            license_data = 'Test license data'
-            manager = ServiceManager([{
-                "service": "landscape",
-                "required_data": [
-                    {"config": {
-                        "license-file": base64.b64encode(license_data)
-                    }},
-                ],
-            }])
-            self.callback(manager, "landscape", None)
-
-            self.assertEqual('Test license data', license_target_file.read())
+        self.assertEqual([
+            ('/etc/landscape/license.txt', 'Test license data',
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.write_file_calls)
 
     def test_license_file_file_url(self):
         """
@@ -119,21 +129,21 @@ class WriteLicenseFileTest(HookenvTest):
             source_license_file.flush()
             source_license_url = 'file://' + source_license_file.name
 
-            with tempfile.NamedTemporaryFile() as target_license_file:
-                self.callback.LICENSE_FILE = target_license_file.name
+            manager = ServiceManager([{
+                "service": "landscape",
+                "required_data": [
+                    {"config": {
+                        "license-file": source_license_url,
+                    }},
+                ],
+            }])
+            self.callback(manager, "landscape", None)
 
-                manager = ServiceManager([{
-                    "service": "landscape",
-                    "required_data": [
-                        {"config": {
-                            "license-file": source_license_url,
-                        }},
-                    ],
-                }])
-                self.callback(manager, "landscape", None)
-
-                self.assertEqual(
-                    'Test license data', target_license_file.read())
+            self.assertEqual([
+                ('/etc/landscape/license.txt', 'Test license data',
+                 {'owner': 'landscape', 'group': 'root',
+                  'perms': 0o640})
+            ], self.write_file_calls),
 
     def test_license_file_http_url(self):
         """
@@ -149,18 +159,17 @@ class WriteLicenseFileTest(HookenvTest):
 
         source_license_url = 'http://blah'
 
-        with tempfile.NamedTemporaryFile() as target_license_file:
-            self.callback.LICENSE_FILE = target_license_file.name
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": source_license_url,
+                }},
+            ],
+        }])
+        self.callback(manager, "landscape", None)
 
-            manager = ServiceManager([{
-                "service": "landscape",
-                "required_data": [
-                    {"config": {
-                        "license-file": source_license_url,
-                    }},
-                ],
-            }])
-            self.callback(manager, "landscape", None)
-
-            self.assertEqual(
-                'Test license data', target_license_file.read())
+        self.assertEqual([
+            ('/etc/landscape/license.txt', 'Test license data',
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.write_file_calls)
