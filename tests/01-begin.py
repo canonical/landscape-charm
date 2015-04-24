@@ -9,53 +9,28 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 import logging
 import unittest
 
-import jujulib.deployer
-
-from os.path import dirname, abspath, join
 from configparser import ConfigParser
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
-from glob import glob
+
+from fixtures import TestWithFixtures
 
 from helpers import (
-    check_url, juju_status, find_address, get_landscape_units,
-    get_landscape_service_conf, BaseLandscapeTests, run_command_on_unit)
+    check_url, juju_status, find_address, get_landscape_service_conf,
+    run_command_on_unit, EnvironmentFixture)
 
 
-log = logging.getLogger(__file__)
+class OneLandscapeUnitTest(TestWithFixtures):
+    """Host all the tests to run against a minimal Landscape deployment.
 
-
-def setUpModule():
-    """Deploys Landscape via the charm. All the tests use this deployment."""
-    deployer = jujulib.deployer.Deployer()
-    charm_dir = dirname(dirname(abspath(__file__)))
-    bundles = glob(join(charm_dir, "bundles", "*.yaml"))
-    deployer.deploy(getenv("DEPLOYER_TARGET", "landscape-scalable"), bundles,
-                    timeout=3000)
-
-    frontend = find_address(juju_status(), "haproxy")
-
-    # Make sure the app server is up.
-    # Note: In order to work on a new server or a server with the
-    #       first admin user already created, this phrase should match
-    #       the new-standalone-user form, the login form, and not
-    #       the maintenance page.
-    good_content = "passphrase"
-    log.info("Polling. Waiting for app server: {}".format(frontend))
-    check_url("https://{}/".format(frontend), good_content, interval=30,
-              attempts=10, retry_unavailable=True)
-
-
-class LandscapeServiceTests(BaseLandscapeTests):
-    """
-    Class hosting all the tests we want to run against a Landscape deployment.
+    The deployment will have one unit of each needed service, with default
+    configuration.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """Prepares juju_status which many tests use."""
-        cls.juju_status = juju_status()
-        cls.frontend = find_address(cls.juju_status, "haproxy")
+    def setUp(self):
+        super(OneLandscapeUnitTest, self).setUp()
+        self.environment = self.useFixture(EnvironmentFixture())
+        self.frontend = self.environment.get_haproxy_public_address()
 
     def test_app(self):
         """Verify that the APP service is up.
@@ -68,8 +43,9 @@ class LandscapeServiceTests(BaseLandscapeTests):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
+        frontend = self.environment.get_haproxy_public_address()
         good_content = "passphrase"
-        check_url("https://{}/".format(self.frontend), good_content)
+        check_url("https://{}/".format(frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -112,58 +88,23 @@ class LandscapeServiceTests(BaseLandscapeTests):
         url = "https://{}/upload/".format(self.frontend)
         check_url(url, good_content)
 
-
-class LandscapeServiceConfigTests(BaseLandscapeTests):
-
-    @classmethod
-    def setUpClass(cls):
-        """Prepare landscape_service_conf which will be used by the tests."""
-        landscape_units = []
-        cls.juju_status = juju_status()
-        cls.landscape_service_conf = []
-        landscape_units = get_landscape_units(cls.juju_status)
-        for unit in landscape_units:
-            config = ConfigParser()
-            config.read_string(get_landscape_service_conf(unit))
-            cls.landscape_service_conf.append(config)
-
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
 
         This test verifies that the host and password configuration keys
         from the [broker] section don't remain at their default values.
         """
-        for config in self.landscape_service_conf:
-            broker = config["broker"]
-            self.assertNotEqual(broker["host"], "localhost")
-            self.assertNotEqual(broker["password"], "landscape")
-
-
-class LandscapeErrorPagesTests(BaseLandscapeTests):
-
-    @classmethod
-    def setUpClass(cls):
-        """Prepares juju_status and other attributes that many tests use."""
-        cls.juju_status = juju_status()
-        cls.frontend = find_address(cls.juju_status, "haproxy")
-        cls.landscape_units = get_landscape_units(cls.juju_status)
-        cls.first_unit = cls.landscape_units[0]
-
-    def stop_server(self, name, unit):
-        cmd = "sudo service %s stop" % name
-        run_command_on_unit(cmd, unit)
-
-    def start_server(self, name, unit):
-        cmd = "sudo service %s start" % name
-        run_command_on_unit(cmd, unit)
+        config = ConfigParser()
+        config.read_string(get_landscape_service_conf("landscape/0"))
+        broker = config["broker"]
+        self.assertNotEqual(broker["host"], "localhost")
+        self.assertNotEqual(broker["password"], "landscape")
 
     def test_app_unavailable_page(self):
         """
         Verify that the frontend shows the styled unavailable page.
         """
-        self.addCleanup(self.start_server, "landscape-appserver",
-                        self.first_unit)
-        self.stop_server("landscape-appserver", self.first_unit)
+        self.environment.stop_landscape_service("landscape-appserver")
         good_content = "please phone us"
         url = "https://{}/".format(self.frontend)
         check_url(url, good_content)
@@ -173,9 +114,7 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         """
         Verify that the frontend shows the unstyled unavailable page for msg.
         """
-        self.addCleanup(self.start_server, "landscape-msgserver",
-                        self.first_unit)
-        self.stop_server("landscape-msgserver", self.first_unit)
+        self.environment.stop_landscape_service("landscape-msgserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "https://{}/message-system".format(self.frontend)
@@ -186,21 +125,35 @@ class LandscapeErrorPagesTests(BaseLandscapeTests):
         """
         Verify that the frontend shows the unstyled unavailable page for ping.
         """
-        self.addCleanup(self.start_server, "landscape-pingserver",
-                        self.first_unit)
-        self.stop_server("landscape-pingserver", self.first_unit)
+        self.environment.stop_landscape_service("landscape-pingserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
         url = "http://{}/ping".format(self.frontend)
         check_url(url, good_content)
 
+    def test_ssl_certificate_is_in_place(self):
+        """
+        The landscape-server charm looks at the SSL certificate set on the
+        relation with haproxy and writes it on disk in the location that
+        the application expects (it will need it when generating client
+        configuration for Autopilot deployments).
+        """
+        ssl_cert = run_command_on_unit(
+            "cat /etc/ssl/certs/landscape_server_ca.crt", "landscape/0")
+        self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
-class LandscapeCronTests(BaseLandscapeTests):
+
+class OneLandscapeUnitNoCronTest(TestWithFixtures):
+    """Host all the tests that expects the cron daemon to be stopped.
+
+    The deployment will the same minimal one from OneLandscapeUnitTest, but
+    the cron daemon will be stopped, so Landscape cron jobs in particular
+    won't be run.
+    """
+    cron_unit = "landscape/0"
 
     @classmethod
     def setUpClass(cls):
-        cls.juju_status = juju_status()
-        cls.cron_unit = get_landscape_units(cls.juju_status)[0]
         cls._stop_cron(cls.cron_unit)
 
     @classmethod
@@ -328,24 +281,11 @@ class LandscapeCronTests(BaseLandscapeTests):
         check_output(cmd, stderr=PIPE)
 
 
-class LandscapeSSLCertificateTests(BaseLandscapeTests):
-
-    @classmethod
-    def setUpClass(cls):
-        """Prepares juju_status and other attributes that many tests use."""
-        cls.juju_status = juju_status()
-        cls.first_unit = get_landscape_units(cls.juju_status)[0]
-
-    def test_ssl_certificate_is_in_place(self):
-        """
-        The landscape-server charm looks at the SSL certificate set on the
-        relation with haproxy and writes it on disk in the location that
-        the application expects (it will need it when generating client
-        configuration for Autopilot deployments).
-        """
-        ssl_cert = run_command_on_unit(
-            "cat /etc/ssl/certs/landscape_server_ca.crt", self.first_unit)
-        self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
+def load_tests(loader, tests, pattern):
+    suite = unittest.TestSuite()
+    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitTest))
+    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitNoCronTest))
+    return suite
 
 
 if __name__ == "__main__":

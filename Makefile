@@ -32,11 +32,22 @@ bundles:
 	    bzr co lp:~landscape/landscape-charm/bundles-trunk-new-charm bundles; \
 	fi
 
+secrets:
+	@if [ -d secrets ]; then \
+	    bzr up secrets; \
+	else \
+	    bzr co lp:~landscape/landscape/secrets secrets; \
+	fi
+
 integration-test: test-depends
-	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
+	juju test --set-e -p SKIP_SLOW_TESTS,LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV -v --timeout 3000s
 
 integration-test-dense-maas: test-depends
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
+
+# Run integration tests using the LDS package from the lds-trunk PPA
+integration-test-trunk: test-depends secrets
+	LS_CHARM_SOURCE=lds-trunk-ppa make integration-test
 
 deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py
