@@ -1,12 +1,18 @@
 import os
 import base64
+import tempfile
+import urllib2
 
 from fixtures import TempDir
 
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.tests.helpers import HookenvTest
-from lib.callbacks.filesystem import EnsureConfigDir, WriteCustomSSLCertificate
+from lib.callbacks.filesystem import (
+    EnsureConfigDir,
+    WriteCustomSSLCertificate,
+    WriteLicenseFile,
+)
 
 
 class EnsureConfigDirTest(HookenvTest):
@@ -70,3 +76,91 @@ class WriteCustomSSLCertificateTest(HookenvTest):
         self.callback(manager, "landscape", None)
         with open(self.certs_dir.join("landscape_server_ca.crt"), "r") as fd:
             self.assertEqual("<config ssl>", fd.read())
+
+
+class WriteLicenseFileTest(HookenvTest):
+
+    with_hookenv_monkey_patch = True
+
+    def setUp(self):
+        super(WriteLicenseFileTest, self).setUp()
+        self.callback = WriteLicenseFile()
+
+    def test_license_file_data(self):
+        """
+        If the config specifies a license file data directly as
+        the base64-encoded value, it is decoded and written
+        into a license file on the unit.
+        """
+        with tempfile.NamedTemporaryFile() as license_target_file:
+            self.callback.LICENSE_FILE = license_target_file.name
+
+            license_data = 'Test license data'
+            manager = ServiceManager([{
+                "service": "landscape",
+                "required_data": [
+                    {"config": {
+                        "license-file": base64.b64encode(license_data)
+                    }},
+                ],
+            }])
+            self.callback(manager, "landscape", None)
+
+            self.assertEqual('Test license data', license_target_file.read())
+
+    def test_license_file_file_url(self):
+        """
+        If the config specifies a license file using a local file:// URL,
+        contents of that file are transferred verbatim to the license file
+        on the unit.
+        """
+        with tempfile.NamedTemporaryFile() as source_license_file:
+            source_license_file.write('Test license data')
+            source_license_file.flush()
+            source_license_url = 'file://' + source_license_file.name
+
+            with tempfile.NamedTemporaryFile() as target_license_file:
+                self.callback.LICENSE_FILE = target_license_file.name
+
+                manager = ServiceManager([{
+                    "service": "landscape",
+                    "required_data": [
+                        {"config": {
+                            "license-file": source_license_url,
+                        }},
+                    ],
+                }])
+                self.callback(manager, "landscape", None)
+
+                self.assertEqual(
+                    'Test license data', target_license_file.read())
+
+    def test_license_file_http_url(self):
+        """
+        If the config specifies a license file using a local file:// URL,
+        contents of that file are transferred verbatim to the license file
+        on the unit.
+        """
+        class FakeUrl(object):
+            def read(self):
+                return 'Test license data'
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+        urllib2.urlopen = lambda url: FakeUrl()
+
+        source_license_url = 'http://blah'
+
+        with tempfile.NamedTemporaryFile() as target_license_file:
+            self.callback.LICENSE_FILE = target_license_file.name
+
+            manager = ServiceManager([{
+                "service": "landscape",
+                "required_data": [
+                    {"config": {
+                        "license-file": source_license_url,
+                    }},
+                ],
+            }])
+            self.callback(manager, "landscape", None)
+
+            self.assertEqual(
+                'Test license data', target_license_file.read())

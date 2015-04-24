@@ -17,7 +17,8 @@ from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.filesystem import (
-    CONFIGS_DIR, SSL_CERTS_DIR, EnsureConfigDir, WriteCustomSSLCertificate)
+    CONFIGS_DIR, SSL_CERTS_DIR, EnsureConfigDir, WriteCustomSSLCertificate,
+    WriteLicenseFile)
 
 
 SERVICE_CONF = "/etc/landscape/service.conf"
@@ -78,6 +79,7 @@ class ServicesHook(Hook):
                 EnsureConfigDir(configs_dir=self._configs_dir),
                 WriteCustomSSLCertificate(ssl_certs_dir=self._ssl_certs_dir),
                 SchemaBootstrap(subprocess=self._subprocess),
+                WriteLicenseFile(),
             ],
             "start": LSCtl(subprocess=self._subprocess),
         }])

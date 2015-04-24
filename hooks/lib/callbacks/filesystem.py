@@ -2,6 +2,7 @@
 
 import os
 import base64
+import urllib2
 
 from charmhelpers.core.services.base import ManagerCallback
 
@@ -65,3 +66,35 @@ class WriteCustomSSLCertificate(ManagerCallback):
             self._ssl_certs_dir, "landscape_server_ca.crt")
         with open(ssl_cert_path, "w") as fd:
             fd.write(base64.b64decode(ssl_cert))
+
+
+class WriteLicenseFile(ManagerCallback):
+    """Write a license file if it is specified in the config file."""
+
+    LICENSE_FILE = "/etc/landscape/license.txt"
+
+    def __call__(self, manager, service_name, event_name):
+        service = manager.get_service(service_name)
+
+        license_file = None
+
+        # Lookup the deployment mode
+        for data in service.get("required_data"):
+            if "config" in data:
+                license_file = data["config"].get("license-file")
+                break
+
+        if license_file is None:
+            return
+
+        if (license_file.startswith("file://") or
+                license_file.startswith("http://") or
+                license_file.startswith("https://")):
+            license_file = urllib2.urlopen(license_file)
+            license_data = license_file.read()
+        else:
+            license_data = base64.b64decode(license_file)
+
+        with open(self.LICENSE_FILE, "w") as new_license_file:
+            new_license_file.write(license_data)
+
