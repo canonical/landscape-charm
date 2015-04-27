@@ -4,7 +4,7 @@ import os
 import base64
 import urllib2
 
-import charmhelpers.core.host
+import charmhelpers.core.host as host
 from charmhelpers.core.services.base import ManagerCallback
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
@@ -72,7 +72,9 @@ class WriteCustomSSLCertificate(ManagerCallback):
 class WriteLicenseFile(ManagerCallback):
     """Write a license file if it is specified in the config file."""
 
-    LICENSE_FILE = "/etc/landscape/license.txt"
+    def __init__(self, license_file="/etc/landscape/license.txt", host=host):
+        self._host = host
+        self._license_file = license_file
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -96,6 +98,6 @@ class WriteLicenseFile(ManagerCallback):
         else:
             license_data = base64.b64decode(license_file_value)
 
-        charmhelpers.core.host.write_file(
-            self.LICENSE_FILE, license_data,
+        self._host.write_file(
+            self._license_file, license_data,
             owner="landscape", group="root", perms=0o640)

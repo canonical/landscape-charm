@@ -7,7 +7,7 @@ from fixtures import TempDir
 
 from charmhelpers.core.services.base import ServiceManager
 
-import charmhelpers.core.host
+from lib.tests.stubs import HostStub
 
 from lib.tests.helpers import HookenvTest
 from lib.callbacks.filesystem import (
@@ -86,15 +86,8 @@ class WriteLicenseFileTest(HookenvTest):
 
     def setUp(self):
         super(WriteLicenseFileTest, self).setUp()
-        self.callback = WriteLicenseFile()
-        self.addCleanup(setattr, charmhelpers.core.host, "write_file",
-                        charmhelpers.core.host.write_file)
-        self.write_file_calls = []
-
-        def write_file(*args, **kwargs):
-            path, content = args
-            self.write_file_calls.append((path, content, kwargs))
-        charmhelpers.core.host.write_file = write_file
+        self.host = HostStub()
+        self.callback = WriteLicenseFile(host=self.host)
 
     def test_license_file_data(self):
         """
@@ -114,9 +107,9 @@ class WriteLicenseFileTest(HookenvTest):
         self.callback(manager, "landscape", None)
 
         self.assertEqual([
-            ('/etc/landscape/license.txt', 'Test license data',
+            ("write_file", ('/etc/landscape/license.txt', 'Test license data'),
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
-        ], self.write_file_calls)
+        ], self.host.calls)
 
     def test_license_file_file_url(self):
         """
@@ -140,10 +133,10 @@ class WriteLicenseFileTest(HookenvTest):
             self.callback(manager, "landscape", None)
 
             self.assertEqual([
-                ('/etc/landscape/license.txt', 'Test license data',
-                 {'owner': 'landscape', 'group': 'root',
-                  'perms': 0o640})
-            ], self.write_file_calls),
+                ("write_file",
+                 ('/etc/landscape/license.txt', 'Test license data'),
+                 {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+            ], self.host.calls)
 
     def test_license_file_http_url(self):
         """
@@ -170,6 +163,6 @@ class WriteLicenseFileTest(HookenvTest):
         self.callback(manager, "landscape", None)
 
         self.assertEqual([
-            ('/etc/landscape/license.txt', 'Test license data',
+            ("write_file", ('/etc/landscape/license.txt', 'Test license data'),
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
-        ], self.write_file_calls)
+        ], self.host.calls)

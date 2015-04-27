@@ -2,8 +2,6 @@ import os
 
 from fixtures import TempDir
 
-import charmhelpers.core.host
-
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
@@ -39,13 +37,6 @@ class ServicesHookTest(HookenvTest):
         self.renders = []
         self.addCleanup(setattr, templating, "render", templating.render)
         templating.render = lambda *args: self.renders.append(args)
-
-        # XXX Monkey patch the write_file API call.
-        self.write_file_calls = []
-        self.addCleanup(setattr, charmhelpers.core.host, "write_file",
-                        charmhelpers.core.host.write_file)
-        charmhelpers.core.host.write_file = lambda *args, **kwargs: (
-            self.write_file_calls.append((args, kwargs)))
 
         # Setup sample relation data for the "common" happy case (an LDS
         # deployment with postgresql, haproxy and rabbitmq-server).
@@ -212,6 +203,14 @@ class ServicesHookTest(HookenvTest):
         self.hook()
 
         self.assertEqual(
-            [(("/etc/landscape/license.txt", "license data"),
+            [("write_file", ("/etc/landscape/license.txt", "license data"),
               {"owner": "landscape", "group": "root", "perms": 0o640})],
-            self.write_file_calls)
+            self.host.calls)
+
+    def test_no_license_file(self):
+        """
+        No license file is created when license-file option is not set.
+        """
+        self.hook()
+
+        self.assertEqual([], self.host.calls)

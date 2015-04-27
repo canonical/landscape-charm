@@ -79,7 +79,7 @@ class ServicesHook(Hook):
                 EnsureConfigDir(configs_dir=self._configs_dir),
                 WriteCustomSSLCertificate(ssl_certs_dir=self._ssl_certs_dir),
                 SchemaBootstrap(subprocess=self._subprocess),
-                WriteLicenseFile(),
+                WriteLicenseFile(host=self._host),
             ],
             "start": LSCtl(subprocess=self._subprocess),
         }])
