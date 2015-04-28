@@ -42,6 +42,10 @@ class EnvironmentFixture(Fixture):
     """Set the initial environment by passing the testing bundle to Amulet.
 
     This fixture also acts as API for driving Amulet as needed by the tests.
+
+    The LS_CHARM_SOURCE environment variable can be used to set the 'source'
+    charm config option of the deployed landscape-server service. See the
+    metadata.yaml file for possible configuration values.
     """
 
     _timeout = 1500
@@ -111,7 +115,7 @@ class EnvironmentFixture(Fixture):
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
         unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
-        output, code = unit.run("sudo service %s %action" % (service, action))
+        output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
 
