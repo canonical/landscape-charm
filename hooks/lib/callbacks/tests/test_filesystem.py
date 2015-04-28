@@ -11,15 +11,10 @@ from lib.tests.stubs import HostStub
 
 from lib.tests.helpers import HookenvTest
 from lib.callbacks.filesystem import (
-    EnsureConfigDir,
-    WriteCustomSSLCertificate,
-    WriteLicenseFile,
-)
+    EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 
 
 class EnsureConfigDirTest(HookenvTest):
-
-    with_hookenv_monkey_patch = True
 
     def setUp(self):
         super(EnsureConfigDirTest, self).setUp()
@@ -39,8 +34,6 @@ class EnsureConfigDirTest(HookenvTest):
 
 
 class WriteCustomSSLCertificateTest(HookenvTest):
-
-    with_hookenv_monkey_patch = True
 
     def setUp(self):
         super(WriteCustomSSLCertificateTest, self).setUp()
@@ -82,12 +75,22 @@ class WriteCustomSSLCertificateTest(HookenvTest):
 
 class WriteLicenseFileTest(HookenvTest):
 
-    with_hookenv_monkey_patch = True
-
     def setUp(self):
         super(WriteLicenseFileTest, self).setUp()
         self.host = HostStub()
         self.callback = WriteLicenseFile(host=self.host)
+
+    def test_license_file_unset(self):
+        """
+        If license-file is unset in the the config, no license file is created.
+        """
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [],
+        }])
+        self.callback(manager, "landscape", None)
+
+        self.assertEqual([], self.host.calls)
 
     def test_license_file_data(self):
         """

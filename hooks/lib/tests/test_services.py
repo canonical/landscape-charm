@@ -206,11 +206,3 @@ class ServicesHookTest(HookenvTest):
             [("write_file", ("/etc/landscape/license.txt", "license data"),
               {"owner": "landscape", "group": "root", "perms": 0o640})],
             self.host.calls)
-
-    def test_no_license_file(self):
-        """
-        No license file is created when license-file option is not set.
-        """
-        self.hook()
-
-        self.assertEqual([], self.host.calls)
