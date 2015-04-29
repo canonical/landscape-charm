@@ -9,7 +9,7 @@ from lib.hook import HookError
 from lib.tests.stubs import HostStub
 from lib.tests.helpers import HookenvTest
 
-from lib.tests.offline_fixture import RootDir
+from lib.tests.rootdir import RootDir
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 

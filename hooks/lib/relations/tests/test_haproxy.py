@@ -8,7 +8,7 @@ from lib.relations.haproxy import (
 from lib.hook import HookError
 from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
-from lib.tests.offline_fixture import RootDir
+from lib.tests.rootdir import RootDir
 
 HTTPS_INDEX = 1
 
