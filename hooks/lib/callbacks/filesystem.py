@@ -4,8 +4,10 @@ import os
 import base64
 import urllib2
 
-import charmhelpers.core.host as host
+from charmhelpers.core import host
 from charmhelpers.core.services.base import ManagerCallback
+
+from lib.hook import HookError
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
 SSL_CERTS_DIR = "/etc/ssl/certs"
@@ -93,10 +95,19 @@ class WriteLicenseFile(ManagerCallback):
         if (license_file_value.startswith("file://") or
                 license_file_value.startswith("http://") or
                 license_file_value.startswith("https://")):
-            license_file = urllib2.urlopen(license_file_value)
-            license_data = license_file.read()
+            try:
+                license_file = urllib2.urlopen(license_file_value)
+                license_data = license_file.read()
+            except urllib2.URLError:
+                raise HookError(
+                    "Could not read license file from '%s'." % (
+                        license_file_value))
         else:
-            license_data = base64.b64decode(license_file_value)
+            try:
+                license_data = base64.b64decode(license_file_value)
+            except TypeError:
+                raise HookError(
+                    "Error base64-decoding license-file data.")
 
         self._host.write_file(
             self._license_file, license_data,

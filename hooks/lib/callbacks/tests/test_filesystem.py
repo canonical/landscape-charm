@@ -7,8 +7,9 @@ from fixtures import TempDir
 
 from charmhelpers.core.services.base import ServiceManager
 
-from lib.tests.stubs import HostStub
+from lib.hook import HookError
 
+from lib.tests.stubs import HostStub
 from lib.tests.helpers import HookenvTest
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
@@ -114,6 +115,23 @@ class WriteLicenseFileTest(HookenvTest):
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
 
+    def test_license_file_bad_data(self):
+        """
+        When license-file is not a URL and not base64-encoded data, fails
+        with HookError.
+        """
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": "bad data",
+                }},
+            ],
+        }])
+        self.assertRaises(HookError, self.callback, manager, "landscape", None)
+
     def test_license_file_file_url(self):
         """
         If the config specifies a license file using a local file:// URL,
@@ -169,3 +187,27 @@ class WriteLicenseFileTest(HookenvTest):
             ("write_file", ('/etc/landscape/license.txt', 'Test license data'),
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
+
+    def test_license_file_bad_url(self):
+        """
+        If the config specifies a license file using a local file:// URL,
+        contents of that file are transferred verbatim to the license file
+        on the unit.
+        """
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+
+        def stub_urlopen(url):
+            raise urllib2.URLError("error")
+        urllib2.urlopen = stub_urlopen
+
+        source_license_url = 'http://blah'
+
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": source_license_url,
+                }},
+            ],
+        }])
+        self.assertRaises(HookError, self.callback, manager, "landscape", None)
