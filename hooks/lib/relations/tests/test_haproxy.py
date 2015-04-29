@@ -6,8 +6,9 @@ from fixtures import TempDir
 from lib.relations.haproxy import (
     HAProxyProvider, HAProxyRequirer, SERVER_OPTIONS, ERRORFILES_MAP)
 from lib.hook import HookError
+from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
-from lib.tests.offline_fixture import OfflineDir
+from lib.tests.offline_fixture import RootDir
 
 HTTPS_INDEX = 1
 
@@ -18,7 +19,8 @@ class HAProxyProviderTest(HookenvTest):
 
     def setUp(self):
         super(HAProxyProviderTest, self).setUp()
-        self.offline_dir = self.useFixture(OfflineDir()).path
+        self.root_dir = self.useFixture(RootDir())
+        self.paths = self.root_dir.paths
 
     def test_required_keys(self):
         """
@@ -34,7 +36,7 @@ class HAProxyProviderTest(HookenvTest):
         The HAProxyProvider class feeds haproxy with the services that this
         Landscape unit runs. By default all services are run.
         """
-        relation = HAProxyProvider(offline_dir=self.offline_dir)
+        relation = HAProxyProvider(paths=self.paths)
 
         # Provide some fake ssl-cert and ssl-key config entries
         config = self.hookenv.config()
@@ -106,8 +108,9 @@ class HAProxyProviderTest(HookenvTest):
         In case a file specified in the errorfiles map cannot be read, the
         provide_data method raises a HookError.
         """
-        offline_dir = self.useFixture(TempDir()).path
-        provider = HAProxyProvider(offline_dir=offline_dir)
+        # Create an empty root tree
+        temp_dir = self.useFixture(TempDir())
+        provider = HAProxyProvider(paths=Paths(temp_dir.path))
 
         self.assertRaises(HookError, provider.provide_data)
 
@@ -116,7 +119,7 @@ class HAProxyProviderTest(HookenvTest):
         If no "ssl-cert" is specified, the provide_data method returns
         ["DEFAULT"] for the HAproxy SSL cert.
         """
-        provider = HAProxyProvider(offline_dir=self.offline_dir)
+        provider = HAProxyProvider(paths=self.paths)
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
@@ -132,8 +135,7 @@ class HAProxyProviderTest(HookenvTest):
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
         config["ssl-key"] = base64.b64encode("a key")
-        provider = HAProxyProvider(
-            offline_dir=self.offline_dir, hookenv=self.hookenv)
+        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
 
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
@@ -153,8 +155,7 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = "a cert"  # Not b64 encoded!
         config["ssl-key"] = base64.b64encode("a key")
 
-        provider = HAProxyProvider(
-            offline_dir=self.offline_dir, hookenv=self.hookenv)
+        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
@@ -173,8 +174,7 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = base64.b64encode("a cert")
         config["ssl-key"] = "something"  # Not base64 encoded!
 
-        provider = HAProxyProvider(
-            offline_dir=self.offline_dir, hookenv=self.hookenv)
+        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
@@ -192,8 +192,7 @@ class HAProxyProviderTest(HookenvTest):
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
         # Not setting 'ssl-key'
-        provider = HAProxyProvider(
-            offline_dir=self.offline_dir, hookenv=self.hookenv)
+        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
 
         expected = "'ssl-cert' is specified but 'ssl-key' is missing!"
 

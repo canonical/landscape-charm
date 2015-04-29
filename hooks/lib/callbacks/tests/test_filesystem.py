@@ -1,11 +1,9 @@
-import os
 import base64
-
-from fixtures import TempDir
 
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.tests.helpers import HookenvTest
+from lib.tests.offline_fixture import RootDir
 from lib.callbacks.filesystem import EnsureConfigDir, WriteCustomSSLCertificate
 
 
@@ -15,8 +13,8 @@ class EnsureConfigDirTest(HookenvTest):
 
     def setUp(self):
         super(EnsureConfigDirTest, self).setUp()
-        self.configs_dir = self.useFixture(TempDir())
-        self.callback = EnsureConfigDir(self.configs_dir.path)
+        self.root_dir = self.useFixture(RootDir())
+        self.callback = EnsureConfigDir(self.root_dir.paths)
 
     def test_options(self):
         """
@@ -27,7 +25,7 @@ class EnsureConfigDirTest(HookenvTest):
             "required_data": [{"hosted": [{"deployment-mode": "edge"}]}],
         }])
         self.callback(manager, "landscape", None)
-        self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
+        self.assertIsNotNone(self.root_dir.paths.config_link("edge"))
 
 
 class WriteCustomSSLCertificateTest(HookenvTest):
@@ -36,8 +34,8 @@ class WriteCustomSSLCertificateTest(HookenvTest):
 
     def setUp(self):
         super(WriteCustomSSLCertificateTest, self).setUp()
-        self.certs_dir = self.useFixture(TempDir())
-        self.callback = WriteCustomSSLCertificate(self.certs_dir.path)
+        self.root_dir = self.useFixture(RootDir())
+        self.callback = WriteCustomSSLCertificate(self.root_dir.paths)
 
     def test_haproxy_certificate(self):
         """
@@ -52,7 +50,7 @@ class WriteCustomSSLCertificateTest(HookenvTest):
             ],
         }])
         self.callback(manager, "landscape", None)
-        with open(self.certs_dir.join("landscape_server_ca.crt"), "r") as fd:
+        with open(self.root_dir.paths.ssl_certificate(), "r") as fd:
             self.assertEqual("<haproxy ssl>", fd.read())
 
     def test_config_certificate(self):
@@ -68,5 +66,5 @@ class WriteCustomSSLCertificateTest(HookenvTest):
             ],
         }])
         self.callback(manager, "landscape", None)
-        with open(self.certs_dir.join("landscape_server_ca.crt"), "r") as fd:
+        with open(self.root_dir.paths.ssl_certificate(), "r") as fd:
             self.assertEqual("<config ssl>", fd.read())

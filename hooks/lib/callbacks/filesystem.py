@@ -5,7 +5,8 @@ import base64
 
 from charmhelpers.core.services.base import ManagerCallback
 
-CONFIGS_DIR = "/opt/canonical/landscape/configs"
+from lib.paths import default_paths
+
 SSL_CERTS_DIR = "/etc/ssl/certs"
 
 
@@ -15,8 +16,8 @@ class EnsureConfigDir(ManagerCallback):
     XXX This is a temporary workaround till we make the Landscape server
         code always look at the same location for configuration files.
     """
-    def __init__(self, configs_dir=CONFIGS_DIR):
-        self._configs_dir = configs_dir
+    def __init__(self, paths=default_paths):
+        self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -28,10 +29,9 @@ class EnsureConfigDir(ManagerCallback):
                 break
 
         # Create a symlink for the config directory
-        config_link = os.path.join(self._configs_dir, deployment_mode)
+        config_link = self._paths.config_link(deployment_mode)
         if not os.path.exists(config_link):
-            standalone_dir = os.path.join(self._configs_dir, "standalone")
-            os.symlink(standalone_dir, config_link)
+            os.symlink(self._paths.config_dir(), config_link)
 
 
 class WriteCustomSSLCertificate(ManagerCallback):
@@ -41,8 +41,8 @@ class WriteCustomSSLCertificate(ManagerCallback):
     either explicitly with the 'ssl-cert' config key, or implicitly (by
     using haproxy's self-signed one).
     """
-    def __init__(self, ssl_certs_dir=SSL_CERTS_DIR):
-        self._ssl_certs_dir = ssl_certs_dir
+    def __init__(self, paths=default_paths):
+        self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -61,7 +61,5 @@ class WriteCustomSSLCertificate(ManagerCallback):
         ssl_cert = config_ssl_cert or haproxy_ssl_cert
 
         # Write out the data
-        ssl_cert_path = os.path.join(
-            self._ssl_certs_dir, "landscape_server_ca.crt")
-        with open(ssl_cert_path, "w") as fd:
+        with open(self._paths.ssl_certificate(), "w") as fd:
             fd.write(base64.b64decode(ssl_cert))

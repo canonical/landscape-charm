@@ -1,21 +1,24 @@
 import os
+
 from fixtures import TempDir
 
 from lib.relations.haproxy import ERRORFILES_MAP
+from lib.paths import Paths
 
 
-class OfflineDir(TempDir):
-    """Temporary offline dir populated with sample data."""
+class RootDir(TempDir):
+    """Filesystem tree that mimics are a root filesystem.
 
-    rootdir = ""  # This is expected to be set
-
-    def __init__(self, errorfiles_map=ERRORFILES_MAP):
-        super(OfflineDir, self)
-        self._errorfiles_map = errorfiles_map
+    This fixtures creates a filesystem tree that has the same layout of
+    what the charm expects to find, but it's rooted at a temporary directory.
+    """
 
     def setUp(self):
-        super(OfflineDir, self).setUp()
-        for filename in self._errorfiles_map.itervalues():
-            fake_content = "Fake %s" % filename
-            with open(os.path.join(self.path, filename), "w") as fd:
-                fd.write(fake_content)
+        super(RootDir, self).setUp()
+        self.paths = Paths(self.path)
+        os.makedirs(os.path.dirname(self.paths.config_dir()))
+        os.makedirs(os.path.dirname(self.paths.ssl_certificate()))
+        os.makedirs(self.paths.offline_dir())
+        for path in ERRORFILES_MAP.itervalues():
+            with open(os.path.join(self.paths.offline_dir(), path), "w") as fd:
+                fd.write("Fake %s" % path)
