@@ -32,6 +32,10 @@ SAMPLE_CONFIG_OPENID_DATA = {
     "openid-logout-url": "http://openid-host/logout",
 }
 
+SAMPLE_CONFIG_LICENSE_DATA = {
+    "license-file": base64.b64encode("license data"),
+}
+
 SAMPLE_HOSTED_DATA = {
     "deployment-mode": "standalone",
 }

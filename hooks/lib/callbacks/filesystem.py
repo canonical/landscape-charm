@@ -2,12 +2,13 @@
 
 import os
 import base64
+import urllib2
 
+from charmhelpers.core import host
 from charmhelpers.core.services.base import ManagerCallback
 
 from lib.paths import default_paths
-
-SSL_CERTS_DIR = "/etc/ssl/certs"
+from lib.hook import HookError
 
 
 class EnsureConfigDir(ManagerCallback):
@@ -63,3 +64,46 @@ class WriteCustomSSLCertificate(ManagerCallback):
         # Write out the data
         with open(self._paths.ssl_certificate(), "w") as fd:
             fd.write(base64.b64decode(ssl_cert))
+
+
+class WriteLicenseFile(ManagerCallback):
+    """Write a license file if it is specified in the config file."""
+
+    def __init__(self, host=host, paths=default_paths):
+        self._host = host
+        self._paths = paths
+
+    def __call__(self, manager, service_name, event_name):
+        service = manager.get_service(service_name)
+
+        license_file_value = None
+
+        # Lookup the deployment mode
+        for data in service.get("required_data"):
+            if "config" in data:
+                license_file_value = data["config"].get("license-file")
+                break
+
+        if license_file_value is None:
+            return
+
+        if (license_file_value.startswith("file://") or
+                license_file_value.startswith("http://") or
+                license_file_value.startswith("https://")):
+            try:
+                license_file = urllib2.urlopen(license_file_value)
+                license_data = license_file.read()
+            except urllib2.URLError:
+                raise HookError(
+                    "Could not read license file from '%s'." % (
+                        license_file_value))
+        else:
+            try:
+                license_data = base64.b64decode(license_file_value)
+            except TypeError:
+                raise HookError(
+                    "Error base64-decoding license-file data.")
+
+        self._host.write_file(
+            self._paths.license_file(), license_data,
+            owner="landscape", group="root", perms=0o640)

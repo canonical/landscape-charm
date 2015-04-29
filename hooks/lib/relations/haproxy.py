@@ -53,10 +53,10 @@ ERRORFILES_MAP = {
     # TODO: Due to bug #1437366 the command line call to "relation-set"
     # will fail by reaching MAX_ARGS if too many errorfiles are set.
     # Until fixed let's set only one errorfile to assert it works.
-    #"403": "unauthorized-haproxy.html",
-    #"500": "exception-haproxy.html",
-    #"502": "unplanned-offline-haproxy.html",
-    #"504": "timeout-haproxy.html",
+    # "403": "unauthorized-haproxy.html",
+    # "500": "exception-haproxy.html",
+    # "502": "unplanned-offline-haproxy.html",
+    # "504": "timeout-haproxy.html",
 }
 
 

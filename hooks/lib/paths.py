@@ -6,6 +6,7 @@ DEFAULT_FILE = "/etc/default/landscape-server"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 CONFIG_DIR = "/opt/canonical/landscape/configs/standalone"
 OFFLINE_DIR = "/opt/canonical/landscape/canonical/landscape/offline"
+LICENSE_FILE = "/etc/landscape/license.txt"
 
 
 class Paths(object):
@@ -48,6 +49,10 @@ class Paths(object):
     def ssl_certificate(self):
         """Return the path to the SSL certificate used by Landscape."""
         return self._get_path(SSL_CERT_PATH)
+
+    def license_file(self):
+        """Return the path to the Landscape license file."""
+        return self._get_path(LICENSE_FILE)
 
     def _get_path(self, *paths):
         """Return the actual path of the given plain path."""

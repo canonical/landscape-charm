@@ -16,7 +16,8 @@ from lib.relations.landscape import (
 from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
-from lib.callbacks.filesystem import EnsureConfigDir, WriteCustomSSLCertificate
+from lib.callbacks.filesystem import (
+    EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 
 
 class ServicesHook(Hook):
@@ -71,6 +72,7 @@ class ServicesHook(Hook):
                 EnsureConfigDir(paths=self._paths),
                 WriteCustomSSLCertificate(paths=self._paths),
                 SchemaBootstrap(subprocess=self._subprocess),
+                WriteLicenseFile(host=self._host, paths=self._paths),
             ],
             "start": LSCtl(subprocess=self._subprocess),
         }])
