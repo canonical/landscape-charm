@@ -8,7 +8,8 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA, SAMPLE_WEBSITE_UNIT_DATA)
+    SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
+    SAMPLE_WEBSITE_UNIT_DATA)
 from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
 from lib.tests.offline_fixture import OfflineDir
 
@@ -193,3 +194,15 @@ class ServicesHookTest(HookenvTest):
         })
         self.hook()
         self.assertEqual(2, len(self.renders))
+
+    def test_license_file(self):
+        """
+        License file is created when license-file option is set in the config.
+        """
+        self.hookenv.config().update(SAMPLE_CONFIG_LICENSE_DATA)
+        self.hook()
+
+        self.assertEqual(
+            [("write_file", ("/etc/landscape/license.txt", "license data"),
+              {"owner": "landscape", "group": "root", "perms": 0o640})],
+            self.host.calls)

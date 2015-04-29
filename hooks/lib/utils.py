@@ -8,7 +8,7 @@ def is_valid_url(value):
         return False
     if not value.startswith("http"):
         return False
-    if not "://" in value:
+    if "://" not in value:
         return False
 
     return True
