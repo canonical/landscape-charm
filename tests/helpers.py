@@ -52,13 +52,15 @@ class EnvironmentFixture(Fixture):
     _series = "trusty"
     _deployment = Deployment()
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, deployment=None):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
             deploying the test bundle.
         """
         self._config = config or {}
+        if deployment is not None:
+            self._deployment = deployment
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
@@ -114,7 +116,7 @@ class EnvironmentFixture(Fixture):
 
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        unit = self._deployment.sentry.unit["landscape/%d" % unit]
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
