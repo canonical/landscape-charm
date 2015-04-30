@@ -42,6 +42,10 @@ class EnvironmentFixture(Fixture):
     """Set the initial environment by passing the testing bundle to Amulet.
 
     This fixture also acts as API for driving Amulet as needed by the tests.
+
+    The LS_CHARM_SOURCE environment variable can be used to set the 'source'
+    charm config option of the deployed landscape-server service. See the
+    metadata.yaml file for possible configuration values.
     """
 
     _timeout = 1500
