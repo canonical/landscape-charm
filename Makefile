@@ -3,6 +3,7 @@ PYTHON := /usr/bin/env python
 
 test:
 	@cd hooks && trial lib
+	@cd tests && trial test_helpers.py
 
 ci-test:
 	./dev/ubuntu-deps

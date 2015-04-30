@@ -52,13 +52,15 @@ class EnvironmentFixture(Fixture):
     _series = "trusty"
     _deployment = Deployment()
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, deployment=None):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
             deploying the test bundle.
         """
         self._config = config or {}
+        if deployment is not None:
+            self._deployment = deployment
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
