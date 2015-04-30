@@ -48,7 +48,7 @@ class EnvironmentFixture(Fixture):
     metadata.yaml file for possible configuration values.
     """
 
-    _timeout = 1500
+    _timeout = 3000
     _series = "trusty"
     _deployment = Deployment()
 
