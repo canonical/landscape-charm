@@ -3,7 +3,6 @@ PYTHON := /usr/bin/env python
 
 test:
 	@cd hooks && trial lib
-	@cd tests && trial test_helpers.py
 
 ci-test:
 	./dev/ubuntu-deps
@@ -25,6 +24,7 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: verify-juju-test bundles
+	@cd tests && trial test_helpers.py
 
 bundles:
 	@if [ -d bundles ]; then \
