@@ -21,7 +21,7 @@ class SentryStub(object):
     def __init__(self):
         self.unit = {
             "haproxy/0": UnitStub(public_address="1.2.3.4"),
-            "landscape/0": UnitStub()
+            "landscape-server/0": UnitStub()
         }
 
     def wait(self, timeout):
@@ -57,8 +57,8 @@ class EnvironmentFixtureTest(TestCase):
         self.fixture.setUp()
         self.assertTrue(self.deployment.deployed)
         self.assertIn("landscape-test", self.deployment.bundle)
-        self.assertEqual(1500, self.deployment.timeout)
-        self.assertEqual(1500, self.deployment.sentry.timeout)
+        self.assertEqual(3000, self.deployment.timeout)
+        self.assertEqual(3000, self.deployment.sentry.timeout)
 
     def test_get_haproxy_public_address(self):
         """
@@ -72,7 +72,7 @@ class EnvironmentFixtureTest(TestCase):
         The start_landscape_service method starts the requested service.
         """
         self.fixture.start_landscape_service("landscape-appserver")
-        unit = self.deployment.sentry.unit["landscape/0"]
+        unit = self.deployment.sentry.unit["landscape-server/0"]
         self.assertEqual(
             "sudo service landscape-appserver start", unit.commands[0])
 
@@ -80,7 +80,11 @@ class EnvironmentFixtureTest(TestCase):
         """
         The stop_landscape_service method stops the requested service.
         """
+        self.fixture.setUp()
         self.fixture.stop_landscape_service("landscape-appserver")
-        unit = self.deployment.sentry.unit["landscape/0"]
+        unit = self.deployment.sentry.unit["landscape-server/0"]
         self.assertEqual(
             "sudo service landscape-appserver stop", unit.commands[0])
+        self.fixture.cleanUp()
+        self.assertEqual(
+            "sudo service landscape-appserver start", unit.commands[1])
