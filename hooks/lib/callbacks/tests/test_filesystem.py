@@ -53,7 +53,7 @@ class WriteCustomSSLCertificateTest(HookenvTest):
             ],
         }])
         self.callback(manager, "landscape", None)
-        with open(self.root_dir.paths.ssl_certificate(), "r") as fd:
+        with open(self.root_dir.paths.ssl_certificate()) as fd:
             self.assertEqual("<haproxy ssl>", fd.read())
 
     def test_config_certificate(self):
@@ -69,7 +69,7 @@ class WriteCustomSSLCertificateTest(HookenvTest):
             ],
         }])
         self.callback(manager, "landscape", None)
-        with open(self.root_dir.paths.ssl_certificate(), "r") as fd:
+        with open(self.root_dir.paths.ssl_certificate()) as fd:
             self.assertEqual("<config ssl>", fd.read())
 
 
