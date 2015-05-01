@@ -122,7 +122,7 @@ class EnvironmentFixture(Fixture):
 
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape/%d" % unit]
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
