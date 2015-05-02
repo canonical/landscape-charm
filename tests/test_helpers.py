@@ -1,6 +1,10 @@
+import os
+
 from unittest import TestCase
 
 from helpers import EnvironmentFixture
+
+CHARM_DIR = os.path.dirname(os.path.dirname(__file__))
 
 
 class UnitStub(object):
@@ -37,6 +41,8 @@ class DeploymentStub(object):
 
     def load(self, bundle):
         self.bundle = bundle
+        self.services = bundle["landscape-test"]["services"]
+        self.services["landscape-server"]["branch"] = CHARM_DIR
 
     def setup(self, timeout=None):
         self.deployed = True
@@ -59,6 +65,9 @@ class EnvironmentFixtureTest(TestCase):
         self.assertIn("landscape-test", self.deployment.bundle)
         self.assertEqual(3000, self.deployment.timeout)
         self.assertEqual(3000, self.deployment.sentry.timeout)
+        config = self.deployment.services["landscape-server"]
+        self.assertEqual("local:trusty/landscape-server", config["charm"])
+        self.assertTrue(os.environ["JUJU_REPOSITORY"].startswith("/tmp"))
 
     def test_get_haproxy_public_address(self):
         """

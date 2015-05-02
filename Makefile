@@ -47,8 +47,8 @@ integration-test-dense-maas: test-depends
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
 
 # Run integration tests using the LDS package from the lds-trunk PPA
-integration-test-trunk: test-depends secrets
-	LS_CHARM_SOURCE=lds-trunk-ppa make integration-test
+integration-test-trunk: secrets
+	LS_CHARM_SOURCE="deb http://10.0.3.1:9999/ trusty main" make integration-test
 
 deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py
