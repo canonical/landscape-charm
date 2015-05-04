@@ -7,10 +7,8 @@ import urllib2
 from charmhelpers.core import host
 from charmhelpers.core.services.base import ManagerCallback
 
+from lib.paths import default_paths
 from lib.hook import HookError
-
-CONFIGS_DIR = "/opt/canonical/landscape/configs"
-SSL_CERTS_DIR = "/etc/ssl/certs"
 
 
 class EnsureConfigDir(ManagerCallback):
@@ -19,8 +17,8 @@ class EnsureConfigDir(ManagerCallback):
     XXX This is a temporary workaround till we make the Landscape server
         code always look at the same location for configuration files.
     """
-    def __init__(self, configs_dir=CONFIGS_DIR):
-        self._configs_dir = configs_dir
+    def __init__(self, paths=default_paths):
+        self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -32,10 +30,9 @@ class EnsureConfigDir(ManagerCallback):
                 break
 
         # Create a symlink for the config directory
-        config_link = os.path.join(self._configs_dir, deployment_mode)
+        config_link = self._paths.config_link(deployment_mode)
         if not os.path.exists(config_link):
-            standalone_dir = os.path.join(self._configs_dir, "standalone")
-            os.symlink(standalone_dir, config_link)
+            os.symlink(self._paths.config_dir(), config_link)
 
 
 class WriteCustomSSLCertificate(ManagerCallback):
@@ -45,8 +42,8 @@ class WriteCustomSSLCertificate(ManagerCallback):
     either explicitly with the 'ssl-cert' config key, or implicitly (by
     using haproxy's self-signed one).
     """
-    def __init__(self, ssl_certs_dir=SSL_CERTS_DIR):
-        self._ssl_certs_dir = ssl_certs_dir
+    def __init__(self, paths=default_paths):
+        self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -65,18 +62,16 @@ class WriteCustomSSLCertificate(ManagerCallback):
         ssl_cert = config_ssl_cert or haproxy_ssl_cert
 
         # Write out the data
-        ssl_cert_path = os.path.join(
-            self._ssl_certs_dir, "landscape_server_ca.crt")
-        with open(ssl_cert_path, "w") as fd:
+        with open(self._paths.ssl_certificate(), "w") as fd:
             fd.write(base64.b64decode(ssl_cert))
 
 
 class WriteLicenseFile(ManagerCallback):
     """Write a license file if it is specified in the config file."""
 
-    def __init__(self, license_file="/etc/landscape/license.txt", host=host):
+    def __init__(self, host=host, paths=default_paths):
         self._host = host
-        self._license_file = license_file
+        self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
         service = manager.get_service(service_name)
@@ -110,5 +105,5 @@ class WriteLicenseFile(ManagerCallback):
                     "Error base64-decoding license-file data.")
 
         self._host.write_file(
-            self._license_file, license_data,
+            self._paths.license_file(), license_data,
             owner="landscape", group="root", perms=0o640)
