@@ -138,7 +138,7 @@ class LandscapeLeaderContextTest(HookenvTest):
                            "secret-token": "old-token",
                            "leader-ip": "old-ip"}))
         context = LandscapeLeaderContext(
-                host=self.host, path=self.path, hookenv=self.hookenv)
+            host=self.host, path=self.path, hookenv=self.hookenv)
         self.assertEqual({"database-password": "old-sekret",
                           "secret-token": "old-token",
                           "leader-ip": "old-ip"}, context)

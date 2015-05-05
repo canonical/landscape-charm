@@ -100,12 +100,19 @@ class HostStub(object):
 
     password = "landscape-sekret"
     secret_token = "landscape-token"
+    write_file_calls = []
+
+    def __init__(self):
+        self.calls = []
 
     def pwgen(self, length=None):
         if length == 172:
             return self.secret_token
         else:
             return self.password
+
+    def write_file(self, *args, **kwargs):
+        self.calls.append(("write_file", args, kwargs))
 
 
 class SubprocessStub(object):
