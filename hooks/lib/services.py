@@ -52,8 +52,8 @@ class ServicesHook(Hook):
                 host=self._host, hookenv=self._hookenv)
 
         SERVICE_COUNTS = {
-            "message": 2,
-            "ping": 2,
+            "message-server": 2,
+            "pingserver": 2,
         }
         manager = ServiceManager([{
             "service": "landscape",
