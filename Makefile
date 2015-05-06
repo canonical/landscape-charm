@@ -24,6 +24,7 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: verify-juju-test bundles
+	@cd tests && python3 test_helpers.py
 
 bundles:
 	@if [ -d bundles ]; then \
@@ -32,11 +33,21 @@ bundles:
 	    bzr co lp:~landscape/landscape-charm/bundles-trunk-new-charm bundles; \
 	fi
 
+secrets:
+	@if [ -d secrets ]; then \
+	    bzr up secrets; \
+	else \
+	    bzr co lp:~landscape/landscape/secrets secrets; \
+	fi
+
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,DEPLOYER_TARGET,JUJU_HOME,JUJU_ENV -v --timeout 3000s
 
 integration-test-dense-maas: test-depends
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
+
+integration-test-trunk: test-depends secrets
+	LS_CHARM_SOURCE=lds-trunk-ppa ./tests/02-ssl.py
 
 deploy-dense-maas: test-depends
 	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py

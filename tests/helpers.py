@@ -7,14 +7,119 @@ import logging
 import unittest
 import sys
 import yaml
+import os
+import subprocess
 
 from os import getenv
 from os.path import splitext, basename
 from subprocess import CalledProcessError, check_output, PIPE
-
 from time import sleep
 
+from fixtures import Fixture
+
+from amulet import Deployment
+
+from jinja2 import FileSystemLoader, Environment
+
 log = logging.getLogger(__file__)
+
+# Default values for rendering the bundle jinja2 template
+DEFAULT_BUNDLE_CONTEXT = {
+    "name": "test",
+    "rabbitmq": {},
+    "postgresql": {
+        "max_connections": 100,
+        "memory": 128,
+        "manual_tuning": True,
+        "shared_buffers": "32MB"},
+    "haproxy": {},
+    "landscape": {
+        "memory": 128},
+}
+
+
+class EnvironmentFixture(Fixture):
+    """Set the initial environment by passing the testing bundle to Amulet.
+
+    This fixture also acts as API for driving Amulet as needed by the tests.
+
+    The LS_CHARM_SOURCE environment variable can be used to set the 'source'
+    charm config option of the deployed landscape-server service. See the
+    metadata.yaml file for possible configuration values.
+    """
+
+    _timeout = 1500
+    _series = "trusty"
+    _deployment = Deployment()
+
+    def __init__(self, config=None, deployment=None):
+        """
+        @param config: Optionally a dict with extra bundle template context
+            values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
+            deploying the test bundle.
+        """
+        self._config = config or {}
+        if deployment is not None:
+            self._deployment = deployment
+
+    def setUp(self):
+        super(EnvironmentFixture, self).setUp()
+        if not self._deployment.deployed:
+            self._deployment.load(self._get_bundle())
+            self._deployment.setup(timeout=self._timeout)
+            self._deployment.sentry.wait(self._timeout)
+
+    def get_haproxy_public_address(self, unit=0):
+        """Return the public address of the given haproxy unit."""
+        unit = self._deployment.sentry.unit["haproxy/%d" % unit]
+        return unit.info["public-address"]
+
+    def stop_landscape_service(self, service, unit=0):
+        """Stop the given Landscape service on the given unit."""
+        self._control_landscape_service("stop", service, unit)
+
+    def start_landscape_service(self, service, unit=0):
+        """Start the given Landscape service on the given unit."""
+        self._control_landscape_service("start", service, unit)
+
+    def _get_bundle(self):
+        """Return a dict with the data for the test bundle."""
+        charm_dir = os.path.join(os.path.dirname(__file__), "..")
+        bundles_dir = os.path.join(charm_dir, "bundles")
+        environment = Environment(
+            loader=FileSystemLoader(bundles_dir), trim_blocks=True,
+            lstrip_blocks=True, keep_trailing_newline=True)
+        context = DEFAULT_BUNDLE_CONTEXT.copy()
+
+        # If we want an alternate PPA, let's add the relevant keys
+        source = os.environ.get("LS_CHARM_SOURCE")
+        if source:
+            if source == "lds-trunk-ppa":
+                # We want the lds-trunk PPA, let's grab its details from
+                # the secrets directory
+                secrets_dir = os.path.join(charm_dir, "secrets")
+                with open(os.path.join(secrets_dir, "lds-trunk-ppa")) as fd:
+                    extra_config = yaml.safe_load(fd.read())
+            else:
+                extra_config = {
+                    "source": source,
+                    "key": os.environ.get("LS_CHARM_KEY", "4652B4E6")
+                }
+            context["landscape"].update(extra_config)
+
+        # Add instance-specific configuration tweaks
+        for service, options in self._config.items():
+            context[service].update(options)
+
+        template = environment.get_template("landscape-template.jinja2")
+        return yaml.safe_load(template.render(context))
+
+    def _control_landscape_service(self, action, service, unit):
+        """Start or stop the given Landscape service on the given unit."""
+        unit = self._deployment.sentry.unit["landscape/%d" % unit]
+        output, code = unit.run("sudo service %s %s" % (service, action))
+        if code != 0:
+            raise RuntimeError(output)
 
 
 @unittest.skipIf(
@@ -30,6 +135,31 @@ class BaseLandscapeTests(unittest.TestCase):
         file_name = splitext(basename(__file__))[0]
         return "{} ({}.{})".format(
             self._testMethodName, file_name, self.__class__.__name__)
+
+
+def get_ssl_certificate(endpoint):
+    """Return the SSL certificate used at the given endpoint.
+
+    @param endpoint: An SSL endpoint in the form <host:port>.
+    """
+    # Call openssl s_client connect to get the actual certificate served.
+    # The command line program is a bit archaic and therefore we need
+    # to do a few things like send it a newline char (a user "return"), and
+    # filter some of the output (it print non-error messages on stderr).
+    process = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
+    with open(os.devnull, 'w') as dev_null:
+        output = subprocess.check_output(  # output is bytes
+            ['openssl', 's_client', '-connect', endpoint],
+            stdin=process.stdout, stderr=dev_null)
+    process.stdout.close()  # Close the pipe fd
+    process.wait()  # This closes the subprocess sending the newline.
+
+    # A regex might be nicer, but this works and is easy to read.
+    certificate = output.decode("utf-8")
+    start = certificate.find("-----BEGIN CERTIFICATE-----")
+    end = certificate.find("-----END CERTIFICATE-----") + len(
+        "-----END CERTIFICATE-----")
+    return certificate[start:end]
 
 
 def check_url(url, good_content, post_data=None, header=None,
