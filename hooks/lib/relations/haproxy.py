@@ -2,10 +2,12 @@ import base64
 import os
 import yaml
 
-from lib.hook import HookError
-
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
+
+from lib.hook import HookError
+from lib.paths import default_paths
+
 
 SERVICE_PORTS = {
     "http": 80,
@@ -56,7 +58,6 @@ ERRORFILES_MAP = {
     # "502": "unplanned-offline-haproxy.html",
     # "504": "timeout-haproxy.html",
 }
-OFFLINE_FOLDER = "/opt/canonical/landscape/canonical/landscape/offline"
 
 
 class HAProxyProvider(RelationContext):
@@ -66,11 +67,10 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, service_counts, hookenv=hookenv,
-                 offline_dir=OFFLINE_FOLDER):
+    def __init__(self, service_counts, hookenv=hookenv, paths=default_paths):
         self._hookenv = hookenv
-        self._offline_dir = offline_dir
         self._service_counts = service_counts
+        self._paths = paths
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -159,7 +159,7 @@ class HAProxyProvider(RelationContext):
 
         for error_code, file_name in sorted(ERRORFILES_MAP.items()):
             content = None
-            path = os.path.join(self._offline_dir, file_name)
+            path = os.path.join(self._paths.offline_dir(), file_name)
 
             try:
                 with open(path, "r") as error_file:

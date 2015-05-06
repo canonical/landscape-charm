@@ -1,7 +1,5 @@
 import os
 
-from fixtures import TempDir
-
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
@@ -10,8 +8,8 @@ from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
     SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA)
-from lib.services import ServicesHook, SERVICE_CONF, DEFAULT_FILE
-from lib.tests.offline_fixture import OfflineDir
+from lib.services import ServicesHook
+from lib.tests.rootdir import RootDir
 
 
 class ServicesHookTest(HookenvTest):
@@ -23,14 +21,12 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
-        self.offline_dir = self.useFixture(OfflineDir())
-        self.configs_dir = self.useFixture(TempDir())
-        self.ssl_certs_dir = self.useFixture(TempDir())
+        self.root_dir = self.useFixture(RootDir())
+        self.paths = self.root_dir.paths
+        self.root_dir = self.useFixture(RootDir())
         self.hook = ServicesHook(
             hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess, offline_dir=self.offline_dir.path,
-            configs_dir=self.configs_dir.path,
-            ssl_certs_dir=self.ssl_certs_dir.path)
+            subprocess=self.subprocess, paths=self.paths)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
@@ -110,10 +106,11 @@ class ServicesHookTest(HookenvTest):
         }
 
         self.assertEqual(
-            ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
+            ("service.conf", self.paths.service_conf(),
+             context, "landscape", "root", 416),
             self.renders[0])
         self.assertEqual(
-            ("landscape-server", DEFAULT_FILE, context,
+            ("landscape-server", self.paths.default_file(), context,
              "landscape", "root", 416),
             self.renders[1])
         [call1, call2] = self.subprocess.calls
@@ -137,7 +134,7 @@ class ServicesHookTest(HookenvTest):
             },
         })
         self.hook()
-        self.assertIsNotNone(os.lstat(self.configs_dir.join("edge")))
+        self.assertIsNotNone(os.lstat(self.paths.config_link("edge")))
 
     def test_ready_write_ssl_cert(self):
         """
@@ -145,8 +142,7 @@ class ServicesHookTest(HookenvTest):
         written on disk.
         """
         self.hook()
-        self.assertTrue(
-            os.path.exists(self.ssl_certs_dir.join("landscape_server_ca.crt")))
+        self.assertTrue(os.path.exists(self.paths.ssl_certificate()))
 
     def test_ready_with_openid_configuration(self):
         """
@@ -167,7 +163,8 @@ class ServicesHookTest(HookenvTest):
         }
 
         self.assertEqual(
-            ("service.conf", SERVICE_CONF, context, "landscape", "root", 416),
+            ("service.conf", self.paths.service_conf(),
+             context, "landscape", "root", 416),
             self.renders[0])
 
     def test_remote_leader_not_ready(self):
@@ -205,6 +202,6 @@ class ServicesHookTest(HookenvTest):
         self.hook()
 
         self.assertEqual(
-            [("write_file", ("/etc/landscape/license.txt", "license data"),
+            [("write_file", (self.paths.license_file(), "license data"),
               {"owner": "landscape", "group": "root", "perms": 0o640})],
             self.host.calls)
