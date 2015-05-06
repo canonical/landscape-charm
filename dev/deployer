@@ -1,47 +1,55 @@
+#!/usr/bin/python3
+
+import os
 import logging
-from os import path
 import shutil
 import subprocess
 import tempfile
+import sys
 
 import yaml
 
-CHARM_SRC = path.dirname(path.dirname(path.dirname(__file__)))
+CHARM_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Deployer(object):
-    """
-    Simple wrapper around juju-deployer.  It's designed to copy the current
-    charm branch in place in a staging directory where juju-deployer will be
-    called.  Juju-deployer will then use that when references to "lp:<charm>"
-    is used.
+    """Simple wrapper around juju-deployer.
+
+    It creates a temporary directory that will act as local charm repository
+    for juju-deployer, so it can deploy the current charm branch as local
+    charm.
+
+    It also overrides the configuration in the stock bundles, accounting for
+    these files:
+
+      - config/repo-file
+      - config/license-file
+      - config/ssl-cert
+      - config/ssl-key
+
+    that can be used to provide custom parameters.
     """
 
     def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
-        charm_dest = path.join(deployer_dir, series, "landscape")
-        shutil.copytree(CHARM_SRC, charm_dest)
+        series_dest = os.path.join(deployer_dir, series)
+        os.mkdir(series_dest)
+        charm_dest = os.path.join(series_dest, "landscape-server")
+        os.symlink(CHARM_SRC, charm_dest)
 
-    def _create_local_yaml(self, tmpdir, config_files):
+    def _create_local_yaml(self, tmpdir, target):
         """
         Create a local yaml file to adjust settings in the bundle.  Return the
         created file name to the caller.
 
         @param tmpdir: directory where we can write a yaml file.
-        @param config_files: config file names are used to determine what
-            bundles will be available for deployment.  This is important
-            since overrides are deployer target specific. We have to know
-            what targets are available, in order to override them.
-
-        Respects and accounts for these files:
-        - config/repo-file
-        - config/license-file
+        @param target: what bundle target to override.
         """
         # Will be appended to end of 'config_files' list.  This will in turn
         # be specified last on the juju-deployer command line, and will be able
         # to overwrite charm settings.  For instance we can use it to add a
         # custom license-file to the deployment.
-        local_yaml_file = path.join(tmpdir, "99-local.yaml")
+        local_yaml_file = os.path.join(tmpdir, "99-local.yaml")
         local_yaml = {}
 
         # overridden options in landscape-charm, with the filename in the
@@ -53,38 +61,36 @@ class Deployer(object):
 
         # Base data structure for the landscape-charm that we will fill out
         # with options.
-        landscape_service = {"charm": "landscape",
-                             "branch": "lp:landscape-charm"}
+        landscape_service = {"charm": "landscape-server"}
         options = {}
         for option, filename in override_options.items():
-            filepath = path.join(CHARM_SRC, "config", filename)
-            if path.exists(filepath):
+            filepath = os.path.join(CHARM_SRC, "config", filename)
+            if os.path.exists(filepath):
                 options[option] = "include-file://%s" % filepath
 
         # Can't include a blank options section, deployer will choke
         if options:
             landscape_service["options"] = options
 
-        for config in config_files:
-            # target name == filename in our bundles branches.
-            target = path.basename(config).rstrip(".yaml")
-            local_yaml[target] = {"services": {}}
-            for service in ["landscape"]:
-                local_yaml[target]["services"][service] = landscape_service
+        # target name == filename in our bundles branches.
+        local_yaml[target] = {"services": {}}
+        for service in ["landscape-server"]:
+            local_yaml[target]["services"][service] = landscape_service
 
         with open(local_yaml_file, "w") as f:
             f.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
-    def deploy(self, target, config_files, timeout=None):
+    def deploy(self, target, timeout=900):
         """
         Use juju-deployer to install `target` on current `juju env`
 
         @param target: target to deploye in the config file.
-        @param config_files: list of config files to pass to deployer (-c)
         @param timeout: timeout in seconds (int or string is OK)
         """
+        target = "landscape-" + target
         deployer_dir = None
+        config_files = [os.path.join(CHARM_SRC, "bundles", target + ".yaml")]
         try:
             deployer_dir = tempfile.mkdtemp()
             # Stage deployer directory for all supported series, even though
@@ -93,7 +99,7 @@ class Deployer(object):
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
             config_files.append(
-                self._create_local_yaml(deployer_dir, config_files))
+                self._create_local_yaml(deployer_dir, target))
             args = ["juju-deployer", "-vdWL", "-w 180"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
@@ -105,3 +111,12 @@ class Deployer(object):
         finally:
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: %s <target>" % sys.argv[0])
+        print("   <target> can be either 'scalable', 'dense' or 'dense-maas'")
+        sys.exit(1)
+    deployer = Deployer()
+    deployer.deploy(sys.argv[1])

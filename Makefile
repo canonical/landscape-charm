@@ -47,14 +47,17 @@ integration-test-dense-maas: test-depends
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
 
 # Run integration tests using the LDS package from the lds-trunk PPA
-integration-test-trunk: secrets
-	LS_CHARM_SOURCE="lds-trunk-ppa" make integration-test
+integration-test-trunk: test-depends secrets
+	LS_CHARM_SOURCE=lds-trunk-ppa make integration-test
 
-deploy-dense-maas: test-depends
-	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-dense-maas tests/01-begin.py
+deploy-dense-maas: bundles
+	./dev/deployer dense-maas
 
-deploy: test-depends
-	SKIP_TESTS=1 DEPLOYER_TARGET=landscape-scalable tests/01-begin.py
+deploy: bundles
+	./dev/deployer scalable
+
+repo-file-trunk: secrets
+	grep -e "^source:" secrets/lds-trunk-ppa | cut -f 2- -d " " > config/repo-file
 
 lint:
 	flake8 --exclude=charmhelpers hooks
