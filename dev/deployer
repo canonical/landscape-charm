@@ -34,7 +34,7 @@ class Deployer(object):
         """Stage the directory for calling deployer."""
         series_dest = os.path.join(deployer_dir, series)
         os.mkdir(series_dest)
-        charm_dest = os.path.join(series_dest, "landscape")
+        charm_dest = os.path.join(series_dest, "landscape-server")
         os.symlink(CHARM_SRC, charm_dest)
 
     def _create_local_yaml(self, tmpdir, target):
@@ -61,7 +61,7 @@ class Deployer(object):
 
         # Base data structure for the landscape-charm that we will fill out
         # with options.
-        landscape_service = {"charm": "landscape"}
+        landscape_service = {"charm": "landscape-server"}
         options = {}
         for option, filename in override_options.items():
             filepath = os.path.join(CHARM_SRC, "config", filename)
@@ -74,7 +74,7 @@ class Deployer(object):
 
         # target name == filename in our bundles branches.
         local_yaml[target] = {"services": {}}
-        for service in ["landscape"]:
+        for service in ["landscape-server"]:
             local_yaml[target]["services"][service] = landscape_service
 
         with open(local_yaml_file, "w") as f:
