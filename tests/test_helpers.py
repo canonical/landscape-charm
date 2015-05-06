@@ -1,10 +1,11 @@
 import os
 
-from unittest import TestCase
+import logging
+import unittest
 
 from helpers import EnvironmentFixture
 
-CHARM_DIR = os.path.dirname(os.path.dirname(__file__))
+CHARM_DIR = os.path.abspath(__file__)
 
 
 class UnitStub(object):
@@ -49,7 +50,7 @@ class DeploymentStub(object):
         self.timeout = timeout
 
 
-class EnvironmentFixtureTest(TestCase):
+class EnvironmentFixtureTest(unittest.TestCase):
 
     def setUp(self):
         super(EnvironmentFixtureTest, self).setUp()
@@ -97,3 +98,9 @@ class EnvironmentFixtureTest(TestCase):
         self.fixture.cleanUp()
         self.assertEqual(
             "sudo service landscape-appserver start", unit.commands[1])
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+    unittest.main(verbosity=2)
