@@ -51,12 +51,16 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
+        SERVICE_COUNTS = {
+            "message": 2,
+            "ping": 2,
+        }
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(offline_dir=self._offline_dir),
+                HAProxyProvider(SERVICE_COUNTS, offline_dir=self._offline_dir),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -68,10 +72,7 @@ class ServicesHook(Hook):
                 HAProxyRequirer(),
                 HostedRequirer(),
                 {"is_leader": is_leader,
-                 "service_counts": {
-                     "message": 2,
-                     "ping": 2,
-                 }},
+                 "service_counts": SERVICE_COUNTS},
             ],
             "data_ready": [
                 render_template(

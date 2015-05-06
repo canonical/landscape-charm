@@ -31,7 +31,7 @@ SERVICE_OPTIONS = {
         "use_backend landscape-api if api",
     ],
 }
-SERVER_PORTS = {
+SERVER_BASE_PORTS = {
     "appserver": 8080,
     "pingserver": 8070,
     "message-server": 8090,
@@ -66,9 +66,11 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, hookenv=hookenv, offline_dir=OFFLINE_FOLDER):
+    def __init__(self, service_counts, hookenv=hookenv,
+                 offline_dir=OFFLINE_FOLDER):
         self._hookenv = hookenv
         self._offline_dir = offline_dir
+        self._service_counts = service_counts
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -80,9 +82,9 @@ class HAProxyProvider(RelationContext):
         """Return the service configuration for the HTTP frontend."""
         service = self._get_service("http")
         service.update({
-            "servers": [self._get_server("appserver")],
+            "servers": self._get_servers("appserver"),
             "backends": [
-                self._get_backend("ping", [self._get_server("pingserver")]),
+                self._get_backend("ping", self._get_servers("pingserver")),
             ]
         })
         return service
@@ -92,11 +94,11 @@ class HAProxyProvider(RelationContext):
         service = self._get_service("https")
         service.update({
             "crts": self._get_ssl_certificate(),
-            "servers": [self._get_server("appserver")],
+            "servers": self._get_servers("appserver"),
             "backends": [
                 self._get_backend(
-                    "message", [self._get_server("message-server")]),
-                self._get_backend("api", [self._get_server("api")]),
+                    "message", self._get_servers("message-server")),
+                self._get_backend("api", self._get_servers("api")),
             ],
         })
         return service
@@ -128,7 +130,7 @@ class HAProxyProvider(RelationContext):
             "servers": servers,
         }
 
-    def _get_server(self, name):
+    def _get_servers(self, name):
         """Return a server 4-tuple, as expected by the HAProxy charm.
 
         @param name: The base name of the server, it will be expanded with
@@ -137,8 +139,8 @@ class HAProxyProvider(RelationContext):
         server_ip = self._hookenv.unit_private_ip()
         unit_name = self._hookenv.local_unit()
         server_name = "landscape-%s-%s" % (name, unit_name.replace("/", "-"))
-        server_port = SERVER_PORTS[name]
-        return (server_name, server_ip, server_port, SERVER_OPTIONS)
+        server_port = SERVER_BASE_PORTS[name]
+        return [(server_name, server_ip, server_port, SERVER_OPTIONS)]
 
     def _get_error_files(self):
         """Return the errorfiles configuration."""
