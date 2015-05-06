@@ -9,6 +9,8 @@ import sys
 import yaml
 import os
 import subprocess
+import tempfile
+import shutil
 
 from os import getenv
 from os.path import splitext, basename
@@ -42,26 +44,37 @@ class EnvironmentFixture(Fixture):
     """Set the initial environment by passing the testing bundle to Amulet.
 
     This fixture also acts as API for driving Amulet as needed by the tests.
+
+    The LS_CHARM_SOURCE environment variable can be used to set the 'source'
+    charm config option of the deployed landscape-server service. See the
+    metadata.yaml file for possible configuration values.
     """
 
-    _timeout = 1500
+    _timeout = 3000
     _series = "trusty"
-    _deployment = Deployment()
+    _deployment = Deployment(series=_series)
 
-    def __init__(self, config=None):
+    def __init__(self, config=None, deployment=None):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
             deploying the test bundle.
         """
         self._config = config or {}
+        if deployment is not None:
+            self._deployment = deployment
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
             self._deployment.load(self._get_bundle())
-            self._deployment.setup(timeout=self._timeout)
+            repo_dir = self._build_repo_dir()
+            try:
+                self._deployment.setup(timeout=self._timeout)
+            finally:
+                shutil.rmtree(repo_dir)
             self._deployment.sentry.wait(self._timeout)
+
         self._stopped_landscape_services = []
         self.addCleanup(self._restore_stopped_landscape_services)
 
@@ -114,9 +127,27 @@ class EnvironmentFixture(Fixture):
         template = environment.get_template("landscape-template.jinja2")
         return yaml.safe_load(template.render(context))
 
+    def _build_repo_dir(self):
+        """Create a temporary charm repository directory.
+
+        XXX Apparently there's no way in Amulet to easily deploy uncommitted
+            changes, so we create a temporary charm repository with a symlink
+            to the branch.
+        """
+        config = self._deployment.services["landscape-server"]
+        config["charm"] = "local:trusty/landscape-server"
+        branch_dir = config.pop("branch")
+        repo_dir = tempfile.mkdtemp()
+        series_dir = os.path.join(repo_dir, self._series)
+        os.mkdir(series_dir)
+        charm_link = os.path.join(series_dir, "landscape-server")
+        os.symlink(branch_dir, charm_link)
+        os.environ["JUJU_REPOSITORY"] = repo_dir
+        return repo_dir
+
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape/%d" % unit]
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)

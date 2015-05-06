@@ -43,9 +43,8 @@ class OneLandscapeUnitTest(TestWithFixtures):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        frontend = self.environment.get_haproxy_public_address()
         good_content = "passphrase"
-        check_url("https://{}/".format(frontend), good_content)
+        check_url("https://{}/".format(self.frontend), good_content)
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -95,7 +94,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         from the [broker] section don't remain at their default values.
         """
         config = ConfigParser()
-        config.read_string(get_landscape_service_conf("landscape/0"))
+        config.read_string(get_landscape_service_conf("landscape-server/0"))
         broker = config["broker"]
         self.assertNotEqual(broker["host"], "localhost")
         self.assertNotEqual(broker["password"], "landscape")
@@ -139,7 +138,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         configuration for Autopilot deployments).
         """
         ssl_cert = run_command_on_unit(
-            "cat /etc/ssl/certs/landscape_server_ca.crt", "landscape/0")
+            "cat /etc/ssl/certs/landscape_server_ca.crt", "landscape-server/0")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
@@ -150,7 +149,7 @@ class OneLandscapeUnitNoCronTest(TestWithFixtures):
     the cron daemon will be stopped, so Landscape cron jobs in particular
     won't be run.
     """
-    cron_unit = "landscape/0"
+    cron_unit = "landscape-server/0"
 
     @classmethod
     def setUpClass(cls):
@@ -221,7 +220,7 @@ class OneLandscapeUnitNoCronTest(TestWithFixtures):
         find_cmd = (
             "sudo ls /opt/canonical/landscape/scripts/landscape_profiles.sh"
             " || sudo ls /opt/canonical/landscape/scripts/process_profiles.sh")
-        cmd = ["juju", "run", "--unit", "landscape/0", find_cmd]
+        cmd = ["juju", "run", "--unit", "landscape-server/0", find_cmd]
         script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
 
         output, status = self._run_cron(script)

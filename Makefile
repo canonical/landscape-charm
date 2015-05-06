@@ -24,6 +24,7 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: verify-juju-test bundles
+	@cd tests && trial test_helpers.py
 
 bundles:
 	@if [ -d bundles ]; then \
