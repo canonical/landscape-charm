@@ -14,7 +14,6 @@ RUN_JOBHANDLER="yes"
 RUN_MSGSERVER="yes"
 RUN_PINGSERVER="yes"
 RUN_APISERVER="yes"
-RUN_PACKAGEUPLOADSERVER="no"
 {% if is_leader and hosted[0]["deployment-mode"] == "standalone" %}
 RUN_JUJU_SYNC="yes"
 {% else %}
@@ -34,4 +33,12 @@ RUN_CRON="no"
 RUN_PACKAGESEARCH="yes"
 {% else %}
 RUN_PACKAGESEARCH="no"
+{% endif %}
+
+# Enable the pacakge upload service on the leader.
+# XXX: This means it is *not* HA: if the leader dies, the data is lost (for now)
+{% if is_leader %}
+RUN_PACKAGEUPLOADSERVER="yes"
+{% else %}
+RUN_PACKAGEUPLOADSERVER="no"
 {% endif %}
