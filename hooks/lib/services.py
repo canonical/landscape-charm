@@ -67,7 +67,11 @@ class ServicesHook(Hook):
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"is_leader": is_leader},
+                {"is_leader": is_leader,
+                 "service_counts": {
+                     "message": 2,
+                     "ping": 2,
+                 }},
             ],
             "data_ready": [
                 render_template(

@@ -39,3 +39,8 @@ SAMPLE_CONFIG_LICENSE_DATA = {
 SAMPLE_HOSTED_DATA = {
     "deployment-mode": "standalone",
 }
+
+SAMPLE_SERVICE_COUNT_DATA = {
+    "message": 2,
+    "ping": 2,
+}
