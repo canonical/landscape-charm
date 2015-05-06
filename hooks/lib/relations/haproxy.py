@@ -139,8 +139,19 @@ class HAProxyProvider(RelationContext):
         server_ip = self._hookenv.unit_private_ip()
         unit_name = self._hookenv.local_unit()
         server_name = "landscape-%s-%s" % (name, unit_name.replace("/", "-"))
-        server_port = SERVER_BASE_PORTS[name]
-        return [(server_name, server_ip, server_port, SERVER_OPTIONS)]
+        server_base_port = SERVER_BASE_PORTS[name]
+        requested_processes = self._service_counts.get(name, 1)
+
+        # When only one process for a service is started, return it.
+        if requested_processes == 1:
+            return [(server_name, server_ip, server_base_port, SERVER_OPTIONS)]
+
+        servers = []
+        for process_count in range(requested_processes):
+            servers.append(
+                (server_name + '-%d' % process_count, server_ip,
+                 server_base_port + process_count, SERVER_OPTIONS))
+        return servers
 
     def _get_error_files(self):
         """Return the errorfiles configuration."""

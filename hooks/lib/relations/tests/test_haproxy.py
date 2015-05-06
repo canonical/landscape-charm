@@ -73,8 +73,10 @@ class HAProxyProviderTest(HookenvTest):
              "backends": [
                  {"backend_name": "landscape-ping",
                   "servers": [
-                      ["landscape-pingserver-landscape-server-0",
-                       "1.2.3.4", 8070, SERVER_OPTIONS]]}]},
+                      ["landscape-pingserver-landscape-server-0-0",
+                       "1.2.3.4", 8070, SERVER_OPTIONS],
+                      ["landscape-pingserver-landscape-server-0-1",
+                       "1.2.3.4", 8071, SERVER_OPTIONS]]}]},
             {"service_name": "landscape-https",
              "service_host": "0.0.0.0",
              "service_port": 443,
@@ -95,8 +97,10 @@ class HAProxyProviderTest(HookenvTest):
              "backends": [
                  {"backend_name": "landscape-message",
                   "servers": [
-                      ["landscape-message-server-landscape-server-0",
-                       "1.2.3.4", 8090, SERVER_OPTIONS]]},
+                      ["landscape-message-server-landscape-server-0-0",
+                       "1.2.3.4", 8090, SERVER_OPTIONS],
+                      ["landscape-message-server-landscape-server-0-1",
+                       "1.2.3.4", 8091, SERVER_OPTIONS]]},
                  {"backend_name": "landscape-api",
                   "servers": [
                       ["landscape-api-landscape-server-0",
