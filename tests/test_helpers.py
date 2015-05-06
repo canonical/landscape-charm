@@ -1,4 +1,5 @@
-from unittest import TestCase
+import logging
+import unittest
 
 from helpers import EnvironmentFixture
 
@@ -43,7 +44,7 @@ class DeploymentStub(object):
         self.timeout = timeout
 
 
-class EnvironmentFixtureTest(TestCase):
+class EnvironmentFixtureTest(unittest.TestCase):
 
     def setUp(self):
         super(EnvironmentFixtureTest, self).setUp()
@@ -84,3 +85,9 @@ class EnvironmentFixtureTest(TestCase):
         unit = self.deployment.sentry.unit["landscape/0"]
         self.assertEqual(
             "sudo service landscape-appserver stop", unit.commands[0])
+
+
+if __name__ == "__main__":
+    logging.basicConfig(
+        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
+    unittest.main(verbosity=2)
