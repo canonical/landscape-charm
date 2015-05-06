@@ -9,6 +9,8 @@ import sys
 import yaml
 import os
 import subprocess
+import tempfile
+import shutil
 
 from os import getenv
 from os.path import splitext, basename
@@ -48,9 +50,9 @@ class EnvironmentFixture(Fixture):
     metadata.yaml file for possible configuration values.
     """
 
-    _timeout = 1500
+    _timeout = 3000
     _series = "trusty"
-    _deployment = Deployment()
+    _deployment = Deployment(series=_series)
 
     def __init__(self, config=None, deployment=None):
         """
@@ -66,8 +68,15 @@ class EnvironmentFixture(Fixture):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
             self._deployment.load(self._get_bundle())
-            self._deployment.setup(timeout=self._timeout)
+            repo_dir = self._build_repo_dir()
+            try:
+                self._deployment.setup(timeout=self._timeout)
+            finally:
+                shutil.rmtree(repo_dir)
             self._deployment.sentry.wait(self._timeout)
+
+        self._stopped_landscape_services = []
+        self.addCleanup(self._restore_stopped_landscape_services)
 
     def get_haproxy_public_address(self, unit=0):
         """Return the public address of the given haproxy unit."""
@@ -75,8 +84,12 @@ class EnvironmentFixture(Fixture):
         return unit.info["public-address"]
 
     def stop_landscape_service(self, service, unit=0):
-        """Stop the given Landscape service on the given unit."""
+        """Stop the given Landscape service on the given unit.
+
+        The service being stopped will be automatically restarted upon cleanUp.
+        """
         self._control_landscape_service("stop", service, unit)
+        self._stopped_landscape_services.append((service, unit))
 
     def start_landscape_service(self, service, unit=0):
         """Start the given Landscape service on the given unit."""
@@ -114,12 +127,35 @@ class EnvironmentFixture(Fixture):
         template = environment.get_template("landscape-template.jinja2")
         return yaml.safe_load(template.render(context))
 
+    def _build_repo_dir(self):
+        """Create a temporary charm repository directory.
+
+        XXX Apparently there's no way in Amulet to easily deploy uncommitted
+            changes, so we create a temporary charm repository with a symlink
+            to the branch.
+        """
+        config = self._deployment.services["landscape-server"]
+        config["charm"] = "local:trusty/landscape-server"
+        branch_dir = config.pop("branch")
+        repo_dir = tempfile.mkdtemp()
+        series_dir = os.path.join(repo_dir, self._series)
+        os.mkdir(series_dir)
+        charm_link = os.path.join(series_dir, "landscape-server")
+        os.symlink(branch_dir, charm_link)
+        os.environ["JUJU_REPOSITORY"] = repo_dir
+        return repo_dir
+
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape/%d" % unit]
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
+
+    def _restore_stopped_landscape_services(self):
+        """Automatically restore any service that was stopped."""
+        for service, unit in self._stopped_landscape_services:
+            self.start_landscape_service(service, unit=unit)
 
 
 @unittest.skipIf(

@@ -21,6 +21,13 @@ class PathsTest(TestCase):
         self.assertEqual(
             "/foo/etc/landscape/service.conf", paths.service_conf())
 
+    def test_default_file(self):
+        """
+        The service_conf() method returns the path to service.conf.
+        """
+        self.assertEqual(
+            "/etc/default/landscape-server", default_paths.default_file())
+
     def test_config_link(self):
         """
         The config_link() method returns the path to the symlink used for
