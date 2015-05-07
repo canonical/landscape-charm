@@ -64,12 +64,14 @@ on each deployed landscape-service like:
 SSL
 ===
 
-The pre-packaged bundles will ask Apache to generate a self signed certificate.
-While useful for testing, this must not be used for production deployments.
+The pre-packaged bundles will ask the HAProxy charm to generate a self
+signed certificate. While useful for testing, this must not be used for
+production deployments.
 
 For production deployments, you should include a "real" SSL certificate key
-pair that has been signed by a CA that your clients trust in the apache charm
-configuration.
+pair that has been signed by a CA that your clients trust in the haproxy service
+configuration (or in the landscape-server service configuration if you need to
+use your haproxy service for other services too with different certificates).
 
 
 Unit Testing
@@ -89,5 +91,11 @@ end-to-end integration testing.  This is how you proceed with running
 them:
 
     # Make sure your JUJU_ENV is *not* bootstrapped, and:
-    $ sudo apt-get install python-psycopg2 python-mocker python-psutil
     $ JUJU_ENV=<env> make integration-test
+
+Or if you want to use the LDS packages from the lds-trunk PPA:
+
+    $ JUJU_ENV=<env> make integration-test-trunk
+
+The JUJU_ENV environment variable can be omitted if you want to use the
+current juju environment (as set by "juju switch").
