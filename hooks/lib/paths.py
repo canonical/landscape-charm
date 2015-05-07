@@ -26,7 +26,7 @@ class Paths(object):
 
     def default_file(self):
         """Return the path to the Landscape etc/default file."""
-        return self._get_path(SERVICE_CONF)
+        return self._get_path(DEFAULT_FILE)
 
     def config_dir(self):
         """Return the path to the standalone config directory."""

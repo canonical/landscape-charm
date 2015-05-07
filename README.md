@@ -78,7 +78,6 @@ Unit Testing
 The Landscape charm is fairly well unit tested and new code changes
 should be submitted with unit tests.  You can run them like this:
 
-    $ sudo apt-get install python-twisted-core
     $ make test
 
 
