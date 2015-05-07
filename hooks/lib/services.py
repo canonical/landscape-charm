@@ -57,7 +57,7 @@ class ServicesHook(Hook):
                 ConfigRequirer(self._hookenv),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
-                HAProxyRequirer(),
+                HAProxyRequirer(is_leader=is_leader),
                 HostedRequirer(),
                 {"is_leader": is_leader},
             ],

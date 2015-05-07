@@ -29,8 +29,10 @@ SERVICE_OPTIONS = {
         "http-request set-header X-Forwarded-Proto https",
         "acl message path_beg -i /message-system",
         "acl api path_beg -i /api",
+        "acl package-upload path_beg -i /package-upload",
         "use_backend landscape-message if message",
         "use_backend landscape-api if api",
+        "use_backend package-upload if package-upload",
     ],
 }
 SERVER_PORTS = {
@@ -38,6 +40,7 @@ SERVER_PORTS = {
     "pingserver": 8070,
     "message-server": 8090,
     "api": 9080,
+    "package-upload": 9090,
 }
 SERVER_OPTIONS = [
     "check",
@@ -67,9 +70,10 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, hookenv=hookenv, paths=default_paths):
+    def __init__(self, hookenv=hookenv, paths=default_paths, is_leader=False):
         self._hookenv = hookenv
         self._paths = paths
+        self._is_leader = is_leader
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -100,6 +104,10 @@ class HAProxyProvider(RelationContext):
                 self._get_backend("api", [self._get_server("api")]),
             ],
         })
+        if self._is_leader:
+            service["backends"].append(
+                self._get_backend(
+                    "package-upload", [self._get_server("package-upload")]))
         return service
 
     def _get_service(self, name):
