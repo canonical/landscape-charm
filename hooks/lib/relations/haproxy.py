@@ -131,10 +131,14 @@ class HAProxyProvider(RelationContext):
         }
 
     def _get_servers(self, name):
-        """Return a server 4-tuple, as expected by the HAProxy charm.
+        """Return a list of server 4-tuples, as expected by the HAProxy charm.
+
+        When a service runs more than one process, process index will be
+        appended to the server name.
 
         @param name: The base name of the server, it will be expanded with
             the local unit name to make each server have a unique name.
+
         """
         server_ip = self._hookenv.unit_private_ip()
         unit_name = self._hookenv.local_unit()

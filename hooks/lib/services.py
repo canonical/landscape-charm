@@ -20,6 +20,12 @@ from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 
 
+SERVICE_COUNTS = {
+    "message-server": 2,
+    "pingserver": 2,
+}
+
+
 class ServicesHook(Hook):
     """Execute service configuration logic.
 
@@ -43,10 +49,6 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
-        SERVICE_COUNTS = {
-            "message-server": 2,
-            "pingserver": 2,
-        }
         manager = ServiceManager([{
             "service": "landscape",
             "ports": [],
