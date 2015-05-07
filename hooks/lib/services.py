@@ -20,6 +20,12 @@ from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 
 
+SERVICE_COUNTS = {
+    "message-server": 2,
+    "pingserver": 2,
+}
+
+
 class ServicesHook(Hook):
     """Execute service configuration logic.
 
@@ -48,7 +54,7 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(paths=self._paths),
+                HAProxyProvider(SERVICE_COUNTS, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -59,7 +65,8 @@ class ServicesHook(Hook):
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"is_leader": is_leader},
+                {"is_leader": is_leader,
+                 "service_counts": SERVICE_COUNTS},
             ],
             "data_ready": [
                 render_template(

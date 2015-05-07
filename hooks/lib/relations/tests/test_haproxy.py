@@ -8,6 +8,7 @@ from lib.relations.haproxy import (
 from lib.hook import HookError
 from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
+from lib.tests.sample import SAMPLE_SERVICE_COUNT_DATA
 from lib.tests.rootdir import RootDir
 
 HTTPS_INDEX = 1
@@ -36,7 +37,8 @@ class HAProxyProviderTest(HookenvTest):
         The HAProxyProvider class feeds haproxy with the services that this
         Landscape unit runs. By default all services are run.
         """
-        relation = HAProxyProvider(paths=self.paths)
+        relation = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
 
         # Provide some fake ssl-cert and ssl-key config entries
         config = self.hookenv.config()
@@ -73,8 +75,10 @@ class HAProxyProviderTest(HookenvTest):
              "backends": [
                  {"backend_name": "landscape-ping",
                   "servers": [
-                      ["landscape-pingserver-landscape-server-0",
-                       "1.2.3.4", 8070, SERVER_OPTIONS]]}]},
+                      ["landscape-pingserver-landscape-server-0-0",
+                       "1.2.3.4", 8070, SERVER_OPTIONS],
+                      ["landscape-pingserver-landscape-server-0-1",
+                       "1.2.3.4", 8071, SERVER_OPTIONS]]}]},
             {"service_name": "landscape-https",
              "service_host": "0.0.0.0",
              "service_port": 443,
@@ -95,8 +99,10 @@ class HAProxyProviderTest(HookenvTest):
              "backends": [
                  {"backend_name": "landscape-message",
                   "servers": [
-                      ["landscape-message-server-landscape-server-0",
-                       "1.2.3.4", 8090, SERVER_OPTIONS]]},
+                      ["landscape-message-server-landscape-server-0-0",
+                       "1.2.3.4", 8090, SERVER_OPTIONS],
+                      ["landscape-message-server-landscape-server-0-1",
+                       "1.2.3.4", 8091, SERVER_OPTIONS]]},
                  {"backend_name": "landscape-api",
                   "servers": [
                       ["landscape-api-landscape-server-0",
@@ -110,7 +116,8 @@ class HAProxyProviderTest(HookenvTest):
         """
         # Create an empty root tree
         temp_dir = self.useFixture(TempDir())
-        provider = HAProxyProvider(paths=Paths(temp_dir.path))
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=Paths(temp_dir.path))
 
         self.assertRaises(HookError, provider.provide_data)
 
@@ -119,7 +126,8 @@ class HAProxyProviderTest(HookenvTest):
         If no "ssl-cert" is specified, the provide_data method returns
         ["DEFAULT"] for the HAproxy SSL cert.
         """
-        provider = HAProxyProvider(paths=self.paths)
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
@@ -135,7 +143,8 @@ class HAProxyProviderTest(HookenvTest):
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
         config["ssl-key"] = base64.b64encode("a key")
-        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, hookenv=self.hookenv, paths=self.paths)
 
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
@@ -155,7 +164,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = "a cert"  # Not b64 encoded!
         config["ssl-key"] = base64.b64encode("a key")
 
-        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
@@ -174,7 +184,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = base64.b64encode("a cert")
         config["ssl-key"] = "something"  # Not base64 encoded!
 
-        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
@@ -192,7 +203,8 @@ class HAProxyProviderTest(HookenvTest):
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
         # Not setting 'ssl-key'
-        provider = HAProxyProvider(paths=self.paths, hookenv=self.hookenv)
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         expected = "'ssl-cert' is specified but 'ssl-key' is missing!"
 

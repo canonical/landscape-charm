@@ -7,9 +7,9 @@ from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
-    SAMPLE_WEBSITE_UNIT_DATA)
-from lib.tests.rootdir import RootDir
+    SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA)
 from lib.services import ServicesHook
+from lib.tests.rootdir import RootDir
 
 
 class ServicesHookTest(HookenvTest):
@@ -102,6 +102,7 @@ class ServicesHookTest(HookenvTest):
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": {},
             "is_leader": True,
+            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
@@ -158,6 +159,7 @@ class ServicesHookTest(HookenvTest):
             "config": SAMPLE_CONFIG_OPENID_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "is_leader": True,
+            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
