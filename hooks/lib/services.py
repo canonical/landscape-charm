@@ -48,7 +48,7 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(paths=self._paths),
+                HAProxyProvider(paths=self._paths, is_leader=is_leader),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -57,7 +57,7 @@ class ServicesHook(Hook):
                 ConfigRequirer(self._hookenv),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
-                HAProxyRequirer(is_leader=is_leader),
+                HAProxyRequirer(),
                 HostedRequirer(),
                 {"is_leader": is_leader},
             ],
