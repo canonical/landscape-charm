@@ -107,9 +107,13 @@ class HAProxyProvider(RelationContext):
             ],
         })
         if self._is_leader:
+            self._hookenv.log("Leader: Writing package-upload backends entry.")
             service["backends"].append(
                 self._get_backend(
-                    "package-upload", [self._get_servers("package-upload")]))
+                    "package-upload", self._get_servers("package-upload")))
+        else:
+            self._hookenv.log(
+                "Not the leader: not writing package-upload backends entry.")
         return service
 
     def _get_service(self, name):
