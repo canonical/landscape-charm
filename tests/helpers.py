@@ -32,8 +32,13 @@ DEFAULT_BUNDLE_CONTEXT = {
     "postgresql": {
         "max_connections": 100,
         "memory": 128,
-        "performance_tuning": "manual",
-        "shared_buffers": "32MB"},
+        "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
+        "shared_buffers": "64MB",
+        "checkpoint_segments": 64,
+        "maintenance_work_mem": "64MB",
+        "work_mem": "64MB",
+        "effective_cache_size": "64MB",
+        },
     "haproxy": {},
     "landscape": {
         "memory": 128},
