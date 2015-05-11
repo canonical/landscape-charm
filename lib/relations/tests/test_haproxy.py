@@ -215,7 +215,10 @@ class HAProxyProviderTest(HookenvTest):
         self.assertEqual(expected, str(error.exception))
 
     def test_leader_has_package_upload_backend(self):
-
+        """
+        The landscape service leader writes a server entry in the
+        landscape-package-upload backend.
+        """
         provider = HAProxyProvider(
             SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv,
             is_leader=True)
@@ -233,6 +236,10 @@ class HAProxyProviderTest(HookenvTest):
 
         self.assertIsNot(package_upload, None)
         self.assertEqual(1, len(package_upload["servers"]))
+        expected = [
+            'landscape-package-upload-landscape-server-0', '1.2.3.4', 9100,
+            ['check', 'inter 5000', 'rise 2', 'fall 5', 'maxconn 50']]
+        self.assertEqual(expected, package_upload["servers"][0])
 
 
 class HAProxyRequirerTest(HookenvTest):
