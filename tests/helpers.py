@@ -32,7 +32,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "postgresql": {
         "max_connections": 100,
         "memory": 128,
-        "manual_tuning": True,
+        "performance_tuning": "manual",
         "shared_buffers": "32MB"},
     "haproxy": {},
     "landscape": {
