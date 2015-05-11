@@ -109,7 +109,7 @@ class HAProxyProvider(RelationContext):
         if self._is_leader:
             service["backends"].append(
                 self._get_backend(
-                    "package-upload", [self._get_server("package-upload")]))
+                    "package-upload", [self._get_servers("package-upload")]))
         return service
 
     def _get_service(self, name):

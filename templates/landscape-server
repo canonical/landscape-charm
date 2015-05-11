@@ -35,7 +35,7 @@ RUN_PACKAGESEARCH="yes"
 RUN_PACKAGESEARCH="no"
 {% endif %}
 
-# Enable the pacakge upload service on the leader.
+# Enable the package upload service on the leader.
 # XXX: This means it is *not* HA: if the leader dies, the data is lost (for now)
 {% if is_leader %}
 RUN_PACKAGEUPLOADSERVER="yes"

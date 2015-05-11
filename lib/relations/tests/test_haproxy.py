@@ -89,10 +89,10 @@ class HAProxyProviderTest(HookenvTest):
                  "http-request set-header X-Forwarded-Proto https",
                  "acl message path_beg -i /message-system",
                  "acl api path_beg -i /api",
-                 "acl package-upload path_beg -i /package-upload",
+                 "acl package-upload path_beg -i /upload",
                  "use_backend landscape-message if message",
                  "use_backend landscape-api if api",
-                 "use_backend package-upload if package-upload"],
+                 "use_backend landscape-package-upload if package-upload"],
              "errorfiles": expected_errorfiles,
              "crts": expected_certs,
              "servers": [
@@ -213,6 +213,26 @@ class HAProxyProviderTest(HookenvTest):
         with self.assertRaises(HookError) as error:
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
+
+    def test_leader_has_package_upload_backend(self):
+
+        provider = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv,
+            is_leader=True)
+
+        data = provider.provide_data()
+        services = yaml.safe_load(data["services"])
+
+        https_service = services[HTTPS_INDEX]
+        backends = https_service["backends"]
+
+        package_upload = None
+        for backend in backends:
+            if backend["backend_name"] == "landscape-package-upload":
+                package_upload = backend
+
+        self.assertIsNot(package_upload, None)
+        self.assertEqual(1, len(package_upload["servers"]))
 
 
 class HAProxyRequirerTest(HookenvTest):
