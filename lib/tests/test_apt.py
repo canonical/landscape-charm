@@ -1,8 +1,8 @@
 import os
 
 from lib.apt import (
-    Apt, PACKAGES, BUILD_LOCAL_ARCHIVE, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
-    SAMPLE_HASHIDS_KEY)
+    Apt, PACKAGES, BUILD_LOCAL_ARCHIVE, DEFAULT_INSTALL_OPTIONS,
+    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
 from lib.hook import HookError
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
@@ -68,8 +68,8 @@ class AptTest(HookenvTest):
 
     def test_set_sources_sample_hashids(self):
         """
-        The C{set_sources} method is a no-op if the source config hasn't
-        changed.
+        The C{set_sources} method adds the sample hashids PPA if a
+        file named 'use-sample-hashids' is found.
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         flag_file = os.path.join(

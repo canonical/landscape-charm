@@ -12,6 +12,8 @@ from lib.hook import HookError
 PACKAGES = ("landscape-server",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
+
+# XXX Eventually we'll want to use a dedicated PPA, populated by Jenkins.
 SAMPLE_HASHIDS_PPA = "ppa:landscape/fake-kernel"
 SAMPLE_HASHIDS_KEY = "4652B4E6"
 
@@ -145,7 +147,7 @@ class Apt(object):
         """Whether to use sample hashids instead of the real ones.
 
         This method will check for a 'use-sample-hashids' file in the charm
-        directory and return True if it founds one.
+        directory and return True if it finds one.
         """
         charm_dir = self._hookenv.charm_dir()
         return os.path.exists(os.path.join(charm_dir, "use-sample-hashids"))
