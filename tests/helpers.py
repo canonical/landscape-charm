@@ -4,7 +4,6 @@ Common helpers for landscpae integration tests.
 
 import json
 import logging
-import unittest
 import sys
 import yaml
 import os
@@ -13,13 +12,14 @@ import tempfile
 import shutil
 
 from os import getenv
-from os.path import splitext, basename
 from subprocess import CalledProcessError, check_output, PIPE
 from time import sleep
 
-from fixtures import Fixture
+from fixtures import Fixture, TestWithFixtures
 
 from amulet import Deployment
+
+from zope.testrunner import run
 
 from jinja2 import FileSystemLoader, Environment
 
@@ -180,19 +180,42 @@ class EnvironmentFixture(Fixture):
             self.start_landscape_service(service, unit=unit)
 
 
-@unittest.skipIf(
-    getenv("SKIP_TESTS", None), "Requested to skip all tests.")
-class BaseLandscapeTests(unittest.TestCase):
-    """
-    Base class with some commonality between all test classes.
-    """
+class OneLandscapeUnitLayer(object):
 
-    maxDiff = None
+    @classmethod
+    def setUp(cls):
+        cls.environment = EnvironmentFixture()
+        cls.environment.setUp()
 
-    def __str__(self):
-        file_name = splitext(basename(__file__))[0]
-        return "{} ({}.{})".format(
-            self._testMethodName, file_name, self.__class__.__name__)
+    @classmethod
+    def tearDown(cls):
+        cls.environment.cleanUp()
+
+
+class IntegrationTest(TestWithFixtures):
+    """Host all the tests to run against a minimal Landscape deployment.
+
+    The deployment will have one unit of each needed service, with default
+    configuration.
+    """
+    layer = OneLandscapeUnitLayer
+
+    def setUp(self):
+        super(IntegrationTest, self).setUp()
+        self.environment = self.layer.environment
+
+
+def main():
+    # All imports are relative to the tests directory, so we want it to be the
+    # current working directory.
+    #os.chdir(os.path.dirname(sys.argv[0]))
+
+    # Figure out the package holding the test files to use and run them.
+    path = os.path.join(os.getcwd(), "tests")
+    module = os.path.basename(sys.argv[0]).split("-")[1]
+    args = sys.argv[:]
+    args.extend(["-vv", "--path", path, "--tests-pattern", "^%s$" % module])
+    run(args=args)
 
 
 def get_ssl_certificate(endpoint):

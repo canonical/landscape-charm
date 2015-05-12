@@ -6,15 +6,13 @@ takes time, this guarantees no side-effects introduced by other tests (SSL is
 a charm config option).
 """
 import base64
-import logging
 import os
-import unittest
 
 from fixtures import TestWithFixtures
 
 from helpers import EnvironmentFixture, get_ssl_certificate
 
-TEST_DIR = os.path.dirname(__file__)
+TEST_DIR = os.path.dirname(os.path.dirname(__file__))
 CERT_FILE = os.path.join(TEST_DIR, "ssl", "server.crt")
 KEY_FILE = os.path.join(TEST_DIR, "ssl", "server.key")
 
@@ -42,15 +40,3 @@ class OneLandscapeUnitTest(TestWithFixtures):
         with open(CERT_FILE, "r") as fd:
             ssl_cert = fd.read().rstrip()
         self.assertEqual(ssl_cert, get_ssl_certificate(endpoint))
-
-
-def load_tests(loader, tests, pattern):
-    suite = unittest.TestSuite()
-    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitTest))
-    return suite
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    unittest.main(verbosity=2)

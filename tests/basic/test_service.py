@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 """
 This test creates a real landscape deployment, and runs some checks against it.
 
@@ -6,21 +5,18 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
 
-import logging
 import unittest
 
 from configparser import ConfigParser
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
-from fixtures import TestWithFixtures
-
 from helpers import (
     check_url, juju_status, find_address, get_landscape_service_conf,
-    run_command_on_unit, EnvironmentFixture)
+    run_command_on_unit, IntegrationTest)
 
 
-class OneLandscapeUnitTest(TestWithFixtures):
+class OneLandscapeUnitTest(IntegrationTest):
     """Host all the tests to run against a minimal Landscape deployment.
 
     The deployment will have one unit of each needed service, with default
@@ -29,7 +25,6 @@ class OneLandscapeUnitTest(TestWithFixtures):
 
     def setUp(self):
         super(OneLandscapeUnitTest, self).setUp()
-        self.environment = self.useFixture(EnvironmentFixture())
         self.frontend = self.environment.get_haproxy_public_address()
 
     def test_app(self):
@@ -142,7 +137,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
-class OneLandscapeUnitNoCronTest(TestWithFixtures):
+class OneLandscapeUnitNoCronTest(IntegrationTest):
     """Host all the tests that expects the cron daemon to be stopped.
 
     The deployment will the same minimal one from OneLandscapeUnitTest, but
@@ -278,16 +273,3 @@ class OneLandscapeUnitNoCronTest(TestWithFixtures):
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
         check_output(cmd, stderr=PIPE)
-
-
-def load_tests(loader, tests, pattern):
-    suite = unittest.TestSuite()
-    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitTest))
-    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitNoCronTest))
-    return suite
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    unittest.main(verbosity=2)
