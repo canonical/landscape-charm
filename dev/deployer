@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import sys
+import time
 
 import yaml
 
@@ -88,6 +89,7 @@ class Deployer(object):
         @param target: target to deploye in the config file.
         @param timeout: timeout in seconds (int or string is OK)
         """
+        start = time.time()
         target = "landscape-" + target
         deployer_dir = None
         config_files = [os.path.join(CHARM_SRC, "bundles", target + ".yaml")]
@@ -100,7 +102,9 @@ class Deployer(object):
                 self._stage_deployer_dir(deployer_dir, series)
             config_files.append(
                 self._create_local_yaml(deployer_dir, target))
-            args = ["juju-deployer", "-vdWL", "-w 180"]
+            # The -w 30 is there to allow things to settle a bit before
+            # issuing a 'juju run' to wait for all the relations to settle.
+            args = ["juju-deployer", "-vdWL", "-w 30"]
             for config_file in config_files:
                 args.extend(["-c", config_file])
             args.append(target)
@@ -108,6 +112,15 @@ class Deployer(object):
                 args.extend(["--timeout", str(timeout)])
             logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
             subprocess.check_call(args, cwd=deployer_dir)
+            logging.info("Waiting for relations to settle")
+            subprocess.check_output(["juju", "run", "--all", "/bin/true"])
+            deploy_time = int(round(time.time() - start))
+            logging.info(
+                "Deployment usable after {} seconds".format(deploy_time))
+            haproxy_ip = subprocess.check_output(
+                ["juju-deployer", "-f", "haproxy"])
+            haproxy_ip = haproxy_ip.decode("utf-8").strip()
+            logging.info("Landscape URL: https://{}/".format(haproxy_ip))
         finally:
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
@@ -118,5 +131,6 @@ if __name__ == "__main__":
         print("Usage: %s <target>" % sys.argv[0])
         print("   <target> can be either 'scalable', 'dense' or 'dense-maas'")
         sys.exit(1)
+    logging.basicConfig(level=logging.INFO)
     deployer = Deployer()
     deployer.deploy(sys.argv[1])
