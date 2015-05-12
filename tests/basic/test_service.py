@@ -12,19 +12,13 @@ from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
 from helpers import (
-    check_url, juju_status, find_address, get_landscape_service_conf,
-    run_command_on_unit, IntegrationTest)
+    check_url, get_landscape_service_conf, run_command_on_unit, IntegrationTest)
 
 
-class OneLandscapeUnitTest(IntegrationTest):
-    """Host all the tests to run against a minimal Landscape deployment.
-
-    The deployment will have one unit of each needed service, with default
-    configuration.
-    """
+class ServiceTest(IntegrationTest):
 
     def setUp(self):
-        super(OneLandscapeUnitTest, self).setUp()
+        super(ServiceTest, self).setUp()
         self.frontend = self.environment.get_haproxy_public_address()
 
     def test_app(self):
@@ -137,7 +131,7 @@ class OneLandscapeUnitTest(IntegrationTest):
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
-class OneLandscapeUnitNoCronTest(IntegrationTest):
+class CronTest(IntegrationTest):
     """Host all the tests that expects the cron daemon to be stopped.
 
     The deployment will the same minimal one from OneLandscapeUnitTest, but
@@ -251,17 +245,13 @@ class OneLandscapeUnitNoCronTest(IntegrationTest):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.expectedFailure
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
-        frontend = find_address(juju_status(), "haproxy")
-        psql_cmd = "sudo -u postgres psql -At landscape-main " \
-            "-c \"select encode(key, 'escape'),encode(value, 'escape') " \
-            "from system_configuration where key='landscape.root_url'\" " \
-            " 2>/dev/null"
-        cmd = ["juju", "run", "--unit", "postgresql/0", psql_cmd]
-        output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
-        self.assertIn(frontend, output)
+        config = ConfigParser()
+        config.read_string(get_landscape_service_conf("landscape-server/0"))
+        frontend = self.environment.get_haproxy_public_address()
+        self.assertEqual(
+            "https://%s/" % frontend, config["global"]["root-url"])
 
     @staticmethod
     def _stop_cron(unit):

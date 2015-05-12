@@ -181,6 +181,11 @@ class EnvironmentFixture(Fixture):
 
 
 class OneLandscapeUnitLayer(object):
+    """Layer for all tests meant to run against a minimal Landscape deployment.
+
+    The deployment will have one unit of each needed service, with default
+    configuration.
+    """
 
     config = None
 
@@ -208,6 +213,11 @@ class IntegrationTest(TestWithFixtures):
 
 
 def main(config=None):
+    """Run all relevant integration tests for this file.
+
+    @param config: A dict with configuration tweaks, so the initial layer can
+        be brought up using a custom landscape-server charm configuration.
+    """
     OneLandscapeUnitLayer.config = config
 
     # Figure out the package holding the test files to use and run them.
@@ -292,13 +302,6 @@ def check_url(url, good_content, post_data=None, header=None,
     raise AssertionError(msg.format(url, good_content, output))
 
 
-def juju_status():
-    """Return a juju status structure."""
-    cmd = ["juju", "status", "--format=json"]
-    output = check_output(cmd).decode("utf-8").strip()
-    return json.loads(output)
-
-
 def get_service_config(service_name):
     """
     Returns the configuration of the given service. Raises an error if
@@ -310,48 +313,6 @@ def get_service_config(service_name):
     cmd = ["juju", "get", "--format=yaml", service_name]
     output = check_output(cmd).decode("utf-8").strip()
     return yaml.load(output)
-
-
-def find_address(juju_status, service_name):
-    """
-    Find the first unit of service_name in the given juju status dictionary.
-    Doesn't handle subordinates, sorry.
-
-    @param juju_status: dictionary representing the juju status output.
-    @param service_name: String representing the name of the service.
-    """
-    services = juju_status["services"]
-    if service_name not in services:
-        raise ServiceOrUnitNotFound(service_name)
-    service = services[service_name]
-    units = service.get("units", {})
-    unit_keys = list(sorted(units.keys()))
-    if unit_keys:
-        public_address = units[unit_keys[0]].get("public-address", "")
-        return public_address
-    else:
-        raise ServiceOrUnitNotFound(service_name)
-
-
-def get_landscape_units(juju_status):
-    """
-    Return a list of all the landscape service units.
-
-    @param juju_status: dictionary representing the juju status output.
-    """
-    landscape_units = []
-    services = juju_status["services"]
-    for service_name in services:
-        if not service_name.startswith("landscape"):
-            continue
-        service = services[service_name]
-        units = service.get("units", {})
-        unit_keys = list(sorted(units.keys()))
-        if unit_keys:
-            landscape_units.extend(unit_keys)
-    if not landscape_units:
-        raise ServiceOrUnitNotFound("landscape")
-    return landscape_units
 
 
 def get_landscape_service_conf(unit):
@@ -366,13 +327,3 @@ def run_command_on_unit(cmd, unit):
     """Run the given command on the given unit and return the output."""
     output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
     return output.decode("utf-8").strip()
-
-
-class ServiceOrUnitNotFound(Exception):
-    """
-    Exception thrown if a service cannot be found in the deployment or has
-    no units.
-    """
-
-    def __init__(self, service_name):
-        self.service_name = service_name
