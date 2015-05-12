@@ -77,7 +77,7 @@ class EnvironmentFixture(Fixture):
             try:
                 self._deployment.setup(timeout=self._timeout)
             finally:
-                shutil.rmtree(repo_dir)
+                self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
         self._stopped_landscape_services = []
@@ -100,10 +100,17 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._control_landscape_service("start", service, unit)
 
+    def _get_charm_dir(self):
+        """Get the path to the root of the charm directory."""
+        return os.path.join(os.path.dirname(__file__), "..")
+
+    def _get_sample_hashids_path(self):
+        """Get the path to the flag file for enabling sample hashids."""
+        return os.path.join(self._get_charm_dir(), "use-sample-hashids")
+
     def _get_bundle(self):
         """Return a dict with the data for the test bundle."""
-        charm_dir = os.path.join(os.path.dirname(__file__), "..")
-        bundles_dir = os.path.join(charm_dir, "bundles")
+        bundles_dir = os.path.join(self._get_charm_dir(), "bundles")
         environment = Environment(
             loader=FileSystemLoader(bundles_dir), trim_blocks=True,
             lstrip_blocks=True, keep_trailing_newline=True)
@@ -115,7 +122,7 @@ class EnvironmentFixture(Fixture):
             if source == "lds-trunk-ppa":
                 # We want the lds-trunk PPA, let's grab its details from
                 # the secrets directory
-                secrets_dir = os.path.join(charm_dir, "secrets")
+                secrets_dir = os.path.join(self._get_charm_dir(), "secrets")
                 with open(os.path.join(secrets_dir, "lds-trunk-ppa")) as fd:
                     extra_config = yaml.safe_load(fd.read())
             else:
@@ -148,7 +155,17 @@ class EnvironmentFixture(Fixture):
         charm_link = os.path.join(series_dir, "landscape-server")
         os.symlink(branch_dir, charm_link)
         os.environ["JUJU_REPOSITORY"] = repo_dir
+
+        # Enable sample hashids
+        with open(self._get_sample_hashids_path(), "w") as fd:
+            fd.write("")
+
         return repo_dir
+
+    def _clean_repo_dir(self, repo_dir):
+        """Clean up the repository directory and the sample hashids flag."""
+        shutil.rmtree(repo_dir)
+        os.unlink(self._get_sample_hashids_path())
 
     def _control_landscape_service(self, action, service, unit):
         """Start or stop the given Landscape service on the given unit."""
