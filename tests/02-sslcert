@@ -1,5 +1,16 @@
 #!/usr/bin/python3
+import base64
+
 from helpers import main
+from sslcert.assets import CERT_FILE, KEY_FILE
 
 if __name__ == "__main__":
-    main()
+    with open(CERT_FILE, "rb") as fd:
+        ssl_cert = fd.read()
+    with open(KEY_FILE, "rb") as fd:
+        ssl_key = fd.read()
+    config = {
+        "landscape": {
+            "ssl-cert": base64.b64encode(ssl_cert).decode("utf-8"),
+            "ssl-key": base64.b64encode(ssl_key).decode("utf-8")}}
+    main(config=config)

@@ -1,35 +1,15 @@
-#!/usr/bin/python3
 """SSL functional tests for the landscape-charm.
 
 They are in a separate module because while bootstrapping a juju environment
 takes time, this guarantees no side-effects introduced by other tests (SSL is
 a charm config option).
 """
-import base64
-import os
 
-from fixtures import TestWithFixtures
-
-from helpers import EnvironmentFixture, get_ssl_certificate
-
-TEST_DIR = os.path.dirname(os.path.dirname(__file__))
-CERT_FILE = os.path.join(TEST_DIR, "ssl", "server.crt")
-KEY_FILE = os.path.join(TEST_DIR, "ssl", "server.key")
+from sslcert.assets import CERT_FILE
+from helpers import IntegrationTest, get_ssl_certificate
 
 
-class OneLandscapeUnitTest(TestWithFixtures):
-
-    def setUp(self):
-        super(OneLandscapeUnitTest, self).setUp()
-        with open(CERT_FILE, "rb") as fd:
-            ssl_cert = fd.read()
-        with open(KEY_FILE, "rb") as fd:
-            ssl_key = fd.read()
-        config = {
-            "landscape": {
-                "ssl-cert": base64.b64encode(ssl_cert).decode("utf-8"),
-                "ssl-key": base64.b64encode(ssl_key).decode("utf-8")}}
-        self.environment = self.useFixture(EnvironmentFixture(config=config))
+class SSLConfigurationTest(IntegrationTest):
 
     def test_certificate_is_what_we_expect(self):
         """

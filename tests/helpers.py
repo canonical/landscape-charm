@@ -182,9 +182,11 @@ class EnvironmentFixture(Fixture):
 
 class OneLandscapeUnitLayer(object):
 
+    config = None
+
     @classmethod
     def setUp(cls):
-        cls.environment = EnvironmentFixture()
+        cls.environment = EnvironmentFixture(config=cls.config)
         cls.environment.setUp()
 
     @classmethod
@@ -205,10 +207,8 @@ class IntegrationTest(TestWithFixtures):
         self.environment = self.layer.environment
 
 
-def main():
-    # All imports are relative to the tests directory, so we want it to be the
-    # current working directory.
-    #os.chdir(os.path.dirname(sys.argv[0]))
+def main(config=None):
+    OneLandscapeUnitLayer.config = config
 
     # Figure out the package holding the test files to use and run them.
     path = os.path.join(os.getcwd(), "tests")
