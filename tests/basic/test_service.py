@@ -200,7 +200,6 @@ class OneLandscapeUnitNoCronTest(IntegrationTest):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skip("fails to acquire the lock needs debugging")
     def test_update_alerts_cron(self):
         """Verify that the update_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_alerts.sh"
