@@ -13,7 +13,8 @@ class UpgradeActionTest(HookenvTest):
 
     def test_run(self):
         """
-        The UpgradeAction stops the Landscape services.
+        The UpgradeAction refreshes package indexes and upgrades
+        landscape-server package.
         """
         self.action()
         self.assertEqual(

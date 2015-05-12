@@ -7,7 +7,7 @@ from lib.hook import Hook
 
 
 class UpgradeAction(Hook):
-    """Execute pause action logic."""
+    """Execute package upgrade action logic."""
 
     def __init__(self, hookenv=hookenv, subprocess=subprocess):
         super(UpgradeAction, self).__init__(hookenv=hookenv)

@@ -4,5 +4,5 @@ pause:
     from happening. It will also transition the unit to the blocked state.
 upgrade:
   description: Upgrade software on the Landscape unit. This action will update
-    apt package indexes and run landscape-server package upgrade.  For best
-    results, unit should already be paused with the 'pause' action.
+    APT package indexes and upgrade the landscape-server package.
+    Unit must already be paused with the 'pause' action.
