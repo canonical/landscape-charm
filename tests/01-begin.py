@@ -76,7 +76,6 @@ class OneLandscapeUnitTest(TestWithFixtures):
         good_content = "Query API Service"
         check_url("https://{}/api".format(self.frontend), good_content)
 
-    @unittest.skip("currently oopses")
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
