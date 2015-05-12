@@ -96,24 +96,30 @@ class HAProxyProvider(RelationContext):
 
     def _get_https(self):
         """Return the service configuration for the HTTPS frontend."""
-        service = self._get_service("https")
-        service.update({
-            "crts": self._get_ssl_certificate(),
-            "servers": self._get_servers("appserver"),
-            "backends": [
-                self._get_backend(
-                    "message", self._get_servers("message-server")),
-                self._get_backend("api", self._get_servers("api")),
-            ],
-        })
+
+        backends = [
+            self._get_backend("message", self._get_servers("message-server")),
+            self._get_backend("api", self._get_servers("api")),
+        ]
         if self._is_leader:
-            self._hookenv.log("Leader: Writing package-upload backends entry.")
-            service["backends"].append(
+            self._hookenv.log(
+                "This unit is the juju leader: Writing package-upload backends"
+                " entry.")
+            backends.append(
                 self._get_backend(
                     "package-upload", self._get_servers("package-upload")))
         else:
             self._hookenv.log(
-                "Not the leader: not writing package-upload backends entry.")
+                "This unit is not the juju leader: not writing package-upload"
+                " backends entry.")
+
+        service = self._get_service("https")
+        service.update({
+            "crts": self._get_ssl_certificate(),
+            "servers": self._get_servers("appserver"),
+            "backends": backends,
+        })
+
         return service
 
     def _get_service(self, name):
