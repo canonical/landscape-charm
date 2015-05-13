@@ -50,12 +50,30 @@ class DeploymentStub(object):
         self.timeout = timeout
 
 
+class SubprocessStub(object):
+    """
+    @ivar outputs: A dict mapping expected commands to their output.
+    """
+
+    def __init__(self):
+        self.outputs = {}
+
+    def check_output(self, command):
+        output = self.outputs[" ".join(command)]
+        if isinstance(output, list):
+            return output.pop(0)
+        else:
+            return output
+
+
 class EnvironmentFixtureTest(unittest.TestCase):
 
     def setUp(self):
         super(EnvironmentFixtureTest, self).setUp()
+        self.subprocess = SubprocessStub()
         self.deployment = DeploymentStub()
-        self.fixture = EnvironmentFixture(deployment=self.deployment)
+        self.fixture = EnvironmentFixture(
+            deployment=self.deployment, subprocess=self.subprocess)
 
     def test_setup(self):
         """
@@ -98,6 +116,44 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.fixture.cleanUp()
         self.assertEqual(
             "sudo service landscape-appserver start", unit.commands[1])
+
+    def test_check_url(self):
+        """
+        The check_url method perform an HTTP request against the haproxy
+        endpoint.
+        """
+        curl = "curl https://1.2.3.4/ -k -L -s --compressed"
+        self.subprocess.outputs[curl] = b"hello"
+        self.fixture.check_url("/", "hello")
+
+    def test_check_url_with_proto(self):
+        """
+        The check_url method accepts a custom protocol.
+        """
+        curl = "curl http://1.2.3.4/ -k -L -s --compressed"
+        self.subprocess.outputs[curl] = b"hello"
+        self.fixture.check_url("/", "hello", proto="http")
+
+    def test_check_url_with_post_data(self):
+        """
+        The check_url method can post data.
+        """
+        curl = "curl https://1.2.3.4/ -k -L -s --compressed -d foo"
+        self.subprocess.outputs[curl] = b"hello"
+        self.fixture.check_url("/", "hello", post_data="foo")
+
+    def test_check_url_retry(self):
+        """
+        The check_url method retries two times before giving up.
+        """
+        curl = "curl https://1.2.3.4/ -k -L -s --compressed"
+        self.subprocess.outputs[curl] = [b"foo", b"bar"]
+        with self.assertRaises(AssertionError) as error:
+            self.fixture.check_url("/", "hello", interval=0)
+        message = str(error.exception)
+        self.assertTrue(message.startswith("Content Not found!"))
+        self.assertIn("good_content:['hello']", message)
+        self.assertIn("output:bar", message)
 
 
 if __name__ == "__main__":
