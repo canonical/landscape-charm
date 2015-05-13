@@ -10,7 +10,8 @@ import unittest
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
-from helpers import IntegrationTest, OneLandscapeUnitLayer
+from helpers import IntegrationTest
+from layers import OneLandscapeUnitLayer
 
 
 class ServiceTest(IntegrationTest):

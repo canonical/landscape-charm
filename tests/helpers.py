@@ -90,8 +90,9 @@ class EnvironmentFixture(Fixture):
 
     def get_file(self, path, unit=0):
         """Return the content of a file on the given landscape-server unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
-        return unit.file_contents(path)
+        unit_sentry = self._deployment.sentry.unit[
+            "landscape-server/%d" % unit]
+        return unit_sentry.file_contents(path)
 
     def get_config(self, unit=0):
         """Return a ConfigParser with service.conf data from the given unit."""
@@ -119,6 +120,7 @@ class EnvironmentFixture(Fixture):
         output = ""
         if type(good_content) is not list:
             good_content = [good_content]
+        # XXX we should use pycurl here
         cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
         if post_data:
             cmd.extend(["-d", post_data])
@@ -230,25 +232,6 @@ class EnvironmentFixture(Fixture):
             self.start_landscape_service(service, unit=unit)
 
 
-class OneLandscapeUnitLayer(object):
-    """Layer for all tests meant to run against a minimal Landscape deployment.
-
-    The deployment will have one Juju unit of each needed Juju service, with
-    default configuration.
-    """
-
-    config = None
-
-    @classmethod
-    def setUp(cls):
-        cls.environment = EnvironmentFixture(config=cls.config)
-        cls.environment.setUp()
-
-    @classmethod
-    def tearDown(cls):
-        cls.environment.cleanUp()
-
-
 class IntegrationTest(TestWithFixtures):
     """Charm integration tests.
 
@@ -271,7 +254,8 @@ def main(config=None):
     @param config: A dict with configuration tweaks, so the initial layer can
         be brought up using a custom landscape-server charm configuration.
     """
-    OneLandscapeUnitLayer.config = config
+    global _config
+    _config = config
 
     # Figure out the package holding the test files to use and run them.
     path = os.path.join(os.getcwd(), "tests")
@@ -279,6 +263,10 @@ def main(config=None):
     args = sys.argv[:]
     args.extend(["-vv", "--path", path, "--tests-pattern", "^%s$" % module])
     run(args=args)
+
+
+def get_config():
+    return _config
 
 
 def _get_ssl_certificate_over_wire(endpoint):
@@ -304,3 +292,7 @@ def _get_ssl_certificate_over_wire(endpoint):
     end = certificate.find("-----END CERTIFICATE-----") + len(
         "-----END CERTIFICATE-----")
     return certificate[start:end]
+
+
+# Global environment configuration
+_config = None

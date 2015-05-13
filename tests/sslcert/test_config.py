@@ -6,8 +6,8 @@ a charm config option).
 """
 
 from sslcert.assets import CERT_FILE
-from helpers import (
-    IntegrationTest, OneLandscapeUnitLayer, get_ssl_certificate_over_wire)
+from helpers import IntegrationTest, get_ssl_certificate_over_wire
+from layers import OneLandscapeUnitLayer
 
 
 class SSLConfigurationTest(IntegrationTest):
