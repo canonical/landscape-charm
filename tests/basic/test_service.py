@@ -64,7 +64,6 @@ class ServiceTest(IntegrationTest):
         """
         self.environment.check_url("/api", "Query API Service")
 
-    @unittest.skip("currently oopses")
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
