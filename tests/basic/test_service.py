@@ -7,15 +7,15 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 
 import unittest
 
-from configparser import ConfigParser
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
-from helpers import (
-    check_url, get_landscape_service_conf, run_command_on_unit, IntegrationTest)
+from helpers import IntegrationTest, OneLandscapeUnitLayer
 
 
 class ServiceTest(IntegrationTest):
+
+    layer = OneLandscapeUnitLayer
 
     def setUp(self):
         super(ServiceTest, self).setUp()
@@ -32,8 +32,7 @@ class ServiceTest(IntegrationTest):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        good_content = "passphrase"
-        check_url("https://{}/".format(self.frontend), good_content)
+        self.environment.check_url("/", "passphrase")
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -45,8 +44,9 @@ class ServiceTest(IntegrationTest):
         post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
                      "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
-        check_url("https://{}/message-system".format(self.frontend),
-                  good_content, post_data, header)
+        self.environment.check_url(
+            "/message-system", good_content, post_data=post_data,
+            header=header)
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -54,16 +54,15 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
-        good_content = "ds5:errors19:provide insecure_id;"
-        check_url("http://{}/ping".format(self.frontend), good_content)
+        self.environment.check_url(
+            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
 
     def test_api(self):
         """Verify that the API service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        good_content = "Query API Service"
-        check_url("https://{}/api".format(self.frontend), good_content)
+        self.environment.check_url("/api", "Query API Service")
 
     @unittest.skip("currently oopses")
     def test_upload(self):
@@ -71,10 +70,7 @@ class ServiceTest(IntegrationTest):
 
         Specifically that it is reachable and returns its name.
         """
-        good_content = "Landscape package upload service"
-        # ending / is important because of the way we wrote this RewriteRule
-        url = "https://{}/upload/".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/upload", "package upload service")
 
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
@@ -82,8 +78,7 @@ class ServiceTest(IntegrationTest):
         This test verifies that the host and password configuration keys
         from the [broker] section don't remain at their default values.
         """
-        config = ConfigParser()
-        config.read_string(get_landscape_service_conf("landscape-server/0"))
+        config = self.environment.get_config()
         broker = config["broker"]
         self.assertNotEqual(broker["host"], "localhost")
         self.assertNotEqual(broker["password"], "landscape")
@@ -93,9 +88,7 @@ class ServiceTest(IntegrationTest):
         Verify that the frontend shows the styled unavailable page.
         """
         self.environment.stop_landscape_service("landscape-appserver")
-        good_content = "please phone us"
-        url = "https://{}/".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/", "please phone us")
 
     @unittest.expectedFailure
     def test_msg_unavailable_page(self):
@@ -105,8 +98,7 @@ class ServiceTest(IntegrationTest):
         self.environment.stop_landscape_service("landscape-msgserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
-        url = "https://{}/message-system".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/message-system", good_content)
 
     @unittest.expectedFailure
     def test_ping_unavailable_page(self):
@@ -116,8 +108,7 @@ class ServiceTest(IntegrationTest):
         self.environment.stop_landscape_service("landscape-pingserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
-        url = "http://{}/ping".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/ping", good_content, proto="http")
 
     def test_ssl_certificate_is_in_place(self):
         """
@@ -126,8 +117,7 @@ class ServiceTest(IntegrationTest):
         the application expects (it will need it when generating client
         configuration for Autopilot deployments).
         """
-        ssl_cert = run_command_on_unit(
-            "cat /etc/ssl/certs/landscape_server_ca.crt", "landscape-server/0")
+        ssl_cert = self.environment.get_ssl_certificate()
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
@@ -138,6 +128,8 @@ class CronTest(IntegrationTest):
     the cron daemon will be stopped, so Landscape cron jobs in particular
     won't be run.
     """
+    layer = OneLandscapeUnitLayer
+
     cron_unit = "landscape-server/0"
 
     @classmethod
@@ -247,8 +239,7 @@ class CronTest(IntegrationTest):
 
     def test_root_url_is_set(self):
         """root_url should be set in the postgres db."""
-        config = ConfigParser()
-        config.read_string(get_landscape_service_conf("landscape-server/0"))
+        config = self.environment.get_config()
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(
             "https://%s/" % frontend, config["global"]["root-url"])

@@ -2,7 +2,6 @@
 Common helpers for landscpae integration tests.
 """
 
-import json
 import logging
 import sys
 import yaml
@@ -12,8 +11,9 @@ import tempfile
 import shutil
 
 from os import getenv
-from subprocess import CalledProcessError, check_output, PIPE
+from subprocess import check_output
 from time import sleep
+from configparser import ConfigParser
 
 from fixtures import Fixture, TestWithFixtures
 
@@ -87,6 +87,63 @@ class EnvironmentFixture(Fixture):
         """Return the public address of the given haproxy unit."""
         unit = self._deployment.sentry.unit["haproxy/%d" % unit]
         return unit.info["public-address"]
+
+    def get_haproxy_certificate(self, unit=0):
+        """Return the certificate that haproxy is using for SSL termination."""
+        endpoint = "%s:443" % self.get_haproxy_public_address()
+        return _get_ssl_certificate(endpoint)
+
+    def get_ssl_certificate(self, unit=0):
+        """Return SSL certificate set on the given Landscape unit."""
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        return unit.file_contents("/etc/ssl/certs/landscape_server_ca.crt")
+
+    def get_config(self, unit=0):
+        """Return a ConfigParser with service.conf data from the given unit."""
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        content = unit.file_contents("/etc/landscape/service.conf")
+        config = ConfigParser()
+        config.read_string(content)
+        return config
+
+    def check_url(self, path, good_content, proto="https", post_data=None,
+                  header=None):
+        """Polls the given path on the haproxy unit looking for good_content.
+
+        If not found in the timeout period, will assert.  If found, returns
+        the output matching.
+
+        @param path: The path to poll
+        @param good_content: string we are looking for, or list of strings
+        @param proto: Either https or http
+        @param post_data: optional POST data string
+        @param header: optional request header string
+        """
+        interval = 5
+        attempts = 2
+
+        url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
+        output = ""
+        if type(good_content) is not list:
+            good_content = [good_content]
+        cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
+        if post_data:
+            cmd.extend(["-d", post_data])
+        if header:
+            cmd.extend(["-H", header])
+        for _ in range(attempts):
+            output = check_output(cmd).decode("utf-8").strip()
+            if all(content in output for content in good_content):
+                return output
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            sleep(interval)
+        msg = """Content Not found!
+        url:{}
+        good_content:{}
+        output:{}
+        """
+        raise AssertionError(msg.format(url, good_content, output))
 
     def stop_landscape_service(self, service, unit=0):
         """Stop the given Landscape service on the given unit.
@@ -200,16 +257,17 @@ class OneLandscapeUnitLayer(object):
 
 
 class IntegrationTest(TestWithFixtures):
-    """Host all the tests to run against a minimal Landscape deployment.
+    """Charm integration tests.
 
-    The deployment will have one unit of each needed service, with default
-    configuration.
+    Sub-classes are expected to set the layer they want to get the setup of.
     """
-    layer = OneLandscapeUnitLayer
 
-    def setUp(self):
-        super(IntegrationTest, self).setUp()
-        self.environment = self.layer.environment
+    layer = None  # Must be set by sub-classes
+
+    @property
+    def environment(self):
+        """Convenience for getting the EnvironmentFixture of the layer."""
+        return self.layer.environment
 
 
 def main(config=None):
@@ -228,7 +286,7 @@ def main(config=None):
     run(args=args)
 
 
-def get_ssl_certificate(endpoint):
+def _get_ssl_certificate(endpoint):
     """Return the SSL certificate used at the given endpoint.
 
     @param endpoint: An SSL endpoint in the form <host:port>.
@@ -251,79 +309,3 @@ def get_ssl_certificate(endpoint):
     end = certificate.find("-----END CERTIFICATE-----") + len(
         "-----END CERTIFICATE-----")
     return certificate[start:end]
-
-
-def check_url(url, good_content, post_data=None, header=None,
-              interval=5, attempts=2, retry_unavailable=False):
-    """
-    Polls the given URL looking for the specified good_content.  If
-    not found in the timeout period, will assert.  If found, returns
-    the output matching.
-
-    @param url: URL to poll
-    @param good_content: string we are looking for, or list of strings
-    @param post_data: optional POST data string
-    @param header: optional request header string
-    @param interval: number of seconds between polls
-    @param attempts: how many times we should poll
-    @param retry_unavailable: if host is unavailable, retry (default: False)
-    """
-    output = ""
-    if type(good_content) is not list:
-        good_content = [good_content]
-    cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
-    if post_data:
-        cmd.extend(["-d", post_data])
-    if header:
-        cmd.extend(["-H", header])
-    for _ in range(attempts):
-        try:
-            output = check_output(cmd).decode("utf-8").strip()
-        except CalledProcessError as e:
-            if not retry_unavailable:
-                raise
-            status = e.returncode
-            # curl: rc=7, host is unavailable, this can happen
-            #       when apache is being restarted, for instance
-            if status == 7:
-                log.info("Unavailable, retrying: {}".format(url))
-            else:
-                raise
-        if all(content in output for content in good_content):
-            return output
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        sleep(interval)
-    msg = """Content Not found!
-    url:{}
-    good_content:{}
-    output:{}
-    """
-    raise AssertionError(msg.format(url, good_content, output))
-
-
-def get_service_config(service_name):
-    """
-    Returns the configuration of the given service. Raises an error if
-    the service is not there.
-
-    @param juju_status: dictionary representing the juju status output.
-    @param service_name: string representing the service we are looking for.
-    """
-    cmd = ["juju", "get", "--format=yaml", service_name]
-    output = check_output(cmd).decode("utf-8").strip()
-    return yaml.load(output)
-
-
-def get_landscape_service_conf(unit):
-    """Fetch the contents of service.conf from the given unit."""
-    cmd = ["juju", "ssh", unit, "sudo cat /etc/landscape/service.conf "
-           "2>/dev/null"]
-    output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
-    return output
-
-
-def run_command_on_unit(cmd, unit):
-    """Run the given command on the given unit and return the output."""
-    output = check_output(["juju", "ssh", unit, cmd], stderr=PIPE)
-    return output.decode("utf-8").strip()
