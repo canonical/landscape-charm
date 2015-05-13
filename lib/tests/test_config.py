@@ -30,7 +30,7 @@ class ConfigHookTest(HookenvTest):
         """
         config = self.hookenv.config()
         config["source"] = "ppa:landscape/14.10"
-        self.assertEqual(None, config.previous("source"))
+        self.assertIsNone(config.previous("source"))
         self.hook()
         config.load_previous()
         self.assertEqual("ppa:landscape/14.10", config.previous("source"))
