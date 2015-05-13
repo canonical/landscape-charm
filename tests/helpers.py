@@ -269,7 +269,7 @@ def get_config():
     return _config
 
 
-def _get_ssl_certificate_over_wire(endpoint):
+def get_ssl_certificate_over_wire(endpoint):
     """Return the SSL certificate used at the given endpoint.
 
     @param endpoint: An SSL endpoint in the form <host:port>.
