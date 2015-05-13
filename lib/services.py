@@ -1,5 +1,6 @@
 import subprocess
 
+from charmhelpers import fetch
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core.services.base import ServiceManager
@@ -18,6 +19,7 @@ from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
+from lib.callbacks.apt import SetAPTSources
 
 
 SERVICE_COUNTS = {
@@ -34,13 +36,14 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
-                 subprocess=subprocess, paths=default_paths):
+                 subprocess=subprocess, paths=default_paths, fetch=fetch):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
         self._cluster = cluster
         self._host = host
         self._paths = paths
         self._subprocess = subprocess
+        self._fetch = fetch
 
     def _run(self):
         leader_context = None
@@ -49,13 +52,15 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
-        manager = ServiceManager([{
+        haproxy_provider = HAProxyProvider(
+            SERVICE_COUNTS, paths=self._paths, is_leader=is_leader)
+
+        manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(SERVICE_COUNTS, paths=self._paths,
-                                is_leader=is_leader),
+                haproxy_provider,
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -77,11 +82,27 @@ class ServicesHook(Hook):
                     owner="landscape", group="root", perms=0o640,
                     source="landscape-server",
                     target=self._paths.default_file()),
+                SetAPTSources(
+                    hookenv=self._hookenv, fetch=self._fetch,
+                    subprocess=self._subprocess),
                 EnsureConfigDir(paths=self._paths),
                 WriteCustomSSLCertificate(paths=self._paths),
                 SchemaBootstrap(subprocess=self._subprocess),
                 WriteLicenseFile(host=self._host, paths=self._paths),
             ],
-            "start": LSCtl(subprocess=self._subprocess),
+            "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
+
+        # XXX The service framework only triggers data providers within the
+        #     context of relation joined/changed hooks, however we also
+        #     want to trigger the haproxy provider if the SSL certificate
+        #     has changed.
+        if self._hookenv.hook_name() == "config-changed":
+            config = self._hookenv.config()
+            if config.changed("ssl-cert") or config.changed("ssl-key"):
+                relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
+                data = haproxy_provider.provide_data()
+                for relation_id in relation_ids:
+                    self._hookenv.relation_set(relation_id, data)
+
         manager.manage()
