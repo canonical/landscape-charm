@@ -6,7 +6,8 @@ a charm config option).
 """
 
 from sslcert.assets import CERT_FILE
-from helpers import IntegrationTest, OneLandscapeUnitLayer
+from helpers import IntegrationTest, get_ssl_certificate_over_wire
+from layers import OneLandscapeUnitLayer
 
 
 class SSLConfigurationTest(IntegrationTest):
@@ -18,6 +19,7 @@ class SSLConfigurationTest(IntegrationTest):
         The SSL certificate we get from the server is the one we set as a
         fixture during environment initialization.
         """
+        endpoint = "%s:443" % self.environment.get_haproxy_public_address()
         with open(CERT_FILE, "r") as fd:
             ssl_cert = fd.read().rstrip()
-        self.assertEqual(ssl_cert, self.environment.get_haproxy_certificate())
+        self.assertEqual(ssl_cert, get_ssl_certificate_over_wire(endpoint))

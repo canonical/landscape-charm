@@ -10,7 +10,8 @@ import unittest
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
-from helpers import IntegrationTest, OneLandscapeUnitLayer
+from helpers import IntegrationTest
+from layers import OneLandscapeUnitLayer
 
 
 class ServiceTest(IntegrationTest):
@@ -116,7 +117,8 @@ class ServiceTest(IntegrationTest):
         the application expects (it will need it when generating client
         configuration for Autopilot deployments).
         """
-        ssl_cert = self.environment.get_ssl_certificate()
+        ssl_cert = self.environment.get_file(
+            "/etc/ssl/certs/landscape_server_ca.crt")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
@@ -237,7 +239,9 @@ class CronTest(IntegrationTest):
         self.assertEqual(status, 0)
 
     def test_root_url_is_set(self):
-        """root_url should be set in the postgres db."""
+        """
+        The root URL should be set in service.conf.
+        """
         config = self.environment.get_config()
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(

@@ -11,7 +11,6 @@ import tempfile
 import shutil
 
 from os import getenv
-from subprocess import check_output
 from time import sleep
 from configparser import ConfigParser
 
@@ -59,7 +58,7 @@ class EnvironmentFixture(Fixture):
     _series = "trusty"
     _deployment = Deployment(series=_series)
 
-    def __init__(self, config=None, deployment=None):
+    def __init__(self, config=None, deployment=None, subprocess=subprocess):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
@@ -68,6 +67,7 @@ class EnvironmentFixture(Fixture):
         self._config = config or {}
         if deployment is not None:
             self._deployment = deployment
+        self._subprocess = subprocess
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
@@ -88,51 +88,46 @@ class EnvironmentFixture(Fixture):
         unit = self._deployment.sentry.unit["haproxy/%d" % unit]
         return unit.info["public-address"]
 
-    def get_haproxy_certificate(self, unit=0):
-        """Return the certificate that haproxy is using for SSL termination."""
-        endpoint = "%s:443" % self.get_haproxy_public_address()
-        return _get_ssl_certificate(endpoint)
-
-    def get_ssl_certificate(self, unit=0):
-        """Return SSL certificate set on the given Landscape unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
-        return unit.file_contents("/etc/ssl/certs/landscape_server_ca.crt")
+    def get_file(self, path, unit=0):
+        """Return the content of a file on the given landscape-server unit."""
+        unit_sentry = self._deployment.sentry.unit[
+            "landscape-server/%d" % unit]
+        return unit_sentry.file_contents(path)
 
     def get_config(self, unit=0):
         """Return a ConfigParser with service.conf data from the given unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
-        content = unit.file_contents("/etc/landscape/service.conf")
         config = ConfigParser()
-        config.read_string(content)
+        config.read_string(self.get_file("/etc/landscape/service.conf"))
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None):
+                  header=None, interval=5):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
         the output matching.
 
-        @param path: The path to poll
+        @param path: the path to poll
         @param good_content: string we are looking for, or list of strings
-        @param proto: Either https or http
+        @param proto: either https or http
         @param post_data: optional POST data string
         @param header: optional request header string
+        @param interval: seconds two wait between attempts
         """
-        interval = 5
         attempts = 2
 
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
         if type(good_content) is not list:
             good_content = [good_content]
+        # XXX we should use pycurl here
         cmd = ["curl", url, "-k", "-L", "-s", "--compressed"]
         if post_data:
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
         for _ in range(attempts):
-            output = check_output(cmd).decode("utf-8").strip()
+            output = self._subprocess.check_output(cmd).decode("utf-8").strip()
             if all(content in output for content in good_content):
                 return output
             sys.stdout.write(".")
@@ -237,25 +232,6 @@ class EnvironmentFixture(Fixture):
             self.start_landscape_service(service, unit=unit)
 
 
-class OneLandscapeUnitLayer(object):
-    """Layer for all tests meant to run against a minimal Landscape deployment.
-
-    The deployment will have one unit of each needed service, with default
-    configuration.
-    """
-
-    config = None
-
-    @classmethod
-    def setUp(cls):
-        cls.environment = EnvironmentFixture(config=cls.config)
-        cls.environment.setUp()
-
-    @classmethod
-    def tearDown(cls):
-        cls.environment.cleanUp()
-
-
 class IntegrationTest(TestWithFixtures):
     """Charm integration tests.
 
@@ -263,6 +239,8 @@ class IntegrationTest(TestWithFixtures):
     """
 
     layer = None  # Must be set by sub-classes
+
+    maxDiff = None
 
     @property
     def environment(self):
@@ -276,7 +254,8 @@ def main(config=None):
     @param config: A dict with configuration tweaks, so the initial layer can
         be brought up using a custom landscape-server charm configuration.
     """
-    OneLandscapeUnitLayer.config = config
+    global _config
+    _config = config
 
     # Figure out the package holding the test files to use and run them.
     path = os.path.join(os.getcwd(), "tests")
@@ -286,7 +265,11 @@ def main(config=None):
     run(args=args)
 
 
-def _get_ssl_certificate(endpoint):
+def get_config():
+    return _config
+
+
+def get_ssl_certificate_over_wire(endpoint):
     """Return the SSL certificate used at the given endpoint.
 
     @param endpoint: An SSL endpoint in the form <host:port>.
@@ -309,3 +292,7 @@ def _get_ssl_certificate(endpoint):
     end = certificate.find("-----END CERTIFICATE-----") + len(
         "-----END CERTIFICATE-----")
     return certificate[start:end]
+
+
+# Global environment configuration
+_config = None
