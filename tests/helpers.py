@@ -264,6 +264,8 @@ class IntegrationTest(TestWithFixtures):
 
     layer = None  # Must be set by sub-classes
 
+    maxDiff = None
+
     @property
     def environment(self):
         """Convenience for getting the EnvironmentFixture of the layer."""
