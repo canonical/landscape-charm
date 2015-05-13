@@ -1,5 +1,5 @@
 from lib.tests.helpers import HookenvTest
-from lib.tests.stubs import SubprocessStub
+from lib.tests.stubs import FetchStub
 from lib.upgrade import UpgradeAction
 
 
@@ -7,9 +7,9 @@ class UpgradeActionTest(HookenvTest):
 
     def setUp(self):
         super(UpgradeActionTest, self).setUp()
-        self.subprocess = SubprocessStub()
+        self.fetch = FetchStub()
         self.action = UpgradeAction(
-            hookenv=self.hookenv, subprocess=self.subprocess)
+            hookenv=self.hookenv, fetch=self.fetch)
 
     def test_run(self):
         """
@@ -17,10 +17,11 @@ class UpgradeActionTest(HookenvTest):
         landscape-server package.
         """
         self.action()
+        # There was on non-fatal apt_update call.
+        self.assertEqual([True], self.fetch.updates)
+        # And one apt_install with appropriate options.
         self.assertEqual(
-            [(("apt-get", "update", "-y"), {}),
-             (["apt-get", "install", "-y",
-               "-o", 'Dpkg::Options::="--force-confdef"',
-               "-o", 'Dpkg::Options::="--force-confold"',
-               "landscape-server"], {})],
-            self.subprocess.calls)
+            [(("landscape-server",),
+              ["-o", 'Dpkg::Options::="--force-confdef"',
+               "-o", 'Dpkg::Options::="--force-confold"'],
+              True)], self.fetch.installed)
