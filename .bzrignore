@@ -6,4 +6,4 @@ hooks/_trial_temp
 tags
 secrets
 trusty
-tests/__pycache__
+__pycache__

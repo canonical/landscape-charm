@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 """
 This test creates a real landscape deployment, and runs some checks against it.
 
@@ -6,30 +5,21 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
 
-import logging
 import unittest
 
-from configparser import ConfigParser
 from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
-from fixtures import TestWithFixtures
-
-from helpers import (
-    check_url, juju_status, find_address, get_landscape_service_conf,
-    run_command_on_unit, EnvironmentFixture)
+from helpers import IntegrationTest
+from layers import OneLandscapeUnitLayer
 
 
-class OneLandscapeUnitTest(TestWithFixtures):
-    """Host all the tests to run against a minimal Landscape deployment.
+class ServiceTest(IntegrationTest):
 
-    The deployment will have one unit of each needed service, with default
-    configuration.
-    """
+    layer = OneLandscapeUnitLayer
 
     def setUp(self):
-        super(OneLandscapeUnitTest, self).setUp()
-        self.environment = self.useFixture(EnvironmentFixture())
+        super(ServiceTest, self).setUp()
         self.frontend = self.environment.get_haproxy_public_address()
 
     def test_app(self):
@@ -43,8 +33,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        good_content = "passphrase"
-        check_url("https://{}/".format(self.frontend), good_content)
+        self.environment.check_url("/", "passphrase")
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -56,8 +45,9 @@ class OneLandscapeUnitTest(TestWithFixtures):
         post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
                      "sequencei0;;")
         header = "X-MESSAGE-API: 3.1"
-        check_url("https://{}/message-system".format(self.frontend),
-                  good_content, post_data, header)
+        self.environment.check_url(
+            "/message-system", good_content, post_data=post_data,
+            header=header)
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -65,26 +55,22 @@ class OneLandscapeUnitTest(TestWithFixtures):
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
-        good_content = "ds5:errors19:provide insecure_id;"
-        check_url("http://{}/ping".format(self.frontend), good_content)
+        self.environment.check_url(
+            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
 
     def test_api(self):
         """Verify that the API service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        good_content = "Query API Service"
-        check_url("https://{}/api".format(self.frontend), good_content)
+        self.environment.check_url("/api", "Query API Service")
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        good_content = "Landscape package upload service"
-        # ending / is important because of the way we wrote this RewriteRule
-        url = "https://{}/upload/".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/upload", "package upload service")
 
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
@@ -92,8 +78,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         This test verifies that the host and password configuration keys
         from the [broker] section don't remain at their default values.
         """
-        config = ConfigParser()
-        config.read_string(get_landscape_service_conf("landscape-server/0"))
+        config = self.environment.get_config()
         broker = config["broker"]
         self.assertNotEqual(broker["host"], "localhost")
         self.assertNotEqual(broker["password"], "landscape")
@@ -103,9 +88,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         Verify that the frontend shows the styled unavailable page.
         """
         self.environment.stop_landscape_service("landscape-appserver")
-        good_content = "please phone us"
-        url = "https://{}/".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/", "please phone us")
 
     @unittest.expectedFailure
     def test_msg_unavailable_page(self):
@@ -115,8 +98,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         self.environment.stop_landscape_service("landscape-msgserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
-        url = "https://{}/message-system".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/message-system", good_content)
 
     @unittest.expectedFailure
     def test_ping_unavailable_page(self):
@@ -126,8 +108,7 @@ class OneLandscapeUnitTest(TestWithFixtures):
         self.environment.stop_landscape_service("landscape-pingserver")
         good_content = ["503 Service Unavailable",
                         "No server is available to handle this request."]
-        url = "http://{}/ping".format(self.frontend)
-        check_url(url, good_content)
+        self.environment.check_url("/ping", good_content, proto="http")
 
     def test_ssl_certificate_is_in_place(self):
         """
@@ -136,18 +117,20 @@ class OneLandscapeUnitTest(TestWithFixtures):
         the application expects (it will need it when generating client
         configuration for Autopilot deployments).
         """
-        ssl_cert = run_command_on_unit(
-            "cat /etc/ssl/certs/landscape_server_ca.crt", "landscape-server/0")
+        ssl_cert = self.environment.get_file(
+            "/etc/ssl/certs/landscape_server_ca.crt")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
-class OneLandscapeUnitNoCronTest(TestWithFixtures):
+class CronTest(IntegrationTest):
     """Host all the tests that expects the cron daemon to be stopped.
 
     The deployment will the same minimal one from OneLandscapeUnitTest, but
     the cron daemon will be stopped, so Landscape cron jobs in particular
     won't be run.
     """
+    layer = OneLandscapeUnitLayer
+
     cron_unit = "landscape-server/0"
 
     @classmethod
@@ -255,17 +238,14 @@ class OneLandscapeUnitNoCronTest(TestWithFixtures):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.expectedFailure
     def test_root_url_is_set(self):
-        """root_url should be set in the postgres db."""
-        frontend = find_address(juju_status(), "haproxy")
-        psql_cmd = "sudo -u postgres psql -At landscape-main " \
-            "-c \"select encode(key, 'escape'),encode(value, 'escape') " \
-            "from system_configuration where key='landscape.root_url'\" " \
-            " 2>/dev/null"
-        cmd = ["juju", "run", "--unit", "postgresql/0", psql_cmd]
-        output = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
-        self.assertIn(frontend, output)
+        """
+        The root URL should be set in service.conf.
+        """
+        config = self.environment.get_config()
+        frontend = self.environment.get_haproxy_public_address()
+        self.assertEqual(
+            "https://%s/" % frontend, config["global"]["root-url"])
 
     @staticmethod
     def _stop_cron(unit):
@@ -276,16 +256,3 @@ class OneLandscapeUnitNoCronTest(TestWithFixtures):
     def _start_cron(unit):
         cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
         check_output(cmd, stderr=PIPE)
-
-
-def load_tests(loader, tests, pattern):
-    suite = unittest.TestSuite()
-    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitTest))
-    suite.addTests(loader.loadTestsFromTestCase(OneLandscapeUnitNoCronTest))
-    return suite
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    unittest.main(verbosity=2)

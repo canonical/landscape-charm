@@ -7,7 +7,7 @@ from charmhelpers.core.services.helpers import render_template
 from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
-from lib.paths import Paths
+from lib.paths import default_paths
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import HAProxyProvider, HAProxyRequirer
@@ -34,12 +34,12 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
-                 subprocess=subprocess, paths=None):
+                 subprocess=subprocess, paths=default_paths):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
         self._cluster = cluster
         self._host = host
-        self._paths = paths or Paths()
+        self._paths = paths
         self._subprocess = subprocess
 
     def _run(self):
