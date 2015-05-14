@@ -20,7 +20,7 @@ class UpgradeAction(Hook):
             # /etc/defaults/landscape-server configuration files
             # (force-confold) and only install config files which
             # have not been changed (force-confdef).
-            "-o", 'Dpkg::Options::="--force-confdef"',
-            "-o", 'Dpkg::Options::="--force-confold"',
+            "--option=Dpkg::Options::=--force-confdef",
+            "--option=Dpkg::Options::=--force-confold",
         ]
         self._fetch.apt_install(PACKAGES, apt_install_options, fatal=True)
