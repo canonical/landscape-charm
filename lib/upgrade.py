@@ -1,5 +1,3 @@
-import subprocess
-
 from charmhelpers.core import hookenv
 from charmhelpers import fetch
 
@@ -13,6 +11,7 @@ class UpgradeAction(Hook):
     def __init__(self, hookenv=hookenv, fetch=fetch):
         super(UpgradeAction, self).__init__(hookenv=hookenv)
         self._fetch = fetch
+
     def _run(self):
         self._fetch.apt_update(fatal=True)
         apt_install_options = [

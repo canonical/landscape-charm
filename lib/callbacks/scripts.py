@@ -1,5 +1,6 @@
 import subprocess
 
+from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 
 from lib.paths import LSCTL
@@ -32,6 +33,10 @@ class SchemaBootstrap(ScriptCallback):
 class LSCtl(ScriptCallback):
     """Call the lsctl script to start or stop services."""
 
+    def __init__(self, subprocess=subprocess, hookenv=hookenv):
+        super(LSCtl, self).__init__(subprocess=subprocess)
+        self._hookenv = hookenv
+
     def __call__(self, manager, service_name, event_name):
         action = event_name
         if event_name == "start":
@@ -39,4 +44,16 @@ class LSCtl(ScriptCallback):
             #     config changes have been applied and its semantics actually
             #     maps to a 'restart' action.
             action = "restart"
+
+        # In case we're reacting to config changes, we don't always want to
+        # restart the processes (for example if only the APT source changed).
+        if self._hookenv.hook_name() == "config-changed":
+            config = self._hookenv.config()
+            changed = set()
+            for key in config.keys():
+                if config.changed(key):
+                    changed.add(key)
+            if changed.issubset({"source", "key"}):
+                return
+
         self._run(LSCTL, (action,))
