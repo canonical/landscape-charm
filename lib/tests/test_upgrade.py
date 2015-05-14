@@ -22,6 +22,6 @@ class UpgradeActionTest(HookenvTest):
         # And one apt_install with appropriate options.
         self.assertEqual(
             [(("landscape-server",),
-              ["-o", 'Dpkg::Options::="--force-confdef"',
-               "-o", 'Dpkg::Options::="--force-confold"'],
+              ["--option=Dpkg::Options::=--force-confdef",
+               "--option=Dpkg::Options::=--force-confold"],
               True)], self.fetch.installed)
