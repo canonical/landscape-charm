@@ -6,7 +6,7 @@ test:
 
 ci-test:
 	./dev/ubuntu-deps
-	$(MAKE) test
+	$(MAKE) test lint
 
 verify-juju-test:
 	@echo "Checking for ... "
@@ -44,11 +44,11 @@ integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING -v --timeout 3000s
 
 integration-test-dense-maas:
-	DEPLOYER_TARGET=landscape-dense-maas make integration-test
+	DEPLOYER_TARGET=landscape-dense-maas $(MAKE) integration-test
 
 # Run integration tests using the LDS package from the lds-trunk PPA
-integration-test-trunk: secrets
-	LS_CHARM_SOURCE=lds-trunk-ppa make integration-test
+integration-test-%-trunk: secrets
+	LS_CHARM_SOURCE=lds-trunk-ppa $(MAKE) $(subst -trunk,,$@)
 
 deploy-dense-maas: bundles
 	./dev/deployer dense-maas
