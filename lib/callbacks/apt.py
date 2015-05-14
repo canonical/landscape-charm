@@ -8,7 +8,7 @@ from lib.apt import Apt
 
 
 class SetAPTSources(ManagerCallback):
-    """Set APT sources are and refresh them if needed."""
+    """Set APT sources and refresh them if needed."""
 
     def __init__(self, hookenv=hookenv, fetch=fetch, subprocess=subprocess):
         self._hookenv = hookenv
@@ -16,7 +16,7 @@ class SetAPTSources(ManagerCallback):
         self._subprocess = subprocess
 
     def __call__(self, manager, service_name, event_name):
-        # Re-set APT sources, if the have changed.
+        # Re-set APT sources, if they have changed.
         apt = Apt(
             hookenv=self._hookenv, fetch=self._fetch,
             subprocess=self._subprocess)

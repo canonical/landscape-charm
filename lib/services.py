@@ -93,7 +93,7 @@ class ServicesHook(Hook):
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
 
-        # XXX The service framework only triggers data providers within the
+        # XXX The services framework only triggers data providers within the
         #     context of relation joined/changed hooks, however we also
         #     want to trigger the haproxy provider if the SSL certificate
         #     has changed.

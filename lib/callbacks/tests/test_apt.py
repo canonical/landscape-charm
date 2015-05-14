@@ -22,4 +22,4 @@ class SetAPTSourcesTest(HookenvTest):
         config.save()
         config["source"] = "ppa:landscape/15.01"
         self.callback(None, None, None)
-        self.assertTrue(len(self.fetch.sources) == 1)
+        self.assertEqual(1, len(self.fetch.sources), repr(self.fetch.sources))

@@ -156,12 +156,11 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._deployment.configure(
             "landscape-server", {"ssl-cert": cert, "ssl-key": key})
+        # Wait for initial landscape-server hooks to fire
         self._deployment.sentry.wait()
-        # We need to wait three times in order to let the haproxy hooks that
-        # got fired after the landscape-server ones to settle and the hooks
-        # on the landscape-server unit to that are in turned fired back
-        # as well.
+        # Wait for haproxy hooks to fire
         self._deployment.sentry.wait()
+        # Wait for landscape-server hooks triggered by the haproxy ones to fire
         self._deployment.sentry.wait()
 
     def _get_charm_dir(self):
