@@ -269,6 +269,11 @@ def main(config=None):
     global _config
     _config = config
 
+    # XXX This will force zope.testrunner to write to stderr, since stdout is
+    # not being printed synchronously by "juju test", see also the call to
+    # subprocess in charmtools.test.Orchestra.perform().
+    sys.stdout = sys.stderr
+
     # Figure out the package holding the test files to use and run them.
     path = os.path.join(os.getcwd(), "tests")
     module = os.path.basename(sys.argv[0]).split("-")[1]
