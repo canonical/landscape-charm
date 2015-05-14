@@ -152,6 +152,17 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._control_landscape_service("start", service, unit)
 
+    def configure_ssl(self, cert, key):
+        """Start the given Landscape service on the given unit."""
+        self._deployment.configure(
+            "landscape-server", {"ssl-cert": cert, "ssl-key": key})
+        # Wait for initial landscape-server hooks to fire
+        self._deployment.sentry.wait()
+        # Wait for haproxy hooks to fire
+        self._deployment.sentry.wait()
+        # Wait for landscape-server hooks triggered by the haproxy ones to fire
+        self._deployment.sentry.wait()
+
     def _get_charm_dir(self):
         """Get the path to the root of the charm directory."""
         return os.path.join(os.path.dirname(__file__), "..")
@@ -256,6 +267,11 @@ def main(config=None):
     """
     global _config
     _config = config
+
+    # XXX This will force zope.testrunner to write to stderr, since stdout is
+    # not being printed synchronously by "juju test", see also the call to
+    # subprocess in charmtools.test.Orchestra.perform().
+    sys.stdout = sys.stderr
 
     # Figure out the package holding the test files to use and run them.
     path = os.path.join(os.getcwd(), "tests")

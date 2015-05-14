@@ -5,14 +5,14 @@ takes time, this guarantees no side-effects introduced by other tests (SSL is
 a charm config option).
 """
 
-from sslcert.assets import CERT_FILE
+from assets import CERT_FILE
 from helpers import IntegrationTest, get_ssl_certificate_over_wire
-from layers import OneLandscapeUnitLayer
+from layers import OneLandscapeUnitCustomSSLCertificateLayer
 
 
 class SSLConfigurationTest(IntegrationTest):
 
-    layer = OneLandscapeUnitLayer
+    layer = OneLandscapeUnitCustomSSLCertificateLayer
 
     def test_certificate_is_what_we_expect(self):
         """

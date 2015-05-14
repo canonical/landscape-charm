@@ -43,11 +43,11 @@ secrets:
 integration-test: test-depends
 	juju test --set-e -p SKIP_SLOW_TESTS,LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING -v --timeout 3000s
 
-integration-test-dense-maas: test-depends
+integration-test-dense-maas:
 	DEPLOYER_TARGET=landscape-dense-maas make integration-test
 
 # Run integration tests using the LDS package from the lds-trunk PPA
-integration-test-trunk: test-depends secrets
+integration-test-trunk: secrets
 	LS_CHARM_SOURCE=lds-trunk-ppa make integration-test
 
 deploy-dense-maas: bundles
