@@ -78,7 +78,7 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual(
             "main package resource-1", config.get("package-search", "stores"))
         self.assertEqual(
-            "/var/lib/landscape/landscape-package-search.pid",
+            "/var/run/landscape/landscape-package-search.pid",
             config.get("package-search", "pid-path"))
         self.assertEqual(
             "1000", config.get("package-search", "account-threshold"))
