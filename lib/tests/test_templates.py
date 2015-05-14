@@ -205,4 +205,4 @@ class LandscapeDefaultsTest(TemplateTest):
         When deployed from charm, it contains DEPLOYED_FROM to indicate that.
         """
         buffer = StringIO(self.template.render(self.context)).readlines()
-        self.assertIn('DEPLOYED_FROM="charm"', buffer)
+        self.assertIn('DEPLOYED_FROM="charm"\n', buffer)
