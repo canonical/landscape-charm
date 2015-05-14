@@ -42,3 +42,5 @@ RUN_PACKAGEUPLOADSERVER="yes"
 {% else %}
 RUN_PACKAGEUPLOADSERVER="no"
 {% endif %}
+
+DEPLOYED_FROM="charm"
