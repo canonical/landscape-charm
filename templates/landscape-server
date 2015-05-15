@@ -1,3 +1,7 @@
+# When DEPLOYED_FROM="charm", package upgrades will attempt to stop, start or
+# restart any of the Landscape services.
+DEPLOYED_FROM="charm"
+
 # To run all Landscape services (including cron jobs) set this to "yes".
 # Alternatively, set this to a number between 1 and 9 to have that number
 # of services to start for each kind that supports this (currently, only

@@ -137,7 +137,7 @@ class LandscapeDefaultsTest(TemplateTest):
         in /etc/default/landscape-server, which configures services to run
         on a particular unit. On leader units cron jobs and juju-sync are on.
         """
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_CRON="yes"\n', buffer)
         self.assertIn('RUN_JUJU_SYNC="yes"\n', buffer)
 
@@ -146,7 +146,7 @@ class LandscapeDefaultsTest(TemplateTest):
         On a non-leader unit, cron scripts are not enabled by default.
         """
         self.context["is_leader"] = False
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_CRON="no"\n', buffer)
 
     def test_render_juju_sync(self):
@@ -154,7 +154,7 @@ class LandscapeDefaultsTest(TemplateTest):
         If the landscape-server unit is the leader and we're in standalone
         mode, juju-sync will be run.
         """
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_JUJU_SYNC="yes"\n', buffer)
 
     def test_render_juju_sync_not_leader(self):
@@ -163,7 +163,7 @@ class LandscapeDefaultsTest(TemplateTest):
         won't be run.
         """
         self.context["is_leader"] = False
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
 
     def test_render_juju_sync_not_standalone(self):
@@ -172,14 +172,14 @@ class LandscapeDefaultsTest(TemplateTest):
         """
         hosted_data = self.context["hosted"][0]
         hosted_data["deployment-mode"] = "production"
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
 
     def test_render_package_search(self):
         """
         If the landscape-server unit is the leader, package-search will be run.
         """
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_PACKAGESEARCH="yes"\n', buffer)
 
     def test_render_package_search_not_leader(self):
@@ -188,7 +188,7 @@ class LandscapeDefaultsTest(TemplateTest):
         not be run.
         """
         self.context["is_leader"] = False
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_PACKAGESEARCH="no"\n', buffer)
 
     def test_render_service_count(self):
@@ -196,6 +196,13 @@ class LandscapeDefaultsTest(TemplateTest):
         Rendering landscape-server file sets RUN_PINGSERVER and
         RUN_MSGSERVER both to 2 from the sample service count configuration.
         """
-        buffer = StringIO(self.template.render(self.context)).readlines()
+        buffer = self.template.render(self.context)
         self.assertIn('RUN_PINGSERVER="2"\n', buffer)
         self.assertIn('RUN_MSGSERVER="2"\n', buffer)
+
+    def test_render_deployed_from(self):
+        """
+        When deployed from charm, it contains DEPLOYED_FROM to indicate that.
+        """
+        buffer = self.template.render(self.context)
+        self.assertIn('DEPLOYED_FROM="charm"\n', buffer)
