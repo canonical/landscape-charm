@@ -74,14 +74,14 @@ class ServiceConfTest(TemplateTest):
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("localhost", config.get("package-search", "host"))
-        self.assertEqual("9250", config.get("package-search", "port"))
+        self.assertEqual("9099", config.get("package-search", "port"))
         self.assertEqual(
             "main package resource-1", config.get("package-search", "stores"))
         self.assertEqual(
             "/var/run/landscape/landscape-package-search.pid",
             config.get("package-search", "pid-path"))
         self.assertEqual(
-            "1000", config.get("package-search", "account-threshold"))
+            "800", config.get("package-search", "account-threshold"))
 
     def test_render_with_package_search_on_non_leader(self):
         """
