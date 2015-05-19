@@ -115,13 +115,13 @@ class HAProxyProviderTest(HookenvTest):
     def test_provide_data_error_files(self):
         """
         Error pages from the Landscape offline dir gets set as error
-        pages for 503, 403, 500, 502 and 504.
+        pages for 403, 500, 502, 503 and 504.
         """
         error_files =  {
-            "503": "unplanned-offline-haproxy.html",
             "403": "unauthorized-haproxy.html",
             "500": "exception-haproxy.html",
             "502": "unplanned-offline-haproxy.html",
+            "503": "unplanned-offline-haproxy.html",
             "504": "timeout-haproxy.html"
             }
         for code, name in error_files.items():

@@ -50,10 +50,10 @@ SERVER_OPTIONS = [
     "maxconn 50",
 ]
 ERRORFILES_MAP = {
-    "503": "unplanned-offline-haproxy.html",
     "403": "unauthorized-haproxy.html",
     "500": "exception-haproxy.html",
     "502": "unplanned-offline-haproxy.html",
+    "503": "unplanned-offline-haproxy.html",
     "504": "timeout-haproxy.html",
 }
 

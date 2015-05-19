@@ -115,10 +115,10 @@ class ServiceTest(IntegrationTest):
         # Look at the files on disk, since we can't instrument the
         # server to return the required HTTP codes or cause timeouts.
         error_files = {
-            "503": "unplanned-offline-haproxy.html",
             "403": "unauthorized-haproxy.html",
             "500": "exception-haproxy.html",
             "502": "unplanned-offline-haproxy.html",
+            "503": "unplanned-offline-haproxy.html",
             "504": "timeout-haproxy.html"}
         haproxy_path = "/var/lib/haproxy/service_landscape-https/"
         ls_path = "/opt/canonical/landscape/canonical/landscape/offline/"
