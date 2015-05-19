@@ -50,16 +50,11 @@ SERVER_OPTIONS = [
     "maxconn 50",
 ]
 ERRORFILES_MAP = {
-    # Add 503 only for now since that's what the integration tests
-    # check.
     "503": "unplanned-offline-haproxy.html",
-    # TODO: Due to bug #1437366 the command line call to "relation-set"
-    # will fail by reaching MAX_ARGS if too many errorfiles are set.
-    # Until fixed let's set only one errorfile to assert it works.
-    # "403": "unauthorized-haproxy.html",
-    # "500": "exception-haproxy.html",
-    # "502": "unplanned-offline-haproxy.html",
-    # "504": "timeout-haproxy.html",
+    "403": "unauthorized-haproxy.html",
+    "500": "exception-haproxy.html",
+    "502": "unplanned-offline-haproxy.html",
+    "504": "timeout-haproxy.html",
 }
 
 

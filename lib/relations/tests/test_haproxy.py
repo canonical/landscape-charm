@@ -1,4 +1,5 @@
 import base64
+import os
 import yaml
 
 from fixtures import TempDir
@@ -110,6 +111,34 @@ class HAProxyProviderTest(HookenvTest):
                       ["landscape-api-landscape-server-0",
                        "1.2.3.4", 9080, SERVER_OPTIONS]]}]}],
             services)
+
+    def test_provide_data_error_files(self):
+        """
+        """
+        error_files =  {
+            "503": "unplanned-offline-haproxy.html",
+            "403": "unauthorized-haproxy.html",
+            "500": "exception-haproxy.html",
+            "502": "unplanned-offline-haproxy.html",
+            "504": "timeout-haproxy.html"
+            }
+        for code, name in error_files.items():
+            with open(os.path.join(self.paths.offline_dir(), name), "w") as fd:
+                fd.write("{} error page".format(name))
+
+        relation = HAProxyProvider(
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
+
+        data = relation.provide_data()
+        services = yaml.safe_load(data["services"])
+        landscape_http, landscape_https = services
+
+        error_pages = [
+            {"http_status": code,
+             "content": "{} error page".format(name).encode("base64").strip()}
+            for code, name in error_files.items()]
+        self.assertItemsEqual(error_pages, landscape_http["errorfiles"])
+        self.assertItemsEqual(error_pages, landscape_https["errorfiles"])
 
     def test_files_cannot_be_read(self):
         """
