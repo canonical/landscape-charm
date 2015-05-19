@@ -90,25 +90,21 @@ class ServiceTest(IntegrationTest):
         self.environment.stop_landscape_service("landscape-appserver")
         self.environment.check_url("/", "please phone us")
 
-    @unittest.expectedFailure
     def test_msg_unavailable_page(self):
         """
-        Verify that the frontend shows the unstyled unavailable page for msg.
+        Verify that the frontend shows the unavailable page for msg.
         """
         self.environment.stop_landscape_service("landscape-msgserver")
-        good_content = ["503 Service Unavailable",
-                        "No server is available to handle this request."]
-        self.environment.check_url("/message-system", good_content)
+        self.environment.check_url(
+            "/message-system", "Landscape is unavailable")
 
-    @unittest.expectedFailure
     def test_ping_unavailable_page(self):
         """
-        Verify that the frontend shows the unstyled unavailable page for ping.
+        Verify that the frontend shows the unavailable page for ping.
         """
         self.environment.stop_landscape_service("landscape-pingserver")
-        good_content = ["503 Service Unavailable",
-                        "No server is available to handle this request."]
-        self.environment.check_url("/ping", good_content, proto="http")
+        self.environment.check_url(
+            "/ping", "Landscape is unavailable", proto="http")
 
     def test_ssl_certificate_is_in_place(self):
         """
