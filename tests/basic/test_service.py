@@ -108,7 +108,12 @@ class ServiceTest(IntegrationTest):
 
     def test_error_pages(self):
         """
+        Verify that the offline pages from Landscape's offline dir got
+        sent to haproxy and configured to used as error pages for HTTP
+        status codes 403, 500, 502, 503 and 504.
         """
+        # Look at the files on disk, since we can't instrument the
+        # server to return the required HTTP codes or cause timeouts.
         error_files = {
             "503": "unplanned-offline-haproxy.html",
             "403": "unauthorized-haproxy.html",

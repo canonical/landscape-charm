@@ -89,7 +89,10 @@ class EnvironmentFixture(Fixture):
         return unit.info["public-address"]
 
     def get_binary_file(self, path, unit="landscape-server/0"):
-        """Return the content of a text file on the given unit."""
+        """Return the content of a binary file on the given unit."""
+        # XXX: Amulet doesn't support getting binary files, so we
+        # get it as a text file and get the binary data from the
+        # UnicodeDecodeError exception.
         try:
             contents = self.get_text_file(path, unit)
         except UnicodeDecodeError as error:
