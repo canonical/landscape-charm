@@ -117,7 +117,7 @@ class HAProxyProviderTest(HookenvTest):
         Error pages from the Landscape offline dir gets set as error
         pages for 403, 500, 502, 503 and 504.
         """
-        error_files =  {
+        error_files = {
             "403": "unauthorized-haproxy.html",
             "500": "exception-haproxy.html",
             "502": "unplanned-offline-haproxy.html",
