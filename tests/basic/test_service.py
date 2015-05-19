@@ -106,6 +106,24 @@ class ServiceTest(IntegrationTest):
         self.environment.check_url(
             "/ping", "Landscape is unavailable", proto="http")
 
+    def test_error_pages(self):
+        """
+        """
+        error_files = {
+            "503": "unplanned-offline-haproxy.html",
+            "403": "unauthorized-haproxy.html",
+            "500": "exception-haproxy.html",
+            "502": "unplanned-offline-haproxy.html",
+            "504": "timeout-haproxy.html"}
+        haproxy_path = "/var/lib/haproxy/service_landscape-https/"
+        ls_path = "/opt/canonical/landscape/canonical/landscape/offline/"
+        for http_code, file_name in error_files.items():
+            haproxy_file = self.environment.get_binary_file(
+                haproxy_path + http_code + ".http", "haproxy/0")
+            landscape_file = self.environment.get_binary_file(
+                ls_path + file_name)
+            self.assertEqual(haproxy_file, landscape_file)
+
     def test_ssl_certificate_is_in_place(self):
         """
         The landscape-server charm looks at the SSL certificate set on the
@@ -113,7 +131,7 @@ class ServiceTest(IntegrationTest):
         the application expects (it will need it when generating client
         configuration for Autopilot deployments).
         """
-        ssl_cert = self.environment.get_file(
+        ssl_cert = self.environment.get_text_file(
             "/etc/ssl/certs/landscape_server_ca.crt")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
