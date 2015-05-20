@@ -17,4 +17,4 @@ class MigrateSchemaActionTest(HookenvTest):
         The MigrateSchemaAction calls the schema script.
         """
         self.action()
-        self.assertEqual([(SCHEMA_SCRIPT, {})], self.subprocess.calls)
+        self.assertEqual([([SCHEMA_SCRIPT], {})], self.subprocess.calls)

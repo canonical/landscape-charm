@@ -15,4 +15,4 @@ class MigrateSchemaAction(Hook):
         super(MigrateSchemaAction, self).__init__(hookenv=hookenv)
 
     def _run(self):
-        self._subprocess.check_call((SCHEMA_SCRIPT))
+        self._subprocess.check_call([SCHEMA_SCRIPT])
