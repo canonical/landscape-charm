@@ -2,6 +2,9 @@ pause:
   description: Pause the Landscape unit. This action will interrupt any
     Landscape-related processing on the unit and prevent any further processing
     from happening. It will also transition the unit to the blocked state.
+resume:
+  description: Resume the Landscape unit. This action will start all the
+    Landscape services on the unit.
 upgrade:
   description: Upgrade software on the Landscape unit. This action will update
     APT package indexes and upgrade the landscape-server package.
