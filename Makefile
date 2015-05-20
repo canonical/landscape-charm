@@ -47,7 +47,7 @@ integration-test-dense-maas:
 	DEPLOYER_TARGET=landscape-dense-maas $(MAKE) integration-test
 
 # Run integration tests using the LDS package from the lds-trunk PPA
-integration-test-%-trunk: secrets
+integration-test-trunk: secrets
 	LS_CHARM_SOURCE=lds-trunk-ppa $(MAKE) $(subst -trunk,,$@)
 
 deploy-dense-maas: bundles
