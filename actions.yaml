@@ -6,3 +6,6 @@ upgrade:
   description: Upgrade software on the Landscape unit. This action will update
     APT package indexes and upgrade the landscape-server package.
     Unit must already be paused with the 'pause' action.
+migrate-schema:
+  description: Upgrade the landscape schemas on the related databases.
+    Unit must already be paused with the 'pause' action.
