@@ -4,8 +4,12 @@ import os
 SERVICE_CONF = "/etc/landscape/service.conf"
 DEFAULT_FILE = "/etc/default/landscape-server"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
-CONFIG_DIR = "/opt/canonical/landscape/configs/standalone"
-OFFLINE_DIR = "/opt/canonical/landscape/canonical/landscape/offline"
+
+INSTALL_DIR = "/opt/canonical/landscape"
+CONFIG_DIR = INSTALL_DIR + "/configs/standalone"
+OFFLINE_DIR = INSTALL_DIR + "/canonical/landscape/offline"
+SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
+
 LICENSE_FILE = "/etc/landscape/license.txt"
 LSCTL = "/usr/bin/lsctl"
 

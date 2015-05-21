@@ -89,16 +89,27 @@ class EnvironmentFixture(Fixture):
         unit = self._deployment.sentry.unit["haproxy/%d" % unit]
         return unit.info["public-address"]
 
-    def get_file(self, path, unit=0):
-        """Return the content of a file on the given landscape-server unit."""
-        unit_sentry = self._deployment.sentry.unit[
-            "landscape-server/%d" % unit]
+    def get_binary_file(self, path, unit="landscape-server/0"):
+        """Return the content of a binary file on the given unit."""
+        # XXX: Amulet doesn't support getting binary files, so we
+        # get it as a text file and get the binary data from the
+        # UnicodeDecodeError exception.
+        try:
+            contents = self.get_text_file(path, unit)
+        except UnicodeDecodeError as error:
+            return error.object
+        else:
+            return contents.encode("utf-8")
+
+    def get_text_file(self, path, unit="landscape-server/0"):
+        """Return the content of a text file on the given unit."""
+        unit_sentry = self._deployment.sentry.unit[unit]
         return unit_sentry.file_contents(path)
 
     def get_config(self, unit=0):
         """Return a ConfigParser with service.conf data from the given unit."""
         config = ConfigParser()
-        config.read_string(self.get_file("/etc/landscape/service.conf"))
+        config.read_string(self.get_text_file("/etc/landscape/service.conf"))
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
