@@ -6,7 +6,6 @@ from charmhelpers.core.services.base import ManagerCallback
 from lib.paths import LSCTL, SCHEMA_SCRIPT
 
 
-
 class ScriptCallback(ManagerCallback):
     """Callback class for invoking Landscape scripts."""
 
