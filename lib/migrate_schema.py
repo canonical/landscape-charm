@@ -10,9 +10,8 @@ class MigrateSchemaAction(Hook):
     """Execute schema upgrade action logic."""
 
     def __init__(self, hookenv=hookenv, subprocess=subprocess):
-        self._subprocess = subprocess
-
         super(MigrateSchemaAction, self).__init__(hookenv=hookenv)
+        self._subprocess = subprocess
 
     def _run(self):
         self._subprocess.check_call([SCHEMA_SCRIPT])

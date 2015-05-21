@@ -3,9 +3,8 @@ import subprocess
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 
-from lib.paths import LSCTL
+from lib.paths import LSCTL, SCHEMA_SCRIPT
 
-SCHEMA = "/usr/bin/landscape-schema"
 
 
 class ScriptCallback(ManagerCallback):
@@ -27,7 +26,7 @@ class SchemaBootstrap(ScriptCallback):
     This will invoke the schema script with the --bootstrap flag.
     """
     def __call__(self, manager, service_name, event_name):
-        self._run(SCHEMA, ("--bootstrap",))
+        self._run(SCHEMA_SCRIPT, ("--bootstrap",))
 
 
 class LSCtl(ScriptCallback):
