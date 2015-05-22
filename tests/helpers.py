@@ -9,6 +9,7 @@ import os
 import subprocess
 import tempfile
 import shutil
+import json
 
 from os import getenv
 from time import sleep
@@ -151,6 +152,22 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
+    def pause_landscape(self, unit=0):
+        """Execute the 'pause' action on a Landscape unit.
+
+        The results of the action is returned.
+        """
+        action_id = self._do_action("pause", "landscape-server/" + str(unit))
+        return self._fetch_action(action_id)
+
+    def resume_landscape(self, unit=0):
+        """Execute the 'resume' action on a Landscape unit.
+
+        The results of the action is returned.
+        """
+        action_id = self._do_action("resume", "landscape-server/" + str(unit))
+        return self._fetch_action(action_id)
+
     def stop_landscape_service(self, service, unit=0):
         """Stop the given Landscape service on the given unit.
 
@@ -163,6 +180,48 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._control_landscape_service("start", service, unit)
 
+    def get_landscape_services_status(self, unit=0):
+        """Return the status of the Landscape service on a Landscape unit.
+
+        A dict is returned: {"running": [<list of running services],
+                             "stopped": [<list of stopped sevices]}
+        """
+        output, _ = self._run(
+            "lsctl status", "landscape-server/" + str(unit))
+        service_status = {"running": [], "stopped": []}
+        lines = output.splitlines()
+        for line in lines:
+            line = line.strip()
+            if not line.startswith("* "):
+                continue
+            service_name = line[2:line.index(" is ")]
+            if line.endswith("is not running"):
+                service_status["stopped"].append(service_name)
+            elif line.endswith("is running"):
+                service_status["running"].append(service_name)
+            else:
+                raise AssertionError("Malformed status line: " + line)
+        package_search_line = lines[-1]
+        assert package_search_line.startswith("landscape-package-search"), (
+            "Malformed status line: " + package_search_line)
+        if "running" in package_search_line:
+            service_status["running"].append(service_name)
+        else:
+            service_status["stopped"].append(service_name)
+        return service_status
+
+    def is_cron_running(self, unit):
+        """Returns whether cron is running on a unit."""
+        unit_sentry = self._deployment.sentry.unit[unit]
+        output, code = unit_sentry.run("service cron status")
+        assert code == 0
+        if "stop/waiting" in output:
+            return False
+        elif "start/running" in output:
+            return True
+        else:
+            raise AssertionError("Malformed status output: " + output)
+
     def configure_ssl(self, cert, key):
         """Start the given Landscape service on the given unit."""
         self._deployment.configure(
@@ -173,6 +232,30 @@ class EnvironmentFixture(Fixture):
         self._deployment.sentry.wait()
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
         self._deployment.sentry.wait()
+
+    def _run(self, command, unit):
+        """Run a command on the given unit.
+
+        The unicode stdout and stderr are returned as a tuple.
+        """
+        process = subprocess.Popen(
+            ["juju", "run", "--unit", unit, command], stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        return stdout.decode("utf-8"), stderr.decode("utf-8")
+
+    def _do_action(self, action, unit):
+        """Execute an action on a unit, returning the id."""
+        result = json.loads(subprocess.check_output(
+            ["juju", "action", "do", "--format=json",
+             unit, action]).decode("utf-8"))
+        return result["Action queued with id"]
+
+    def _fetch_action(self, action_id, wait=300):
+        """Fetch the results of an action."""
+        return json.loads(subprocess.check_output(
+            ["juju", "action", "fetch", "--format=json", "--wait", str(wait),
+             action_id]).decode("utf-8"))
 
     def _get_charm_dir(self):
         """Get the path to the root of the charm directory."""
