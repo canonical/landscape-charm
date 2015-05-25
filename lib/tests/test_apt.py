@@ -1,4 +1,9 @@
 import os
+import shutil
+import subprocess
+import tempfile
+
+import apt_pkg
 
 from lib.apt import (
     Apt, PACKAGES, BUILD_LOCAL_ARCHIVE, DEFAULT_INSTALL_OPTIONS,
@@ -14,8 +19,22 @@ class AptTest(HookenvTest):
         super(AptTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
+        self.subprocess.fake_executables = [
+            "add-apt-repository", "/usr/lib/pbuilder/pbuilder-satisfydepends"]
         self.apt = Apt(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
+
+    def _create_local_tarball(self, name, version):
+        build_dir = tempfile.mkdtemp()
+        package_name = "{}-{}".format(name, version)
+        package_dir = os.path.join(build_dir, package_name)
+        os.mkdir(package_dir)
+        subprocess.check_call(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
+        tarball = os.path.join(
+            self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
+        subprocess.check_call(
+            ["tar", "zcvf", tarball, package_name], cwd=build_dir)
+        shutil.rmtree(build_dir)
 
     def test_no_source(self):
         """
@@ -89,17 +108,17 @@ class AptTest(HookenvTest):
         repository with the relevant deb packages.
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
-        tarball = os.path.join(
-            self.hookenv.charm_dir(), "landscape-server_1.2.3.tar.gz")
-        with open(tarball, "w") as fd:
-            fd.write("")
+        self._create_local_tarball("landscape-server", "1.2.3")
         self.apt.set_sources()
 
         build_dir = os.path.join(self.hookenv.charm_dir(), "build")
 
-        self.assertEqual(
-            [(["tar", "--strip=1", "-xf", tarball],  {"cwd": build_dir}),
-             (BUILD_LOCAL_ARCHIVE, {"shell": True, "cwd": build_dir})],
+        self.assertTrue(os.path.exists(os.path.join(
+            self.hookenv.charm_dir(), "build",
+            "landscape-server_1.2.3_all.deb")))
+
+        self.assertIn(
+            (["/usr/lib/pbuilder/pbuilder-satisfydepends"], {}),
             self.subprocess.calls)
 
         self.assertEqual(
@@ -112,10 +131,7 @@ class AptTest(HookenvTest):
         If the landscape tarball hasn't changed, it won't be built.
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
-        tarball = os.path.join(
-            self.hookenv.charm_dir(), "landscape-server_1.2.3.tar.gz")
-        with open(tarball, "w") as fd:
-            fd.write("data")
+        self._create_local_tarball("landscape-server", "1.2.3")
         self.apt.set_sources()
 
         # Reset the recorded sources and subprocess calls and run again

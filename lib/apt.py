@@ -25,7 +25,6 @@ DEFAULT_INSTALL_OPTIONS = ("--option=Dpkg::Options::=--force-confold",)
 BUILD_LOCAL_ARCHIVE = """
 dch -v 9999:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
     development --distribution $(lsb_release -cs) &&
-/usr/lib/pbuilder/pbuilder-satisfydepends &&
 dpkg-buildpackage -us -uc &&
 mv ../*.deb . &&
 dpkg-scanpackages -m . /dev/null > Packages &&
@@ -113,6 +112,8 @@ class Apt(object):
 
         self._subprocess.check_call(
             ["tar", "--strip=1", "-xf", tarball], cwd=build_dir)
+        self._subprocess.check_call(
+            ["/usr/lib/pbuilder/pbuilder-satisfydepends"])
         self._subprocess.check_call(
             BUILD_LOCAL_ARCHIVE, shell=True, cwd=build_dir)
 
