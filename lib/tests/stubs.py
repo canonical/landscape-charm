@@ -129,4 +129,8 @@ class SubprocessStub(object):
         if self.fake_executables is None or command[0] in self.fake_executables:
             self.calls.append((command, kwargs))
         else:
-            return subprocess.check_call(command, **kwargs)
+            process = subprocess.Popen(
+                command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                **kwargs)
+            process.communicate()
+            return process.returncode

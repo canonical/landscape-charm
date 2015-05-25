@@ -29,10 +29,10 @@ class AptTest(HookenvTest):
         package_name = "{}-{}".format(name, version)
         package_dir = os.path.join(build_dir, package_name)
         os.mkdir(package_dir)
-        subprocess.check_call(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
+        subprocess.check_output(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
         tarball = os.path.join(
             self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
-        subprocess.check_call(
+        subprocess.check_output(
             ["tar", "zcvf", tarball, package_name], cwd=build_dir)
         shutil.rmtree(build_dir)
 
