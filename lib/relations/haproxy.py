@@ -16,6 +16,12 @@ SERVICE_PORTS = {
 SERVICE_OPTIONS = {
     "http": [
         "mode http",
+        # WARNING: our AJAX long-polling needs the client/server timeouts
+        # to be greater than txlongpoll.frontend.QueueManager.message_timeout,
+        # which by default is 270 seconds. If you change the values of the
+        # timeouts below, please change QueueManager.message_timeout too.
+        "timeout client 300000",
+        "timeout server 300000",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "acl ping path_beg -i /ping",
@@ -24,6 +30,8 @@ SERVICE_OPTIONS = {
     ],
     "https": [
         "mode http",
+        "timeout client 300000",
+        "timeout server 300000",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
