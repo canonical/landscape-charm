@@ -111,19 +111,20 @@ class AptTest(HookenvTest):
         self._create_local_tarball("landscape-server", "1.2.3")
         self.apt.set_sources()
 
-        build_dir = os.path.join(self.hookenv.charm_dir(), "build")
-
+        build_dir = os.path.join(self.hookenv.charm_dir(), "build", "package")
         self.assertTrue(os.path.exists(os.path.join(
-            self.hookenv.charm_dir(), "build",
+            self.hookenv.charm_dir(), "build", "package",
             "landscape-server_1.2.3_all.deb")))
 
         self.assertIn(
-            (["/usr/lib/pbuilder/pbuilder-satisfydepends"], {}),
+            (["/usr/lib/pbuilder/pbuilder-satisfydepends"],
+             {"cwd": build_dir}),
             self.subprocess.calls)
 
         self.assertEqual(
             [("ppa:landscape/14.10", None),
-             ("deb file://%s/build/ ./" % self.hookenv.charm_dir(), None)],
+             ("deb file://%s/build/package/ ./" % self.hookenv.charm_dir(),
+              None)],
             self.fetch.sources)
 
     def test_local_tarball_not_new(self):
