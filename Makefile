@@ -60,7 +60,8 @@ repo-file-trunk: secrets
 	grep -e "^source:" secrets/lds-trunk-ppa | cut -f 2- -d " " > config/repo-file
 
 lint:
-	flake8 --exclude=charmhelpers hooks
+	flake8 --filename='*' hooks
+	flake8 lib tests
 	pyflakes3 tests dev/update-charm-revision-numbers
 	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 pep8
 	pep8 tests dev/update-charm-revision-numbers 
