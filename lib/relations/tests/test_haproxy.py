@@ -64,6 +64,8 @@ class HAProxyProviderTest(HookenvTest):
              "service_port": 80,
              "service_options": [
                  "mode http",
+                 "timeout client 300000",
+                 "timeout server 300000",
                  "balance leastconn",
                  "option httpchk HEAD / HTTP/1.0",
                  "acl ping path_beg -i /ping",
@@ -85,6 +87,8 @@ class HAProxyProviderTest(HookenvTest):
              "service_port": 443,
              "service_options": [
                  "mode http",
+                 "timeout client 300000",
+                 "timeout server 300000",
                  "balance leastconn",
                  "option httpchk HEAD / HTTP/1.0",
                  "http-request set-header X-Forwarded-Proto https",
