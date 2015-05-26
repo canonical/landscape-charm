@@ -120,17 +120,30 @@ class HostStub(object):
 class SubprocessStub(object):
     """Testable stub for C{subprocess}."""
 
-    fake_executables = None
-
     def __init__(self):
         self.calls = []
+        self.fake_executables = {}
+
+    def add_fake_call(self, executable, handler=None):
+        if handler is None:
+            handler = lambda *args, **kwargs: (0, "", "")
+        self.fake_executables[executable] = handler
 
     def check_call(self, command, **kwargs):
+        returncode, stdout, stderr = self._call(command, **kwargs)
+        return returncode
+
+    def check_output(self, command, **kwargs):
+        returncode, stdout, stderr = self._call(command, **kwargs)
+        return stdout
+
+    def _call(self, command, **kwargs):
         if self.fake_executables is None or command[0] in self.fake_executables:
             self.calls.append((command, kwargs))
+            return 0, "", ""
         else:
             process = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 **kwargs)
-            process.communicate()
-            return process.returncode
+            stdout, stderr = process.communicate()
+            return process.returncode, stdout, stderr

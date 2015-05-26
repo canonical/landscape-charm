@@ -19,8 +19,9 @@ class AptTest(HookenvTest):
         super(AptTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
-        self.subprocess.fake_executables = [
-            "add-apt-repository", "/usr/lib/pbuilder/pbuilder-satisfydepends"]
+        self.subprocess.add_fake_call("add-apt-repository")
+        self.subprocess.add_fake_call(
+            "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
 
@@ -154,7 +155,6 @@ class AptTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
-        self.assertEqual([PACKAGES], self.fetch.filtered)
         options = list(DEFAULT_INSTALL_OPTIONS)
         self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
 

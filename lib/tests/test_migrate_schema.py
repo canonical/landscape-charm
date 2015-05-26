@@ -9,6 +9,7 @@ class MigrateSchemaActionTest(HookenvTest):
     def setUp(self):
         super(MigrateSchemaActionTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_call(SCHEMA_SCRIPT)
         self.action = MigrateSchemaAction(
             hookenv=self.hookenv, subprocess=self.subprocess)
 

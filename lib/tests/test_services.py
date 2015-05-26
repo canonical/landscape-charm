@@ -12,6 +12,7 @@ from lib.tests.sample import (
     SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
 from lib.services import ServicesHook
 from lib.tests.rootdir import RootDir
+from lib.paths import SCHEMA_SCRIPT, LSCTL
 
 
 class ServicesHookTest(HookenvTest):
@@ -23,6 +24,8 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_call(SCHEMA_SCRIPT)
+        self.subprocess.add_fake_call(LSCTL)
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.root_dir = self.useFixture(RootDir())
