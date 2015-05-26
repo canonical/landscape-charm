@@ -124,6 +124,13 @@ class Apt(object):
         return True
 
     def _get_local_epoch(self):
+        """Get the epoch to use for the locally built package.
+
+        If landscape-server is installed, an epoch greater than the one
+        installed with be chosen. If no landscape-server package is
+        installed, an epoch of 1000 is chosen to ensure it's greater
+        than any PPA version.
+        """
         try:
             version = self._subprocess.check_output(
                 ["dpkg-query", "-f", "${version}", "-W", "landscape-server"])
