@@ -19,8 +19,8 @@ class AptTest(HookenvTest):
         super(AptTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_call("add-apt-repository")
-        self.subprocess.add_fake_call(
+        self.subprocess.add_fake_executable("add-apt-repository")
+        self.subprocess.add_fake_executable(
             "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
