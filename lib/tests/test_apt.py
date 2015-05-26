@@ -3,11 +3,9 @@ import shutil
 import subprocess
 import tempfile
 
-import apt_pkg
-
 from lib.apt import (
-    Apt, PACKAGES, BUILD_LOCAL_ARCHIVE, DEFAULT_INSTALL_OPTIONS,
-    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
+    Apt, PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
+    SAMPLE_HASHIDS_KEY)
 from lib.hook import HookError
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
