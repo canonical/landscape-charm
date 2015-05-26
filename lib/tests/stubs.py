@@ -131,16 +131,22 @@ class SubprocessStub(object):
 
     def check_call(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
+        if returncode != 0:
+            raise subprocess.CalledProcessError(returncode, command)
         return returncode
 
     def check_output(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
+        if returncode != 0:
+            raise subprocess.CalledProcessError(
+                returncode, command, output=stdout)
         return stdout
 
     def _call(self, command, **kwargs):
-        if self.fake_executables is None or command[0] in self.fake_executables:
-            self.calls.append((command, kwargs))
-            return 0, "", ""
+        self.calls.append((command, kwargs))
+        handler = self.fake_executables.get(command[0])
+        if handler is not None:
+            return handler(command[1:], **kwargs)
         else:
             process = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
