@@ -24,8 +24,8 @@ class ServicesHookTest(HookenvTest):
         self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_call(SCHEMA_SCRIPT)
-        self.subprocess.add_fake_call(LSCTL)
+        self.subprocess.add_fake_executable(SCHEMA_SCRIPT)
+        self.subprocess.add_fake_executable(LSCTL)
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.root_dir = self.useFixture(RootDir())

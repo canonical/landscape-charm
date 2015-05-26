@@ -9,8 +9,8 @@ class ResumeActionTest(HookenvTest):
     def setUp(self):
         super(ResumeActionTest, self).setUp()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_call(LSCTL)
-        self.subprocess.add_fake_call("service")
+        self.subprocess.add_fake_executable(LSCTL)
+        self.subprocess.add_fake_executable("service")
         self.action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess)
 

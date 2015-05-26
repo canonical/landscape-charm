@@ -118,16 +118,29 @@ class HostStub(object):
 
 
 class SubprocessStub(object):
-    """Testable stub for C{subprocess}."""
+    """Testable stub for C{subprocess}.
+
+    By default it will pass through the calls to the real subprocess
+    module, but it's possible to provide fake output results by calling
+    add_fake_call().
+
+    @ivar calls: A list of all calls that have been made.
+    """
 
     def __init__(self):
         self.calls = []
-        self.fake_executables = {}
+        self._fake_executables = {}
 
-    def add_fake_call(self, executable, handler=None):
+    def add_fake_executable(self, executable, handler=None):
+        """Register fake executable.
+
+        The handler should accept args and **kwargs and return a tuple
+        (returncode, stdout, stderr). If no handler is given, the
+        executable will return (0, "", "")
+        """
         if handler is None:
-            handler = lambda *args, **kwargs: (0, "", "")
-        self.fake_executables[executable] = handler
+            handler = lambda args, **kwargs: (0, "", "")
+        self._fake_executables[executable] = handler
 
     def check_call(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
@@ -143,8 +156,14 @@ class SubprocessStub(object):
         return stdout
 
     def _call(self, command, **kwargs):
+        """Helper method for executing either a fake or real call.
+
+        If a fake executable has been registered, use that one.
+        Otherwise pass through the call to the real subprocess
+        module.
+        """
         self.calls.append((command, kwargs))
-        handler = self.fake_executables.get(command[0])
+        handler = self._fake_executables.get(command[0])
         if handler is not None:
             return handler(command[1:], **kwargs)
         else:

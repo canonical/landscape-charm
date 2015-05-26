@@ -19,13 +19,17 @@ class AptTest(HookenvTest):
         super(AptTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_call("add-apt-repository")
-        self.subprocess.add_fake_call(
+        self.subprocess.add_fake_executable("add-apt-repository")
+        self.subprocess.add_fake_executable(
             "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
 
     def _create_local_tarball(self, name, version):
+        """Create a local minimal source package tarball that can be built.
+
+        It will be put in the charm directory.
+        """
         build_dir = tempfile.mkdtemp()
         package_name = "{}-{}".format(name, version)
         package_dir = os.path.join(build_dir, package_name)
@@ -114,8 +118,7 @@ class AptTest(HookenvTest):
 
         build_dir = os.path.join(self.hookenv.charm_dir(), "build", "package")
         self.assertTrue(os.path.exists(os.path.join(
-            self.hookenv.charm_dir(), "build", "package",
-            "landscape-server_1.2.3_all.deb")))
+            build_dir, "landscape-server_1.2.3_all.deb")))
 
         self.assertIn(
             (["/usr/lib/pbuilder/pbuilder-satisfydepends"],
@@ -127,6 +130,7 @@ class AptTest(HookenvTest):
              ("deb file://%s/build/package/ ./" % self.hookenv.charm_dir(),
               None)],
             self.fetch.sources)
+        # XXX: We should check that the generated repository is valid.
 
     def test_local_tarball_not_new(self):
         """
