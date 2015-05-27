@@ -36,7 +36,7 @@ class AptTest(HookenvTest):
         # send a newline to it. When tarmac-lander for the charm runs on
         # trusty, we can pass -y to dh_make instead.
         dh_make = subprocess.Popen(
-            ["dh_make", "-n" , "-i"], cwd=package_dir,
+            ["dh_make", "-n", "-i"], cwd=package_dir,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         dh_make.communicate("\n")
