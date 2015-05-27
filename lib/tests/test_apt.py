@@ -32,7 +32,14 @@ class AptTest(HookenvTest):
         package_name = "{}-{}".format(name, version)
         package_dir = build_dir.join(package_name)
         os.mkdir(package_dir)
-        subprocess.check_output(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
+        # dh_make stops and wait for confirmation when it's run, so we
+        # send a newline to it. When tarmac-lander for the charm runs on
+        # trusty, we can pass -y to dh_make instead.
+        dh_make = subprocess.Popen(
+            ["dh_make", "-n" , "-i"], cwd=package_dir,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        dh_make.communicate("\n")
         tarball = os.path.join(
             self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
         subprocess.check_output(
