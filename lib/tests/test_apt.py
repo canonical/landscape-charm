@@ -1,7 +1,7 @@
 import os
-import shutil
 import subprocess
-import tempfile
+
+from fixtures import TempDir
 
 from lib.apt import (
     Apt, PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
@@ -28,16 +28,15 @@ class AptTest(HookenvTest):
 
         It will be put in the charm directory.
         """
-        build_dir = tempfile.mkdtemp()
+        build_dir = self.useFixture(TempDir())
         package_name = "{}-{}".format(name, version)
-        package_dir = os.path.join(build_dir, package_name)
+        package_dir = build_dir.join(package_name)
         os.mkdir(package_dir)
         subprocess.check_output(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
         tarball = os.path.join(
             self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
         subprocess.check_output(
-            ["tar", "zcvf", tarball, package_name], cwd=build_dir)
-        shutil.rmtree(build_dir)
+            ["tar", "zcvf", tarball, package_name], cwd=build_dir.path)
 
     def test_no_source(self):
         """
