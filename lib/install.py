@@ -27,7 +27,7 @@ class InstallHook(Hook):
         hooks = glob.glob(os.path.join(charm_dir, CHARM_PRE_INSTALL_PATTERN))
         for hook in hooks:
             if os.access(hook, os.X_OK):
-                self._subprocess.check_call(("/bin/sh", "-c", hook))
+                self._subprocess.check_call(hook, shell=True)
 
         # Set APT sources and install Landscape packages
         apt = Apt(
