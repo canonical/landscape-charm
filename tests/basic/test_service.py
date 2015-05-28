@@ -4,10 +4,6 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-
-import unittest
-
-from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
 from helpers import IntegrationTest
@@ -234,8 +230,6 @@ class CronTest(IntegrationTest):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skipIf(getenv("SKIP_SLOW_TESTS", None),
-                     "Requested to skip slow tests.")
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"

@@ -6,6 +6,7 @@ from lib.apt import (
 from lib.hook import HookError
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
+from lib.tests.rootdir import RootDir
 
 
 class AptTest(HookenvTest):
@@ -14,8 +15,11 @@ class AptTest(HookenvTest):
         super(AptTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
+        self.root_dir = self.useFixture(RootDir())
+        self.paths = self.root_dir.paths
         self.apt = Apt(
-            hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
+            hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess,
+            paths=self.paths)
 
     def test_no_source(self):
         """
@@ -154,3 +158,28 @@ class AptTest(HookenvTest):
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS) + ["--allow-unauthenticated"]
         self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+
+    def test_install_sample_hashids(self):
+        """
+        If a file named 'use-sample-hashids' is found the install() method
+        replaces the real hash-id-databases config file with the sample one.
+        """
+        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        charm_dir = self.hookenv.charm_dir()
+        config_dir = self.paths.config_dir()
+        flag_file = os.path.join(charm_dir, "use-sample-hashids")
+        real = os.path.join(config_dir, "hash-id-databases.conf")
+        sample = os.path.join(config_dir, "hash-id-databases-sample.conf")
+        with open(flag_file, "w") as fd:
+            fd.write("")
+        with open(real, "w") as fd:
+            fd.write("real")
+        with open(sample, "w") as fd:
+            fd.write("sample")
+        self.apt.install_packages()
+
+        with open(real + ".orig") as fd:
+            self.assertEqual("real", fd.read())
+
+        with open(real) as fd:
+            self.assertEqual("sample", fd.read())
