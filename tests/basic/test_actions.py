@@ -18,16 +18,13 @@ class ActionsTest(IntegrationTest):
         result = self.environment.pause_landscape()
         self.assertEqual("completed", result["status"])
         service_status = self.environment.get_landscape_services_status()
-        # All Landcape services and cron have been stopped
+        # All Landcape services have been stopped
         self.assertEqual([], service_status["running"])
         self.assertTrue(len(service_status["stopped"]) > 0)
-        self.assertFalse(
-            self.environment.is_cron_running("landscape-server/0"))
 
         result = self.environment.resume_landscape()
         self.assertEqual("completed", result["status"])
         service_status = self.environment.get_landscape_services_status()
-        # All Landcape services and cron have been started
+        # All Landcape services have been started
         self.assertEqual([], service_status["stopped"])
         self.assertTrue(len(service_status["running"]) > 0)
-        self.assertTrue(self.environment.is_cron_running("landscape-server/0"))

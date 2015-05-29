@@ -11,7 +11,7 @@ from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
 from helpers import IntegrationTest
-from layers import OneLandscapeUnitLayer
+from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
 
 
 class ServiceTest(IntegrationTest):
@@ -148,17 +148,9 @@ class CronTest(IntegrationTest):
     the cron daemon will be stopped, so Landscape cron jobs in particular
     won't be run.
     """
-    layer = OneLandscapeUnitLayer
+    layer = OneLandscapeUnitNoCronLayer
 
     cron_unit = "landscape-server/0"
-
-    @classmethod
-    def setUpClass(cls):
-        cls._stop_cron(cls.cron_unit)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._start_cron(cls.cron_unit)
 
     def _sanitize_ssh_output(self, output,
                              remove_text=["sudo: unable to resolve",
@@ -265,13 +257,3 @@ class CronTest(IntegrationTest):
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(
             "https://%s/" % frontend, config["global"]["root-url"])
-
-    @staticmethod
-    def _stop_cron(unit):
-        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
-        check_output(cmd, stderr=PIPE)
-
-    @staticmethod
-    def _start_cron(unit):
-        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
-        check_output(cmd, stderr=PIPE)

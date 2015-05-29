@@ -15,4 +15,3 @@ class ResumeAction(Hook):
 
     def _run(self):
         self._subprocess.check_call((LSCTL, "start"))
-        self._subprocess.check_call(("service", "cron", "start"))

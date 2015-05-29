@@ -15,4 +15,3 @@ class PauseAction(Hook):
 
     def _run(self):
         self._subprocess.check_call((LSCTL, "stop"))
-        self._subprocess.check_call(("service", "cron", "stop"))

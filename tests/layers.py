@@ -15,8 +15,26 @@ class OneLandscapeUnitLayer(object):
         cls.environment.setUp()
 
     @classmethod
-    def tearDown(cls):
+    def testTearDown(cls):
         cls.environment.cleanUp()
+
+
+class OneLandscapeUnitNoCronLayer(OneLandscapeUnitLayer):
+    """Layer for all tests needing to run with the cron daemon stopped.
+
+    The deployment has the same structure as OneLandscapeUnitLayer, the cron
+    daemon will be stopped. Also, the layer setup waits for any currently
+    running Landscape cron job to finish.
+    """
+
+    @classmethod
+    def setUp(cls):
+        cls.environment.stop_landscape_service("cron", restore=False)
+        cls.environment.wait_landscape_cron_jobs()
+
+    @classmethod
+    def tearDown(cls):
+        cls.environment.start_landscape_service("cron")
 
 
 class OneLandscapeUnitCustomSSLCertificateLayer(OneLandscapeUnitLayer):

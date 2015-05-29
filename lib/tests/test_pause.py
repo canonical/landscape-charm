@@ -20,6 +20,4 @@ class PauseActionTest(HookenvTest):
         """
         self.action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "stop"), {}),
-             (("service", "cron", "stop"), {})],
-            self.subprocess.calls)
+            [(("/usr/bin/lsctl", "stop"), {})], self.subprocess.calls)
