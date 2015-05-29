@@ -3,6 +3,7 @@ from fixtures import TestWithFixtures
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
+from lib.paths import LSCTL, SCHEMA_SCRIPT
 
 
 class SchemaBootstrapTest(TestWithFixtures):
@@ -10,6 +11,7 @@ class SchemaBootstrapTest(TestWithFixtures):
     def setUp(self):
         super(SchemaBootstrapTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable(SCHEMA_SCRIPT)
         self.callback = SchemaBootstrap(subprocess=self.subprocess)
 
     def test_options(self):
@@ -27,6 +29,7 @@ class LSCtlTest(HookenvTest):
     def setUp(self):
         super(LSCtlTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable(LSCTL)
         self.callback = LSCtl(subprocess=self.subprocess, hookenv=self.hookenv)
 
     def test_start(self):
