@@ -183,3 +183,29 @@ class AptTest(HookenvTest):
 
         with open(real) as fd:
             self.assertEqual("sample", fd.read())
+
+    def test_install_sample_hashids_idempotent(self):
+        """
+        The real hash-id-databases configuration file is not renamed again
+        if was already.
+        """
+        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        charm_dir = self.hookenv.charm_dir()
+        config_dir = self.paths.config_dir()
+        flag_file = os.path.join(charm_dir, "use-sample-hashids")
+        real = os.path.join(config_dir, "hash-id-databases.conf")
+        sample = os.path.join(config_dir, "hash-id-databases-sample.conf")
+        with open(flag_file, "w") as fd:
+            fd.write("")
+        with open(real, "w") as fd:
+            fd.write("real")
+        with open(sample, "w") as fd:
+            fd.write("sample")
+        self.apt.install_packages()
+        self.apt.install_packages()
+
+        with open(real + ".orig") as fd:
+            self.assertEqual("real", fd.read())
+
+        with open(real) as fd:
+            self.assertEqual("sample", fd.read())

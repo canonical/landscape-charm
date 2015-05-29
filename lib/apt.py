@@ -78,8 +78,9 @@ class Apt(object):
             config_dir = self._paths.config_dir()
             real = os.path.join(config_dir, "hash-id-databases.conf")
             sample = os.path.join(config_dir, "hash-id-databases-sample.conf")
-            os.rename(real, real + ".orig")
-            shutil.copy(sample, real)
+            if not os.path.exists(real + ".orig"):
+                os.rename(real, real + ".orig")
+                shutil.copy(sample, real)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
