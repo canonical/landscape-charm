@@ -22,6 +22,4 @@ class ResumeActionTest(HookenvTest):
         """
         self.action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "start"), {}),
-             (("service", "cron", "start"), {})],
-            self.subprocess.calls)
+            [(("/usr/bin/lsctl", "start"), {})], self.subprocess.calls)
