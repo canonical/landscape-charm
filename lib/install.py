@@ -5,7 +5,7 @@ import subprocess
 from charmhelpers import fetch
 from charmhelpers.core import hookenv
 
-from lib.hook import Hook
+from lib.hook import Hook, HookError
 from lib.apt import Apt
 
 # Pattern for pre-install hooks
@@ -27,7 +27,10 @@ class InstallHook(Hook):
         hooks = glob.glob(os.path.join(charm_dir, CHARM_PRE_INSTALL_PATTERN))
         for hook in hooks:
             if os.access(hook, os.X_OK):
-                self._subprocess.check_call(hook, shell=True)
+                try:
+                    self._subprocess.check_call(hook, shell=True)
+                except subprocess.CalledProcessError as error:
+                    raise HookError(str(error))
 
         # Set APT sources and install Landscape packages
         apt = Apt(
