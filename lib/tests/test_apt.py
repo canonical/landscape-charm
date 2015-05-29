@@ -32,19 +32,7 @@ class AptTest(HookenvTest):
         package_name = "{}-{}".format(name, version)
         package_dir = build_dir.join(package_name)
         os.mkdir(package_dir)
-        # dh_make stops and wait for confirmation when it's run, so we
-        # send a newline to it. When tarmac-lander for the charm runs on
-        # trusty, we can pass -y to dh_make instead.
-        # We also need to change the cwd manually, since passing cwd to
-        # subprocess doesn't work when executing dh_make on precise for
-        # some unknown reason.
-        old_cwd = os.getcwd()
-        os.chdir(package_dir)
-        dh_make = subprocess.Popen(
-            ["dh_make",  "-n", "-i"], stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        dh_make.communicate("\n")
-        os.chdir(old_cwd)
+        subprocess.check_output(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
         tarball = os.path.join(
             self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
         subprocess.check_output(
