@@ -41,7 +41,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	juju test --set-e -p SKIP_SLOW_TESTS,LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING -v --timeout 3000s
+	juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING -v --timeout 3000s
 
 integration-test-dense-maas:
 	DEPLOYER_TARGET=landscape-dense-maas $(MAKE) integration-test
@@ -60,7 +60,8 @@ repo-file-trunk: secrets
 	grep -e "^source:" secrets/lds-trunk-ppa | cut -f 2- -d " " > config/repo-file
 
 lint:
-	flake8 --exclude=charmhelpers hooks
+	flake8 --filename='*' hooks
+	flake8 lib tests
 	pyflakes3 tests dev/update-charm-revision-numbers
 	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 pep8
 	pep8 tests dev/update-charm-revision-numbers 

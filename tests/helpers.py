@@ -168,13 +168,25 @@ class EnvironmentFixture(Fixture):
         action_id = self._do_action("resume", "landscape-server/" + str(unit))
         return self._fetch_action(action_id)
 
-    def stop_landscape_service(self, service, unit=0):
-        """Stop the given Landscape service on the given unit.
+    def wait_landscape_cron_jobs(self, unit=0):
+        """Wait for running cron jobs to finish on the given Landscape unit."""
+        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        output, code = unit.run(
+            "sudo /opt/canonical/landscape/wait-batch-scripts")
+        if code != 0:
+            raise RuntimeError(output)
 
-        The service being stopped will be automatically restarted upon cleanUp.
+    def stop_landscape_service(self, service, unit=0, restore=True):
+        """Stop the given service on the given Landscape unit.
+
+        @param service: The service to stop.
+        @param unit: The Landscape unit to act on.
+        @param restore: Whether the service should be automatically restarted
+            upon cleanUp.
         """
         self._control_landscape_service("stop", service, unit)
-        self._stopped_landscape_services.append((service, unit))
+        if restore:
+            self._stopped_landscape_services.append((service, unit))
 
     def start_landscape_service(self, service, unit=0):
         """Start the given Landscape service on the given unit."""
@@ -209,18 +221,6 @@ class EnvironmentFixture(Fixture):
         else:
             service_status["stopped"].append(service_name)
         return service_status
-
-    def is_cron_running(self, unit):
-        """Returns whether cron is running on a unit."""
-        unit_sentry = self._deployment.sentry.unit[unit]
-        output, code = unit_sentry.run("service cron status")
-        assert code == 0
-        if "stop/waiting" in output:
-            return False
-        elif "start/running" in output:
-            return True
-        else:
-            raise AssertionError("Malformed status output: " + output)
 
     def configure_ssl(self, cert, key):
         """Start the given Landscape service on the given unit."""

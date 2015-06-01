@@ -4,14 +4,10 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-
-import unittest
-
-from os import getenv
 from subprocess import check_output, CalledProcessError, PIPE
 
 from helpers import IntegrationTest
-from layers import OneLandscapeUnitLayer
+from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
 
 
 class ServiceTest(IntegrationTest):
@@ -148,17 +144,9 @@ class CronTest(IntegrationTest):
     the cron daemon will be stopped, so Landscape cron jobs in particular
     won't be run.
     """
-    layer = OneLandscapeUnitLayer
+    layer = OneLandscapeUnitNoCronLayer
 
     cron_unit = "landscape-server/0"
-
-    @classmethod
-    def setUpClass(cls):
-        cls._stop_cron(cls.cron_unit)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._start_cron(cls.cron_unit)
 
     def _sanitize_ssh_output(self, output,
                              remove_text=["sudo: unable to resolve",
@@ -234,8 +222,6 @@ class CronTest(IntegrationTest):
         self.assertEqual(output, "")
         self.assertEqual(status, 0)
 
-    @unittest.skipIf(getenv("SKIP_SLOW_TESTS", None),
-                     "Requested to skip slow tests.")
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
@@ -265,13 +251,3 @@ class CronTest(IntegrationTest):
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(
             "https://%s/" % frontend, config["global"]["root-url"])
-
-    @staticmethod
-    def _stop_cron(unit):
-        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "stop", "2>&1"]
-        check_output(cmd, stderr=PIPE)
-
-    @staticmethod
-    def _start_cron(unit):
-        cmd = ["juju", "ssh", unit, "sudo", "service", "cron", "start", "2>&1"]
-        check_output(cmd, stderr=PIPE)

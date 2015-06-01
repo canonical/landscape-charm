@@ -8,6 +8,7 @@ from charmhelpers import fetch
 from charmhelpers.core import hookenv
 
 from lib.hook import HookError
+from lib.paths import default_paths
 
 PACKAGES = ("landscape-server",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
@@ -46,10 +47,12 @@ class Apt(object):
     tarball.
     """
 
-    def __init__(self, hookenv=hookenv, fetch=fetch, subprocess=subprocess):
+    def __init__(self, hookenv=hookenv, fetch=fetch, subprocess=subprocess,
+                 paths=default_paths):
         self._hookenv = hookenv
         self._fetch = fetch
         self._subprocess = subprocess
+        self._paths = paths
 
     def set_sources(self, force_update=False):
         """Configure the extra APT sources to use."""
@@ -70,6 +73,14 @@ class Apt(object):
             # apt-get that we don't care.
             options.append("--allow-unauthenticated")
         self._fetch.apt_install(PACKAGES, options=options, fatal=True)
+
+        if self._use_sample_hashids():
+            config_dir = self._paths.config_dir()
+            real = os.path.join(config_dir, "hash-id-databases.conf")
+            sample = os.path.join(config_dir, "hash-id-databases-sample.conf")
+            if not os.path.exists(real + ".orig"):
+                os.rename(real, real + ".orig")
+                shutil.copy(sample, real)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
