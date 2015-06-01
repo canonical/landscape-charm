@@ -23,11 +23,14 @@ class UpgradeActionTest(HookenvTest):
         open(self.paths.maintenance_flag(), "w")
         self.addCleanup(os.remove, self.paths.maintenance_flag())
 
+        self.hookenv.config()["source"] = "ppa:my-ppa"
         action = UpgradeAction(
             hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
-
         action()
-        # There was one non-fatal apt_update call.
+
+        self.assertEqual([("ppa:my-ppa", None)], self.fetch.sources)
+
+        # There was fatal apt_update call.
         self.assertEqual([True], self.fetch.updates)
         # And one apt_install with appropriate options.
         self.assertEqual(
@@ -45,7 +48,6 @@ class UpgradeActionTest(HookenvTest):
             hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
 
         action()
-        # There was one non-fatal apt_update call.
+        # There were no apt_update calls or apt_install calls.
         self.assertEqual([], self.fetch.updates)
-        # And one apt_install with appropriate options.
         self.assertEqual([], self.fetch.installed)

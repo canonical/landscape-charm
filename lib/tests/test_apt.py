@@ -148,6 +148,42 @@ class AptTest(HookenvTest):
         self.assertEqual([], self.subprocess.calls)
         self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
 
+    def test_wb_get_local_epoch_with_epoch(self):
+        """
+        If an installed landscape-server package has an epoch,
+        _get_local_epoch() returns the installed epoch + 1.
+        """
+        self.subprocess.add_fake_executable(
+            "dpkg-query", lambda *args, **kwargs: (0, "1:1.2.3", ""))
+        self.assertEqual(2, self.apt._get_local_epoch())
+        self.assertIn(
+            (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
+            self.subprocess.calls)
+
+    def test_wb_get_local_epoch_with_no_epoch(self):
+        """
+        If an installed landscape-server package has no epoch,
+        _get_local_epoch() returns the 1000.
+        """
+        self.subprocess.add_fake_executable(
+            "dpkg-query", lambda *args, **kwargs: (0, "1.2.3", ""))
+        self.assertEqual(1000, self.apt._get_local_epoch())
+        self.assertIn(
+            (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
+            self.subprocess.calls)
+
+    def test_wb_get_local_epoch_not_installed(self):
+        """
+        If no landscape-server package is installed _get_local_epoch()
+        returns the 1000.
+        """
+        self.subprocess.add_fake_executable(
+            "dpkg-query", lambda *args, **kwargs: (1, "", "no such package"))
+        self.assertEqual(1000, self.apt._get_local_epoch())
+        self.assertIn(
+            (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
+            self.subprocess.calls)
+
     def test_packages(self):
         """
         The C{PACKAGES} tuple holds the packages expected to get installed.
@@ -160,7 +196,6 @@ class AptTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
-        self.assertEqual([PACKAGES], self.fetch.filtered)
         options = list(DEFAULT_INSTALL_OPTIONS)
         self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
 
