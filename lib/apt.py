@@ -22,9 +22,10 @@ SAMPLE_HASHIDS_KEY = "4652B4E6"
 #     extend them.
 DEFAULT_INSTALL_OPTIONS = ("--option=Dpkg::Options::=--force-confold",)
 
+BASE_EPOCH = 1000
 # Shell commands to build the debs and publish them in a local repository
 BUILD_LOCAL_ARCHIVE = """
-dch -v 9999:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
+dch -v {}:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
     development --distribution $(lsb_release -cs) &&
 dpkg-buildpackage -us -uc &&
 mv ../*.deb . &&
@@ -53,9 +54,9 @@ class Apt(object):
         self._subprocess = subprocess
         self._paths = paths
 
-    def set_sources(self):
+    def set_sources(self, force_update=False):
         """Configure the extra APT sources to use."""
-        needs_update = False
+        needs_update = force_update
         if self._set_remote_source():
             needs_update = True
         if self._set_local_source():
@@ -63,15 +64,15 @@ class Apt(object):
         if needs_update:
             self._fetch.apt_update(fatal=True)
 
-    def install_packages(self):
+    def install_packages(self, options=None):
         """Install the needed packages."""
-        options = list(DEFAULT_INSTALL_OPTIONS)
+        if options is None:
+            options = list(DEFAULT_INSTALL_OPTIONS)
         if self._get_local_tarball() is not None:
             # We don't sign the locally built repository, so we need to tell
             # apt-get that we don't care.
             options.append("--allow-unauthenticated")
-        packages = self._fetch.filter_installed_packages(PACKAGES)
-        self._fetch.apt_install(packages, options=options, fatal=True)
+        self._fetch.apt_install(PACKAGES, options=options, fatal=True)
 
         if self._use_sample_hashids():
             config_dir = self._paths.config_dir()
@@ -121,16 +122,35 @@ class Apt(object):
         shutil.rmtree(build_dir, ignore_errors=True)
         os.makedirs(build_dir)
 
+        epoch = self._get_local_epoch()
         self._subprocess.check_call(
             ["tar", "--strip=1", "-xf", tarball], cwd=build_dir)
         self._subprocess.check_call(
             ["/usr/lib/pbuilder/pbuilder-satisfydepends"], cwd=build_dir)
         self._subprocess.check_call(
-            BUILD_LOCAL_ARCHIVE, shell=True, cwd=build_dir)
+            BUILD_LOCAL_ARCHIVE.format(epoch), shell=True, cwd=build_dir)
 
         self._fetch.add_source("deb file://%s/ ./" % build_dir)
 
         return True
+
+    def _get_local_epoch(self):
+        """Get the epoch to use for the locally built package.
+
+        If landscape-server is installed, an epoch greater than the one
+        installed is chosen. If no landscape-server package is
+        installed, an epoch of 1000 is chosen to ensure it's greater
+        than any PPA version.
+        """
+        try:
+            version = self._subprocess.check_output(
+                ["dpkg-query", "-f", "${version}", "-W", "landscape-server"])
+        except subprocess.CalledProcessError:
+            version = ""
+        if ":" not in version:
+            return BASE_EPOCH
+        epoch = int(version.split(":", 1)[0])
+        return epoch + 1
 
     def _get_local_tarball(self):
         """Return the local Landscape tarball if any, C{None} otherwise."""

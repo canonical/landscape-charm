@@ -16,8 +16,10 @@ class UpgradeActionTest(HookenvTest):
         The UpgradeAction refreshes package indexes and upgrades
         landscape-server package.
         """
+        self.hookenv.config()["source"] = "ppa:my-ppa"
         self.action()
-        # There was on non-fatal apt_update call.
+        self.assertEqual([("ppa:my-ppa", None)], self.fetch.sources)
+        # There was fatal apt_update call.
         self.assertEqual([True], self.fetch.updates)
         # And one apt_install with appropriate options.
         self.assertEqual(
