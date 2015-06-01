@@ -1,6 +1,7 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
 from lib.resume import ResumeAction
+from lib.paths import LSCTL
 
 
 class ResumeActionTest(HookenvTest):
@@ -8,6 +9,8 @@ class ResumeActionTest(HookenvTest):
     def setUp(self):
         super(ResumeActionTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable(LSCTL)
+        self.subprocess.add_fake_executable("service")
         self.action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess)
 
@@ -19,6 +22,4 @@ class ResumeActionTest(HookenvTest):
         """
         self.action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "start"), {}),
-             (("service", "cron", "start"), {})],
-            self.subprocess.calls)
+            [(("/usr/bin/lsctl", "start"), {})], self.subprocess.calls)

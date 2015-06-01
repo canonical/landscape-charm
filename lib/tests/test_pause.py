@@ -1,6 +1,7 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
 from lib.pause import PauseAction
+from lib.paths import LSCTL
 
 
 class PauseActionTest(HookenvTest):
@@ -8,6 +9,8 @@ class PauseActionTest(HookenvTest):
     def setUp(self):
         super(PauseActionTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable(LSCTL)
+        self.subprocess.add_fake_executable("service")
         self.action = PauseAction(
             hookenv=self.hookenv, subprocess=self.subprocess)
 
@@ -17,6 +20,4 @@ class PauseActionTest(HookenvTest):
         """
         self.action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "stop"), {}),
-             (("service", "cron", "stop"), {})],
-            self.subprocess.calls)
+            [(("/usr/bin/lsctl", "stop"), {})], self.subprocess.calls)

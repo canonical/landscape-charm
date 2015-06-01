@@ -8,6 +8,7 @@ SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 INSTALL_DIR = "/opt/canonical/landscape"
 CONFIG_DIR = INSTALL_DIR + "/configs/standalone"
 OFFLINE_DIR = INSTALL_DIR + "/canonical/landscape/offline"
+
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 
 LICENSE_FILE = "/etc/landscape/license.txt"
