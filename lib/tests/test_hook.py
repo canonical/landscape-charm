@@ -2,12 +2,12 @@ import os
 
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
-from lib.tests.stubs import FetchStub
 from lib.hook import MaintenanceHook
 
 
 class DummyMaintenanceHook(MaintenanceHook):
     executed = False
+
     def _run(self):
         self.executed = True
 
