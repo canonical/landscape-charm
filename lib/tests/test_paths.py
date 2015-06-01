@@ -39,7 +39,8 @@ class PathsTest(TestCase):
 
     def test_maintenance_flag(self):
         """
-        The service_conf() method returns the path to service.conf.
+        The maintenance_flag() method returns the path to maintenance.txt
+        which indicates maintenance mode on a unit.
         """
         self.assertEqual(
             "/opt/canonical/landscape/maintenance.txt",
