@@ -1,18 +1,25 @@
+import os.path
+
 from charmhelpers.core import hookenv
 from charmhelpers import fetch
 
 from lib.apt import PACKAGES
-from lib.hook import Hook
+from lib.hook import Hook, HookError
+from lib.paths import default_paths
 
 
 class UpgradeAction(Hook):
     """Execute package upgrade action logic."""
 
-    def __init__(self, hookenv=hookenv, fetch=fetch):
+    def __init__(self, hookenv=hookenv, fetch=fetch, paths=default_paths):
         super(UpgradeAction, self).__init__(hookenv=hookenv)
         self._fetch = fetch
+        self._paths = paths
 
     def _run(self):
+        if not os.path.exists(self._paths.maintenance_flag()):
+            raise HookError(
+                "Upgrade action can only be called on a unit in paused state.")
         self._fetch.apt_update(fatal=True)
         apt_install_options = [
             # Ensure we keep the existing service.conf and

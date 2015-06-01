@@ -1,4 +1,7 @@
+import os
+
 from lib.tests.helpers import HookenvTest
+from lib.tests.rootdir import RootDir
 from lib.tests.stubs import FetchStub
 from lib.upgrade import UpgradeAction
 
@@ -8,16 +11,23 @@ class UpgradeActionTest(HookenvTest):
     def setUp(self):
         super(UpgradeActionTest, self).setUp()
         self.fetch = FetchStub()
-        self.action = UpgradeAction(
-            hookenv=self.hookenv, fetch=self.fetch)
+        self.root_dir = self.useFixture(RootDir())
+        self.paths = self.root_dir.paths
 
     def test_run(self):
         """
         The UpgradeAction refreshes package indexes and upgrades
         landscape-server package.
         """
-        self.action()
-        # There was on non-fatal apt_update call.
+
+        maintenance_flag = open(self.paths.maintenance_flag(), "w")
+        self.addCleanup(os.remove, self.paths.maintenance_flag())
+
+        action = UpgradeAction(
+            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
+
+        action()
+        # There was one non-fatal apt_update call.
         self.assertEqual([True], self.fetch.updates)
         # And one apt_install with appropriate options.
         self.assertEqual(
@@ -25,3 +35,17 @@ class UpgradeActionTest(HookenvTest):
               ["--option=Dpkg::Options::=--force-confdef",
                "--option=Dpkg::Options::=--force-confold"],
               True)], self.fetch.installed)
+
+    def test_run_without_maintenance_flag(self):
+        """
+        When maintenance flag file is absent, upgrade action is a no-op.
+        """
+
+        action = UpgradeAction(
+            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
+
+        action()
+        # There was one non-fatal apt_update call.
+        self.assertEqual([], self.fetch.updates)
+        # And one apt_install with appropriate options.
+        self.assertEqual([], self.fetch.installed)
