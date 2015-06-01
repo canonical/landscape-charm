@@ -138,7 +138,7 @@ class Apt(object):
         """Get the epoch to use for the locally built package.
 
         If landscape-server is installed, an epoch greater than the one
-        installed with be chosen. If no landscape-server package is
+        installed is chosen. If no landscape-server package is
         installed, an epoch of 1000 is chosen to ensure it's greater
         than any PPA version.
         """
