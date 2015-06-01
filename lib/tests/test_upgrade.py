@@ -20,7 +20,7 @@ class UpgradeActionTest(HookenvTest):
         landscape-server package.
         """
 
-        maintenance_flag = open(self.paths.maintenance_flag(), "w")
+        open(self.paths.maintenance_flag(), "w")
         self.addCleanup(os.remove, self.paths.maintenance_flag())
 
         action = UpgradeAction(
