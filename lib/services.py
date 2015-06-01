@@ -105,4 +105,10 @@ class ServicesHook(Hook):
                 for relation_id in relation_ids:
                     self._hookenv.relation_set(relation_id, data)
 
+        if self._hookenv.hook_name() == "leader-elected":
+            relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
+            data = haproxy_provider.provide_data()
+            for relation_id in relation_ids:
+                self._hookenv.relation_set(relation_id, data)
+
         manager.manage()
