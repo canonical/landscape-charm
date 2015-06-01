@@ -94,10 +94,8 @@ class HAProxyProviderTest(HookenvTest):
                  "http-request set-header X-Forwarded-Proto https",
                  "acl message path_beg -i /message-system",
                  "acl api path_beg -i /api",
-                 "acl package-upload path_beg -i /upload",
                  "use_backend landscape-message if message",
-                 "use_backend landscape-api if api",
-                 "use_backend landscape-package-upload if package-upload"],
+                 "use_backend landscape-api if api"],
              "errorfiles": expected_errorfiles,
              "crts": expected_certs,
              "servers": [
