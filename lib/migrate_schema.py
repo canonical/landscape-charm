@@ -3,7 +3,7 @@ import subprocess
 from charmhelpers.core import hookenv
 
 from lib.hook import MaintenanceHook
-from lib.paths import SCHEMA_SCRIPT, default_paths
+from lib.paths import default_paths, SCHEMA_SCRIPT
 
 
 class MigrateSchemaAction(MaintenanceHook):
