@@ -37,10 +37,8 @@ SERVICE_OPTIONS = {
         "http-request set-header X-Forwarded-Proto https",
         "acl message path_beg -i /message-system",
         "acl api path_beg -i /api",
-        "acl package-upload path_beg -i /upload",
         "use_backend landscape-message if message",
         "use_backend landscape-api if api",
-        "use_backend landscape-package-upload if package-upload",
     ],
 }
 SERVER_BASE_PORTS = {
@@ -100,6 +98,7 @@ class HAProxyProvider(RelationContext):
     def _get_https(self):
         """Return the service configuration for the HTTPS frontend."""
 
+        service = self._get_service("https")
         backends = [
             self._get_backend("message", self._get_servers("message-server")),
             self._get_backend("api", self._get_servers("api")),
@@ -108,6 +107,9 @@ class HAProxyProvider(RelationContext):
             self._hookenv.log(
                 "This unit is the juju leader: Writing package-upload backends"
                 " entry.")
+            service["service_options"].extend([
+                "acl package-upload path_beg -i /upload",
+                "use_backend landscape-package-upload if package-upload"])
             backends.append(
                 self._get_backend(
                     "package-upload", self._get_servers("package-upload")))
@@ -116,7 +118,6 @@ class HAProxyProvider(RelationContext):
                 "This unit is not the juju leader: not writing package-upload"
                 " backends entry.")
 
-        service = self._get_service("https")
         service.update({
             "crts": self._get_ssl_certificate(),
             "servers": self._get_servers("appserver"),
@@ -136,7 +137,7 @@ class HAProxyProvider(RelationContext):
             "service_name": "landscape-%s" % name,
             "service_host": "0.0.0.0",
             "service_port": SERVICE_PORTS[name],
-            "service_options": SERVICE_OPTIONS[name],
+            "service_options": SERVICE_OPTIONS[name][:],
             "errorfiles": self._get_error_files()
         }
 

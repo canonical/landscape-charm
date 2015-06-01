@@ -5,7 +5,6 @@ from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core.services.base import ServiceManager
 from charmhelpers.core.services.helpers import render_template
-from charmhelpers.contrib.hahelpers import cluster
 
 from lib.hook import Hook
 from lib.paths import default_paths
@@ -20,6 +19,7 @@ from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 from lib.callbacks.apt import SetAPTSources
+from lib import cluster
 
 
 SERVICE_COUNTS = {
