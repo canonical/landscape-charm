@@ -60,7 +60,7 @@ class MaintenanceHook(Hook):
         """
         if not os.path.exists(self._paths.maintenance_flag()):
             self._hookenv.log(
-                "Upgrade action can only be called on a unit in paused state.",
+                "This action can only be called on a unit in paused state.",
                 ERROR)
             return 1
         super(MaintenanceHook, self).__call__()
