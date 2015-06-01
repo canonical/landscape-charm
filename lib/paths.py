@@ -14,6 +14,8 @@ SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 LICENSE_FILE = "/etc/landscape/license.txt"
 LSCTL = "/usr/bin/lsctl"
 
+MAINTENANCE_FLAG = "/opt/canonical/landscape/maintenance.txt"
+
 
 class Paths(object):
     """Encapsulate all filesystem paths that the charm needs to know about.
@@ -59,6 +61,10 @@ class Paths(object):
     def license_file(self):
         """Return the path to the Landscape license file."""
         return self._get_path(LICENSE_FILE)
+
+    def maintenance_flag(self):
+        """Return the path to the Landscape maintenance flag file."""
+        return self._get_path(MAINTENANCE_FLAG)
 
     def _get_path(self, *paths):
         """Return the actual path of the given plain path."""
