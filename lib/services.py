@@ -100,15 +100,20 @@ class ServicesHook(Hook):
         if self._hookenv.hook_name() == "config-changed":
             config = self._hookenv.config()
             if config.changed("ssl-cert") or config.changed("ssl-key"):
-                relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
-                data = haproxy_provider.provide_data()
-                for relation_id in relation_ids:
-                    self._hookenv.relation_set(relation_id, data)
+                self._set_haproxy_data(haproxy_provider)
 
+        # XXX The services framework only triggers data providers within the
+        #     context of relation joined/changed hooks, however we also
+        #     want to trigger the haproxy provider if the unit gets
+        #     elected as the leader.
         if self._hookenv.hook_name() == "leader-elected":
-            relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
-            data = haproxy_provider.provide_data()
-            for relation_id in relation_ids:
-                self._hookenv.relation_set(relation_id, data)
+            self._set_haproxy_data(haproxy_provider)
 
         manager.manage()
+
+    def _set_haproxy_data(self, haproxy_provider):
+        """Provid and set the data in the haproxy relation."""
+        relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
+        data = haproxy_provider.provide_data()
+        for relation_id in relation_ids:
+            self._hookenv.relation_set(relation_id, data)
