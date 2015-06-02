@@ -20,9 +20,7 @@ class MaintenanceHookTest(HookenvTest):
         self.paths = self.root_dir.paths
 
     def test_run(self):
-        """
-        Calling a dummy hook runs only with maintenance flag set.
-        """
+        """Calling a dummy hook runs only with maintenance flag set."""
 
         open(self.paths.maintenance_flag(), "w")
         self.addCleanup(os.remove, self.paths.maintenance_flag())
@@ -42,3 +40,6 @@ class MaintenanceHookTest(HookenvTest):
 
         action()
         self.assertFalse(action.executed)
+        self.assertEqual(
+            ["This action can only be called on a unit in paused state."],
+            self.hookenv._action_fails)

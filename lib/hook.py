@@ -59,8 +59,7 @@ class MaintenanceHook(Hook):
         @return: An integer with the exit code for the hook.
         """
         if not os.path.exists(self._paths.maintenance_flag()):
-            self._hookenv.log(
-                "This action can only be called on a unit in paused state.",
-                ERROR)
+            self._hookenv.action_fail(
+                "This action can only be called on a unit in paused state.")
             return 1
         super(MaintenanceHook, self).__call__()
