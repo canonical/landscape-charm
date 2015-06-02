@@ -1,28 +1,23 @@
-import os.path
 import subprocess
 
 from charmhelpers.core import hookenv
 from charmhelpers import fetch
 
 from lib.apt import Apt
-from lib.hook import Hook, HookError
+from lib.hook import MaintenanceHook
 from lib.paths import default_paths
 
 
-class UpgradeAction(Hook):
+class UpgradeAction(MaintenanceHook):
     """Execute package upgrade action logic."""
 
     def __init__(self, hookenv=hookenv, fetch=fetch, paths=default_paths,
                  subprocess=subprocess):
-        super(UpgradeAction, self).__init__(hookenv=hookenv)
+        super(UpgradeAction, self).__init__(hookenv=hookenv, paths=paths)
         self._fetch = fetch
-        self._paths = paths
         self._subprocess = subprocess
 
     def _run(self):
-        if not os.path.exists(self._paths.maintenance_flag()):
-            raise HookError(
-                "Upgrade action can only be called on a unit in paused state.")
         apt_install_options = [
             # Ensure we keep the existing service.conf and
             # /etc/defaults/landscape-server configuration files
