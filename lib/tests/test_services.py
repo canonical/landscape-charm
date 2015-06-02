@@ -236,3 +236,13 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         data = yaml.load(self.hookenv.relations["website:1"]["services"])
         self.assertIsNotNone(data)
+
+    def test_leader_elected(self):
+        """
+        When a leader is elected, the ServicesHook sets the haproxy
+        relation data.
+        """
+        self.hookenv.hook = "leader-elected"
+        self.hook()
+        data = yaml.load(self.hookenv.relations["website:1"]["services"])
+        self.assertIsNotNone(data)
