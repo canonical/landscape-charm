@@ -96,15 +96,6 @@ class FetchStub(object):
         self.installed.append((packages, options, fatal))
 
 
-class ClusterStub(object):
-    """Testable stub for C{charmhelpers.contrib.hahelpers.cluster}."""
-
-    leader = True
-
-    def is_elected_leader(self, resource):
-        return self.leader
-
-
 class HostStub(object):
     """Testable stub for C{charmhelpers.core.host}."""
 
