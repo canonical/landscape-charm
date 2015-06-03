@@ -1,7 +1,6 @@
 import os.path
 
 from charmhelpers.core import hookenv
-from charmhelpers.core.hookenv import ERROR
 
 from lib.paths import default_paths
 
