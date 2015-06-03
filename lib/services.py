@@ -53,15 +53,13 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
-        haproxy_provider = HAProxyProvider(
-            SERVICE_COUNTS, paths=self._paths, is_leader=is_leader)
-
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                haproxy_provider,
+                HAProxyProvider(
+                    SERVICE_COUNTS, paths=self._paths, is_leader=is_leader),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -93,17 +91,5 @@ class ServicesHook(Hook):
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
-
-        # XXX The services framework only triggers data providers within the
-        #     context of relation joined/changed hooks, however we also
-        #     want to trigger the haproxy provider if the SSL certificate
-        #     has changed.
-        if self._hookenv.hook_name() == "config-changed":
-            config = self._hookenv.config()
-            if config.changed("ssl-cert") or config.changed("ssl-key"):
-                relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
-                data = haproxy_provider.provide_data()
-                for relation_id in relation_ids:
-                    self._hookenv.relation_set(relation_id, data)
 
         manager.manage()
