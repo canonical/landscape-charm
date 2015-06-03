@@ -1,4 +1,7 @@
+import os
+
 from lib.tests.helpers import HookenvTest
+from lib.tests.rootdir import RootDir
 from lib.tests.stubs import SubprocessStub
 from lib.resume import ResumeAction
 from lib.paths import LSCTL
@@ -11,8 +14,8 @@ class ResumeActionTest(HookenvTest):
         self.subprocess = SubprocessStub()
         self.subprocess.add_fake_executable(LSCTL)
         self.subprocess.add_fake_executable("service")
-        self.action = ResumeAction(
-            hookenv=self.hookenv, subprocess=self.subprocess)
+        self.root_dir = self.useFixture(RootDir())
+        self.paths = self.root_dir.paths
 
     def test_run(self):
         """
@@ -20,6 +23,20 @@ class ResumeActionTest(HookenvTest):
         enabling the cron service so that Landscape cron jobs can start
         running again.
         """
-        self.action()
+        open(self.paths.maintenance_flag(), "w")
+        self.addCleanup(os.remove, self.paths.maintenance_flag())
+
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
         self.assertEqual(
             [(("/usr/bin/lsctl", "start"), {})], self.subprocess.calls)
+
+    def test_run_without_maintenance_flag(self):
+        """
+        When no maintenance flag file is present, resume action is a no-op.
+        """
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
+        self.assertEqual([], self.subprocess.calls)

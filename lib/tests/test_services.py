@@ -77,12 +77,8 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         # Assert that the HAProxyProvider has run by checking that it set the
         # relation with the dict returned by HAProxyProvider.provide_data (the
-        # only key of that dict is 'services'). The ID of relation being set
-        # is None because we're running in the website-relation-joined hook
-        # and are using the default relation ID (which in a real-world
-        # relation-set run will resolve to the relation for the http
-        # interface).
-        self.assertIn("services", self.hookenv.relations[None])
+        # only key of that dict is 'services').
+        self.assertIn("services", self.hookenv.relations["website:1"])
 
     def test_amqp_relation_not_ready(self):
         """

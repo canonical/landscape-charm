@@ -23,6 +23,7 @@ from lib import cluster
 
 
 SERVICE_COUNTS = {
+    "appserver": 2,
     "message-server": 2,
     "pingserver": 2,
 }
@@ -52,15 +53,13 @@ class ServicesHook(Hook):
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)
 
-        haproxy_provider = HAProxyProvider(
-            SERVICE_COUNTS, paths=self._paths, is_leader=is_leader)
-
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                haproxy_provider,
+                HAProxyProvider(
+                    SERVICE_COUNTS, paths=self._paths, is_leader=is_leader),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -92,22 +91,6 @@ class ServicesHook(Hook):
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
-
-        # XXX The services framework only triggers data providers within the
-        #     context of relation joined/changed hooks, however we also
-        #     want to trigger the haproxy provider if the SSL certificate
-        #     has changed.
-        if self._hookenv.hook_name() == "config-changed":
-            config = self._hookenv.config()
-            if config.changed("ssl-cert") or config.changed("ssl-key"):
-                self._set_haproxy_data(haproxy_provider)
-
-        # XXX The services framework only triggers data providers within the
-        #     context of relation joined/changed hooks, however we also
-        #     want to trigger the haproxy provider if the unit gets
-        #     elected as the leader.
-        if self._hookenv.hook_name() == "leader-elected":
-            self._set_haproxy_data(haproxy_provider)
 
         manager.manage()
 

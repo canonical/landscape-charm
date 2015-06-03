@@ -73,8 +73,10 @@ class HAProxyProviderTest(HookenvTest):
                  "use_backend landscape-ping if ping"],
              "errorfiles": expected_errorfiles,
              "servers": [
-                 ["landscape-appserver-landscape-server-0",
-                  "1.2.3.4", 8080, SERVER_OPTIONS]],
+                 ["landscape-appserver-landscape-server-0-0",
+                  "1.2.3.4", 8080, SERVER_OPTIONS],
+                 ["landscape-appserver-landscape-server-0-1",
+                  "1.2.3.4", 8081, SERVER_OPTIONS]],
              "backends": [
                  {"backend_name": "landscape-ping",
                   "servers": [
@@ -99,8 +101,10 @@ class HAProxyProviderTest(HookenvTest):
              "errorfiles": expected_errorfiles,
              "crts": expected_certs,
              "servers": [
-                 ["landscape-appserver-landscape-server-0",
-                  "1.2.3.4", 8080, SERVER_OPTIONS]],
+                 ["landscape-appserver-landscape-server-0-0",
+                  "1.2.3.4", 8080, SERVER_OPTIONS],
+                 ["landscape-appserver-landscape-server-0-1",
+                  "1.2.3.4", 8081, SERVER_OPTIONS]],
              "backends": [
                  {"backend_name": "landscape-message",
                   "servers": [

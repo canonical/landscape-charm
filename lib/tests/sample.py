@@ -46,6 +46,7 @@ SAMPLE_HOSTED_DATA = {
 }
 
 SAMPLE_SERVICE_COUNT_DATA = {
+    "appserver": 2,
     "message-server": 2,
     "pingserver": 2,
 }
