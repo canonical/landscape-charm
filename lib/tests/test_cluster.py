@@ -4,7 +4,7 @@ from lib import cluster
 from lib.tests.stubs import SubprocessStub
 
 
-class ClusterTest(TestWithFixtures): 
+class ClusterTest(TestWithFixtures):
     def setUp(self):
         self.subprocess = SubprocessStub()
 

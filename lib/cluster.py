@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+
 def is_elected_leader(resource, subprocess=subprocess):
     """Return whether the current unit is the elected leader.
 
