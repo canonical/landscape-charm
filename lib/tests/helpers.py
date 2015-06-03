@@ -1,11 +1,8 @@
-import json
 import os
-import shutil
-import tempfile
 
 from jinja2 import FileSystemLoader, Environment
 
-from fixtures import TestWithFixtures, EnvironmentVariable, TempDir, Fixture
+from fixtures import TestWithFixtures, EnvironmentVariable, TempDir
 
 from charmhelpers.core import hookenv
 
@@ -60,40 +57,3 @@ class TemplateTest(TestWithFixtures):
         templates_dir = os.path.join(charm_dir, "templates")
         loader = Environment(loader=FileSystemLoader(templates_dir))
         self.template = loader.get_template(self.template_filename)
-
-
-class TempExecutableFile(Fixture):
-
-    def __init__(self, name):
-        super(TempExecutableFile, self).__init__()
-        self._name = name
-        self._args_to_output = {}
-
-    def setUp(self):
-        super(TempExecutableFile, self).setUp()
-        self._dir_path = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self._dir_path, ignore_errors=True)
-        self.path = os.path.join(self._dir_path, self._name)
-        self.set_output("")
-        os.chmod(self.path, 0o700)
-
-    def set_output(self, stdout, code=0, stderr="", args=None):
-        if args is None:
-            args = False
-        args = json.dumps(args)
-        self._args_to_output[args] = (code, stdout, stderr)
-        with open(self.path, "w") as f:
-            f.write("""#!/usr/bin/env python3
-import sys, json
-args = json.dumps(sys.argv[1:])
-args_to_output = json.loads({})
-if args in args_to_output:
-    code, stdout, stderr = args_to_output[args]
-else:
-    code, stdout, stderr = args_to_output.get(
-        False, (1, "", "Unexpected parameters"))
-print(stdout, file=sys.stdout, end="")
-print(stderr, file=sys.stderr, end="")
-sys.exit(code)
-""".format(repr(json.dumps(self._args_to_output))))
-

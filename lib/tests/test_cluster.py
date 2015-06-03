@@ -1,20 +1,27 @@
 from fixtures import TestWithFixtures
 
-from lib.tests.helpers import TempExecutableFile
 from lib import cluster
+from lib.tests.stubs import SubprocessStub
 
 
-class ClusterTest(TestWithFixtures):
-
+class ClusterTest(TestWithFixtures): 
     def setUp(self):
-        self.is_leader = self.useFixture(TempExecutableFile("is-leader"))
+        self.subprocess = SubprocessStub()
 
     def test_elected_leader_true(self):
-        self.is_leader.set_output("true", args=["--format", "json"])
+        def is_leader_true(args, **kwargs):
+            if args == ["--format", "json"]:
+                return 0, "true", ""
+
+        self.subprocess.add_fake_executable("is-leader", is_leader_true)
         self.assertTrue(
-            cluster.is_elected_leader(None, is_leader_exec=self.is_leader.path))
+            cluster.is_elected_leader(None, subprocess=self.subprocess))
 
     def test_elected_leader_false(self):
-        self.is_leader.set_output("false", args=["--format", "json"])
+        def is_leader_false(args, **kwargs):
+            if args == ["--format", "json"]:
+                return 0, "false", ""
+
+        self.subprocess.add_fake_executable("is-leader", is_leader_false)
         self.assertFalse(
-            cluster.is_elected_leader(None, is_leader_exec=self.is_leader.path))
+            cluster.is_elected_leader(None, subprocess=self.subprocess))
