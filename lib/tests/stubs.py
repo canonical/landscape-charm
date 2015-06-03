@@ -10,6 +10,7 @@ class HookenvStub(object):
     hook = "some-hook"
     unit = "landscape-server/0"
     relid = None
+    leader = True
 
     def __init__(self, charm_dir):
         self.messages = []
@@ -67,6 +68,9 @@ class HookenvStub(object):
 
     def action_fail(self, message):
         self._action_fails.append(message)
+
+    def is_leader(self):
+        return self.leader
 
 
 class FetchStub(object):

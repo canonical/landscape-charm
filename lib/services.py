@@ -19,7 +19,6 @@ from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 from lib.callbacks.apt import SetAPTSources
-from lib import cluster
 
 
 SERVICE_COUNTS = {
@@ -36,11 +35,10 @@ class ServicesHook(Hook):
     all relation data we need in order to configure this Landscape unit, and
     proceed with the configuration if ready.
     """
-    def __init__(self, hookenv=hookenv, cluster=cluster, host=host,
+    def __init__(self, hookenv=hookenv, host=host,
                  subprocess=subprocess, paths=default_paths, fetch=fetch):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
-        self._cluster = cluster
         self._host = host
         self._paths = paths
         self._subprocess = subprocess
@@ -48,7 +46,7 @@ class ServicesHook(Hook):
 
     def _run(self):
         leader_context = None
-        is_leader = self._cluster.is_elected_leader(None)
+        is_leader = self._hookenv.is_leader()
         if is_leader:
             leader_context = LandscapeLeaderContext(
                 host=self._host, hookenv=self._hookenv)

@@ -5,7 +5,7 @@ import yaml
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.stubs import ClusterStub, HostStub, SubprocessStub, FetchStub
+from lib.tests.stubs import HostStub, SubprocessStub, FetchStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
@@ -21,7 +21,6 @@ class ServicesHookTest(HookenvTest):
 
     def setUp(self):
         super(ServicesHookTest, self).setUp()
-        self.cluster = ClusterStub()
         self.host = HostStub()
         self.subprocess = SubprocessStub()
         self.subprocess.add_fake_executable(SCHEMA_SCRIPT)
@@ -31,8 +30,8 @@ class ServicesHookTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.fetch = FetchStub()
         self.hook = ServicesHook(
-            hookenv=self.hookenv, cluster=self.cluster, host=self.host,
-            subprocess=self.subprocess, paths=self.paths, fetch=self.fetch)
+            hookenv=self.hookenv, host=self.host, subprocess=self.subprocess,
+            paths=self.paths, fetch=self.fetch)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.
@@ -175,7 +174,7 @@ class ServicesHookTest(HookenvTest):
         If we're not the leader unit and we didn't yet get relation data from
         the leader, we are not ready.
         """
-        self.cluster.leader = False
+        self.hookenv.leader = False
         self.hook()
         self.assertIn(
             ("Incomplete relation: LandscapeRequirer", "DEBUG"),
@@ -186,7 +185,7 @@ class ServicesHookTest(HookenvTest):
         If we're not the leader unit and we got relation data from the leader,
         along with the rest of required relations, then we're good.
         """
-        self.cluster.leader = False
+        self.hookenv.leader = False
         self.hookenv.relations.update({
             "cluster": {
                 "cluster:1": {
