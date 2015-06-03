@@ -197,6 +197,7 @@ class LandscapeDefaultsTest(TemplateTest):
         RUN_MSGSERVER both to 2 from the sample service count configuration.
         """
         buffer = self.template.render(self.context)
+        self.assertIn('RUN_APPSERVER="2"\n', buffer)
         self.assertIn('RUN_PINGSERVER="2"\n', buffer)
         self.assertIn('RUN_MSGSERVER="2"\n', buffer)
 

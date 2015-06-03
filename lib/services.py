@@ -23,6 +23,7 @@ from lib.callbacks.apt import SetAPTSources
 
 
 SERVICE_COUNTS = {
+    "appserver": 2,
     "message-server": 2,
     "pingserver": 2,
 }
