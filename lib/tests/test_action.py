@@ -8,17 +8,17 @@ from lib.action import Action, ActionError, MaintenanceAction
 class DummyAction(Action):
     executed = False
 
-    def run(self):
+    def _run(self):
         self.executed = True
 
 
 class DummyActionWithValues(Action):
-    def run(self):
+    def _run(self):
         return {"key": "value"}
 
 
 class DummyErrorAction(Action):
-    def run(self):
+    def _run(self):
         raise ActionError("no go")
 
 
@@ -35,7 +35,7 @@ class ActionTest(HookenvTest):
         action()
         self.assertTrue(action.executed)
 
-    def test_run(self):
+    def test_run_with_return_values(self):
         """Calling a dummy hook runs only with maintenance flag set."""
         action = DummyActionWithValues(hookenv=self.hookenv)
         action()
@@ -53,7 +53,7 @@ class ActionTest(HookenvTest):
 class DummyMaintenanceAction(MaintenanceAction):
     executed = False
 
-    def run(self):
+    def _run(self):
         self.executed = True
 
 

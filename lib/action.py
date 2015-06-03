@@ -32,7 +32,7 @@ class Action(object):
         """
         self._hookenv.log("Running action %s" % type(self).__name__)
         try:
-            return_values = self.run()
+            return_values = self._run()
             if return_values is not None:
                 self._hookenv.action_set(return_values)
         except ActionError, error:
