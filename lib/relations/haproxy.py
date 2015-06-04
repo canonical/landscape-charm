@@ -137,6 +137,8 @@ class HAProxyProvider(RelationContext):
             "service_name": "landscape-%s" % name,
             "service_host": "0.0.0.0",
             "service_port": SERVICE_PORTS[name],
+            # Copy the service options, since it will be modified if
+            # we're the leader.
             "service_options": SERVICE_OPTIONS[name][:],
             "errorfiles": self._get_error_files()
         }
