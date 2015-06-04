@@ -2,25 +2,19 @@ import os.path
 
 from charmhelpers.core import hookenv
 
+from lib.hook import Hook, HookError
 from lib.paths import default_paths
 
 
-class ActionError(Exception):
+class ActionError(HookError):
     """Raised by actions when they want to fail.
 
     Raising this exception will make the action process exit with action_fail.
     """
 
 
-class Action(object):
+class Action(Hook):
     """Juju action abstraction, providing dependency injection for testing."""
-
-    def __init__(self, hookenv=hookenv):
-        """
-        @param hookenv: The charm-helpers C{hookenv} module, will be replaced
-            by tests.
-        """
-        self._hookenv = hookenv
 
     def __call__(self):
         """
@@ -33,16 +27,17 @@ class Action(object):
         try:
             return_values = self._run()
             if return_values is not None:
-                self._hookenv.action_set(return_values)
+                self.set(return_values)
         except ActionError, error:
             self.fail(str(error))
 
     def fail(self, message):
+        """Mark the action as failed with 'message'."""
         self._hookenv.action_fail(message)
 
-    def _run(self):
-        """Run the action and return a dict of values."""
-        raise NotImplementedError("Must be implemented by sub-classes")
+    def set(self, values):
+        """Set the action return values to 'values'."""
+        self._hookenv.action_set(values)
 
 
 class MaintenanceAction(Action):
