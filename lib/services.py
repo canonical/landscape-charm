@@ -90,10 +90,3 @@ class ServicesHook(Hook):
         }])
 
         manager.manage()
-
-    def _set_haproxy_data(self, haproxy_provider):
-        """Provide and set the data in the haproxy relation."""
-        relation_ids = self._hookenv.relation_ids(HAProxyProvider.name)
-        data = haproxy_provider.provide_data()
-        for relation_id in relation_ids:
-            self._hookenv.relation_set(relation_id, data)
