@@ -233,6 +233,21 @@ class EnvironmentFixture(Fixture):
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
         self._deployment.sentry.wait()
 
+    def set_unit_count(self, service, new_count):
+        existing_units = sorted(
+            unit_name for unit_name in self._deployment.sentry.unit.keys()
+            if unit_name.startswith(service + "/"))
+        current_count = len(existing_units)
+        if current_count == new_count:
+            return
+        while current_count < new_count:
+            self._deployment.add_unit(service)
+            current_count += 1
+        while current_count > new_count:
+            self._deployment.destroy_unit(existing_units.pop())
+            current_count -= 1
+        self._deployment.sentry.wait()
+
     def _run(self, command, unit):
         """Run a command on the given unit.
 
@@ -372,6 +387,9 @@ def main(config=None):
     module = os.path.basename(sys.argv[0]).split("-")[1]
     args = sys.argv[:]
     args.extend(["-vv", "--path", path, "--tests-pattern", "^%s$" % module])
+    extra_args = os.environ.get("TEST_RUNNER_ARGS")
+    if extra_args:
+        args.extend(extra_args.split(" "))
     run(args=args)
 
 
