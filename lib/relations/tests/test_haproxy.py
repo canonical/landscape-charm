@@ -38,8 +38,9 @@ class HAProxyProviderTest(HookenvTest):
         The HAProxyProvider class feeds haproxy with the services that this
         Landscape unit runs. By default all services are run.
         """
+        self.hookenv.leader = False
         relation = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         # Provide some fake ssl-cert and ssl-key config entries
         config = self.hookenv.config()
@@ -135,7 +136,7 @@ class HAProxyProviderTest(HookenvTest):
                 fd.write("{} error page".format(name))
 
         relation = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         data = relation.provide_data()
         services = yaml.safe_load(data["services"])
@@ -156,7 +157,8 @@ class HAProxyProviderTest(HookenvTest):
         # Create an empty root tree
         temp_dir = self.useFixture(TempDir())
         provider = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=Paths(temp_dir.path))
+            SAMPLE_SERVICE_COUNT_DATA, paths=Paths(temp_dir.path),
+            hookenv=self.hookenv)
 
         self.assertRaises(HookError, provider.provide_data)
 
@@ -165,8 +167,9 @@ class HAProxyProviderTest(HookenvTest):
         If the unit is a leader, package-upload config is provided for
         the https service, but not for http.
         """
+        self.hookenv.leader = True
         relation = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, is_leader=True)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         data = relation.provide_data()
 
@@ -195,8 +198,9 @@ class HAProxyProviderTest(HookenvTest):
         If the unit is not a leader, package-upload config isn't
         provided for neither the https nor http services.
         """
+        self.hookenv.leader = False
         relation = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, is_leader=False)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         data = relation.provide_data()
 
@@ -226,7 +230,7 @@ class HAProxyProviderTest(HookenvTest):
         ["DEFAULT"] for the HAproxy SSL cert.
         """
         provider = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
@@ -316,9 +320,9 @@ class HAProxyProviderTest(HookenvTest):
         The landscape service leader writes a server entry in the
         landscape-package-upload backend.
         """
+        self.hookenv.leader = True
         provider = HAProxyProvider(
-            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv,
-            is_leader=True)
+            SAMPLE_SERVICE_COUNT_DATA, paths=self.paths, hookenv=self.hookenv)
 
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])

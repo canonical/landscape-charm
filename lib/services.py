@@ -56,8 +56,7 @@ class ServicesHook(Hook):
             "ports": [],
             "provided_data": [
                 LandscapeProvider(leader_context),
-                HAProxyProvider(
-                    SERVICE_COUNTS, paths=self._paths, is_leader=is_leader),
+                HAProxyProvider(SERVICE_COUNTS, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.

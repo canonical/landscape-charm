@@ -71,12 +71,10 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, service_counts, hookenv=hookenv, paths=default_paths,
-                 is_leader=False):
+    def __init__(self, service_counts, hookenv=hookenv, paths=default_paths):
         self._hookenv = hookenv
         self._service_counts = service_counts
         self._paths = paths
-        self._is_leader = is_leader
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
@@ -103,7 +101,7 @@ class HAProxyProvider(RelationContext):
             self._get_backend("message", self._get_servers("message-server")),
             self._get_backend("api", self._get_servers("api")),
         ]
-        if self._is_leader:
+        if self._hookenv.is_leader():
             self._hookenv.log(
                 "This unit is the juju leader: Writing package-upload backends"
                 " entry.")
