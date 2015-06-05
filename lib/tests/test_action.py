@@ -52,18 +52,6 @@ class ActionTest(HookenvTest):
         action()
         self.assertEqual(["no go"], self.hookenv._action_fails)
 
-    def test_fail(self):
-        """Action fail() method calls out to hookenv._action_fail()."""
-        action = DummyAction(hookenv=self.hookenv)
-        action.fail("test message")
-        self.assertEqual(["test message"], self.hookenv._action_fails)
-
-    def test_set(self):
-        """Action set() method calls out to hookenv._action_set()."""
-        action = DummyAction(hookenv=self.hookenv)
-        action.set({"foo": "bar"})
-        self.assertEqual([{"foo": "bar"}], self.hookenv._action_sets)
-
 
 class DummyMaintenanceAction(MaintenanceAction):
     executed = False

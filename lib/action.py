@@ -21,17 +21,9 @@ class Action(Hook):
         try:
             return_values = self._run()
             if return_values is not None:
-                self.set(return_values)
+                self._hookenv.action_set(return_values)
         except CharmError, error:
-            self.fail(str(error))
-
-    def fail(self, message):
-        """Mark the action as failed with 'message'."""
-        self._hookenv.action_fail(message)
-
-    def set(self, values):
-        """Set the action return values to 'values'."""
-        self._hookenv.action_set(values)
+            self._hookenv.action_fail(str(error))
 
 
 class MaintenanceAction(Action):
@@ -52,7 +44,7 @@ class MaintenanceAction(Action):
         @return: An integer with the exit code for the hook.
         """
         if not os.path.exists(self._paths.maintenance_flag()):
-            self.fail(
+            self._hookenv.action_fail(
                 "This action can only be called on a unit in paused state.")
             return
         super(MaintenanceAction, self).__call__()
