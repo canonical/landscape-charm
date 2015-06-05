@@ -19,6 +19,7 @@ class HookenvStub(object):
         self._charm_dir = charm_dir
         self.action_fails = []
         self.action_sets = []
+        self.action_gets = []
 
     def config(self):
         return self._config
@@ -75,6 +76,10 @@ class HookenvStub(object):
 
     def action_set(self, values):
         self.action_sets.append(values)
+
+    def action_get(self, key):
+        self.action_gets.append(key)
+        return "%s-value" % key
 
 
 class FetchStub(object):
