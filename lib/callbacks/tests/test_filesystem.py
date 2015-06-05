@@ -216,4 +216,3 @@ class WriteLicenseFileTest(HookenvTest):
         self.assertEqual(
             "Could not read license file from 'http://blah'",
             str(error.exception))
-

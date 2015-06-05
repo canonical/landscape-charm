@@ -27,7 +27,6 @@ class LicenseDataBase64DecodeError(CharmError):
         super(LicenseDataBase64DecodeError, self).__init__(message)
 
 
-
 class EnsureConfigDir(ManagerCallback):
     """Ensure that the config dir for the configured deployment mode exists.
 
