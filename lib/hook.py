@@ -61,5 +61,5 @@ class MaintenanceHook(Hook):
         if not os.path.exists(self._paths.maintenance_flag()):
             self._hookenv.action_fail(
                 "This action can only be called on a unit in paused state.")
-            return 1
+            return
         super(MaintenanceHook, self).__call__()
