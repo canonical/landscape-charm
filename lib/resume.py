@@ -2,11 +2,11 @@ import subprocess
 
 from charmhelpers.core import hookenv
 
-from lib.hook import MaintenanceHook
+from lib.action import MaintenanceAction
 from lib.paths import default_paths, LSCTL
 
 
-class ResumeAction(MaintenanceHook):
+class ResumeAction(MaintenanceAction):
     """Resume all Landscape services on the unit."""
 
     def __init__(self, hookenv=hookenv, paths=default_paths,
