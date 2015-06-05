@@ -68,6 +68,7 @@ lint:
 
 clean:
 	@rm -rf bundles
+	@find -name '*.pyc' -delete
 
 .PHONY: lint \
 	test-depends \

@@ -10,6 +10,7 @@ class HookenvStub(object):
     hook = "some-hook"
     unit = "landscape-server/0"
     relid = None
+    leader = True
 
     def __init__(self, charm_dir):
         self.messages = []
@@ -66,6 +67,9 @@ class HookenvStub(object):
     def charm_dir(self):
         return self._charm_dir
 
+    def is_leader(self):
+        return self.leader
+
     def action_fail(self, message):
         self._action_fails.append(message)
 
@@ -94,15 +98,6 @@ class FetchStub(object):
 
     def apt_install(self, packages, options=None, fatal=False):
         self.installed.append((packages, options, fatal))
-
-
-class ClusterStub(object):
-    """Testable stub for C{charmhelpers.contrib.hahelpers.cluster}."""
-
-    leader = True
-
-    def is_elected_leader(self, resource):
-        return self.leader
 
 
 class HostStub(object):
