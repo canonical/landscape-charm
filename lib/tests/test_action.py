@@ -38,10 +38,10 @@ class ActionTest(HookenvTest):
         self.assertTrue(action.executed)
 
     def test_run_with_return_values(self):
-        """If _run returns values, they are set with _action_set()."""
+        """If _run returns values, they are set with action_set()."""
         action = DummyActionWithValues(hookenv=self.hookenv)
         action()
-        self.assertEqual([{"key": "value"}], self.hookenv._action_sets)
+        self.assertEqual([{"key": "value"}], self.hookenv.action_sets)
 
     def test_run_raises_error(self):
         """
@@ -50,7 +50,7 @@ class ActionTest(HookenvTest):
         """
         action = DummyErrorAction(hookenv=self.hookenv)
         action()
-        self.assertEqual(["no go"], self.hookenv._action_fails)
+        self.assertEqual(["no go"], self.hookenv.action_fails)
 
 
 class DummyMaintenanceAction(MaintenanceAction):
@@ -90,4 +90,4 @@ class MaintenanceActionTest(HookenvTest):
         self.assertFalse(action.executed)
         self.assertEqual(
             ["This action can only be called on a unit in paused state."],
-            self.hookenv._action_fails)
+            self.hookenv.action_fails)
