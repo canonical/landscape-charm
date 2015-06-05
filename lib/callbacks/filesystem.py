@@ -14,8 +14,8 @@ from lib.paths import default_paths
 class LicenseFileUnreadableError(CharmError):
     """Unable to read the license file."""
 
-    def __init__(self, filename):
-        message = "Could not read license file from '%s'" % filename
+    def __init__(self, license_file_value):
+        message = "Could not read license file from '%s'" % license_file_value
         super(LicenseFileUnreadableError, self).__init__(message)
 
 
