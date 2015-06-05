@@ -8,6 +8,10 @@ DEPLOYMENT_MODES = ("standalone", "edge", "staging", "production")
 class InvalidDeploymentModeError(CharmError):
     """Invalid deployment mode."""
 
+    def __init__(self, deployment_mode):
+        message = "Invalid deployment-mode '%s'" % deployment_mode
+        super(InvalidDeploymentModeError, self).__init__(message)
+
 
 class HostedRequirer(RelationContext):
     """Relation data requirer for the 'hosted' interface.
@@ -37,5 +41,4 @@ class HostedRequirer(RelationContext):
             # is a subordinate charm.
             deployment_mode = data[0]["deployment-mode"]
             if deployment_mode not in DEPLOYMENT_MODES:
-                raise InvalidDeploymentModeError(
-                    "Invalid deployment-mode '%s'" % deployment_mode)
+                raise InvalidDeploymentModeError(deployment_mode)

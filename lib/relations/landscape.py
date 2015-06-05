@@ -6,8 +6,12 @@ from charmhelpers.core import host, hookenv
 from lib.error import CharmError
 
 
-class LeaderElectionError(CharmError):
+class SplitBrainError(CharmError):
     """Landscape leader election problem."""
+
+    def __init__(self):
+        message = "Split brain detected in leader election"
+        super(SplitBrainError, self).__init__(message)
 
 
 class LandscapeProvider(RelationContext):
@@ -63,8 +67,7 @@ class LandscapeRequirer(RelationContext):
             # store locally with the LandscapeLeaderContext class.
             leader_count += 1
         if leader_count > 1:
-            raise LeaderElectionError(
-                "Split brain detected in leader election")
+            raise SplitBrainError()
         elif leader_count == 1:
             self["leader"] = self._leader_context or data[0]
 

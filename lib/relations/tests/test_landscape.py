@@ -6,7 +6,7 @@ from lib.tests.stubs import HostStub
 from lib.tests.sample import SAMPLE_LEADER_CONTEXT_DATA
 from lib.relations.landscape import (
     LandscapeRequirer, LandscapeProvider, LandscapeLeaderContext,
-    LeaderElectionError)
+    SplitBrainError)
 
 
 class LandscapeRequirerTest(HookenvTest):
@@ -65,8 +65,10 @@ class LandscapeRequirerTest(HookenvTest):
                 }
             }
         }
-        self.assertRaises(
-            LeaderElectionError, LandscapeRequirer, SAMPLE_LEADER_CONTEXT_DATA)
+        with self.assertRaises(SplitBrainError) as error:
+            LandscapeRequirer(SAMPLE_LEADER_CONTEXT_DATA)
+        self.assertEqual(
+            "Split brain detected in leader election", error.exception.message)
 
     def test_not_ready(self):
         """

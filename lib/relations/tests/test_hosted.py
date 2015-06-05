@@ -57,4 +57,8 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        self.assertRaises(InvalidDeploymentModeError, HostedRequirer)
+        with self.assertRaises(InvalidDeploymentModeError) as error:
+            HostedRequirer()
+
+        self.assertEqual(
+            "Invalid deployment-mode 'foo'", error.exception.message)
