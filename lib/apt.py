@@ -39,8 +39,12 @@ apt-ftparchive release . > Release
 """
 
 
-class AptError(CharmError):
-    """Error with an apt module operation."""
+class AptNoSourceConfigError(CharmError):
+    """Raise when there is no source config provided."""
+
+    def __init__(self):
+        message = "No source config parameter defined"
+        super(AptNoSourceConfigError, self).__init__(message)
 
 
 class Apt(object):
@@ -91,7 +95,7 @@ class Apt(object):
         config = self._hookenv.config()
         source = config.get("source")
         if not source:
-            raise AptError("No source config parameter defined")
+            raise AptNoSourceConfigError()
 
         # Check if we're setting the source for the first time, or replacing
         # an existing value. In the latter case we'll no-op if the value is the

@@ -4,8 +4,8 @@ import subprocess
 from fixtures import TempDir
 
 from lib.apt import (
-    Apt, AptError, PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
-    SAMPLE_HASHIDS_KEY)
+    Apt, AptNoSourceConfigError, PACKAGES, DEFAULT_INSTALL_OPTIONS,
+    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
@@ -43,9 +43,9 @@ class AptTest(HookenvTest):
 
     def test_no_source(self):
         """
-        If no APT source is defined, we fail with an AptError.
+        If no APT source is defined, we fail with an AptNoSourceConfigError.
         """
-        with self.assertRaises(AptError) as error:
+        with self.assertRaises(AptNoSourceConfigError) as error:
             self.apt.set_sources()
         self.assertEqual(
             "No source config parameter defined", str(error.exception))

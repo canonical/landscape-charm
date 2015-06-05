@@ -11,8 +11,21 @@ from lib.error import CharmError
 from lib.paths import default_paths
 
 
-class LicenseFileError(CharmError):
-    """Problem with the license file."""
+class LicenseFileUnreadableError(CharmError):
+    """Unable to read the license file."""
+
+    def __init__(self, filename):
+        message = "Could not read license file from '%s'" % filename
+        super(LicenseFileUnreadableError, self).__init__(message)
+
+
+class LicenseDataBase64DecodeError(CharmError):
+    """Problem base64-decoding license data."""
+
+    def __init__(self):
+        message = "Error base64-decoding license-file data."
+        super(LicenseDataBase64DecodeError, self).__init__(message)
+
 
 
 class EnsureConfigDir(ManagerCallback):
@@ -98,15 +111,12 @@ class WriteLicenseFile(ManagerCallback):
                 license_file = urllib2.urlopen(license_file_value)
                 license_data = license_file.read()
             except urllib2.URLError:
-                raise LicenseFileError(
-                    "Could not read license file from '%s'." % (
-                        license_file_value))
+                raise LicenseFileUnreadableError(license_file_value)
         else:
             try:
                 license_data = base64.b64decode(license_file_value)
             except TypeError:
-                raise LicenseFileError(
-                    "Error base64-decoding license-file data.")
+                raise LicenseDataBase64DecodeError()
 
         self._host.write_file(
             self._paths.license_file(), license_data,
