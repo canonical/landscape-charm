@@ -48,5 +48,5 @@ class ConfigRequirer(dict):
         openid_provider_url = config.get("openid-provider-url")
         openid_logout_url = config.get("openid-logout-url")
         if ((openid_provider_url and not openid_logout_url) or
-           (not openid_provider_url and openid_logout_url)):
+                (not openid_provider_url and openid_logout_url)):
             raise OpenIDConfigurationError()

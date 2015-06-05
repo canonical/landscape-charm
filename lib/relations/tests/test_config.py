@@ -59,11 +59,27 @@ class ServicesHookTest(HookenvTest):
         self.assertEqual({"config": {"root-url": "https://example.com/"}},
                          result)
 
-    def test_openid_options_one_missing(self):
+    def test_openid_options_provider_missing(self):
         """
-        If one openid option is provided but not the other, error is raised.
+        If openid_provider_url option is provided but not openid_logout_url,
+        an error is raised.
         """
         self.hookenv.config().update({"openid-provider-url": "blah"})
+
+        with self.assertRaises(OpenIDConfigurationError) as error:
+            ConfigRequirer(hookenv=self.hookenv)
+
+        expected = (
+            "To set up OpenID authentication, both 'openid-provider-url' "
+            "and 'openid-logout-url' must be provided.")
+        self.assertEqual(expected, error.exception.message)
+
+    def test_openid_options_logout_missing(self):
+        """
+        If openid_logout_url option is provided but not openid_provider_url,
+        an error is raised.
+        """
+        self.hookenv.config().update({"openid-logout-url": "blah"})
 
         with self.assertRaises(OpenIDConfigurationError) as error:
             ConfigRequirer(hookenv=self.hookenv)
