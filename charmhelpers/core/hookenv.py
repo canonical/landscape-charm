@@ -364,11 +364,16 @@ def relation_set(relation_id=None, relation_settings=None, **kwargs):
     relation_settings = relation_settings if relation_settings else {}
     relation_cmd_line = ['relation-set']
     accepts_file = "--file" in subprocess.check_output(
-        relation_cmd_line + ["--help"])
+        relation_cmd_line + ["--help"], universal_newlines=True)
     if relation_id is not None:
         relation_cmd_line.extend(('-r', relation_id))
     settings = relation_settings.copy()
     settings.update(kwargs)
+    for key, value in settings.items():
+        # Force value to be a string: it always should, but some call
+        # sites pass in things like dicts or numbers.
+        if value is not None:
+            settings[key] = "{}".format(value)
     if accepts_file:
         # --file was introduced in Juju 1.23.2. Use it by default if
         # available, since otherwise we'll break if the relation data is
@@ -388,6 +393,17 @@ def relation_set(relation_id=None, relation_settings=None, **kwargs):
         subprocess.check_call(relation_cmd_line)
     # Flush cache of any relation-gets for local unit
     flush(local_unit())
+
+
+def relation_clear(r_id=None):
+    ''' Clears any relation data already set on relation r_id '''
+    settings = relation_get(rid=r_id,
+                            unit=local_unit())
+    for setting in settings:
+        if setting not in ['public-address', 'private-address']:
+            settings[setting] = None
+    relation_set(relation_id=r_id,
+                 **settings)
 
 
 @cached
@@ -681,3 +697,48 @@ def status_get():
             return 'unknown'
         else:
             raise
+
+
+def translate_exc(from_exc, to_exc):
+    def inner_translate_exc1(f):
+        def inner_translate_exc2(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except from_exc:
+                raise to_exc
+
+        return inner_translate_exc2
+
+    return inner_translate_exc1
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def is_leader():
+    """Does the current unit hold the juju leadership
+
+    Uses juju to determine whether the current unit is the leader of its peers
+    """
+    cmd = ['is-leader', '--format=json']
+    return json.loads(subprocess.check_output(cmd).decode('UTF-8'))
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def leader_get(attribute=None):
+    """Juju leader get value(s)"""
+    cmd = ['leader-get', '--format=json'] + [attribute or '-']
+    return json.loads(subprocess.check_output(cmd).decode('UTF-8'))
+
+
+@translate_exc(from_exc=OSError, to_exc=NotImplementedError)
+def leader_set(settings=None, **kwargs):
+    """Juju leader set value(s)"""
+    log("Juju leader-set '%s'" % (settings), level=DEBUG)
+    cmd = ['leader-set']
+    settings = settings or {}
+    settings.update(kwargs)
+    for k, v in settings.iteritems():
+        if v is None:
+            cmd.append('{}='.format(k))
+        else:
+            cmd.append('{}={}'.format(k, v))
+    subprocess.check_call(cmd)

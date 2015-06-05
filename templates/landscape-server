@@ -12,7 +12,7 @@ RUN_ALL="no"
 # set the services you want to run to "yes".
 # If you want to start more than one copy of each service, use a number
 # instead of "yes" or "no". Currently, only msg, app and ping support this.
-RUN_APPSERVER="yes"
+RUN_APPSERVER="{{ service_counts["appserver"] }}"
 RUN_ASYNC_FRONTEND="yes"
 RUN_JOBHANDLER="yes"
 RUN_MSGSERVER="{{ service_counts["message-server"] }}"
