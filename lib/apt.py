@@ -7,7 +7,7 @@ import subprocess
 from charmhelpers import fetch
 from charmhelpers.core import hookenv
 
-from lib.hook import HookError
+from lib.error import CharmError
 from lib.paths import default_paths
 
 PACKAGES = ("landscape-server",)
@@ -37,6 +37,10 @@ cat Sources | bzip2 -9 > Sources.bz2 &&
 cat Sources | gzip -9 > Sources.gz &&
 apt-ftparchive release . > Release
 """
+
+
+class AptError(CharmError):
+    """Error with an apt module operation."""
 
 
 class Apt(object):
@@ -87,7 +91,7 @@ class Apt(object):
         config = self._hookenv.config()
         source = config.get("source")
         if not source:
-            raise HookError("No source config parameter defined")
+            raise AptError("No source config parameter defined")
 
         # Check if we're setting the source for the first time, or replacing
         # an existing value. In the latter case we'll no-op if the value is the
