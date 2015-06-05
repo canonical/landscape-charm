@@ -5,7 +5,7 @@ import yaml
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
-from lib.hook import HookError
+from lib.error import CharmError
 from lib.paths import default_paths
 
 
@@ -62,6 +62,32 @@ ERRORFILES_MAP = {
     "503": "unplanned-offline-haproxy.html",
     "504": "timeout-haproxy.html",
 }
+
+
+class SSLCertificateKeyMissingError(CharmError):
+    """SSL certificate is specificed but ssl-key configuration is missing."""
+
+    def __init__(self):
+        message = "'ssl-cert' is specified but 'ssl-key' is missing!"
+        super(SSLCertificateKeyMissingError, self).__init__(message)
+
+
+class SSLCertificateInvalidDataError(CharmError):
+    """SSL certificate configuration is invalid."""
+
+    def __init__(self):
+        message = (
+            "The supplied 'ssl-cert' or 'ssl-key' parameters are "
+            "not valid base64.")
+        super(SSLCertificateInvalidDataError, self).__init__(message)
+
+
+class ErrorFilesConfigurationError(CharmError):
+    """HAProxy error-files configuration problem."""
+
+    def __init__(self, path, message):
+        message = "Could not read '%s' (%s)!" % (path, message)
+        super(ErrorFilesConfigurationError, self).__init__(message)
 
 
 class HAProxyProvider(RelationContext):
@@ -192,8 +218,7 @@ class HAProxyProvider(RelationContext):
                 with open(path, "r") as error_file:
                     content = error_file.read()
             except IOError as error:
-                raise HookError(
-                    "Could not read '%s' (%s)!" % (path, str(error)))
+                raise ErrorFilesConfigurationError(path, str(error))
 
             entry = {"http_status": error_code,
                      "content": base64.b64encode(content)}
@@ -220,16 +245,13 @@ class HAProxyProvider(RelationContext):
 
         if ssl_key == "":
             # A cert is specified, but no key. Error out.
-            raise HookError(
-                "'ssl-cert' is specified but 'ssl-key' is missing!")
+            raise SSLCertificateKeyMissingError()
 
         try:
             decoded_cert = base64.b64decode(ssl_cert)
             decoded_key = base64.b64decode(ssl_key)
         except TypeError:
-            raise HookError(
-                "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
-                " base64.")
+            raise SSLCertificateInvalidDataError()
 
         decoded_pem = "%s\n%s" % (decoded_cert, decoded_key)
 
