@@ -5,7 +5,7 @@ import yaml
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
-from lib.hook import HookError
+from lib.error import CharmError
 from lib.paths import default_paths
 
 
@@ -64,6 +64,14 @@ ERRORFILES_MAP = {
     "503": "unplanned-offline-haproxy.html",
     "504": "timeout-haproxy.html",
 }
+
+
+class SSLCertificateConfigurationError(CharmError):
+    """SSL certificate configuration is invalid."""
+
+
+class ErrorFilesConfigurationError(CharmError):
+    """HAProxy error-files configuration problem."""
 
 
 class HAProxyProvider(RelationContext):
@@ -191,7 +199,7 @@ class HAProxyProvider(RelationContext):
                 with open(path, "r") as error_file:
                     content = error_file.read()
             except IOError as error:
-                raise HookError(
+                raise ErrorFilesConfigurationError(
                     "Could not read '%s' (%s)!" % (path, str(error)))
 
             entry = {"http_status": error_code,
@@ -219,14 +227,14 @@ class HAProxyProvider(RelationContext):
 
         if ssl_key == "":
             # A cert is specified, but no key. Error out.
-            raise HookError(
+            raise SSLCertificateConfigurationError(
                 "'ssl-cert' is specified but 'ssl-key' is missing!")
 
         try:
             decoded_cert = base64.b64decode(ssl_cert)
             decoded_key = base64.b64decode(ssl_key)
         except TypeError:
-            raise HookError(
+            raise SSLCertificateConfigurationError(
                 "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
                 " base64.")
 

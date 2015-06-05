@@ -5,8 +5,8 @@ import yaml
 from fixtures import TempDir
 
 from lib.relations.haproxy import (
-    HAProxyProvider, HAProxyRequirer, SERVER_OPTIONS, ERRORFILES_MAP)
-from lib.hook import HookError
+    HAProxyProvider, HAProxyRequirer, SERVER_OPTIONS, ERRORFILES_MAP,
+    SSLCertificateConfigurationError, ErrorFilesConfigurationError)
 from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
 from lib.tests.sample import SAMPLE_SERVICE_COUNT_DATA
@@ -149,14 +149,14 @@ class HAProxyProviderTest(HookenvTest):
     def test_files_cannot_be_read(self):
         """
         In case a file specified in the errorfiles map cannot be read, the
-        provide_data method raises a HookError.
+        provide_data method raises an ErrorFilesConfigurationError.
         """
         # Create an empty root tree
         temp_dir = self.useFixture(TempDir())
         provider = HAProxyProvider(
             SAMPLE_SERVICE_COUNT_DATA, paths=Paths(temp_dir.path))
 
-        self.assertRaises(HookError, provider.provide_data)
+        self.assertRaises(ErrorFilesConfigurationError, provider.provide_data)
 
     def test_default_ssl_cert_is_used_without_config_keys(self):
         """
@@ -192,10 +192,10 @@ class HAProxyProviderTest(HookenvTest):
         decoded_result = base64.b64decode(https_service["crts"][0])
         self.assertEqual(expected, decoded_result)
 
-    def test_provide_data_raises_hookerror_for_invalid_b64_cert(self):
+    def test_provide_data_raises_sslerror_for_invalid_b64_cert(self):
         """
         When passed a cert that is not valid b64, the provide_data method
-        raises a HookError.
+        raises a SSLCertificateConfigurationError.
         """
         config = self.hookenv.config()
         config["ssl-cert"] = "a cert"  # Not b64 encoded!
@@ -208,14 +208,14 @@ class HAProxyProviderTest(HookenvTest):
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
             " base64.")
 
-        with self.assertRaises(HookError) as error:
+        with self.assertRaises(SSLCertificateConfigurationError) as error:
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
 
-    def test_provide_data_raises_hookerror_for_invalid_b64_key(self):
+    def test_provide_data_raises_sslerror_for_invalid_b64_key(self):
         """
         When passed a key that is not valid b64, the provide_data method
-        raises a HookError.
+        raises a SSLCertificateConfigurationError.
         """
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
@@ -228,14 +228,14 @@ class HAProxyProviderTest(HookenvTest):
             "The supplied 'ssl-cert' or 'ssl-key' parameter is not valid"
             " base64.")
 
-        with self.assertRaises(HookError) as error:
+        with self.assertRaises(SSLCertificateConfigurationError) as error:
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
 
-    def test_provide_data_raises_hookerror_for_missing_key(self):
+    def test_provide_data_raises_sslerror_for_missing_key(self):
         """
         When an ssl-cert config key is present but no ssl-key was specified,
-        the provide_data method raises a HookError.
+        the provide_data method raises a SSLCertificateConfigurationError.
         """
         config = self.hookenv.config()
         config["ssl-cert"] = base64.b64encode("a cert")
@@ -245,7 +245,7 @@ class HAProxyProviderTest(HookenvTest):
 
         expected = "'ssl-cert' is specified but 'ssl-key' is missing!"
 
-        with self.assertRaises(HookError) as error:
+        with self.assertRaises(SSLCertificateConfigurationError) as error:
             provider.provide_data()
         self.assertEqual(expected, str(error.exception))
 
