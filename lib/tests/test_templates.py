@@ -64,6 +64,21 @@ class ServiceConfTest(TemplateTest):
             "http://openid-host/logout",
             config.get("landscape", "openid-logout-url"))
 
+    def test_render_with_openid_both_required(self):
+        """
+        When only one of OpenID configuration keys is present, neither
+        openid-related options are set.
+        """
+        config = self.context["config"]
+        config.update({
+            "openid-provider-url": "http://openid-host/",
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertFalse(config.has_option("landscape", "openid-provider-url"))
+        self.assertFalse(config.has_option("landscape", "openid-logout-url"))
+
     def test_render_with_package_search_on_leader(self):
         """
         The service.conf file on the leader has a package-search host set

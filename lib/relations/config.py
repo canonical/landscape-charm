@@ -13,6 +13,20 @@ class RootUrlNotValidError(CharmError):
         super(RootUrlNotValidError, self).__init__(message)
 
 
+class OpenIDConfigurationError(CharmError):
+    """
+    OpenID configuration is invalid.
+
+    Both provider and logout URL must be set.
+    """
+
+    def __init__(self):
+        message = (
+            "To set up OpenID authentication, both 'openid-provider-url' "
+            "and 'openid-logout-url' must be provided.")
+        super(OpenIDConfigurationError, self).__init__(message)
+
+
 class ConfigRequirer(dict):
     """Dependency manager for the service configuration.
 
@@ -28,3 +42,11 @@ class ConfigRequirer(dict):
         root_url = config.get("root-url")
         if root_url and not is_valid_url(root_url):
             raise RootUrlNotValidError()
+
+        # When OpenID authentication is requested, both 'openid_provider_url'
+        # and 'openid_logout_url' must be defined in the configuration.
+        openid_provider_url = config.get("openid-provider-url")
+        openid_logout_url = config.get("openid-logout-url")
+        if ((openid_provider_url and not openid_logout_url) or
+                (not openid_provider_url and openid_logout_url)):
+            raise OpenIDConfigurationError()
