@@ -10,7 +10,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile,
-    LicenseFileError)
+    LicenseFileUnreadableError, LicenseDataBase64DecodeError)
 
 
 class EnsureConfigDirTest(HookenvTest):
@@ -116,7 +116,7 @@ class WriteLicenseFileTest(HookenvTest):
     def test_license_file_bad_data(self):
         """
         When license-file is not a URL and not base64-encoded data, fails
-        with LicenseFileError.
+        with LicenseDataBase64DecodeError.
         """
         self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
 
@@ -128,8 +128,10 @@ class WriteLicenseFileTest(HookenvTest):
                 }},
             ],
         }])
-        self.assertRaises(
-            LicenseFileError, self.callback, manager, "landscape", None)
+        with self.assertRaises(LicenseDataBase64DecodeError) as error:
+            self.callback(manager, "landscape", None)
+        self.assertEqual(
+            "Error base64-decoding license-file data.", str(error.exception))
 
     def test_license_file_file_url(self):
         """
@@ -209,5 +211,8 @@ class WriteLicenseFileTest(HookenvTest):
                 }},
             ],
         }])
-        self.assertRaises(
-            LicenseFileError, self.callback, manager, "landscape", None)
+        with self.assertRaises(LicenseFileUnreadableError) as error:
+            self.callback(manager, "landscape", None)
+        self.assertEqual(
+            "Could not read license file from 'http://blah'",
+            str(error.exception))

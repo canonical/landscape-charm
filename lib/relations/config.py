@@ -3,8 +3,14 @@ from lib.error import CharmError
 from lib.utils import is_valid_url
 
 
-class ConfigError(CharmError):
-    """Charm configuration problem."""
+class RootUrlNotValidError(CharmError):
+    """Charm root-url is not a valid URL."""
+
+    def __init__(self):
+        message = (
+            "The 'root-url' configuration value is not a valid URL. "
+            "Please make sure it is of the form 'http[s]://<hostname>/'")
+        super(RootUrlNotValidError, self).__init__(message)
 
 
 class ConfigRequirer(dict):
@@ -21,7 +27,4 @@ class ConfigRequirer(dict):
     def _validate(self, config):
         root_url = config.get("root-url")
         if root_url and not is_valid_url(root_url):
-            raise ConfigError(
-                "The 'root-url' configuration value is not a valid URL."
-                " Please make sure it is of the form"
-                " 'http[s]://<hostname>/'")
+            raise RootUrlNotValidError()

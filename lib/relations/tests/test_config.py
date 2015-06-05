@@ -1,5 +1,5 @@
 from lib.tests.helpers import HookenvTest
-from lib.relations.config import ConfigError, ConfigRequirer
+from lib.relations.config import ConfigRequirer, RootUrlNotValidError
 
 
 class ServicesHookTest(HookenvTest):
@@ -10,12 +10,12 @@ class ServicesHookTest(HookenvTest):
         """
         self.hookenv.config().update({"root-url": "asd"})
 
-        with self.assertRaises(ConfigError) as error:
+        with self.assertRaises(RootUrlNotValidError) as error:
             ConfigRequirer(hookenv=self.hookenv)
 
-        expected = ("The 'root-url' configuration value is not a valid URL."
-                    " Please make sure it is of the form"
-                    " 'http[s]://<hostname>/'")
+        expected = (
+            "The 'root-url' configuration value is not a valid URL. "
+            "Please make sure it is of the form 'http[s]://<hostname>/'")
         self.assertEqual(expected, error.exception.message)
 
     def test_root_url_is_set_without_protocol(self):
@@ -24,12 +24,13 @@ class ServicesHookTest(HookenvTest):
         ConfigError is raised.
         """
         self.hookenv.config().update({"root-url": "example.com/"})
-        with self.assertRaises(ConfigError) as error:
+
+        with self.assertRaises(RootUrlNotValidError) as error:
             ConfigRequirer(hookenv=self.hookenv)
 
-        expected = ("The 'root-url' configuration value is not a valid URL."
-                    " Please make sure it is of the form"
-                    " 'http[s]://<hostname>/'")
+        expected = (
+            "The 'root-url' configuration value is not a valid URL. "
+            "Please make sure it is of the form 'http[s]://<hostname>/'")
         self.assertEqual(expected, error.exception.message)
 
     def test_root_url_is_set_without_trailing_slash(self):
@@ -38,12 +39,12 @@ class ServicesHookTest(HookenvTest):
         a ConfigError is raised.
         """
         self.hookenv.config().update({"root-url": "https://example.com"})
-        with self.assertRaises(ConfigError) as error:
+        with self.assertRaises(RootUrlNotValidError) as error:
             ConfigRequirer(hookenv=self.hookenv)
 
-        expected = ("The 'root-url' configuration value is not a valid URL."
-                    " Please make sure it is of the form"
-                    " 'http[s]://<hostname>/'")
+        expected = (
+            "The 'root-url' configuration value is not a valid URL. "
+            "Please make sure it is of the form 'http[s]://<hostname>/'")
         self.assertEqual(expected, error.exception.message)
 
     def test_a_valid_root_url_configuration_key_is_set(self):
