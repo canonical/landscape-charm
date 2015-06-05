@@ -3,14 +3,8 @@ import os.path
 from charmhelpers.core import hookenv
 from charmhelpers.core.hookenv import ERROR
 
+from lib.error import CharmError
 from lib.paths import default_paths
-
-
-class HookError(Exception):
-    """Raised by hooks when they want to fail.
-
-    Raising this exception will make the hook process exit non-zero.
-    """
 
 
 class Hook(object):
@@ -31,7 +25,7 @@ class Hook(object):
         self._hookenv.log("Invoke handler for %s" % self._hookenv.hook_name())
         try:
             self._run()
-        except HookError, error:
+        except CharmError as error:
             self._hookenv.log(str(error), ERROR)
             return 1
         return 0
