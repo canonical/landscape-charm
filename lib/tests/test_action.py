@@ -1,8 +1,10 @@
 import os
 
+from lib.action import Action, MaintenanceAction
+from lib.error import CharmError
+
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
-from lib.action import Action, ActionError, MaintenanceAction
 
 
 class DummyAction(Action):
@@ -19,7 +21,7 @@ class DummyActionWithValues(Action):
 
 class DummyErrorAction(Action):
     def _run(self):
-        raise ActionError("no go")
+        raise CharmError("no go")
 
 
 class ActionTest(HookenvTest):

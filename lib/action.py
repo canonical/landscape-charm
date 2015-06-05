@@ -2,15 +2,9 @@ import os.path
 
 from charmhelpers.core import hookenv
 
-from lib.hook import Hook, HookError
+from lib.error import CharmError
+from lib.hook import Hook
 from lib.paths import default_paths
-
-
-class ActionError(HookError):
-    """Raised by actions when they want to fail.
-
-    Raising this exception will make the action process exit with action_fail.
-    """
 
 
 class Action(Hook):
@@ -21,14 +15,14 @@ class Action(Hook):
         Invoke the action's run() method.
 
         If _run() returns a value, set it using action_set().
-        If _run() throws an ActionError, fail using action.fail().
+        If _run() throws a CharmError, fail using action.fail().
         """
         self._hookenv.log("Running action %s" % type(self).__name__)
         try:
             return_values = self._run()
             if return_values is not None:
                 self.set(return_values)
-        except ActionError, error:
+        except CharmError, error:
             self.fail(str(error))
 
     def fail(self, message):
