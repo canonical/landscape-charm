@@ -32,24 +32,37 @@ class ActionTest(HookenvTest):
         self.paths = self.root_dir.paths
 
     def test_run(self):
-        """Calling a dummy hook runs only with maintenance flag set."""
+        """Calling an action executes the _run method."""
         action = DummyAction(hookenv=self.hookenv)
         action()
         self.assertTrue(action.executed)
 
     def test_run_with_return_values(self):
-        """Calling a dummy hook runs only with maintenance flag set."""
+        """If _run returns values, they are set with _action_set()."""
         action = DummyActionWithValues(hookenv=self.hookenv)
         action()
         self.assertEqual([{"key": "value"}], self.hookenv._action_sets)
 
     def test_run_raises_error(self):
         """
-        When maintenance flag file is absent, maintenance hooks are no-ops.
+        If action fails with a CharmError, it is set as failed with the
+        exception message as the error message.
         """
         action = DummyErrorAction(hookenv=self.hookenv)
         action()
         self.assertEqual(["no go"], self.hookenv._action_fails)
+
+    def test_fail(self):
+        """Action fail() method calls out to hookenv._action_fail()."""
+        action = DummyAction(hookenv=self.hookenv)
+        action.fail("test message")
+        self.assertEqual(["test message"], self.hookenv._action_fails)
+
+    def test_set(self):
+        """Action set() method calls out to hookenv._action_set()."""
+        action = DummyAction(hookenv=self.hookenv)
+        action.set({"foo": "bar"})
+        self.assertEqual([{"foo": "bar"}], self.hookenv._action_sets)
 
 
 class DummyMaintenanceAction(MaintenanceAction):
