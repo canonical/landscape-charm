@@ -2,11 +2,11 @@ import subprocess
 
 from charmhelpers.core import hookenv
 
-from lib.hook import MaintenanceHook
+from lib.action import MaintenanceAction
 from lib.paths import default_paths, SCHEMA_SCRIPT
 
 
-class MigrateSchemaAction(MaintenanceHook):
+class MigrateSchemaAction(MaintenanceAction):
     """Execute schema upgrade action logic."""
 
     def __init__(self, hookenv=hookenv, paths=default_paths,

@@ -6,7 +6,7 @@ test:
 
 ci-test:
 	./dev/ubuntu-deps
-	$(MAKE) test
+	$(MAKE) test lint
 
 verify-juju-test:
 	@echo "Checking for ... "
