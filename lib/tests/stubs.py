@@ -18,6 +18,7 @@ class HookenvStub(object):
         self._config = Config()
         self._charm_dir = charm_dir
         self._action_fails = []
+        self._leader_data = {}
 
     def config(self):
         return self._config
@@ -71,6 +72,12 @@ class HookenvStub(object):
 
     def is_leader(self):
         return self.leader
+
+    def leader_set(self, settings):
+        self._leader_data = settings
+
+    def leader_get(self):
+        return self._leader_data
 
 
 class FetchStub(object):

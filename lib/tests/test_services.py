@@ -7,7 +7,7 @@ from charmhelpers.core import templating
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import HostStub, SubprocessStub, FetchStub
 from lib.tests.sample import (
-    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
+    SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
     SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
 from lib.services import ServicesHook
@@ -98,7 +98,7 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "leader": SAMPLE_LEADER_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "website": [SAMPLE_WEBSITE_UNIT_DATA],
             "hosted": [SAMPLE_HOSTED_DATA],
@@ -155,7 +155,7 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
-            "leader": SAMPLE_LEADER_CONTEXT_DATA,
+            "leader": SAMPLE_LEADER_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "website": [SAMPLE_WEBSITE_UNIT_DATA],
             "config": SAMPLE_CONFIG_OPENID_DATA,
@@ -177,22 +177,16 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.leader = False
         self.hook()
         self.assertIn(
-            ("Incomplete relation: LandscapeRequirer", "DEBUG"),
+            ("Incomplete data: LeaderRequirer", "DEBUG"),
             self.hookenv.messages)
 
     def test_remote_leader_ready(self):
         """
-        If we're not the leader unit and we got relation data from the leader,
+        If we're not the leader unit and we got leader data from the leader,
         along with the rest of required relations, then we're good.
         """
         self.hookenv.leader = False
-        self.hookenv.relations.update({
-            "cluster": {
-                "cluster:1": {
-                    "landscape/0": SAMPLE_LEADER_CONTEXT_DATA,
-                },
-            },
-        })
+        self.hookenv.leader_set(SAMPLE_LEADER_DATA)
         self.hook()
         self.assertEqual(2, len(self.renders))
 
