@@ -152,6 +152,36 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
+    def check_app_server(self):
+        self.check_url("/", "passphrase")
+
+    def check_message_server(self):
+        good_content = ["ds8:messagesl", "s11:server-uuid"]
+        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
+                     "sequencei0;;")
+        header = "X-MESSAGE-API: 3.1"
+        self.check_url(
+            "/message-system", good_content, post_data=post_data,
+            header=header)
+
+    def check_ping_server(self):
+        self.check_url(
+            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
+
+    def check_api_server(self):
+        """Verify that the API service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        self.check_url("/api", "Query API Service")
+
+    def check_package_upload_server(self):
+        """Verify that the PACKAGE UPLOAD service is up.
+
+        Specifically that it is reachable and returns its name.
+        """
+        self.check_url("/upload", "package upload service")
+
     def pause_landscape(self, unit=0):
         """Execute the 'pause' action on a Landscape unit.
 
@@ -246,6 +276,7 @@ class EnvironmentFixture(Fixture):
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
             current_count -= 1
+        self._deployment.sentry.wait()
         self._deployment.sentry.wait()
 
     def _run(self, command, unit):
