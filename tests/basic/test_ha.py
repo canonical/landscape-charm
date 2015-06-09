@@ -1,6 +1,3 @@
-"""
-"""
-
 from helpers import IntegrationTest
 from layers import TwoLandscapeUnitsLayer
 

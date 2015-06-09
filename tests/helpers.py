@@ -166,7 +166,7 @@ class EnvironmentFixture(Fixture):
                 "path": "/message-system",
                 "post_data": (
                     "ds8:messagesl;s22:next-expected-sequencei0;s8:"
-                     "sequencei0;;"),
+                    "sequencei0;;"),
                 "header": "X-MESSAGE-API: 3.1",
                 "up": ["ds8:messagesl", "s11:server-uuid"],
                 "down": "Landscape is unavailable"},
@@ -184,7 +184,7 @@ class EnvironmentFixture(Fixture):
                 "up": "package upload service",
                 "down": "Landscape is unavailable"},
         }
-        service = services[name] 
+        service = services[name]
         self.check_url(
             service["path"], service[state],
             proto=service.get("protocol", "https"),
