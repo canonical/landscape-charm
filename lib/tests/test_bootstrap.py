@@ -22,9 +22,11 @@ class BootstrapActionTest(HookenvTest):
         self.action()
         # HookenvStub.action_get returns 'key-value' as
         # the value for each 'key'.
+        [(command, kwargs)] = self.subprocess.calls
         self.assertEqual(
-            [(("/usr/bin/landscape-schema", "--create-lds-account-only",
-               "--admin-name", "admin-name-value",
-               "--admin-email", "admin-email-value",
-               "--admin-password", "admin-password-value"), {})],
-            self.subprocess.calls)
+            (("/usr/bin/landscape-schema", "--create-lds-account-only",
+              "--admin-name", "admin-name-value",
+              "--admin-email", "admin-email-value",
+              "--admin-password", "admin-password-value"), {}),
+            (command, kwargs))
+
