@@ -64,5 +64,5 @@ class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
     @classmethod
     def setUp(cls):
         cls.environment.set_unit_count("landscape-server", 2)
-        cls.leader, [cls.non_leader] = cls.environment.get_unit_numbers(
+        cls.leader, [cls.non_leader] = cls.environment.get_unit_ids(
             "landscape-server")

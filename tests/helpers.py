@@ -298,8 +298,8 @@ class EnvironmentFixture(Fixture):
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
 
-    def get_unit_numbers(self, service):
-        """Return the number parts for the unit names for the given service.
+    def get_unit_ids(self, service):
+        """Return the numerical id parts for the units of the given service.
 
         A tuple with (leader, list_of_non_leaders) is returned.
 
