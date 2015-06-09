@@ -113,7 +113,7 @@ class EnvironmentFixture(Fixture):
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None, interval=5):
+                  header=None, attempts=2, interval=5):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
@@ -126,8 +126,6 @@ class EnvironmentFixture(Fixture):
         @param header: optional request header string
         @param interval: seconds two wait between attempts
         """
-        attempts = 2
-
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
         if type(good_content) is not list:
@@ -152,35 +150,40 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
-    def check_app_server(self):
-        self.check_url("/", "passphrase")
-
-    def check_message_server(self):
-        good_content = ["ds8:messagesl", "s11:server-uuid"]
-        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
-                     "sequencei0;;")
-        header = "X-MESSAGE-API: 3.1"
+    def check_service(self, name, state="up", attempts=2, interval=5):
+        services = {
+            "appserver": {
+                "path": "/",
+                "up": "passphrase",
+                "down": "Landscape is unavailable"},
+            "msgserver": {
+                "path": "/message-system",
+                "post_data": (
+                    "ds8:messagesl;s22:next-expected-sequencei0;s8:"
+                     "sequencei0;;"),
+                "header": "X-MESSAGE-API: 3.1",
+                "up": ["ds8:messagesl", "s11:server-uuid"],
+                "down": "Landscape is unavailable"},
+            "pingserver": {
+                "path": "/ping",
+                "protocol": "http",
+                "up": "ds5:errors19:provide insecure_id;",
+                "down": "Landscape is unavailable"},
+            "api": {
+                "path": "/api",
+                "up": "Query API Service",
+                "down": "Landscape is unavailable"},
+            "package-upload": {
+                "path": "/upload",
+                "up": "package upload service",
+                "down": "Landscape is unavailable"},
+        }
+        service = services[name] 
         self.check_url(
-            "/message-system", good_content, post_data=post_data,
-            header=header)
-
-    def check_ping_server(self):
-        self.check_url(
-            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
-
-    def check_api_server(self):
-        """Verify that the API service is up.
-
-        Specifically that it is reachable and returns its name.
-        """
-        self.check_url("/api", "Query API Service")
-
-    def check_package_upload_server(self):
-        """Verify that the PACKAGE UPLOAD service is up.
-
-        Specifically that it is reachable and returns its name.
-        """
-        self.check_url("/upload", "package upload service")
+            service["path"], service[state],
+            proto=service.get("protocol", "https"),
+            post_data=service.get("post_data"), header=service.get("header"),
+            attempts=attempts, interval=interval)
 
     def pause_landscape(self, unit=0):
         """Execute the 'pause' action on a Landscape unit.

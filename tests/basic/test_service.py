@@ -29,7 +29,7 @@ class ServiceTest(IntegrationTest):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        self.environment.check_app_server()
+        self.environment.check_service("appserver")
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -37,7 +37,7 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to requests.
         """
-        self.environment.check_message_server()
+        self.environment.check_service("msgserver")
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -45,21 +45,21 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
-        self.environment.check_ping_server()
+        self.environment.check_service("pingserver")
 
     def test_api(self):
         """Verify that the API service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_api_server()
+        self.environment.check_service("apiserver")
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_package_upload_server()
+        self.environment.check_service("package-upload")
 
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
