@@ -29,7 +29,7 @@ class ServiceTest(IntegrationTest):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        self.environment.check_url("/", "passphrase")
+        self.environment.check_service("appserver")
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -37,13 +37,7 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to requests.
         """
-        good_content = ["ds8:messagesl", "s11:server-uuid"]
-        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
-                     "sequencei0;;")
-        header = "X-MESSAGE-API: 3.1"
-        self.environment.check_url(
-            "/message-system", good_content, post_data=post_data,
-            header=header)
+        self.environment.check_service("msgserver")
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -51,22 +45,21 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
-        self.environment.check_url(
-            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
+        self.environment.check_service("pingserver")
 
     def test_api(self):
         """Verify that the API service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_url("/api", "Query API Service")
+        self.environment.check_service("api")
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_url("/upload", "package upload service")
+        self.environment.check_service("package-upload")
 
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
