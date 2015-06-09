@@ -168,6 +168,19 @@ class EnvironmentFixture(Fixture):
         action_id = self._do_action("resume", "landscape-server/" + str(unit))
         return self._fetch_action(action_id)
 
+    def bootstrap_landscape(self, admin_name, admin_email, admin_password,
+                            unit=0):
+        """Execute the 'bootstrap' action on a Landscape unit.
+
+        The results of the action is returned.
+        """
+        bootstrap_params = {"admin-name": admin_name,
+                            "admin-email": admin_email,
+                            "admin-password": admin_password}
+        action_id = self._do_action(
+            "bootstrap", "landscape-server/" + str(unit), bootstrap_params)
+        return self._fetch_action(action_id)
+
     def wait_landscape_cron_jobs(self, unit=0):
         """Wait for running cron jobs to finish on the given Landscape unit."""
         unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
@@ -244,16 +257,23 @@ class EnvironmentFixture(Fixture):
         stdout, stderr = process.communicate()
         return stdout.decode("utf-8"), stderr.decode("utf-8")
 
-    def _do_action(self, action, unit):
+    def _do_action(self, action, unit, action_params=None):
         """Execute an action on a unit, returning the id."""
-        result = json.loads(subprocess.check_output(
-            ["juju", "action", "do", "--format=json",
-             unit, action]).decode("utf-8"))
+        command = ["juju", "action", "do", "--format=json", unit, action]
+        from operator import itemgetter
+        if action_params is not None:
+            sorted_action_params = sorted(
+                action_params.items(), key=itemgetter(0))
+            for key, value in sorted_action_params:
+                if value is not None:
+                    command.append("%s=%s" % (key, value))
+        result = json.loads(
+            self._subprocess.check_output(command).decode("utf-8"))
         return result["Action queued with id"]
 
     def _fetch_action(self, action_id, wait=300):
         """Fetch the results of an action."""
-        return json.loads(subprocess.check_output(
+        return json.loads(self._subprocess.check_output(
             ["juju", "action", "fetch", "--format=json", "--wait", str(wait),
              action_id]).decode("utf-8"))
 

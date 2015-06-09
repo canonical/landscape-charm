@@ -1,6 +1,6 @@
-import os
-
+import json
 import logging
+import os
 import unittest
 
 from helpers import EnvironmentFixture
@@ -154,6 +154,26 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.assertTrue(message.startswith("Content Not found!"))
         self.assertIn("good_content:['hello']", message)
         self.assertIn("output:bar", message)
+
+    def test_bootstrap_landscape(self):
+        """
+        bootstrap_landscape method calls 'bootstrap' action on
+        a landscape-server unit.
+        """
+        action_do_command = (
+            "juju action do --format=json landscape-server/0 bootstrap "
+            "admin-email=admin@example.com admin-name=foo admin-password=bar")
+        self.subprocess.outputs[action_do_command] = json.dumps(
+            {"Action queued with id": "17"}).encode("utf-8")
+        action_fetch_command = "juju action fetch --format=json --wait 300 17"
+        self.subprocess.outputs[action_fetch_command] = json.dumps(
+            {"status": "fine"}).encode("utf-8")
+
+        self.assertEqual(
+            {"status": "fine"},
+            self.fixture.bootstrap_landscape(
+                admin_name="foo", admin_email="admin@example.com",
+                admin_password="bar"))
 
 
 if __name__ == "__main__":
