@@ -81,9 +81,6 @@ class EnvironmentFixture(Fixture):
                 self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
-        self._stopped_landscape_services = []
-        self.addCleanup(self._restore_stopped_landscape_services)
-
     def get_haproxy_public_address(self, unit=0):
         """Return the public address of the given haproxy unit."""
         unit = self._deployment.sentry.unit["haproxy/%d" % unit]
@@ -219,7 +216,7 @@ class EnvironmentFixture(Fixture):
         """
         self._control_landscape_service("stop", service, unit)
         if restore:
-            self._stopped_landscape_services.append((service, unit))
+            self.addCleanup(self.start_landscape_service, service, unit=unit)
 
     def start_landscape_service(self, service, unit=0):
         """Start the given Landscape service on the given unit."""
@@ -379,11 +376,6 @@ class EnvironmentFixture(Fixture):
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
-
-    def _restore_stopped_landscape_services(self):
-        """Automatically restore any service that was stopped."""
-        for service, unit in self._stopped_landscape_services:
-            self.start_landscape_service(service, unit=unit)
 
 
 class IntegrationTest(TestWithFixtures):
