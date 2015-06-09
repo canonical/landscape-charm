@@ -52,7 +52,7 @@ class ServiceTest(IntegrationTest):
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_service("apiserver")
+        self.environment.check_service("api")
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.

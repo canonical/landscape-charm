@@ -280,6 +280,24 @@ class EnvironmentFixture(Fixture):
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
 
+    def get_unit_numbers(self, service):
+        units = [
+            unit for unit_name, unit in self._deployment.sentry.unit.items()
+            if unit_name.startswith(service + "/")]
+        leader = None
+        non_leaders = []
+        for unit in units:
+            _, unit_number = unit.info["unit_name"].split("/")
+            result, code = unit.run("is-leader --format=json")
+            if json.loads(result):
+                assert leader is None, "Multiple leaders found."
+                leader = unit_number
+            else:
+                non_leaders.append(unit_number)
+
+        return int(leader), sorted(
+            int(unit_number) for unit_number in non_leaders)
+
     def _run(self, command, unit):
         """Run a command on the given unit.
 
