@@ -64,9 +64,3 @@ class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
     @classmethod
     def setUp(cls):
         cls.environment.set_unit_count("landscape-server", 2)
-        cls.environment = EnvironmentFixture(config=get_config())
-        cls.environment.setUp()
-
-    @classmethod
-    def tearDown(cls):
-        cls.environment.set_unit_count("landscape-server", 1)

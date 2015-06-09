@@ -278,6 +278,7 @@ class EnvironmentFixture(Fixture):
             current_count -= 1
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
+        self._deployment.sentry.wait()
 
     def _run(self, command, unit):
         """Run a command on the given unit.
