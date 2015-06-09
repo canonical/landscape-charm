@@ -432,9 +432,6 @@ def main(config=None):
     module = os.path.basename(sys.argv[0]).split("-")[1]
     args = sys.argv[:]
     args.extend(["-vv", "--path", path, "--tests-pattern", "^%s$" % module])
-    extra_args = os.environ.get("TEST_RUNNER_ARGS")
-    if extra_args:
-        args.extend(extra_args.split(" "))
     run(args=args)
 
 
