@@ -6,17 +6,17 @@ from lib.action import Action
 from lib.paths import SCHEMA_SCRIPT
 
 
-class AddAdminUserAction(Action):
-    """Action to add admin user to Landscape."""
+class BootstrapAction(Action):
+    """Action to bootstrap Landscape and create an initial admin user."""
 
     def __init__(self, hookenv=hookenv, subprocess=subprocess):
-        super(AddAdminUserAction, self).__init__(hookenv=hookenv)
+        super(BootstrapAction, self).__init__(hookenv=hookenv)
         self._subprocess = subprocess
 
     def _run(self):
-        admin_name = self._hookenv.action_get("name")
-        admin_email = self._hookenv.action_get("email")
-        admin_password = self._hookenv.action_get("password")
+        admin_name = self._hookenv.action_get("admin-name")
+        admin_email = self._hookenv.action_get("admin-email")
+        admin_password = self._hookenv.action_get("admin-password")
 
         cmd = (SCHEMA_SCRIPT, "--create-lds-account-only", "--admin-name",
                admin_name, "--admin-email", admin_email,
