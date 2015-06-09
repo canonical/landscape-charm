@@ -122,6 +122,7 @@ class EnvironmentFixture(Fixture):
         @param post_data: optional POST data string
         @param header: optional request header string
         @param interval: seconds two wait between attempts
+        @param attempts: number of attempts to try
         """
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
@@ -148,6 +149,14 @@ class EnvironmentFixture(Fixture):
         raise AssertionError(msg.format(url, good_content, output))
 
     def check_service(self, name, state="up", attempts=2, interval=5):
+        """Check that a Landscape service is either up or down.
+
+        @param name: The name of the Landscape service, excluding the
+            "landscape-" prefix.
+        @param state: Whether the service should be "up" or "down".
+        @param attempts: Number of attempts to try.
+        @param interval: Seconds two wait between attempts.
+        """
         services = {
             "appserver": {
                 "path": "/",
@@ -264,6 +273,14 @@ class EnvironmentFixture(Fixture):
         self._deployment.sentry.wait()
 
     def set_unit_count(self, service, new_count):
+        """Change the service to have the given number of units.
+
+        If the existing service has fewer units than the new count, add
+        units to the deployment.
+
+        If the existing service has more units than the new count,
+        arbitrary units are destroyed.
+        """
         existing_units = sorted(
             unit_name for unit_name in self._deployment.sentry.unit.keys()
             if unit_name.startswith(service + "/"))
@@ -276,11 +293,20 @@ class EnvironmentFixture(Fixture):
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
             current_count -= 1
+        # Wait for all the hooks to finish firing.
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
 
     def get_unit_numbers(self, service):
+        """Return the number parts for the unit names for the given service.
+
+        A tuple with (leader, list_of_non_leaders) is returned.
+
+        For example, if we have landscape-server/0 and
+        landscape-server/1, where the first one is the leadder, (0, [1])
+        is returned.
+        """
         units = [
             unit for unit_name, unit in self._deployment.sentry.unit.items()
             if unit_name.startswith(service + "/")]
