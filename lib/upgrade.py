@@ -4,11 +4,11 @@ from charmhelpers.core import hookenv
 from charmhelpers import fetch
 
 from lib.apt import Apt
-from lib.hook import MaintenanceHook
+from lib.action import MaintenanceAction
 from lib.paths import default_paths
 
 
-class UpgradeAction(MaintenanceHook):
+class UpgradeAction(MaintenanceAction):
     """Execute package upgrade action logic."""
 
     def __init__(self, hookenv=hookenv, fetch=fetch, paths=default_paths,

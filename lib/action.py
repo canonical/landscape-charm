@@ -1,0 +1,50 @@
+import os.path
+
+from charmhelpers.core import hookenv
+
+from lib.error import CharmError
+from lib.hook import Hook
+from lib.paths import default_paths
+
+
+class Action(Hook):
+    """Juju action abstraction, providing dependency injection for testing."""
+
+    def __call__(self):
+        """
+        Invoke the action's run() method.
+
+        If _run() returns a value, set it using action_set().
+        If _run() throws a CharmError, fail using action.fail().
+        """
+        self._hookenv.log("Running action %s" % type(self).__name__)
+        try:
+            return_values = self._run()
+            if return_values is not None:
+                self._hookenv.action_set(return_values)
+        except CharmError, error:
+            self._hookenv.action_fail(str(error))
+
+
+class MaintenanceAction(Action):
+    """Action that only runs when in maintenance mode."""
+
+    def __init__(self, hookenv=hookenv, paths=default_paths):
+        """
+        @param hookenv: The charm-helpers C{hookenv} module, will be replaced
+            by tests.
+        @param paths: The landscape-server default paths class.
+        """
+        self._hookenv = hookenv
+        self._paths = paths
+
+    def __call__(self):
+        """Invoke the action.
+
+        @return: An integer with the exit code for the hook.
+        """
+        if not os.path.exists(self._paths.maintenance_flag()):
+            self._hookenv.action_fail(
+                "This action can only be called on a unit in paused state.")
+            return
+        super(MaintenanceAction, self).__call__()

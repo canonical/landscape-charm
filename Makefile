@@ -6,7 +6,7 @@ test:
 
 ci-test:
 	./dev/ubuntu-deps
-	$(MAKE) test
+	$(MAKE) test lint
 
 verify-juju-test:
 	@echo "Checking for ... "
@@ -68,6 +68,7 @@ lint:
 
 clean:
 	@rm -rf bundles
+	@find -name '*.pyc' -delete
 
 .PHONY: lint \
 	test-depends \

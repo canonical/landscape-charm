@@ -2,11 +2,11 @@ import subprocess
 
 from charmhelpers.core import hookenv
 
-from lib.hook import Hook
+from lib.action import Action
 from lib.paths import LSCTL
 
 
-class PauseAction(Hook):
+class PauseAction(Action):
     """Execute pause action logic."""
 
     def __init__(self, hookenv=hookenv, subprocess=subprocess):
