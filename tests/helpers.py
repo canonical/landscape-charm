@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import shutil
 import json
+import time
 
 from os import getenv
 from time import sleep
@@ -298,6 +299,20 @@ class EnvironmentFixture(Fixture):
         self._deployment.sentry.wait()
         self._deployment.sentry.wait()
 
+    def destroy_landscape_leader(self):
+        leader, _ = self.get_unit_ids("landscape-server")
+        self._deployment.destroy_unit("landscape-server/{}".format(leader))
+        # Wait for all the hooks to finish firing.
+        self._deployment.sentry.wait()
+        self._deployment.sentry.wait()
+        self._deployment.sentry.wait()
+        for _ in range(60):
+            leader, _ = self.get_unit_ids("landscape-server")
+            if leader is not None:
+                break
+            time.sleep(1)
+        assert leader is not None, "No new leader was elected."
+
     def get_unit_ids(self, service):
         """Return the numerical id parts for the units of the given service.
 
@@ -317,12 +332,11 @@ class EnvironmentFixture(Fixture):
             result, code = unit.run("is-leader --format=json")
             if json.loads(result):
                 assert leader is None, "Multiple leaders found."
-                leader = unit_number
+                leader = int(unit_number)
             else:
-                non_leaders.append(unit_number)
+                non_leaders.append(int(unit_number))
 
-        return int(leader), sorted(
-            int(unit_number) for unit_number in non_leaders)
+        return leader, sorted(non_leaders)
 
     def _run(self, command, unit):
         """Run a command on the given unit.

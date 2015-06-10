@@ -66,3 +66,13 @@ class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
         cls.environment.set_unit_count("landscape-server", 2)
         cls.leader, [cls.non_leader] = cls.environment.get_unit_ids(
             "landscape-server")
+
+
+class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
+
+    @classmethod
+    def setUp(cls):
+        cls.environment.destroy_landscape_leader()
+        cls.leader, _ = cls.environment.get_unit_ids(
+            "landscape-server")
+        cls.non_leader = None
