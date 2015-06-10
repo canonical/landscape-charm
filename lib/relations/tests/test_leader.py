@@ -50,6 +50,7 @@ class LeaderProviderTest(HookenvTest):
         The leader-ip is refreshed if it changes.
         """
         self.provider.provide_data()
+        assert self.hookenv.ip != "9.9.9.9", "Unexpected test precondition."
         self.hookenv.ip = "9.9.9.9"
         self.provider.provide_data()
         data = self.hookenv.leader_get()

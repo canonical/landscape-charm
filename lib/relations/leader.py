@@ -22,8 +22,9 @@ class LeaderProvider(object):
 
 
 # XXX We inherit from RelationContext here to re-use some of its
-#     behavior (e.g. required_keys), althought this is not really
-#     a relation. Perhaps charmhelpers should factor out a base class.
+#     behavior (the _is_ready method that tests that all required_keys are
+#     available), althought this is not really a relation. Perhaps charmhelpers
+#     should factor out a base class.
 class LeaderRequirer(RelationContext):
     """Grab leader data, which is common across all units."""
 
