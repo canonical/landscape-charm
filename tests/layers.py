@@ -55,7 +55,7 @@ class OneLandscapeUnitCustomSSLCertificateLayer(OneLandscapeUnitLayer):
 
 
 class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
-    """Layer for all tests meant to run against a multiple unit deployment.
+    """Layer for tests meant to run against a deployment with multiple units.
 
     The deployment will have one Juju unit of each needed Juju service,
     except for landscape-server, which will have two units.
