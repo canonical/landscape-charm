@@ -17,6 +17,12 @@ SAMPLE_LEADER_CONTEXT_DATA = {
     "leader-ip": "1.2.3.4",
 }
 
+SAMPLE_LEADER_DATA = {
+    "database-password": "landscape-sekret",
+    "secret-token": "landscape-token",
+    "leader-ip": "1.2.3.4",
+}
+
 SAMPLE_WEBSITE_UNIT_DATA = {
     "public-address": "1.2.3.4",
     "ssl_cert": base64.b64encode("<ssl data>"),
