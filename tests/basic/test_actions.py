@@ -28,3 +28,17 @@ class ActionsTest(IntegrationTest):
         # All Landcape services have been started
         self.assertEqual([], service_status["stopped"])
         self.assertTrue(len(service_status["running"]) > 0)
+
+    def test_bootstrap(self):
+        """
+        A landscape unit can be bootstrapped to create an admin account.
+        """
+        result = self.environment.bootstrap_landscape(
+            admin_name="foo", admin_password="bar", admin_email="foo@bar")
+        self.assertEqual("completed", result["status"])
+        # This phrase should match the login form and not match the
+        # new-standalone-user form.
+        self.environment.check_url("/", "Access your account")
+        #self.environment.check_url(
+        #    "/", "foo",
+        #    post_data="login.email=foo@bar&login.password=bar")
