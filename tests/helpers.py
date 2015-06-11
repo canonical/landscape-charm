@@ -97,7 +97,7 @@ class EnvironmentFixture(Fixture):
             return error.object
         else:
             return contents.encode("utf-8")
- 
+
     def get_text_file(self, path, service, unit=None):
         """Return the content of a text file on the given unit."""
         unit_sentry = self._get_service_unit(service, unit=unit)
@@ -445,7 +445,6 @@ class EnvironmentFixture(Fixture):
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
                 if unit_name.startswith("{}/".format(service))]
         return self._deployment.sentry.unit[unit_name]
-
 
 
 class IntegrationTest(TestWithFixtures):
