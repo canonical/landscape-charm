@@ -4,6 +4,13 @@ from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 
 from lib.paths import LSCTL, SCHEMA_SCRIPT
+from lib.utils import get_required_data, update_persisted_data
+
+# Configuration keys for which, in case of change, a restart is not needed.
+NO_RESTART_CONFIG_KEYS = {"source", "key", "ssl-cert", "ssl-key"}
+
+# Database relation keys for which, in case of change, a restart is not needed.
+NO_RESTART_DB_RELATION_KEYS = {"allowed-units", "state"}
 
 
 class ScriptCallback(ManagerCallback):
@@ -22,10 +29,12 @@ class ScriptCallback(ManagerCallback):
 class SchemaBootstrap(ScriptCallback):
     """Ensure that database users and schemas are setup.
 
-    This will invoke the schema script with the --bootstrap flag.
+    This will invoke the schema script with the --bootstrap flag, if it hasn't
+    been called yet.
     """
     def __call__(self, manager, service_name, event_name):
-        self._run(SCHEMA_SCRIPT, ("--bootstrap",))
+        if not manager.was_ready(service_name):
+            self._run(SCHEMA_SCRIPT, ("--bootstrap",))
 
 
 class LSCtl(ScriptCallback):
@@ -43,15 +52,49 @@ class LSCtl(ScriptCallback):
             #     maps to a 'restart' action.
             action = "restart"
 
-        # In case we're reacting to config changes, we don't always want to
-        # restart the processes (for example if only the APT source changed).
-        if self._hookenv.hook_name() == "config-changed":
-            config = self._hookenv.config()
-            changed = set()
-            for key in config.keys():
-                if config.changed(key):
-                    changed.add(key)
-            if changed.issubset({"source", "key"}):
-                return
+        # Persist the new db connection details and fetch the old ones
+        db_new = get_required_data(manager, service_name, "db")[0]
+        db_old = update_persisted_data("db", db_new, hookenv=self._hookenv)
+
+        if action == "restart":
+            # Check if we really need to kick a restart
+            hook_name = self._hookenv.hook_name()
+            if hook_name == "config-changed":
+                if not self._need_restart_config_changed():
+                    return
+            elif hook_name == "db-relation-changed":
+                if not self._need_restart_db_relation_changed(db_new, db_old):
+                    return
 
         self._run(LSCTL, (action,))
+
+    def _need_restart_config_changed(self):
+        """Check whether we need to restart after a config change.
+
+        In case we're reacting to config changes, we don't always want to
+        restart the processes (for example if only the APT source or SSL
+        certificate changed).
+        """
+        config = self._hookenv.config()
+        changed = set()
+        for key in config.keys():
+            if config.changed(key):
+                changed.add(key)
+        if changed.issubset(NO_RESTART_CONFIG_KEYS):
+            return False
+        return True
+
+    def _need_restart_db_relation_changed(self, db_new, db_old):
+        """Check whether we need to restart after a db relation change.
+
+        In case we're reacting to db relation changes, we don't want to
+        restart the processes if connection details didn't change.
+        """
+        if db_old is None:
+            return True
+        new = db_new.copy()
+        old = db_old.copy()
+        for key in NO_RESTART_DB_RELATION_KEYS:
+            new.pop(key)
+            old.pop(key, None)
+        return new != old
