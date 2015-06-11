@@ -4,7 +4,7 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-from subprocess import check_output, CalledProcessError, PIPE
+from subprocess import check_output, CalledProcessError, PIPE, STDOUT
 
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
@@ -67,7 +67,7 @@ class ServiceTest(IntegrationTest):
         This test verifies that the host and password configuration keys
         from the [broker] section don't remain at their default values.
         """
-        config = self.environment.get_config()
+        config = self.environment.get_landscape_config()
         broker = config["broker"]
         self.assertNotEqual(broker["host"], "localhost")
         self.assertNotEqual(broker["password"], "landscape")
@@ -113,9 +113,9 @@ class ServiceTest(IntegrationTest):
         ls_path = "/opt/canonical/landscape/canonical/landscape/offline/"
         for http_code, file_name in error_files.items():
             haproxy_file = self.environment.get_binary_file(
-                haproxy_path + http_code + ".http", "haproxy/0")
+                haproxy_path + http_code + ".http", "haproxy")
             landscape_file = self.environment.get_binary_file(
-                ls_path + file_name)
+                ls_path + file_name, "landscape-server")
             self.assertEqual(haproxy_file, landscape_file)
 
     def test_ssl_certificate_is_in_place(self):
@@ -126,7 +126,7 @@ class ServiceTest(IntegrationTest):
         configuration for Autopilot deployments).
         """
         ssl_cert = self.environment.get_text_file(
-            "/etc/ssl/certs/landscape_server_ca.crt")
+            "/etc/ssl/certs/landscape_server_ca.crt", "landscape-server")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
@@ -139,11 +139,10 @@ class CronTest(IntegrationTest):
     """
     layer = OneLandscapeUnitNoCronLayer
 
-    cron_unit = "landscape-server/0"
-
     def _sanitize_ssh_output(self, output,
                              remove_text=["sudo: unable to resolve",
-                                          "Warning: Permanently added"]):
+                                          "Warning: Permanently added",
+                                          "Connection to"]):
         """Strip some common warning messages from ssh output.
 
         @param output: output to sanitize
@@ -160,12 +159,13 @@ class CronTest(IntegrationTest):
 
     def _run_cron(self, script):
         status = 0
-        cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
-               "2>&1"]
+        cmd = ["juju", "ssh", self.layer.cron_unit, "sudo", "-u landscape",
+               script, "2>&1"]
         try:
             # The sanitize is a workaround for lp:1328269
             output = self._sanitize_ssh_output(
-                check_output(cmd, stderr=PIPE).decode("utf-8").strip())
+                check_output(
+                    cmd, stderr=STDOUT, stdin=PIPE).decode("utf-8").strip())
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
@@ -201,7 +201,7 @@ class CronTest(IntegrationTest):
         find_cmd = (
             "sudo ls /opt/canonical/landscape/scripts/landscape_profiles.sh"
             " || sudo ls /opt/canonical/landscape/scripts/process_profiles.sh")
-        cmd = ["juju", "run", "--unit", "landscape-server/0", find_cmd]
+        cmd = ["juju", "run", "--unit", self.layer.cron_unit, find_cmd]
         script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
 
         output, status = self._run_cron(script)
@@ -240,7 +240,7 @@ class CronTest(IntegrationTest):
         """
         The root URL should be set in service.conf.
         """
-        config = self.environment.get_config()
+        config = self.environment.get_landscape_config()
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(
             "https://%s/" % frontend, config["global"]["root-url"])

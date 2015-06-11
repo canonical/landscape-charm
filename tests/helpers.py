@@ -81,32 +81,33 @@ class EnvironmentFixture(Fixture):
                 self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
-    def get_haproxy_public_address(self, unit=0):
+    def get_haproxy_public_address(self, unit=None):
         """Return the public address of the given haproxy unit."""
-        unit = self._deployment.sentry.unit["haproxy/%d" % unit]
+        unit = self._get_service_unit("haproxy", unit=unit)
         return unit.info["public-address"]
 
-    def get_binary_file(self, path, unit="landscape-server/0"):
+    def get_binary_file(self, path, service, unit=None):
         """Return the content of a binary file on the given unit."""
         # XXX: Amulet doesn't support getting binary files, so we
         # get it as a text file and get the binary data from the
         # UnicodeDecodeError exception.
         try:
-            contents = self.get_text_file(path, unit)
+            contents = self.get_text_file(path, service, unit=unit)
         except UnicodeDecodeError as error:
             return error.object
         else:
             return contents.encode("utf-8")
 
-    def get_text_file(self, path, unit="landscape-server/0"):
+    def get_text_file(self, path, service, unit=None):
         """Return the content of a text file on the given unit."""
-        unit_sentry = self._deployment.sentry.unit[unit]
+        unit_sentry = self._get_service_unit(service, unit=unit)
         return unit_sentry.file_contents(path)
 
-    def get_config(self, unit=0):
+    def get_landscape_config(self, unit=None):
         """Return a ConfigParser with service.conf data from the given unit."""
         config = ConfigParser()
-        config.read_string(self.get_text_file("/etc/landscape/service.conf"))
+        config.read_string(self.get_text_file(
+            "/etc/landscape/service.conf", "landscape-server", unit=unit))
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
@@ -191,31 +192,33 @@ class EnvironmentFixture(Fixture):
             post_data=service.get("post_data"), header=service.get("header"),
             attempts=attempts, interval=interval)
 
-    def pause_landscape(self, unit=0):
+    def pause_landscape(self, unit=None):
         """Execute the 'pause' action on a Landscape unit.
 
         The results of the action is returned.
         """
-        action_id = self._do_action("pause", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        action_id = self._do_action("pause", unit.info["unit_name"])
         return self._fetch_action(action_id)
 
-    def resume_landscape(self, unit=0):
+    def resume_landscape(self, unit=None):
         """Execute the 'resume' action on a Landscape unit.
 
         The results of the action is returned.
         """
-        action_id = self._do_action("resume", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        action_id = self._do_action("resume", unit.info["unit_name"])
         return self._fetch_action(action_id)
 
-    def wait_landscape_cron_jobs(self, unit=0):
+    def wait_landscape_cron_jobs(self, unit=None):
         """Wait for running cron jobs to finish on the given Landscape unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        unit = self._get_service_unit("landscape-server", unit=unit)
         output, code = unit.run(
             "sudo /opt/canonical/landscape/wait-batch-scripts")
         if code != 0:
             raise RuntimeError(output)
 
-    def stop_landscape_service(self, service, unit=0, restore=True):
+    def stop_landscape_service(self, service, unit=None, restore=True):
         """Stop the given service on the given Landscape unit.
 
         @param service: The service to stop.
@@ -227,18 +230,18 @@ class EnvironmentFixture(Fixture):
         if restore:
             self.addCleanup(self.start_landscape_service, service, unit=unit)
 
-    def start_landscape_service(self, service, unit=0):
+    def start_landscape_service(self, service, unit=None):
         """Start the given Landscape service on the given unit."""
         self._control_landscape_service("start", service, unit)
 
-    def get_landscape_services_status(self, unit=0):
+    def get_landscape_services_status(self, unit=None):
         """Return the status of the Landscape service on a Landscape unit.
 
         A dict is returned: {"running": [<list of running services],
                              "stopped": [<list of stopped sevices]}
         """
-        output, _ = self._run(
-            "lsctl status", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        output, _ = self._run("lsctl status", unit.info["unit_name"])
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -415,12 +418,34 @@ class EnvironmentFixture(Fixture):
         shutil.rmtree(repo_dir)
         os.unlink(self._get_sample_hashids_path())
 
-    def _control_landscape_service(self, action, service, unit):
+    def _control_landscape_service(self, action, service, unit=None):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        unit = self._get_service_unit("landscape-server", unit=unit)
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
+
+    def _get_service_unit(self, service, unit=None):
+        """Get the given unit for the specified service.
+
+        @param service: The name of the Juju service
+        @param unit: The id of the unit within the service. If None is
+            provided, it's assumed that the service has only one unit, which
+            will be returned. Passing in None if the service has more
+            than one unit will cause an error. (The rational is that if
+            there are more than one unit, you should be aware of it)
+
+        E.g., _get_service_unit("landscape-server", 5) will return the
+        landscape-server/5 unit.
+        """
+        if unit is not None:
+            unit_name = "{}/{}".format(service, unit)
+            unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        else:
+            [unit_name] = [
+                unit_name for unit_name in self._deployment.sentry.unit.keys()
+                if unit_name.startswith("{}/".format(service))]
+        return self._deployment.sentry.unit[unit_name]
 
 
 class IntegrationTest(TestWithFixtures):
