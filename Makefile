@@ -60,8 +60,8 @@ lint:
 	flake8 --filename='*' hooks
 	flake8 lib tests
 	pyflakes3 tests dev/update-charm-revision-numbers
-	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 pep8
-	pep8 tests dev/update-charm-revision-numbers 
+	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 flake8
+	flake8 tests dev/update-charm-revision-numbers 
 
 clean:
 	@rm -rf bundles
