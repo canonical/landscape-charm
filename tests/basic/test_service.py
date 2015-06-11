@@ -164,7 +164,8 @@ class CronTest(IntegrationTest):
         try:
             # The sanitize is a workaround for lp:1328269
             output = self._sanitize_ssh_output(
-                check_output(cmd, stderr=STDOUT).decode("utf-8").strip())
+                check_output(
+                    cmd, stderr=STDOUT, stdin=PIPE).decode("utf-8").strip())
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
