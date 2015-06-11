@@ -15,7 +15,7 @@ class LandscapeHATest(IntegrationTest):
     def setUp(self):
         super(LandscapeHATest, self).setUp()
         self.leader = self.layer.leader
-        self.non_leader = self.layer.non_leader
+        [self.non_leader] = self.layer.non_leaders
 
     def test_app_leader_down(self):
         """

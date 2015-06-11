@@ -66,5 +66,20 @@ class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
     @classmethod
     def setUp(cls):
         cls.environment.set_unit_count("landscape-server", 2)
-        cls.leader, [cls.non_leader] = cls.environment.get_unit_ids(
+        cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
+            "landscape-server")
+
+
+class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
+    """Layer for tests meant to run when the leader has been destroyed.
+
+    After setting up this layer, a new leader will have been elected.
+
+    Note that this layer is destructive and reduces the deployment to 1 unit.
+    """
+
+    @classmethod
+    def setUp(cls):
+        cls.environment.destroy_landscape_leader()
+        cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
             "landscape-server")

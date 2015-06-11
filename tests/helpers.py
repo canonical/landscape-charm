@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import shutil
 import json
+import time
 
 from os import getenv
 from time import sleep
@@ -268,12 +269,7 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._deployment.configure(
             "landscape-server", {"ssl-cert": cert, "ssl-key": key})
-        # Wait for initial landscape-server hooks to fire
-        self._deployment.sentry.wait()
-        # Wait for haproxy hooks to fire
-        self._deployment.sentry.wait()
-        # Wait for landscape-server hooks triggered by the haproxy ones to fire
-        self._deployment.sentry.wait()
+        self._wait_for_deployment_change_hooks()
 
     def set_unit_count(self, service, new_count):
         """Change the service to have the given number of units.
@@ -296,10 +292,23 @@ class EnvironmentFixture(Fixture):
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
             current_count -= 1
-        # Wait for all the hooks to finish firing.
-        self._deployment.sentry.wait()
-        self._deployment.sentry.wait()
-        self._deployment.sentry.wait()
+        self._wait_for_deployment_change_hooks()
+
+    def destroy_landscape_leader(self):
+        """Destroy the landscape-server leader
+
+        This method will wait at most 60 seconds for a new leader to
+        elected before returning.
+        """
+        leader, _ = self.get_unit_ids("landscape-server")
+        self._deployment.destroy_unit("landscape-server/{}".format(leader))
+        self._wait_for_deployment_change_hooks()
+        for _ in range(60):
+            leader, _ = self.get_unit_ids("landscape-server")
+            if leader is not None:
+                break
+            time.sleep(1)
+        assert leader is not None, "No new leader was elected."
 
     def get_unit_ids(self, service):
         """Return the numerical id parts for the units of the given service.
@@ -320,12 +329,20 @@ class EnvironmentFixture(Fixture):
             result, code = unit.run("is-leader --format=json")
             if json.loads(result):
                 assert leader is None, "Multiple leaders found."
-                leader = unit_number
+                leader = int(unit_number)
             else:
-                non_leaders.append(unit_number)
+                non_leaders.append(int(unit_number))
 
-        return int(leader), sorted(
-            int(unit_number) for unit_number in non_leaders)
+        return leader, sorted(non_leaders)
+
+    def _wait_for_deployment_change_hooks(self):
+        """Wait for hooks to finish firing after a change in the deployment."""
+        # Wait for initial landscape-server hooks to fire
+        self._deployment.sentry.wait()
+        # Wait for haproxy hooks to fire
+        self._deployment.sentry.wait()
+        # Wait for landscape-server hooks triggered by the haproxy ones to fire
+        self._deployment.sentry.wait()
 
     def _run(self, command, unit):
         """Run a command on the given unit.
