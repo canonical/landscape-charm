@@ -426,6 +426,17 @@ class EnvironmentFixture(Fixture):
             raise RuntimeError(output)
 
     def _get_service_unit(self, service, unit=None):
+        """Get the given unit for the specified service.
+
+        @param service: The name of the Juju service
+        @param unit: The id of the unit within the service. If None is
+            provided, it's assumed that the service has only one unit, which
+            will be returned. Passing in None if the service has more
+            than one unit will cause an error.
+
+        E.g., _get_service_unit("landscape-server", 5) will return the
+        landscape-server/5 unit.
+        """
         if unit is not None:
             unit_name = "{}/{}".format(service, unit)
             unit = self._deployment.sentry.unit["landscape-server/%d" % unit]

@@ -31,6 +31,8 @@ class OneLandscapeUnitNoCronLayer(OneLandscapeUnitLayer):
     def setUp(cls):
         cls.environment.stop_landscape_service("cron", restore=False)
         cls.environment.wait_landscape_cron_jobs()
+        leader, _ = cls.environment.get_unit_ids("landscape-server")
+        cls.cron_unit = "landscape-server/{}".format(leader)
 
     @classmethod
     def tearDown(cls):
