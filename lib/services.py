@@ -11,8 +11,7 @@ from lib.paths import default_paths
 from lib.relations.postgresql import PostgreSQLRequirer
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import HAProxyProvider, HAProxyRequirer
-from lib.relations.landscape import (
-    LandscapeLeaderContext, LandscapeRequirer, LandscapeProvider)
+from lib.relations.leader import LeaderProvider, LeaderRequirer
 from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
@@ -45,29 +44,29 @@ class ServicesHook(Hook):
         self._fetch = fetch
 
     def _run(self):
-        leader_context = None
-        is_leader = self._hookenv.is_leader()
-        if is_leader:
-            leader_context = LandscapeLeaderContext(
-                host=self._host, hookenv=self._hookenv)
+
+        # XXX We need to manually kick the leader provider because atm the
+        #     services framework only works with relation providers.
+        leader_provider = LeaderProvider(
+            hookenv=self._hookenv, host=self._host)
+        leader_provider.provide_data()
 
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
-                LandscapeProvider(leader_context),
                 HAProxyProvider(SERVICE_COUNTS, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
             "required_data": [
-                LandscapeRequirer(leader_context),
-                ConfigRequirer(self._hookenv),
+                LeaderRequirer(hookenv=self._hookenv),
+                ConfigRequirer(hookenv=self._hookenv),
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"is_leader": is_leader,
+                {"is_leader": self._hookenv.is_leader(),
                  "service_counts": SERVICE_COUNTS},
             ],
             "data_ready": [
@@ -88,5 +87,4 @@ class ServicesHook(Hook):
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
-
         manager.manage()

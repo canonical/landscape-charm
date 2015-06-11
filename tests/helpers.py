@@ -98,7 +98,7 @@ class EnvironmentFixture(Fixture):
             return error.object
         else:
             return contents.encode("utf-8")
- 
+
     def get_text_file(self, path, service, unit=None):
         """Return the content of a text file on the given unit."""
         unit_sentry = self._get_service_unit(service, unit=unit)
@@ -443,6 +443,17 @@ class EnvironmentFixture(Fixture):
             raise RuntimeError(output)
 
     def _get_service_unit(self, service, unit=None):
+        """Get the given unit for the specified service.
+
+        @param service: The name of the Juju service
+        @param unit: The id of the unit within the service. If None is
+            provided, it's assumed that the service has only one unit, which
+            will be returned. Passing in None if the service has more
+            than one unit will cause an error.
+
+        E.g., _get_service_unit("landscape-server", 5) will return the
+        landscape-server/5 unit.
+        """
         if unit is not None:
             unit_name = "{}/{}".format(service, unit)
             unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
@@ -451,7 +462,6 @@ class EnvironmentFixture(Fixture):
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
                 if unit_name.startswith("{}/".format(service))]
         return self._deployment.sentry.unit[unit_name]
-
 
 
 class IntegrationTest(TestWithFixtures):
