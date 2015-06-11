@@ -38,7 +38,6 @@ class EnsureConfigDir(ManagerCallback):
         self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
-        # Lookup the deployment mode
         hosted = get_required_data(manager, service_name, "hosted")
         deployment_mode = hosted[0]["deployment-mode"]
 
