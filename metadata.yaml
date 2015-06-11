@@ -19,6 +19,3 @@ provides:
   hosted:
     interface: landscape-hosted
     scope: container
-peers:
-  cluster:
-    interface: landscape-ha
