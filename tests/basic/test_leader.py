@@ -5,7 +5,7 @@ from layers import LandscapeLeaderDestroyedLayer
 class LandscapeLeaderDestroyedTest(IntegrationTest):
     """Test what happens when the landscape-server leader gets destroyed.
 
-    The tests in here are intented to test that the newly elected leader
+    The tests in here are intended to test that the newly elected leader
     takes over correctly.
     """
 
