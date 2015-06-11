@@ -432,7 +432,8 @@ class EnvironmentFixture(Fixture):
         @param unit: The id of the unit within the service. If None is
             provided, it's assumed that the service has only one unit, which
             will be returned. Passing in None if the service has more
-            than one unit will cause an error.
+            than one unit will cause an error. (The rational is that if
+            there are more than one unit, you should be aware of it)
 
         E.g., _get_service_unit("landscape-server", 5) will return the
         landscape-server/5 unit.
