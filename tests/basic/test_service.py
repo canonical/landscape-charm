@@ -4,7 +4,7 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-from subprocess import check_output, CalledProcessError, PIPE
+from subprocess import check_output, CalledProcessError, PIPE, STDOUT
 
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
@@ -141,7 +141,8 @@ class CronTest(IntegrationTest):
 
     def _sanitize_ssh_output(self, output,
                              remove_text=["sudo: unable to resolve",
-                                          "Warning: Permanently added"]):
+                                          "Warning: Permanently added",
+                                          "Connection to"]):
         """Strip some common warning messages from ssh output.
 
         @param output: output to sanitize
@@ -163,7 +164,7 @@ class CronTest(IntegrationTest):
         try:
             # The sanitize is a workaround for lp:1328269
             output = self._sanitize_ssh_output(
-                check_output(cmd, stderr=PIPE).decode("utf-8").strip())
+                check_output(cmd, stderr=STDOUT).decode("utf-8").strip())
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
