@@ -59,6 +59,7 @@ class EnvironmentFixture(Fixture):
     _timeout = 3000
     _series = "trusty"
     _deployment = Deployment(series=_series)
+    _new_unit_target = None
 
     def __init__(self, config=None, deployment=None, subprocess=subprocess):
         """
@@ -70,10 +71,13 @@ class EnvironmentFixture(Fixture):
         if deployment is not None:
             self._deployment = deployment
         self._subprocess = subprocess
+        self._dense_maas = os.environ.get("DENSE_MAAS", "0") == "1"
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
+            if self._dense_maas:
+                self._configure_for_dense_maas()
             self._deployment.load(self._get_bundle())
             repo_dir = self._build_repo_dir()
             try:
@@ -287,7 +291,7 @@ class EnvironmentFixture(Fixture):
         if current_count == new_count:
             return
         while current_count < new_count:
-            self._deployment.add_unit(service)
+            self._deployment.add_unit(service, target=self._new_unit_target)
             current_count += 1
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
@@ -463,6 +467,14 @@ class EnvironmentFixture(Fixture):
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
                 if unit_name.startswith("{}/".format(service))]
         return self._deployment.sentry.unit[unit_name]
+
+    def _configure_for_dense_maas(self):
+        self._new_unit_target = "lxc:0"
+        services = [
+            service for service in DEFAULT_BUNDLE_CONTEXT.keys()
+            if service != "name"]
+        for service in services:
+            DEFAULT_BUNDLE_CONTEXT[service]["to"] = self._new_unit_target
 
 
 class IntegrationTest(TestWithFixtures):
