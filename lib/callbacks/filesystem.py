@@ -2,6 +2,7 @@
 
 import os
 import base64
+import re
 import urllib2
 
 from charmhelpers.core import host
@@ -10,6 +11,13 @@ from charmhelpers.core.services.base import ManagerCallback
 from lib.error import CharmError
 from lib.paths import default_paths
 from lib.utils import get_required_data
+
+
+# Python base64 module will decode strings which might contain non-base64
+# alphabet characters.  To ensure we can support both plain text and
+# base64-encoded values, we pre-check strings against a base64 alphabet,
+# while still allowing newlines, carriage returns, tabs and spaces.
+BASE64_ALPHABET_RE = re.compile("^[A-Za-z0-9+/ \t\r\n]+[=]{0,2}$")
 
 
 class LicenseFileUnreadableError(CharmError):
@@ -108,11 +116,17 @@ class WriteLicenseFile(ManagerCallback):
             except urllib2.URLError:
                 raise LicenseFileUnreadableError(license_file_value)
         else:
+            use_plain_text = False
             try:
-                license_data = base64.b64decode(license_file_value)
+                if BASE64_ALPHABET_RE.match(license_file_value):
+                    license_data = base64.b64decode(license_file_value)
+                else:
+                    use_plain_text = True
             except TypeError:
-                raise LicenseDataBase64DecodeError()
+                use_plain_text = True
 
+            if use_plain_text:
+                license_data = license_file_value
         self._host.write_file(
             self._paths.license_file(), license_data,
             owner="landscape", group="root", perms=0o640)
