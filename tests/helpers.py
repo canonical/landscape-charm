@@ -212,7 +212,7 @@ class EnvironmentFixture(Fixture):
         return self._fetch_action(action_id)
 
     def bootstrap_landscape(self, admin_name, admin_email, admin_password,
-                            unit=0):
+                            unit=None):
         """Execute the 'bootstrap' action on a Landscape unit.
 
         The results of the action is returned.

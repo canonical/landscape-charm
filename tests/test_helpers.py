@@ -12,7 +12,8 @@ class UnitStub(object):
 
     def __init__(self, public_address=None):
         self.info = {
-            "public-address": public_address
+            "public-address": public_address,
+            "unit_name": "landscape-server/0"
         }
         self.commands = []
 
