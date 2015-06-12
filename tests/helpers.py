@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import shutil
 import json
+import time
 
 from os import getenv
 from time import sleep
@@ -81,39 +82,37 @@ class EnvironmentFixture(Fixture):
                 self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
-        self._stopped_landscape_services = []
-        self.addCleanup(self._restore_stopped_landscape_services)
-
-    def get_haproxy_public_address(self, unit=0):
+    def get_haproxy_public_address(self, unit=None):
         """Return the public address of the given haproxy unit."""
-        unit = self._deployment.sentry.unit["haproxy/%d" % unit]
+        unit = self._get_service_unit("haproxy", unit=unit)
         return unit.info["public-address"]
 
-    def get_binary_file(self, path, unit="landscape-server/0"):
+    def get_binary_file(self, path, service, unit=None):
         """Return the content of a binary file on the given unit."""
         # XXX: Amulet doesn't support getting binary files, so we
         # get it as a text file and get the binary data from the
         # UnicodeDecodeError exception.
         try:
-            contents = self.get_text_file(path, unit)
+            contents = self.get_text_file(path, service, unit=unit)
         except UnicodeDecodeError as error:
             return error.object
         else:
             return contents.encode("utf-8")
 
-    def get_text_file(self, path, unit="landscape-server/0"):
+    def get_text_file(self, path, service, unit=None):
         """Return the content of a text file on the given unit."""
-        unit_sentry = self._deployment.sentry.unit[unit]
+        unit_sentry = self._get_service_unit(service, unit=unit)
         return unit_sentry.file_contents(path)
 
-    def get_config(self, unit=0):
+    def get_landscape_config(self, unit=None):
         """Return a ConfigParser with service.conf data from the given unit."""
         config = ConfigParser()
-        config.read_string(self.get_text_file("/etc/landscape/service.conf"))
+        config.read_string(self.get_text_file(
+            "/etc/landscape/service.conf", "landscape-server", unit=unit))
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None, interval=5):
+                  header=None, attempts=2, interval=5):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
@@ -125,9 +124,8 @@ class EnvironmentFixture(Fixture):
         @param post_data: optional POST data string
         @param header: optional request header string
         @param interval: seconds two wait between attempts
+        @param attempts: number of attempts to try
         """
-        attempts = 2
-
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
         if type(good_content) is not list:
@@ -152,20 +150,65 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
-    def pause_landscape(self, unit=0):
+    def check_service(self, name, state="up", attempts=2, interval=5):
+        """Check that a Landscape service is either up or down.
+
+        @param name: The name of the Landscape service, excluding the
+            "landscape-" prefix.
+        @param state: Whether the service should be "up" or "down".
+        @param attempts: Number of attempts to try.
+        @param interval: Seconds two wait between attempts.
+        """
+        services = {
+            "appserver": {
+                "path": "/",
+                "up": "passphrase",
+                "down": "Landscape is unavailable"},
+            "msgserver": {
+                "path": "/message-system",
+                "post_data": (
+                    "ds8:messagesl;s22:next-expected-sequencei0;s8:"
+                    "sequencei0;;"),
+                "header": "X-MESSAGE-API: 3.1",
+                "up": ["ds8:messagesl", "s11:server-uuid"],
+                "down": "Landscape is unavailable"},
+            "pingserver": {
+                "path": "/ping",
+                "protocol": "http",
+                "up": "ds5:errors19:provide insecure_id;",
+                "down": "Landscape is unavailable"},
+            "api": {
+                "path": "/api",
+                "up": "Query API Service",
+                "down": "Landscape is unavailable"},
+            "package-upload": {
+                "path": "/upload",
+                "up": "package upload service",
+                "down": "Landscape is unavailable"},
+        }
+        service = services[name]
+        self.check_url(
+            service["path"], service[state],
+            proto=service.get("protocol", "https"),
+            post_data=service.get("post_data"), header=service.get("header"),
+            attempts=attempts, interval=interval)
+
+    def pause_landscape(self, unit=None):
         """Execute the 'pause' action on a Landscape unit.
 
         The results of the action is returned.
         """
-        action_id = self._do_action("pause", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        action_id = self._do_action("pause", unit.info["unit_name"])
         return self._fetch_action(action_id)
 
-    def resume_landscape(self, unit=0):
+    def resume_landscape(self, unit=None):
         """Execute the 'resume' action on a Landscape unit.
 
         The results of the action is returned.
         """
-        action_id = self._do_action("resume", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        action_id = self._do_action("resume", unit.info["unit_name"])
         return self._fetch_action(action_id)
 
     def bootstrap_landscape(self, admin_name, admin_email, admin_password,
@@ -174,22 +217,23 @@ class EnvironmentFixture(Fixture):
 
         The results of the action is returned.
         """
+        unit = self._get_service_unit("landscape-server", unit=unit)
         bootstrap_params = {"admin-name": admin_name,
                             "admin-email": admin_email,
                             "admin-password": admin_password}
         action_id = self._do_action(
-            "bootstrap", "landscape-server/" + str(unit), bootstrap_params)
+            "bootstrap", unit.info["unit_name"], bootstrap_params)
         return self._fetch_action(action_id)
 
-    def wait_landscape_cron_jobs(self, unit=0):
+    def wait_landscape_cron_jobs(self, unit=None):
         """Wait for running cron jobs to finish on the given Landscape unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        unit = self._get_service_unit("landscape-server", unit=unit)
         output, code = unit.run(
             "sudo /opt/canonical/landscape/wait-batch-scripts")
         if code != 0:
             raise RuntimeError(output)
 
-    def stop_landscape_service(self, service, unit=0, restore=True):
+    def stop_landscape_service(self, service, unit=None, restore=True):
         """Stop the given service on the given Landscape unit.
 
         @param service: The service to stop.
@@ -199,20 +243,20 @@ class EnvironmentFixture(Fixture):
         """
         self._control_landscape_service("stop", service, unit)
         if restore:
-            self._stopped_landscape_services.append((service, unit))
+            self.addCleanup(self.start_landscape_service, service, unit=unit)
 
-    def start_landscape_service(self, service, unit=0):
+    def start_landscape_service(self, service, unit=None):
         """Start the given Landscape service on the given unit."""
         self._control_landscape_service("start", service, unit)
 
-    def get_landscape_services_status(self, unit=0):
+    def get_landscape_services_status(self, unit=None):
         """Return the status of the Landscape service on a Landscape unit.
 
         A dict is returned: {"running": [<list of running services],
                              "stopped": [<list of stopped sevices]}
         """
-        output, _ = self._run(
-            "lsctl status", "landscape-server/" + str(unit))
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        output, _ = self._run("lsctl status", unit.info["unit_name"])
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -239,6 +283,74 @@ class EnvironmentFixture(Fixture):
         """Start the given Landscape service on the given unit."""
         self._deployment.configure(
             "landscape-server", {"ssl-cert": cert, "ssl-key": key})
+        self._wait_for_deployment_change_hooks()
+
+    def set_unit_count(self, service, new_count):
+        """Change the service to have the given number of units.
+
+        If the existing service has fewer units than the new count, add
+        units to the deployment.
+
+        If the existing service has more units than the new count,
+        arbitrary units are destroyed.
+        """
+        existing_units = sorted(
+            unit_name for unit_name in self._deployment.sentry.unit.keys()
+            if unit_name.startswith(service + "/"))
+        current_count = len(existing_units)
+        if current_count == new_count:
+            return
+        while current_count < new_count:
+            self._deployment.add_unit(service)
+            current_count += 1
+        while current_count > new_count:
+            self._deployment.destroy_unit(existing_units.pop())
+            current_count -= 1
+        self._wait_for_deployment_change_hooks()
+
+    def destroy_landscape_leader(self):
+        """Destroy the landscape-server leader
+
+        This method will wait at most 60 seconds for a new leader to
+        elected before returning.
+        """
+        leader, _ = self.get_unit_ids("landscape-server")
+        self._deployment.destroy_unit("landscape-server/{}".format(leader))
+        self._wait_for_deployment_change_hooks()
+        for _ in range(60):
+            leader, _ = self.get_unit_ids("landscape-server")
+            if leader is not None:
+                break
+            time.sleep(1)
+        assert leader is not None, "No new leader was elected."
+
+    def get_unit_ids(self, service):
+        """Return the numerical id parts for the units of the given service.
+
+        A tuple with (leader, list_of_non_leaders) is returned.
+
+        For example, if we have landscape-server/0 and
+        landscape-server/1, where the first one is the leadder, (0, [1])
+        is returned.
+        """
+        units = [
+            unit for unit_name, unit in self._deployment.sentry.unit.items()
+            if unit_name.startswith(service + "/")]
+        leader = None
+        non_leaders = []
+        for unit in units:
+            _, unit_number = unit.info["unit_name"].split("/")
+            result, code = unit.run("is-leader --format=json")
+            if json.loads(result):
+                assert leader is None, "Multiple leaders found."
+                leader = int(unit_number)
+            else:
+                non_leaders.append(int(unit_number))
+
+        return leader, sorted(non_leaders)
+
+    def _wait_for_deployment_change_hooks(self):
+        """Wait for hooks to finish firing after a change in the deployment."""
         # Wait for initial landscape-server hooks to fire
         self._deployment.sentry.wait()
         # Wait for haproxy hooks to fire
@@ -344,17 +456,34 @@ class EnvironmentFixture(Fixture):
         shutil.rmtree(repo_dir)
         os.unlink(self._get_sample_hashids_path())
 
-    def _control_landscape_service(self, action, service, unit):
+    def _control_landscape_service(self, action, service, unit=None):
         """Start or stop the given Landscape service on the given unit."""
-        unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        unit = self._get_service_unit("landscape-server", unit=unit)
         output, code = unit.run("sudo service %s %s" % (service, action))
         if code != 0:
             raise RuntimeError(output)
 
-    def _restore_stopped_landscape_services(self):
-        """Automatically restore any service that was stopped."""
-        for service, unit in self._stopped_landscape_services:
-            self.start_landscape_service(service, unit=unit)
+    def _get_service_unit(self, service, unit=None):
+        """Get the given unit for the specified service.
+
+        @param service: The name of the Juju service
+        @param unit: The id of the unit within the service. If None is
+            provided, it's assumed that the service has only one unit, which
+            will be returned. Passing in None if the service has more
+            than one unit will cause an error. (The rational is that if
+            there are more than one unit, you should be aware of it)
+
+        E.g., _get_service_unit("landscape-server", 5) will return the
+        landscape-server/5 unit.
+        """
+        if unit is not None:
+            unit_name = "{}/{}".format(service, unit)
+            unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
+        else:
+            [unit_name] = [
+                unit_name for unit_name in self._deployment.sentry.unit.keys()
+                if unit_name.startswith("{}/".format(service))]
+        return self._deployment.sentry.unit[unit_name]
 
 
 class IntegrationTest(TestWithFixtures):

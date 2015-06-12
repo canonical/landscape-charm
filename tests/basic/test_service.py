@@ -4,7 +4,7 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-from subprocess import check_output, CalledProcessError, PIPE
+from subprocess import check_output, CalledProcessError, PIPE, STDOUT
 
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
@@ -29,7 +29,7 @@ class ServiceTest(IntegrationTest):
           the new-standalone-user form, the login form, and not
           the maintenance page.
         """
-        self.environment.check_url("/", "passphrase")
+        self.environment.check_service("appserver")
 
     def test_msg(self):
         """Verify that the MSG service is up.
@@ -37,13 +37,7 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to requests.
         """
-        good_content = ["ds8:messagesl", "s11:server-uuid"]
-        post_data = ("ds8:messagesl;s22:next-expected-sequencei0;s8:"
-                     "sequencei0;;")
-        header = "X-MESSAGE-API: 3.1"
-        self.environment.check_url(
-            "/message-system", good_content, post_data=post_data,
-            header=header)
+        self.environment.check_service("msgserver")
 
     def test_ping(self):
         """Verify that the PING service is up.
@@ -51,22 +45,21 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and that it responds
         correctly to a ping request without an ID.
         """
-        self.environment.check_url(
-            "/ping", "ds5:errors19:provide insecure_id;", proto="http")
+        self.environment.check_service("pingserver")
 
     def test_api(self):
         """Verify that the API service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_url("/api", "Query API Service")
+        self.environment.check_service("api")
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
 
         Specifically that it is reachable and returns its name.
         """
-        self.environment.check_url("/upload", "package upload service")
+        self.environment.check_service("package-upload")
 
     def test_no_broker_defaults(self):
         """Verify that [broker] has no default values.
@@ -74,7 +67,7 @@ class ServiceTest(IntegrationTest):
         This test verifies that the host and password configuration keys
         from the [broker] section don't remain at their default values.
         """
-        config = self.environment.get_config()
+        config = self.environment.get_landscape_config()
         broker = config["broker"]
         self.assertNotEqual(broker["host"], "localhost")
         self.assertNotEqual(broker["password"], "landscape")
@@ -120,9 +113,9 @@ class ServiceTest(IntegrationTest):
         ls_path = "/opt/canonical/landscape/canonical/landscape/offline/"
         for http_code, file_name in error_files.items():
             haproxy_file = self.environment.get_binary_file(
-                haproxy_path + http_code + ".http", "haproxy/0")
+                haproxy_path + http_code + ".http", "haproxy")
             landscape_file = self.environment.get_binary_file(
-                ls_path + file_name)
+                ls_path + file_name, "landscape-server")
             self.assertEqual(haproxy_file, landscape_file)
 
     def test_ssl_certificate_is_in_place(self):
@@ -133,7 +126,7 @@ class ServiceTest(IntegrationTest):
         configuration for Autopilot deployments).
         """
         ssl_cert = self.environment.get_text_file(
-            "/etc/ssl/certs/landscape_server_ca.crt")
+            "/etc/ssl/certs/landscape_server_ca.crt", "landscape-server")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
 
@@ -146,11 +139,10 @@ class CronTest(IntegrationTest):
     """
     layer = OneLandscapeUnitNoCronLayer
 
-    cron_unit = "landscape-server/0"
-
     def _sanitize_ssh_output(self, output,
                              remove_text=["sudo: unable to resolve",
-                                          "Warning: Permanently added"]):
+                                          "Warning: Permanently added",
+                                          "Connection to"]):
         """Strip some common warning messages from ssh output.
 
         @param output: output to sanitize
@@ -167,12 +159,13 @@ class CronTest(IntegrationTest):
 
     def _run_cron(self, script):
         status = 0
-        cmd = ["juju", "ssh", self.cron_unit, "sudo", "-u landscape", script,
-               "2>&1"]
+        cmd = ["juju", "ssh", self.layer.cron_unit, "sudo", "-u landscape",
+               script, "2>&1"]
         try:
             # The sanitize is a workaround for lp:1328269
             output = self._sanitize_ssh_output(
-                check_output(cmd, stderr=PIPE).decode("utf-8").strip())
+                check_output(
+                    cmd, stderr=STDOUT, stdin=PIPE).decode("utf-8").strip())
         except CalledProcessError as e:
             output = e.output.decode("utf-8").strip()
             status = e.returncode
@@ -208,7 +201,7 @@ class CronTest(IntegrationTest):
         find_cmd = (
             "sudo ls /opt/canonical/landscape/scripts/landscape_profiles.sh"
             " || sudo ls /opt/canonical/landscape/scripts/process_profiles.sh")
-        cmd = ["juju", "run", "--unit", "landscape-server/0", find_cmd]
+        cmd = ["juju", "run", "--unit", self.layer.cron_unit, find_cmd]
         script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
 
         output, status = self._run_cron(script)
@@ -247,7 +240,7 @@ class CronTest(IntegrationTest):
         """
         The root URL should be set in service.conf.
         """
-        config = self.environment.get_config()
+        config = self.environment.get_landscape_config()
         frontend = self.environment.get_haproxy_public_address()
         self.assertEqual(
             "https://%s/" % frontend, config["global"]["root-url"])

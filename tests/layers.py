@@ -31,6 +31,8 @@ class OneLandscapeUnitNoCronLayer(OneLandscapeUnitLayer):
     def setUp(cls):
         cls.environment.stop_landscape_service("cron", restore=False)
         cls.environment.wait_landscape_cron_jobs()
+        leader, _ = cls.environment.get_unit_ids("landscape-server")
+        cls.cron_unit = "landscape-server/{}".format(leader)
 
     @classmethod
     def tearDown(cls):
@@ -52,3 +54,32 @@ class OneLandscapeUnitCustomSSLCertificateLayer(OneLandscapeUnitLayer):
     @classmethod
     def tearDown(cls):
         cls.environment.configure_ssl("", "")
+
+
+class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
+    """Layer for tests meant to run against a deployment with multiple units.
+
+    The deployment will have one Juju unit of each needed Juju service,
+    except for landscape-server, which will have two units.
+    """
+
+    @classmethod
+    def setUp(cls):
+        cls.environment.set_unit_count("landscape-server", 2)
+        cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
+            "landscape-server")
+
+
+class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
+    """Layer for tests meant to run when the leader has been destroyed.
+
+    After setting up this layer, a new leader will have been elected.
+
+    Note that this layer is destructive and reduces the deployment to 1 unit.
+    """
+
+    @classmethod
+    def setUp(cls):
+        cls.environment.destroy_landscape_leader()
+        cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
+            "landscape-server")

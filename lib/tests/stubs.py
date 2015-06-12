@@ -15,11 +15,14 @@ class HookenvStub(object):
     def __init__(self, charm_dir):
         self.messages = []
         self.relations = {}
+        self.action_fails = []
+        self.action_sets = []
         self._config = Config()
         self._charm_dir = charm_dir
         self.action_fails = []
         self.action_sets = []
         self.action_gets = []
+        self._leader_data = {}
 
     def config(self):
         return self._config
@@ -70,6 +73,12 @@ class HookenvStub(object):
 
     def is_leader(self):
         return self.leader
+
+    def leader_set(self, settings):
+        self._leader_data = settings
+
+    def leader_get(self):
+        return self._leader_data
 
     def action_fail(self, message):
         self.action_fails.append(message)

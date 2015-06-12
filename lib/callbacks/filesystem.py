@@ -9,6 +9,7 @@ from charmhelpers.core.services.base import ManagerCallback
 
 from lib.error import CharmError
 from lib.paths import default_paths
+from lib.utils import get_required_data
 
 
 class LicenseFileUnreadableError(CharmError):
@@ -37,13 +38,8 @@ class EnsureConfigDir(ManagerCallback):
         self._paths = paths
 
     def __call__(self, manager, service_name, event_name):
-        service = manager.get_service(service_name)
-
-        # Lookup the deployment mode
-        for data in service.get("required_data"):
-            if "hosted" in data:
-                deployment_mode = data["hosted"][0]["deployment-mode"]
-                break
+        hosted = get_required_data(manager, service_name, "hosted")
+        deployment_mode = hosted[0]["deployment-mode"]
 
         # Create a symlink for the config directory
         config_link = self._paths.config_link(deployment_mode)
