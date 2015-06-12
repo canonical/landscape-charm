@@ -29,4 +29,3 @@ class BootstrapActionTest(HookenvTest):
               "--admin-email", "admin-email-value",
               "--admin-password", "admin-password-value"), {}),
             (command, kwargs))
-
