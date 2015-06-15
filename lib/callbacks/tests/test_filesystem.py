@@ -91,7 +91,7 @@ class WriteLicenseFileTest(HookenvTest):
 
         self.assertEqual([], self.host.calls)
 
-    def test_license_file_data(self):
+    def test_license_file_base64_data(self):
         """
         If the config specifies a license file data directly as
         the base64-encoded value, it is decoded and written
@@ -113,30 +113,26 @@ class WriteLicenseFileTest(HookenvTest):
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
 
-    def test_license_file_plain_text(self):
+    def test_license_file_base64_with_whitespaces(self):
         """
-        When license-file is neither an URL nor base64-encoded data,
-        it is written out as plain text string.
+        If the base64-encoded data is formatted into multiple lines with
+        some leading and trailing whitespace, it is still detected as base64
+        and decoded accordingly.
         """
-        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
-
-        # Note that the string here is carefully chosen to contain
-        # correct number of base64 characters (20, which is 0 modulo 4),
-        # to ensure that we do not attempt to base64-decode it even in
-        # that case if it contains non-base64 characters (since b64decode
-        # does not complain).
+        license_data = base64.b64encode('Test license data')
+        formatted_data = " \t" + license_data[:12] + "\t\n" + license_data[12:]
         manager = ServiceManager([{
             "service": "landscape",
             "required_data": [
                 {"config": {
-                    "license-file": "plain text license data.",
+                    "license-file": formatted_data,
                 }},
             ],
         }])
         self.callback(manager, "landscape", None)
+
         self.assertEqual([
-            ("write_file",
-             ('/etc/landscape/license.txt', 'plain text license data.'),
+            ("write_file", ('/etc/landscape/license.txt', 'Test license data'),
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
 
@@ -160,6 +156,31 @@ class WriteLicenseFileTest(HookenvTest):
         self.assertEqual([
             ("write_file",
              ('/etc/landscape/license.txt', license_data),
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.host.calls)
+
+    def test_license_file_plain_text(self):
+        """
+        When license-file is neither an URL nor base64-encoded data,
+        it is written out as plain text string.
+        """
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+
+        # Whitespaces in the middle of the text indicate it is not
+        # base64-encoded data.
+        license_data = "plain text license data"
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": license_data,
+                }},
+            ],
+        }])
+        self.callback(manager, "landscape", None)
+        self.assertEqual([
+            ("write_file",
+             ('/etc/landscape/license.txt', 'plain text license data'),
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
 

@@ -15,9 +15,8 @@ from lib.utils import get_required_data
 
 # Python base64 module will decode strings which might contain non-base64
 # alphabet characters.  To ensure we can support both plain text and
-# base64-encoded values, we pre-check strings against a base64 alphabet,
-# while still allowing newlines, carriage returns, tabs and spaces.
-BASE64_ALPHABET_RE = re.compile("^[A-Za-z0-9+/ \t\r\n]+[=]{0,2}$")
+# base64-encoded values, we pre-check strings against a base64 alphabet.
+BASE64_ALPHABET_RE = re.compile("^[A-Za-z0-9+/]+[=]{0,2}$")
 
 
 class LicenseFileUnreadableError(CharmError):
@@ -117,9 +116,13 @@ class WriteLicenseFile(ManagerCallback):
                 raise LicenseFileUnreadableError(license_file_value)
         else:
             use_plain_text = False
+            # Strip leading and trailing whitespace from each line
+            # to check for base64-encoded data.
+            stripped_license_value = "".join(
+                [line.strip() for line in license_file_value.splitlines()])
             try:
-                if BASE64_ALPHABET_RE.match(license_file_value):
-                    license_data = base64.b64decode(license_file_value)
+                if BASE64_ALPHABET_RE.match(stripped_license_value):
+                    license_data = base64.b64decode(stripped_license_value)
                 else:
                     use_plain_text = True
             except TypeError:
