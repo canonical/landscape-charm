@@ -45,6 +45,13 @@ class ResumeActionTest(HookenvTest):
 
     def test_run_fail(self):
         """
+        After the services have been started, a call to 'lsctl status'
+        is maded to make sure everything started. If not, the action is
+        failed, with the output of 'lsctl start' and lsctl status' in
+        the error message to aid debugging.
+
+        The unit is stopped again, to ensure that the 'resume' action
+        can run again after the problems have been addressed.
         """
         open(self.paths.maintenance_flag(), "w")
         self.addCleanup(os.remove, self.paths.maintenance_flag())

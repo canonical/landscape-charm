@@ -31,6 +31,11 @@ class ActionsTest(IntegrationTest):
 
     def test_resume_fail(self):
         """
+        If some service fail to start, for example due to not migrating
+        the schema after an upgrade, the 'resume' action will fail.
+
+        After addressing the problems, it's possible to run the 'resume'
+        action again.
         """
         self.environment.pause_landscape()
         self.addCleanup(self.environment.resume_landscape)

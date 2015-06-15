@@ -132,7 +132,7 @@ class SubprocessStub(object):
 
     By default it will pass through the calls to the real subprocess
     module, but it's possible to provide fake output results by calling
-    add_fake_call().
+    add_fake_executable().
 
     @ivar calls: A list of all calls that have been made.
     """
@@ -143,11 +143,17 @@ class SubprocessStub(object):
 
     def add_fake_executable(self, executable, args=None, stdout="", stderr="",
                             return_code=0):
-        """Register fake executable.
+        """Register a fake executable.
 
-        The handler should accept args and **kwargs and return a tuple
-        (returncode, stdout, stderr). If no handler is given, the
-        executable will return (0, "", "")
+        @param executable: The full path of the executable to fake.
+        @param args: Args that the executable should handle. If not
+            provided, it will handle any arguments passed to it. It's
+            possible to call this method multiple times with different
+            arguments, if you want different behaviors for different
+            arguments.
+        @param stdout: The stdout the executable should return.
+        @param stderr: The stderr the executable should return.
+        @param return_code: The return code of the executable.
         """
         if args is not None:
             args = tuple(args)
