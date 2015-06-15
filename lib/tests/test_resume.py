@@ -49,10 +49,18 @@ class ResumeActionTest(HookenvTest):
         open(self.paths.maintenance_flag(), "w")
         self.addCleanup(os.remove, self.paths.maintenance_flag())
         self.subprocess.add_fake_executable(
-            LSCTL, args=["status"], return_code=3)
+            LSCTL, args=["start"], stdout="start output")
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["status"], stdout="status failure", return_code=3)
 
         action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
         self.assertEqual(
-            [""], self.hookenv.action_fails)
+            ["Some services failed to start.\n\nstart output\n\n"
+             "status failure"],
+            self.hookenv.action_fails)
+        self.assertEqual(
+            [(("/usr/bin/lsctl", "start"), {}),
+             (("/usr/bin/lsctl", "status"), {})],
+            self.subprocess.calls)

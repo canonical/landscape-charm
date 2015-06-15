@@ -37,3 +37,5 @@ class ActionsTest(IntegrationTest):
         self.environment.add_fake_db_patch()
         result = self.environment.resume_landscape()
         self.assertEqual("failed", result["status"])
+        self.assertIn(
+            "ERROR:root:main has unapplied patches", result["message"])
