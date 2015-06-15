@@ -469,6 +469,10 @@ class EnvironmentFixture(Fixture):
         return self._deployment.sentry.unit[unit_name]
 
     def _configure_for_dense_maas(self):
+        """Configure the deployment for a dense MAAS configuration.
+
+        All units will be placed in an LXC on the bootstrap node.
+        """
         self._new_unit_target = "lxc:0"
         services = [
             service for service in DEFAULT_BUNDLE_CONTEXT.keys()
