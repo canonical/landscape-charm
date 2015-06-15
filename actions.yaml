@@ -12,3 +12,18 @@ upgrade:
 migrate-schema:
   description: Upgrade the landscape schemas on the related databases.
     Unit must already be paused with the 'pause' action.
+bootstrap:
+  description: Bootstraps Landscape installation by creating an administrator
+    user account.
+  params:
+    admin-name:
+      type: string
+      description: Name for the administrator to add.
+    admin-email:
+      type: string
+      description: Email for the administrator to add.
+    admin-password:
+      type: string
+      description: Password for the administrator to add.
+  required: [admin-name, admin-email, admin-password]
+  additionalProperties: false
