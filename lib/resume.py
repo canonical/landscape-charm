@@ -3,7 +3,11 @@ import subprocess
 from charmhelpers.core import hookenv
 
 from lib.action import MaintenanceAction
+from lib.error import CharmError
 from lib.paths import default_paths, LSCTL
+
+class ProcessesNotStartedError(CharmError):
+    """Some of the Landscape server processes couldnt' be started."""
 
 
 class ResumeAction(MaintenanceAction):
@@ -16,3 +20,7 @@ class ResumeAction(MaintenanceAction):
 
     def _run(self):
         self._subprocess.check_call((LSCTL, "start"))
+        try:
+            self._subprocess.check_call((LSCTL, "status"))
+        except subprocess.CalledProcessError:
+            raise ProcessesNotStartedError()

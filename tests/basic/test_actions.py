@@ -28,3 +28,12 @@ class ActionsTest(IntegrationTest):
         # All Landcape services have been started
         self.assertEqual([], service_status["stopped"])
         self.assertTrue(len(service_status["running"]) > 0)
+
+    def test_resume_fail(self):
+        """
+        """
+        self.environment.pause_landscape()
+        self.addCleanup(self.environment.resume_landscape)
+        self.environment.add_fake_db_patch()
+        result = self.environment.resume_landscape()
+        self.assertEqual("failed", result["status"])

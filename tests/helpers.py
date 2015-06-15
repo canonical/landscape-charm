@@ -265,6 +265,13 @@ class EnvironmentFixture(Fixture):
             service_status["stopped"].append(service_name)
         return service_status
 
+    def add_fake_db_patch(self, unit=None):
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        patch_dir = (
+            "/opt/canonical/landscape/canonical/landscape/schema/patch_9999")
+        unit.run("touch {}".format(patch_dir))
+        self.addCleanup(unit.run, "rm -r {}".format(patch_dir))
+
     def configure_ssl(self, cert, key):
         """Start the given Landscape service on the given unit."""
         self._deployment.configure(

@@ -12,8 +12,8 @@ class ResumeActionTest(HookenvTest):
     def setUp(self):
         super(ResumeActionTest, self).setUp()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_executable(LSCTL)
-        self.subprocess.add_fake_executable("service")
+        self.subprocess.add_fake_executable(LSCTL, args=["start"])
+        self.subprocess.add_fake_executable(LSCTL, args=["status"])
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
 
@@ -30,7 +30,9 @@ class ResumeActionTest(HookenvTest):
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "start"), {})], self.subprocess.calls)
+            [(("/usr/bin/lsctl", "start"), {}),
+             (("/usr/bin/lsctl", "status"), {})],
+            self.subprocess.calls)
 
     def test_run_without_maintenance_flag(self):
         """
@@ -40,3 +42,17 @@ class ResumeActionTest(HookenvTest):
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
         self.assertEqual([], self.subprocess.calls)
+
+    def test_run_fail(self):
+        """
+        """
+        open(self.paths.maintenance_flag(), "w")
+        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["status"], return_code=3)
+
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
+        self.assertEqual(
+            [""], self.hookenv.action_fails)
