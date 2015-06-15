@@ -141,15 +141,15 @@ class SubprocessStub(object):
         self.calls = []
         self._fake_executables = {}
 
-    def add_fake_executable(self, executable, handler=None):
+    def add_fake_executable(self, executable, stdout="", stderr="",
+                            return_code=0):
         """Register fake executable.
 
         The handler should accept args and **kwargs and return a tuple
         (returncode, stdout, stderr). If no handler is given, the
         executable will return (0, "", "")
         """
-        if handler is None:
-            handler = lambda args, **kwargs: (0, "", "")
+        handler = lambda args, **kwargs: (return_code, stdout, stderr)
         self._fake_executables[executable] = handler
 
     def check_call(self, command, **kwargs):
