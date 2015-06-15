@@ -6,6 +6,7 @@ from lib.action import MaintenanceAction
 from lib.error import CharmError
 from lib.paths import default_paths, LSCTL
 
+
 class ProcessesNotStartedError(CharmError):
     """Some of the Landscape server processes couldnt' be started."""
 
