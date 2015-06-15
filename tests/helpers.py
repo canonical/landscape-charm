@@ -12,6 +12,7 @@ import shutil
 import json
 import time
 
+from operator import itemgetter
 from os import getenv
 from time import sleep
 from configparser import ConfigParser
@@ -372,7 +373,6 @@ class EnvironmentFixture(Fixture):
     def _do_action(self, action, unit, action_params=None):
         """Execute an action on a unit, returning the id."""
         command = ["juju", "action", "do", "--format=json", unit, action]
-        from operator import itemgetter
         if action_params is not None:
             sorted_action_params = sorted(
                 action_params.items(), key=itemgetter(0))

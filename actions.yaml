@@ -14,7 +14,7 @@ migrate-schema:
     Unit must already be paused with the 'pause' action.
 bootstrap:
   description: Bootstraps Landscape installation by creating an administrator
-    user account, potentially setting the registration key as well.
+    user account.
   params:
     admin-name:
       type: string
