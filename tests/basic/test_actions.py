@@ -34,8 +34,13 @@ class ActionsTest(IntegrationTest):
         """
         self.environment.pause_landscape()
         self.addCleanup(self.environment.resume_landscape)
-        self.environment.add_fake_db_patch()
+        remove_fake_db_patch = self.environment.add_fake_db_patch()
+        self.addCleanup(remove_fake_db_patch)
         result = self.environment.resume_landscape()
         self.assertEqual("failed", result["status"])
         self.assertIn(
             "ERROR:root:main has unapplied patches", result["message"])
+
+        remove_fake_db_patch()
+        result = self.environment.resume_landscape()
+        self.assertEqual("completed", result["status"])

@@ -154,6 +154,10 @@ class SubprocessStub(object):
         self._fake_executables.setdefault(executable, {})[args] = (
             return_code, stdout, stderr)
 
+    def call(self, command, **kwargs):
+        returncode, stdout, stderr = self._call(command, **kwargs)
+        return returncode
+
     def check_call(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
         if returncode != 0:

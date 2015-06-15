@@ -52,6 +52,7 @@ class ResumeActionTest(HookenvTest):
             LSCTL, args=["start"], stdout="start output")
         self.subprocess.add_fake_executable(
             LSCTL, args=["status"], stdout="status failure", return_code=3)
+        self.subprocess.add_fake_executable(LSCTL, args=["stop"])
 
         action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
@@ -62,5 +63,6 @@ class ResumeActionTest(HookenvTest):
             self.hookenv.action_fails)
         self.assertEqual(
             [(("/usr/bin/lsctl", "start"), {}),
-             (("/usr/bin/lsctl", "status"), {})],
+             (("/usr/bin/lsctl", "status"), {}),
+             (("/usr/bin/lsctl", "stop"), {})],
             self.subprocess.calls)
