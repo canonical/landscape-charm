@@ -12,8 +12,8 @@ class ResumeActionTest(HookenvTest):
     def setUp(self):
         super(ResumeActionTest, self).setUp()
         self.subprocess = SubprocessStub()
-        self.subprocess.add_fake_executable(LSCTL)
-        self.subprocess.add_fake_executable("service")
+        self.subprocess.add_fake_executable(LSCTL, args=["start"])
+        self.subprocess.add_fake_executable(LSCTL, args=["status"])
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
 
@@ -30,7 +30,9 @@ class ResumeActionTest(HookenvTest):
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
         self.assertEqual(
-            [(("/usr/bin/lsctl", "start"), {})], self.subprocess.calls)
+            [(("/usr/bin/lsctl", "start"), {}),
+             (("/usr/bin/lsctl", "status"), {})],
+            self.subprocess.calls)
 
     def test_run_without_maintenance_flag(self):
         """
@@ -40,3 +42,34 @@ class ResumeActionTest(HookenvTest):
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
         self.assertEqual([], self.subprocess.calls)
+
+    def test_run_fail(self):
+        """
+        After the services have been started, a call to 'lsctl status'
+        is made to make sure everything started.  When the action
+        failed, the 'lsctl start' output is reported in the error
+        message to aid debugging.
+
+        The unit is stopped again, to ensure that the 'resume' action
+        can run again after the problems have been addressed.
+        """
+        open(self.paths.maintenance_flag(), "w")
+        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["start"], stdout="start output")
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["status"], stdout="status failure", return_code=3)
+        self.subprocess.add_fake_executable(LSCTL, args=["stop"])
+
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
+        self.assertEqual(
+            ["Some services failed to start.\n\nstart output\n\n"
+             "status failure"],
+            self.hookenv.action_fails)
+        self.assertEqual(
+            [(("/usr/bin/lsctl", "start"), {}),
+             (("/usr/bin/lsctl", "status"), {}),
+             (("/usr/bin/lsctl", "stop"), {})],
+            self.subprocess.calls)

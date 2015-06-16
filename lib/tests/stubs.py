@@ -139,7 +139,7 @@ class SubprocessStub(object):
 
     By default it will pass through the calls to the real subprocess
     module, but it's possible to provide fake output results by calling
-    add_fake_call().
+    add_fake_executable().
 
     @ivar calls: A list of all calls that have been made.
     """
@@ -148,16 +148,28 @@ class SubprocessStub(object):
         self.calls = []
         self._fake_executables = {}
 
-    def add_fake_executable(self, executable, handler=None):
-        """Register fake executable.
+    def add_fake_executable(self, executable, args=None, stdout="", stderr="",
+                            return_code=0):
+        """Register a fake executable.
 
-        The handler should accept args and **kwargs and return a tuple
-        (returncode, stdout, stderr). If no handler is given, the
-        executable will return (0, "", "")
+        @param executable: The full path of the executable to fake.
+        @param args: Args that the executable should handle. If not
+            provided, it will handle any arguments passed to it. It's
+            possible to call this method multiple times with different
+            arguments, if you want different behaviors for different
+            arguments.
+        @param stdout: The stdout the executable should return.
+        @param stderr: The stderr the executable should return.
+        @param return_code: The return code of the executable.
         """
-        if handler is None:
-            handler = lambda args, **kwargs: (0, "", "")
-        self._fake_executables[executable] = handler
+        if args is not None:
+            args = tuple(args)
+        self._fake_executables.setdefault(executable, {})[args] = (
+            return_code, stdout, stderr)
+
+    def call(self, command, **kwargs):
+        returncode, stdout, stderr = self._call(command, **kwargs)
+        return returncode
 
     def check_call(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
@@ -180,9 +192,12 @@ class SubprocessStub(object):
         module.
         """
         self.calls.append((command, kwargs))
-        handler = self._fake_executables.get(command[0])
-        if handler is not None:
-            return handler(command[1:], **kwargs)
+        fake_command = self._fake_executables.get(command[0])
+        if fake_command is not None:
+            args = tuple(command[1:])
+            if args not in fake_command:
+                args = None
+            return fake_command[args]
         else:
             process = subprocess.Popen(
                 command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

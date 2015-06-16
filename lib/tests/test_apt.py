@@ -152,8 +152,7 @@ class AptTest(HookenvTest):
         If an installed landscape-server package has an epoch,
         _get_local_epoch() returns the installed epoch + 1.
         """
-        self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (0, "1:1.2.3", ""))
+        self.subprocess.add_fake_executable("dpkg-query", stdout="1:1.2.3")
         self.assertEqual(2, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
@@ -164,8 +163,7 @@ class AptTest(HookenvTest):
         If an installed landscape-server package has no epoch,
         _get_local_epoch() returns the 1000.
         """
-        self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (0, "1.2.3", ""))
+        self.subprocess.add_fake_executable("dpkg-query", stdout="1.2.3")
         self.assertEqual(1000, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
@@ -177,7 +175,7 @@ class AptTest(HookenvTest):
         returns the 1000.
         """
         self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (1, "", "no such package"))
+            "dpkg-query", return_code=1, stderr="no such package")
         self.assertEqual(1000, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
