@@ -8,7 +8,7 @@ from lib.paths import default_paths, LSCTL
 
 
 class ProcessesNotStartedError(CharmError):
-    """Some of the Landscape server processes couldnt' be started."""
+    """Some of the Landscape server processes couldn't be started."""
 
     def __init__(self, start_output, status_output):
         message = "Some services failed to start.\n\n{}\n\n{}".format(
