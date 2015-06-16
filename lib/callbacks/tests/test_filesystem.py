@@ -10,7 +10,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile,
-    LicenseFileUnreadableError, LicenseDataBase64DecodeError)
+    LicenseFileUnreadableError)
 
 
 class EnsureConfigDirTest(HookenvTest):
@@ -91,7 +91,7 @@ class WriteLicenseFileTest(HookenvTest):
 
         self.assertEqual([], self.host.calls)
 
-    def test_license_file_data(self):
+    def test_license_file_base64_data(self):
         """
         If the config specifies a license file data directly as
         the base64-encoded value, it is decoded and written
@@ -113,25 +113,76 @@ class WriteLicenseFileTest(HookenvTest):
              {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
         ], self.host.calls)
 
-    def test_license_file_bad_data(self):
+    def test_license_file_base64_with_whitespaces(self):
         """
-        When license-file is not a URL and not base64-encoded data, fails
-        with LicenseDataBase64DecodeError.
+        If the base64-encoded data is formatted into multiple lines with
+        some leading and trailing whitespace, it is still detected as base64
+        and decoded accordingly.
         """
-        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
-
+        license_data = base64.b64encode('Test license data')
+        formatted_data = " \t" + license_data[:12] + "\t\n" + license_data[12:]
         manager = ServiceManager([{
             "service": "landscape",
             "required_data": [
                 {"config": {
-                    "license-file": "bad data",
+                    "license-file": formatted_data,
                 }},
             ],
         }])
-        with self.assertRaises(LicenseDataBase64DecodeError) as error:
-            self.callback(manager, "landscape", None)
-        self.assertEqual(
-            "Error base64-decoding license-file data.", str(error.exception))
+        self.callback(manager, "landscape", None)
+
+        self.assertEqual([
+            ("write_file", ('/etc/landscape/license.txt', 'Test license data'),
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.host.calls)
+
+    def test_license_file_bad_base64_padding(self):
+        """
+        When license-file is a base64-decoded string with missing padding,
+        it is written out as plain text string.
+        """
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+        # Strip '=\n' from the end of the base64-encoded string.
+        license_data = base64.b64encode("Test license data")[:-2]
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": license_data,
+                }},
+            ],
+        }])
+        self.callback(manager, "landscape", None)
+        self.assertEqual([
+            ("write_file",
+             ('/etc/landscape/license.txt', license_data),
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.host.calls)
+
+    def test_license_file_plain_text(self):
+        """
+        When license-file is neither an URL nor base64-encoded data,
+        it is written out as plain text string.
+        """
+        self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
+
+        # Whitespaces in the middle of the text indicate it is not
+        # base64-encoded data.
+        license_data = "plain text license data"
+        manager = ServiceManager([{
+            "service": "landscape",
+            "required_data": [
+                {"config": {
+                    "license-file": license_data,
+                }},
+            ],
+        }])
+        self.callback(manager, "landscape", None)
+        self.assertEqual([
+            ("write_file",
+             ('/etc/landscape/license.txt', 'plain text license data'),
+             {'owner': 'landscape', 'group': 'root', 'perms': 0o640})
+        ], self.host.calls)
 
     def test_license_file_file_url(self):
         """
@@ -162,7 +213,7 @@ class WriteLicenseFileTest(HookenvTest):
 
     def test_license_file_http_url(self):
         """
-        If the config specifies a license file using a local file:// URL,
+        If the config specifies a license file using a http:// URL,
         contents of that file are transferred verbatim to the license file
         on the unit.
         """
@@ -191,9 +242,8 @@ class WriteLicenseFileTest(HookenvTest):
 
     def test_license_file_bad_url(self):
         """
-        If the config specifies a license file using a local file:// URL,
-        contents of that file are transferred verbatim to the license file
-        on the unit.
+        If the config specifies a license file using a non-existent http URL,
+        LicenseFileUnreadableError is raised.
         """
         self.addCleanup(setattr, urllib2, "urlopen", urllib2.urlopen)
 
