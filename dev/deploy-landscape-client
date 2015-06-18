@@ -12,7 +12,7 @@ only generate the juju-deployer config and deploy manually:
 """
 
 # This import isn't strictly needed, since we don't need to support
-# Python2, but this make linting easier, since we have a mix of Python2
+# Python2, but this makes linting easier, since we have a mix of Python2
 # and Python3 in the charm
 from __future__ import print_function
 
