@@ -120,7 +120,7 @@ class ServiceConfTest(TemplateTest):
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("https://4.3.2.1/", config.get("global", "root-url"))
-        self.assertEqual("https://4.3.2.1/", config.get("api", "root-url"))
+        self.assertEqual("https://4.3.2.1/api", config.get("api", "root-url"))
         self.assertEqual(
             "https://4.3.2.1/", config.get("package-upload", "root-url"))
 
@@ -134,7 +134,7 @@ class ServiceConfTest(TemplateTest):
         config = ConfigParser()
         config.readfp(buffer)
         self.assertEqual("https://8.8.8.8/", config.get("global", "root-url"))
-        self.assertEqual("https://8.8.8.8/", config.get("api", "root-url"))
+        self.assertEqual("https://8.8.8.8/api", config.get("api", "root-url"))
         self.assertEqual(
             "https://8.8.8.8/", config.get("package-upload", "root-url"))
 
