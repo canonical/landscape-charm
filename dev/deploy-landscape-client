@@ -87,7 +87,7 @@ def generate_deploy_config(ca_cert_path, host):
                         "account-name": "standalone",
                         "url": "https://{}/message-system".format(host),
                         "ping-url": "http://{}/ping".format(host),
-                        "ssl-public-key": "base64: {}".format(ca_base64),
+                        "ssl-public-key": "base64:{}".format(ca_base64),
                         }}}}}
     return yaml.safe_dump(deployer_config)
 
