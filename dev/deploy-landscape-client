@@ -1,0 +1,95 @@
+#!/usr/bin/python3
+"""
+This script looks at the current Juju environment and generates a
+juju-deployer config for landscape-client that is configured to talk to
+the deployed landscape-server service. The URLs and SSL certificate are
+taken from the deployed landscape-server units.
+
+By default, landscape-client will be deployed, but you can choose to
+only generate the juju-deployer config and deploy manually:
+
+    deploy-landscape-client --no-deploy > landscape-client.yaml
+"""
+
+# This import isn't strictly needed, since we don't need to support
+# Python2, but this make linting easier, since we have a mix of Python2
+# and Python3 in the charm
+from __future__ import print_function
+
+import argparse
+import os.path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import yaml
+
+
+def main(args, stdout=sys.stdout, stderr=sys.stderr):
+    tempdir = tempfile.mkdtemp()
+    print("Checking for landscape-server units.", file=stderr)
+    status = yaml.load(subprocess.check_output(
+        ["juju", "status", "--format", "yaml", "landscape-server"]))
+    units = status["services"]["landscape-server"]["units"]
+    # Any landscape-server unit will do.
+    landscape_unit = next(iter(units.keys()))
+
+    ca_cert = "landscape_server_ca.crt"
+    ca_cert_path = os.path.join(tempdir, ca_cert)
+    print(
+        "Copying {} from {}".format(ca_cert, landscape_unit), file=stderr)
+    subprocess.check_call(
+        ["juju", "scp",
+         "{}:/etc/ssl/certs/landscape_server_ca.crt".format(landscape_unit),
+         tempdir])
+
+    ca_subject = subprocess.check_output(
+        ["openssl", "x509", "-in", ca_cert_path, "-subject", "-noout"])
+    for subject in ca_subject.decode("utf-8").split("/"):
+        subject = subject.strip()
+        if subject.startswith("CN="):
+            break
+    else:
+        error_msg = "Couldn't find the common name in {}: {}".format(
+            ca_cert_path, ca_subject)
+        print(error_msg, file=stderr)
+        return 1
+
+    ca_base64 = subprocess.check_output(
+        ["openssl", "base64", "-in", ca_cert_path, "-e"]).decode("utf-8")
+
+    _, host = subject.split("=", 1)
+    print("Generating deployer config.", file=stderr)
+    deployer_config = {
+        "landscape-client": {
+            "series": "trusty",
+            "services": {
+                "landscape-client": {
+                    "charm": "cs:trusty/landscape-client",
+                    "options": {
+                        "account-name": "standalone",
+                        "url": "https://{}/message-system".format(host),
+                        "ping-url": "http://{}/ping".format(host),
+                        "ssl-public-key": "base64: {}".format(ca_base64),
+                        }}}}}
+    config_path = os.path.join(tempdir, "landscape-client.yaml")
+    yaml_config = yaml.safe_dump(deployer_config)
+    with open(config_path, "w") as f:
+        f.write(yaml_config)
+    print(yaml_config, file=stdout)
+
+    if args.deploy:
+        print("Deploying landscape-client.", file=stderr)
+        subprocess.check_call(["juju-deployer", "-c", config_path])
+    print("Cleaning up {}".format(tempdir), file=stderr)
+    shutil.rmtree(tempdir)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--no-deploy", dest="deploy", action="store_false", default=True,
+        help="Only generate deployer config, don't deploy service.")
+    args = parser.parse_args()
+    sys.exit(main(args))
