@@ -81,7 +81,7 @@ def generate_deploy_config(ca_cert_path, host):
     Return the YAML config as a string.
     """
     ca_base64 = subprocess.check_output(
-        ["openssl", "base64", "-in", ca_cert_path, "-e"]).decode("utf-8")
+        ["openssl", "base64", "-in", ca_cert_path]).decode("utf-8")
     deployer_config = {
         "landscape-client": {
             "series": "trusty",
