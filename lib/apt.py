@@ -100,7 +100,7 @@ class Apt(object):
 
         # The source can be i.e. "15.04" or "14.10" for public PPAs, and we'll
         # do the conversion automatically for UX
-        if re.match("[0-9]+\.[0-9]+", source):
+        if re.match("[0-9]{2}\.[0-9]{2}$", source):
             source = "ppa:landscape/%s" % source
 
         # Check if we're setting the source for the first time, or replacing
