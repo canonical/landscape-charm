@@ -1,6 +1,7 @@
 import glob
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 
@@ -96,6 +97,11 @@ class Apt(object):
         source = config.get("source")
         if not source:
             raise AptNoSourceConfigError()
+
+        # The source can be i.e. "15.04" or "14.10" for public PPAs, and we'll
+        # do the conversion automatically for UX
+        if re.match("[0-9]{2}\.[0-9]{2}$", source):
+            source = "ppa:landscape/%s" % source
 
         # Check if we're setting the source for the first time, or replacing
         # an existing value. In the latter case we'll no-op if the value is the

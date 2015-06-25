@@ -60,6 +60,16 @@ class AptTest(HookenvTest):
         self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
         self.assertEqual([True], self.fetch.updates)
 
+    def test_set_shorthand_sources(self):
+        """
+        When the "source" config parameter is set to only the LDS version
+        number, the charm correctly expands it to the PPA URL.
+        """
+        self.hookenv.config()["source"] = "14.10"
+        self.apt.set_sources()
+        self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
+        self.assertEqual([True], self.fetch.updates)
+
     def test_set_sources_not_changed(self):
         """
         The C{set_sources} method is a no-op if the source config hasn't

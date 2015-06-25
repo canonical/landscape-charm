@@ -2,7 +2,7 @@ name: landscape-server
 summary: Charm for installing and using Landscape Dedicated Server.
 maintainer: Landscape Team <landscape-team@canonical.com>
 description: A multi server Landscape Dedicated Server charm.
-categories:
+tags:
   - app-servers
 requires:
   db:
