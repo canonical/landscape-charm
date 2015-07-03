@@ -17,7 +17,12 @@ class HookenvStub(object):
         self.relations = {}
         self.action_fails = []
         self.action_sets = []
+
+        # We should disable implicit saving since it runs at charm exit using
+        # globals :(
         self._config = Config()
+        self._config.implicit_save = False
+
         self._charm_dir = charm_dir
         self.action_fails = []
         self.action_sets = []
