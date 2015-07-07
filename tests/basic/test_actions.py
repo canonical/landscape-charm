@@ -68,6 +68,7 @@ class ActionsTest(IntegrationTest):
         self.assertTrue(bool(token_match))
         token = token_match.group(1)
 
-        post_data = ("login.email=foo@bar&login.password=bar&login=Login"
+        post_data = ("login.email=foo@bar&login.password=bar&login=Login&"
                      "form-security-token=%s" % token)
-        self.environment.check_url("/redirect", "foo", post_data=post_data)
+        self.environment.check_url(
+            "/redirect", "<h2>Organisation</h2>", post_data=post_data)

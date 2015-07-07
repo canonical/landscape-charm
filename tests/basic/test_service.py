@@ -5,6 +5,8 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
 from subprocess import check_output, CalledProcessError, PIPE, STDOUT
+import re
+import tempfile
 
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
@@ -25,9 +27,9 @@ class ServiceTest(IntegrationTest):
         user form.
 
         Note: In order to work on a new server or a server with the
-          first admin user already created, this phrase should match
-          the new-standalone-user form, the login form, and not
-          the maintenance page.
+        first admin user already created, this phrase should match
+        the new-standalone-user form, the login form, and not
+        the maintenance page.
         """
         self.environment.check_service("appserver")
 
@@ -53,6 +55,31 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and returns its name.
         """
         self.environment.check_service("api")
+
+    def test_api_endpoint(self):
+        """Verify that API endpoint is correctly listed."""
+        self.environment.bootstrap_landscape(
+            admin_name="foo", admin_password="bar", admin_email="foo@bar")
+
+        cookie_jar = tempfile.NamedTemporaryFile()
+        cookie_file = cookie_jar.name
+
+        index_page = self.environment.check_url(
+            "/", "Access your account", cookie_jar=cookie_file)
+        token_re = re.compile(
+            '<input type="hidden" name="form-security-token" '
+            'value="([0-9a-f-]*)"/>')
+        token = token_re.search(index_page).group(1)
+        post_data = ("login.email=foo@bar&login.password=bar&login=Login&"
+                     "form-security-token=%s" % token)
+        self.environment.check_url(
+            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
+            cookie_jar=cookie_file)
+
+        public_url = self.environment.get_haproxy_public_address()
+        self.environment.check_url(
+            "/settings", "https://%s/api/" % public_url,
+            cookie_jar=cookie_file)
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
