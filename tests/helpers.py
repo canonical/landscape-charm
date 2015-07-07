@@ -113,7 +113,7 @@ class EnvironmentFixture(Fixture):
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None, attempts=2, interval=5):
+                  header=None, attempts=2, interval=5, cookie_jar=None):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
@@ -124,8 +124,9 @@ class EnvironmentFixture(Fixture):
         @param proto: either https or http
         @param post_data: optional POST data string
         @param header: optional request header string
-        @param interval: seconds two wait between attempts
+        @param interval: seconds to wait between attempts
         @param attempts: number of attempts to try
+        @param cookie_jar: file to store cookies in
         """
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
@@ -137,6 +138,8 @@ class EnvironmentFixture(Fixture):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
+        if cookie_jar:
+            cmd.extend(["--cookie-jar", cookie_jar, "-b", cookie_jar])
         for _ in range(attempts):
             output = self._subprocess.check_output(cmd).decode("utf-8").strip()
             if all(content in output for content in good_content):
