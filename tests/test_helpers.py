@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import unittest
 
@@ -175,9 +174,3 @@ class EnvironmentFixtureTest(unittest.TestCase):
             self.fixture.bootstrap_landscape(
                 admin_name="foo", admin_email="admin@example.com",
                 admin_password="bar"))
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    unittest.main(verbosity=2)

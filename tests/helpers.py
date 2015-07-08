@@ -547,7 +547,7 @@ def get_ssl_certificate_over_wire(endpoint):
     """
     # Call openssl s_client connect to get the actual certificate served.
     # The command line program is a bit archaic and therefore we need
-    # to do a few things like send it a newline char (a user "return"), and
+    # to do a few things like send it a user "return"), and
     # filter some of the output (it print non-error messages on stderr).
     process = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
     with open(os.devnull, 'w') as dev_null:
@@ -555,9 +555,8 @@ def get_ssl_certificate_over_wire(endpoint):
             ['openssl', 's_client', '-connect', endpoint],
             stdin=process.stdout, stderr=dev_null)
     process.stdout.close()  # Close the pipe fd
-    process.wait()  # This closes the subprocess sending the newline.
+    process.wait()  # This closes the subprocess sending the return.
 
-    # A regex might be nicer, but this works and is easy to read.
     certificate = output.decode("utf-8")
     start = certificate.find("-----BEGIN CERTIFICATE-----")
     end = certificate.find("-----END CERTIFICATE-----") + len(
