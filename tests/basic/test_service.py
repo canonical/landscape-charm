@@ -5,7 +5,6 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
 from subprocess import check_output, CalledProcessError, PIPE, STDOUT
-import re
 import tempfile
 
 from helpers import IntegrationTest
@@ -41,6 +40,13 @@ class ServiceTest(IntegrationTest):
         """
         self.environment.check_service("msgserver")
 
+    def test_script_attachments(self):
+        """
+        Verify that the script attachments are correctly served by the
+        message service.
+        """
+        self.environment.check_service("script-attachments")
+
     def test_ping(self):
         """Verify that the PING service is up.
 
@@ -63,18 +69,7 @@ class ServiceTest(IntegrationTest):
 
         cookie_jar = tempfile.NamedTemporaryFile()
         cookie_file = cookie_jar.name
-
-        index_page = self.environment.check_url(
-            "/", "Access your account", cookie_jar=cookie_file)
-        token_re = re.compile(
-            '<input type="hidden" name="form-security-token" '
-            'value="([0-9a-f-]*)"/>')
-        token = token_re.search(index_page).group(1)
-        post_data = ("login.email=foo@bar&login.password=bar&login=Login&"
-                     "form-security-token=%s" % token)
-        self.environment.check_url(
-            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
-            cookie_jar=cookie_file)
+        self.environment.login("foo@bar", "bar", cookie_file)
 
         public_url = self.environment.get_haproxy_public_address()
         self.environment.check_url(

@@ -11,6 +11,7 @@ import tempfile
 import shutil
 import json
 import time
+import re
 
 from operator import itemgetter
 from os import getenv
@@ -154,6 +155,25 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
+    def login(self, email, password, cookie_file):
+        """
+        Logs into Landscape web service with the given email/password.
+
+        To ensure re-usability in further check_url calls,
+        cookie_file must be passed in (to keep the same session ID).
+        """
+        index_page = self.check_url(
+            "/", "Access your account", cookie_jar=cookie_file)
+        token_re = re.compile(
+            '<input type="hidden" name="form-security-token" '
+            'value="([0-9a-f-]*)"/>')
+        token = token_re.search(index_page).group(1)
+        post_data = ("login.email=%s&login.password=%s&login=Login&"
+                     "form-security-token=%s" % (email, password, token))
+        return self.check_url(
+            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
+            cookie_jar=cookie_file)
+
     def check_service(self, name, state="up", attempts=2, interval=5):
         """Check that a Landscape service is either up or down.
 
@@ -175,6 +195,10 @@ class EnvironmentFixture(Fixture):
                     "sequencei0;;"),
                 "header": "X-MESSAGE-API: 3.1",
                 "up": ["ds8:messagesl", "s11:server-uuid"],
+                "down": "Landscape is unavailable"},
+            "script-attachments": {
+                "path": "/attachment",
+                "up": "script",
                 "down": "Landscape is unavailable"},
             "pingserver": {
                 "path": "/ping",
