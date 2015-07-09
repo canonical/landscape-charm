@@ -11,6 +11,7 @@ import tempfile
 import shutil
 import json
 import time
+import re
 
 from operator import itemgetter
 from os import getenv
@@ -61,7 +62,8 @@ class EnvironmentFixture(Fixture):
     _series = "trusty"
     _deployment = Deployment(series=_series)
 
-    def __init__(self, config=None, deployment=None, subprocess=subprocess):
+    def __init__(self, config=None, deployment=None, subprocess=subprocess,
+                 tempfile=tempfile):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
@@ -71,6 +73,7 @@ class EnvironmentFixture(Fixture):
         if deployment is not None:
             self._deployment = deployment
         self._subprocess = subprocess
+        self._tempfile = tempfile
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
@@ -113,7 +116,7 @@ class EnvironmentFixture(Fixture):
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None, attempts=2, interval=5):
+                  header=None, attempts=2, interval=5, cookie_jar=None):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
@@ -124,8 +127,9 @@ class EnvironmentFixture(Fixture):
         @param proto: either https or http
         @param post_data: optional POST data string
         @param header: optional request header string
-        @param interval: seconds two wait between attempts
+        @param interval: seconds to wait between attempts
         @param attempts: number of attempts to try
+        @param cookie_jar: file to store cookies in
         """
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
@@ -137,6 +141,8 @@ class EnvironmentFixture(Fixture):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
+        if cookie_jar:
+            cmd.extend(["--cookie-jar", cookie_jar, "-b", cookie_jar])
         for _ in range(attempts):
             output = self._subprocess.check_output(cmd).decode("utf-8").strip()
             if all(content in output for content in good_content):
@@ -150,6 +156,29 @@ class EnvironmentFixture(Fixture):
         output:{}
         """
         raise AssertionError(msg.format(url, good_content, output))
+
+    def login(self, email, password, cookie_file=None):
+        """
+        Logs into Landscape web service with the given email/password.
+
+        To re-use session ID cookies, you can pass cookie_file in.
+        """
+        if cookie_file is None:
+            cookie_jar = self._tempfile.NamedTemporaryFile()
+            cookie_file = cookie_jar.name
+        # The phrase "Access your account" should match the login form
+        # and not match the new-standalone-user form.
+        index_page = self.check_url(
+            "/", "Access your account", cookie_jar=cookie_file)
+        token_re = re.compile(
+            '<input type="hidden" name="form-security-token" '
+            'value="([0-9a-f-]*)"/>')
+        token = token_re.search(index_page).group(1)
+        post_data = ("login.email=%s&login.password=%s&login=Login&"
+                     "form-security-token=%s" % (email, password, token))
+        return self.check_url(
+            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
+            cookie_jar=cookie_file)
 
     def check_service(self, name, state="up", attempts=2, interval=5):
         """Check that a Landscape service is either up or down.
