@@ -234,6 +234,32 @@ class EnvironmentFixture(Fixture):
         if code != 0:
             raise RuntimeError(output)
 
+    def run_script_on_cron_unit(self, script_location, layer):
+        """
+        Execute a script on the landscape cron unit, given the script location.
+
+        @param script_location: The full path to the script on the landscape
+            unit filesystem.
+        @param layer: The Layer in which this method is called. This is used
+            to determine which unit is the cron unit.
+        """
+        status = 0
+        cmd = ["juju", "ssh", layer.cron_unit, "sudo", "-u landscape",
+               script_location, "2>&1"]
+        try:
+            # The sanitize is a workaround for lp:1328269
+            output = self._sanitize_ssh_output(
+                self._subprocess.check_output(
+                    cmd,
+                    stderr=self._subprocess.STDOUT,
+                    stdin=self._subprocess.PIPE).decode("utf-8").strip())
+        except self._subprocess.CalledProcessError as e:
+            output = e.output.decode("utf-8").strip()
+            status = e.returncode
+        # these jobs currently don't set their exit status to non-zero
+        # if they fail, they just print things to stdout/stderr
+        return (output, status)
+
     def stop_landscape_service(self, service, unit=None, restore=True):
         """Stop the given service on the given Landscape unit.
 
@@ -496,6 +522,24 @@ class EnvironmentFixture(Fixture):
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
                 if unit_name.startswith("{}/".format(service))]
         return self._deployment.sentry.unit[unit_name]
+
+    def _sanitize_ssh_output(self, output,
+                             remove_text=["sudo: unable to resolve",
+                                          "Warning: Permanently added",
+                                          "Connection to"]):
+        """Strip some common warning messages from ssh output.
+
+        @param output: output to sanitize
+        @param remove_text: list of text that, if found at the beginning of
+                            the a output line, will have that line removed
+                            entirely.
+        """
+        new_output = []
+        for line in output.split("\n"):
+            if any(line.startswith(remove) for remove in remove_text):
+                continue
+            new_output.append(line)
+        return "\n".join(new_output)
 
 
 class IntegrationTest(TestWithFixtures):
