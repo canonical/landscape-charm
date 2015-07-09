@@ -549,9 +549,9 @@ def get_ssl_certificate_over_wire(endpoint):
     # outputs the server certificate, but expects a request body, which we
     # don't have, so we just pipe in /dev/null to generate an empty request.
     # The server is likely to generate an error response. <shrug>
-    with open(os.devnull, 'w') as dev_null:
+    with open(os.devnull, "r+") as dev_null:
         output = subprocess.check_output(  # output is bytes
-            ['openssl', 's_client', '-connect', endpoint],
+            ["openssl", "s_client", "-connect", endpoint],
             stdin=dev_null, stderr=dev_null)
     certificate = output.decode("utf-8")
     start = certificate.find("-----BEGIN CERTIFICATE-----")
