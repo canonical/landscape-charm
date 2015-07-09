@@ -545,18 +545,14 @@ def get_ssl_certificate_over_wire(endpoint):
 
     @param endpoint: An SSL endpoint in the form <host:port>.
     """
-    # Call openssl s_client connect to get the actual certificate served.
-    # The command line program is a bit archaic and therefore we need
-    # to do a few things like send it a user "return"), and
-    # filter some of the output (it print non-error messages on stderr).
-    process = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
+    # Call openssl to get the actual certificate served.  The s_client command
+    # outputs the server certificate, but expects a request body, which we
+    # don't have, so we just pipe in /dev/null to generate an empty request.
+    # The server is likely to generate an error response. <shrug>
     with open(os.devnull, 'w') as dev_null:
         output = subprocess.check_output(  # output is bytes
             ['openssl', 's_client', '-connect', endpoint],
-            stdin=process.stdout, stderr=dev_null)
-    process.stdout.close()  # Close the pipe fd
-    process.wait()  # This closes the subprocess sending the return.
-
+            stdin=dev_null, stderr=dev_null)
     certificate = output.decode("utf-8")
     start = certificate.find("-----BEGIN CERTIFICATE-----")
     end = certificate.find("-----END CERTIFICATE-----") + len(
