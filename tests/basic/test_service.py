@@ -40,13 +40,6 @@ class ServiceTest(IntegrationTest):
         """
         self.environment.check_service("msgserver")
 
-    def test_script_attachments(self):
-        """
-        Verify that the script attachments are correctly served by the
-        message service.
-        """
-        self.environment.check_service("script-attachments")
-
     def test_ping(self):
         """Verify that the PING service is up.
 

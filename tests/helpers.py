@@ -202,10 +202,6 @@ class EnvironmentFixture(Fixture):
                 "header": "X-MESSAGE-API: 3.1",
                 "up": ["ds8:messagesl", "s11:server-uuid"],
                 "down": "Landscape is unavailable"},
-            "script-attachments": {
-                "path": "/attachment",
-                "up": "script",
-                "down": "Landscape is unavailable"},
             "pingserver": {
                 "path": "/ping",
                 "protocol": "http",
