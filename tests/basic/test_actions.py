@@ -58,17 +58,6 @@ class ActionsTest(IntegrationTest):
         result = self.environment.bootstrap_landscape(
             admin_name="foo", admin_password="bar", admin_email="foo@bar")
         self.assertEqual("completed", result["status"])
-        # This phrase should match the login form and not match the
-        # new-standalone-user form.
-        index_page = self.environment.check_url("/", "Access your account")
-        token_re = re.compile(
-            '<input type="hidden" name="form-security-token" '
-            'value="([0-9a-f-]*)"/>')
-        token_match = token_re.search(index_page)
-        self.assertTrue(bool(token_match))
-        token = token_match.group(1)
 
-        post_data = ("login.email=foo@bar&login.password=bar&login=Login&"
-                     "form-security-token=%s" % token)
-        self.environment.check_url(
-            "/redirect", "<h2>Organisation</h2>", post_data=post_data)
+        # Logging in should now work.
+        self.environment.login("foo@bar", "bar")

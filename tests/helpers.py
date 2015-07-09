@@ -155,13 +155,15 @@ class EnvironmentFixture(Fixture):
         """
         raise AssertionError(msg.format(url, good_content, output))
 
-    def login(self, email, password, cookie_file):
+    def login(self, email, password, cookie_file=None):
         """
         Logs into Landscape web service with the given email/password.
 
         To ensure re-usability in further check_url calls,
-        cookie_file must be passed in (to keep the same session ID).
+        cookie_file must be passed in (to store the session ID).
         """
+        # The phrase "Access your account" should match the login form
+        # and not match the new-standalone-user form.
         index_page = self.check_url(
             "/", "Access your account", cookie_jar=cookie_file)
         token_re = re.compile(
