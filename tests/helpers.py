@@ -62,7 +62,8 @@ class EnvironmentFixture(Fixture):
     _series = "trusty"
     _deployment = Deployment(series=_series)
 
-    def __init__(self, config=None, deployment=None, subprocess=subprocess):
+    def __init__(self, config=None, deployment=None, subprocess=subprocess,
+                 tempfile=tempfile):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
@@ -72,6 +73,7 @@ class EnvironmentFixture(Fixture):
         if deployment is not None:
             self._deployment = deployment
         self._subprocess = subprocess
+        self._tempfile = tempfile
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
@@ -159,9 +161,11 @@ class EnvironmentFixture(Fixture):
         """
         Logs into Landscape web service with the given email/password.
 
-        To ensure re-usability in further check_url calls,
-        cookie_file must be passed in (to store the session ID).
+        To re-use session ID cookies, you can pass cookie_file in.
         """
+        if cookie_file is None:
+            cookie_jar = self._tempfile.NamedTemporaryFile()
+            cookie_file = cookie_jar.name
         # The phrase "Access your account" should match the login form
         # and not match the new-standalone-user form.
         index_page = self.check_url(

@@ -67,14 +67,28 @@ class SubprocessStub(object):
             return output
 
 
+class NamedTemporaryFileStub(object):
+
+    def __init__(self):
+        self.name = "TEMP-FILE"
+
+
+class TempfileStub(object):
+
+    def __init__(self):
+        self.NamedTemporaryFile = NamedTemporaryFileStub
+
+
 class EnvironmentFixtureTest(unittest.TestCase):
 
     def setUp(self):
         super(EnvironmentFixtureTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.tempfile = TempfileStub()
         self.deployment = DeploymentStub()
         self.fixture = EnvironmentFixture(
-            deployment=self.deployment, subprocess=self.subprocess)
+            deployment=self.deployment, subprocess=self.subprocess,
+            tempfile=self.tempfile)
 
     def test_setup(self):
         """
@@ -155,6 +169,25 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.assertTrue(message.startswith("Content Not found!"))
         self.assertIn("good_content:['hello']", message)
         self.assertIn("output:bar", message)
+
+    def test_login(self):
+        """
+        The check_url method can post data.
+        """
+        curl_index = (
+            "curl https://1.2.3.4/ -k -L -s --compressed "
+            "--cookie-jar TEMP-FILE -b TEMP-FILE")
+        curl_login = (
+            "curl https://1.2.3.4/redirect -k -L -s --compressed "
+            "-d login.email=FOO&login.password=BAR&login=Login&"
+            "form-security-token=f00 "
+            "--cookie-jar TEMP-FILE -b TEMP-FILE")
+        self.subprocess.outputs[curl_index] = (
+            b'Access your account'
+            b'<input type="hidden" name="form-security-token" value="f00"/>')
+        self.subprocess.outputs[curl_login] = b'<h2>Organisation</h2> Success!'
+        output = self.fixture.login("FOO", "BAR")
+        self.assertIn('Success!', output)
 
     def test_bootstrap_landscape(self):
         """

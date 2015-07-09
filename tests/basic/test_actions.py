@@ -2,8 +2,6 @@
 Tests for the actions defined by the charm.
 """
 
-import re
-
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer
 
@@ -57,6 +55,7 @@ class ActionsTest(IntegrationTest):
         """
         result = self.environment.bootstrap_landscape(
             admin_name="foo", admin_password="bar", admin_email="foo@bar")
+        # This assumes that bootstrap has not run before (eg. in other tests).
         self.assertEqual("completed", result["status"])
 
         # Logging in should now work.
