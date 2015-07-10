@@ -4,6 +4,7 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
+import tempfile
 from subprocess import check_output, PIPE
 
 from helpers import IntegrationTest
@@ -25,9 +26,9 @@ class ServiceTest(IntegrationTest):
         user form.
 
         Note: In order to work on a new server or a server with the
-          first admin user already created, this phrase should match
-          the new-standalone-user form, the login form, and not
-          the maintenance page.
+        first admin user already created, this phrase should match
+        the new-standalone-user form, the login form, and not
+        the maintenance page.
         """
         self.environment.check_service("appserver")
 
@@ -53,6 +54,20 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and returns its name.
         """
         self.environment.check_service("api")
+
+    def test_api_endpoint(self):
+        """Verify that API endpoint is correctly listed."""
+        self.environment.bootstrap_landscape(
+            admin_name="foo", admin_password="bar", admin_email="foo@bar")
+
+        cookie_jar = tempfile.NamedTemporaryFile()
+        cookie_file = cookie_jar.name
+        self.environment.login("foo@bar", "bar", cookie_file)
+
+        public_url = self.environment.get_haproxy_public_address()
+        self.environment.check_url(
+            "/settings", "https://%s/api/" % public_url,
+            cookie_jar=cookie_file)
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.

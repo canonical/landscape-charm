@@ -16,7 +16,7 @@ verify-juju-test:
 		exit 1;\
 	else \
 		echo "installed"; \
-	fi 
+	fi
 
 update-charm-revision-numbers: bundles
 	@dev/update-charm-revision-numbers \
@@ -61,7 +61,7 @@ lint:
 	flake8 lib tests
 	pyflakes3 tests dev/update-charm-revision-numbers
 	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 flake8
-	flake8 tests dev/update-charm-revision-numbers 
+	flake8 tests dev/update-charm-revision-numbers
 
 clean:
 	@rm -rf bundles
@@ -81,7 +81,11 @@ clean:
 dev/charm_helpers_sync.py:
 	@mkdir -p dev
 	@bzr cat lp:charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py \
-        > dev/charm_helpers_sync.py
+            > dev/charm_helpers_sync.py
 
 sync: dev/charm_helpers_sync.py
 	$(PYTHON) dev/charm_helpers_sync.py -c charm-helpers.yaml
+
+build: secrets test-depends
+
+.DEFAULT_GOAL := build
