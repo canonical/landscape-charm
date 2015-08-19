@@ -495,11 +495,12 @@ class EnvironmentFixture(Fixture):
 
     @contextmanager
     def _enable_sample_hashids(self):
-        """Context manager to enable hashids around the tests"""
-        with open(self._get_sample_hashids_path(), "w") as fd:
+        """Context manager to enable sample hashids around the tests"""
+        sample_hashids_path = self._get_sample_hashids_path()
+        with open(sample_hashids_path, "w") as fd:
             fd.write("")
         yield
-        os.unlink(self._get_sample_hashids_path())
+        os.unlink(sample_hashids_path)
 
     def _control_landscape_service(self, action, service, unit=None):
         """Start or stop the given Landscape service on the given unit."""
