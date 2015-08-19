@@ -8,11 +8,11 @@ import yaml
 import os
 import subprocess
 import tempfile
-import shutil
 import json
 import time
 import re
 
+from contextlib import contextmanager
 from operator import itemgetter
 from os import getenv
 from time import sleep
@@ -79,11 +79,8 @@ class EnvironmentFixture(Fixture):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
             self._deployment.load(self._get_bundle())
-            repo_dir = self._build_repo_dir()
-            try:
+            with self._enable_sample_hashids():
                 self._deployment.setup(timeout=self._timeout)
-            finally:
-                self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
     def get_haproxy_public_address(self, unit=None):
@@ -495,33 +492,14 @@ class EnvironmentFixture(Fixture):
         template = environment.get_template("landscape-template.jinja2")
         return yaml.safe_load(template.render(context))
 
-    def _build_repo_dir(self):
-        """Create a temporary charm repository directory.
-
-        XXX Apparently there's no way in Amulet to easily deploy uncommitted
-            changes, so we create a temporary charm repository with a symlink
-            to the branch.
-        """
-        config = self._deployment.services["landscape-server"]
-        config["charm"] = "local:trusty/landscape-server"
-        branch_dir = config.pop("branch")
-        repo_dir = tempfile.mkdtemp()
-        series_dir = os.path.join(repo_dir, self._series)
-        os.mkdir(series_dir)
-        charm_link = os.path.join(series_dir, "landscape-server")
-        os.symlink(branch_dir, charm_link)
-        os.environ["JUJU_REPOSITORY"] = repo_dir
-
-        # Enable sample hashids
-        with open(self._get_sample_hashids_path(), "w") as fd:
+    @contextmanager
+    def _enable_sample_hashids(self):
+        """Context manager to enable sample hashids around the tests"""
+        sample_hashids_path = self._get_sample_hashids_path()
+        with open(sample_hashids_path, "w") as fd:
             fd.write("")
-
-        return repo_dir
-
-    def _clean_repo_dir(self, repo_dir):
-        """Clean up the repository directory and the sample hashids flag."""
-        shutil.rmtree(repo_dir)
-        os.unlink(self._get_sample_hashids_path())
+        yield
+        os.unlink(sample_hashids_path)
 
     def _control_landscape_service(self, action, service, unit=None):
         """Start or stop the given Landscape service on the given unit."""
