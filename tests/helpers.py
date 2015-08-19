@@ -8,7 +8,6 @@ import yaml
 import os
 import subprocess
 import tempfile
-import shutil
 import json
 import time
 import re
