@@ -1,3 +1,5 @@
+from fixtures import EnvironmentVariable
+
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.paths import LSCTL, SCHEMA_SCRIPT
@@ -21,11 +23,28 @@ class SchemaBootstrapTest(HookenvTest):
 
     def test_options(self):
         """
-        The schema script is invoked with the --bootstrap option.
+        The schema script is invoked with the --bootstrap option and the proxy
+        options.
         """
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
-            ["/usr/bin/landscape-schema", "--bootstrap"],
+            ["/usr/bin/landscape-schema", "--bootstrap", "--with-http-proxy=",
+             "--with-https-proxy=", "--with-no-proxy="],
+            self.subprocess.calls[0][0])
+
+    def test_with_proxy_settings(self):
+        """
+        The proxy options are set according to the environment variables.
+        """
+        self.useFixture(EnvironmentVariable("HTTP_PROXY", "http://host:3128"))
+        self.useFixture(EnvironmentVariable("HTTPS_PROXY", "http://host:3128"))
+        self.useFixture(EnvironmentVariable("NO_PROXY", "localhost"))
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap",
+             "--with-http-proxy=http://host:3128",
+             "--with-https-proxy=http://host:3128",
+             "--with-no-proxy=localhost"],
             self.subprocess.calls[0][0])
 
     def test_was_ready(self):

@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from charmhelpers.core import hookenv
@@ -34,7 +35,12 @@ class SchemaBootstrap(ScriptCallback):
     """
     def __call__(self, manager, service_name, event_name):
         if not manager.was_ready(service_name):
-            self._run(SCHEMA_SCRIPT, ("--bootstrap",))
+            options = (
+                "--bootstrap",
+                "--with-http-proxy=%s" % os.environ.get("HTTP_PROXY", ""),
+                "--with-https-proxy=%s" % os.environ.get("HTTPS_PROXY", ""),
+                "--with-no-proxy=%s" % os.environ.get("NO_PROXY", ""))
+            self._run(SCHEMA_SCRIPT, options)
 
 
 class LSCtl(ScriptCallback):
