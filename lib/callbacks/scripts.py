@@ -35,11 +35,15 @@ class SchemaBootstrap(ScriptCallback):
     """
     def __call__(self, manager, service_name, event_name):
         if not manager.was_ready(service_name):
-            options = (
-                "--bootstrap",
-                "--with-http-proxy=%s" % os.environ.get("HTTP_PROXY", ""),
-                "--with-https-proxy=%s" % os.environ.get("HTTPS_PROXY", ""),
-                "--with-no-proxy=%s" % os.environ.get("NO_PROXY", ""))
+            options = ["--bootstrap"]
+
+            # Forward any proxy configuration set in the environment
+            for proxy_variable in ("http_proxy", "https_proxy", "no_proxy"):
+                if proxy_variable in os.environ:
+                    options.append("--with-%s=%s" % (
+                        proxy_variable.replace("_", "-"),
+                        os.environ[proxy_variable]))
+
             self._run(SCHEMA_SCRIPT, options)
 
 

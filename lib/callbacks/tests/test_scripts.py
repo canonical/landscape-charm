@@ -28,17 +28,16 @@ class SchemaBootstrapTest(HookenvTest):
         """
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
-            ["/usr/bin/landscape-schema", "--bootstrap", "--with-http-proxy=",
-             "--with-https-proxy=", "--with-no-proxy="],
+            ["/usr/bin/landscape-schema", "--bootstrap"],
             self.subprocess.calls[0][0])
 
     def test_with_proxy_settings(self):
         """
         The proxy options are set according to the environment variables.
         """
-        self.useFixture(EnvironmentVariable("HTTP_PROXY", "http://host:3128"))
-        self.useFixture(EnvironmentVariable("HTTPS_PROXY", "http://host:3128"))
-        self.useFixture(EnvironmentVariable("NO_PROXY", "localhost"))
+        self.useFixture(EnvironmentVariable("http_proxy", "http://host:3128"))
+        self.useFixture(EnvironmentVariable("https_proxy", "http://host:3128"))
+        self.useFixture(EnvironmentVariable("no_proxy", "localhost"))
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
             ["/usr/bin/landscape-schema", "--bootstrap",
