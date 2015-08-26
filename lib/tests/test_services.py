@@ -115,9 +115,10 @@ class ServicesHookTest(HookenvTest):
             ("landscape-server", self.paths.default_file(), context,
              "landscape", "root", 416),
             self.renders[1])
-        [call1, call2] = self.subprocess.calls
-        self.assertEqual("/usr/bin/landscape-schema", call1[0][0])
-        self.assertEqual("/usr/bin/lsctl", call2[0][0])
+        [call1, call2, call3] = self.subprocess.calls
+        self.assertEqual(["/usr/bin/landscape-schema", "-h"], call1[0])
+        self.assertEqual("/usr/bin/landscape-schema", call2[0][0])
+        self.assertEqual("/usr/bin/lsctl", call3[0][0])
 
     def test_ready_with_non_standalone_deployment_mode(self):
         """
