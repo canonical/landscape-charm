@@ -1,3 +1,5 @@
+from fixtures import EnvironmentVariable
+
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.paths import LSCTL, SCHEMA_SCRIPT
@@ -21,12 +23,43 @@ class SchemaBootstrapTest(HookenvTest):
 
     def test_options(self):
         """
-        The schema script is invoked with the --bootstrap option.
+        The schema script is invoked with the --bootstrap option and the proxy
+        options.
         """
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
             ["/usr/bin/landscape-schema", "--bootstrap"],
-            self.subprocess.calls[0][0])
+            self.subprocess.calls[1][0])
+
+    def test_with_no_proxy_support_in_schema_script(self):
+        """
+        If there's no proxy support in the schema script, the relevant options
+        are not passed.
+        """
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: --foo --bar")
+        self.useFixture(EnvironmentVariable("http_proxy", "http://host:3128"))
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap"],
+            self.subprocess.calls[1][0])
+
+    def test_with_proxy_settings(self):
+        """
+        The proxy options are set according to the environment variables.
+        """
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: --with-http-proxy")
+        self.useFixture(EnvironmentVariable("http_proxy", "http://foo:3128"))
+        self.useFixture(EnvironmentVariable("https_proxy", "http://bar:3128"))
+        self.useFixture(EnvironmentVariable("no_proxy", "localhost"))
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap",
+             "--with-http-proxy=http://foo:3128",
+             "--with-https-proxy=http://bar:3128",
+             "--with-no-proxy=localhost"],
+            self.subprocess.calls[1][0])
 
     def test_was_ready(self):
         """
