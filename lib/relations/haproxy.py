@@ -135,7 +135,9 @@ class HAProxyProvider(RelationContext):
                 " entry.")
             service["service_options"].extend([
                 "acl package-upload path_beg -i /upload",
-                "use_backend landscape-package-upload if package-upload"])
+                "use_backend landscape-package-upload if package-upload",
+                "reqrep ^([^\\ ]*)\\ /upload/(.*) \\1\ /\\2",
+            ])
             backends.append(
                 self._get_backend(
                     "package-upload", self._get_servers("package-upload")))
