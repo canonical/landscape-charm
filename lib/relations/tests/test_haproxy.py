@@ -333,12 +333,18 @@ class HAProxyProviderTest(HookenvTest):
         https_service = services[HTTPS_INDEX]
         backends = https_service["backends"]
 
+        # "/upload" is stripped from URLs before being forwarded to
+        # the package-upload backend.
+        self.assertIn(
+            "reqrep ^([^\\ ]*)\\ /upload/(.*) \\1\ /\\2",
+            https_service["service_options"])
+
         package_upload = None
         for backend in backends:
             if backend["backend_name"] == "landscape-package-upload":
                 package_upload = backend
 
-        self.assertIsNot(package_upload, None)
+        self.assertIsNotNone(package_upload)
         self.assertEqual(1, len(package_upload["servers"]))
         expected = [
             'landscape-package-upload-landscape-server-0', '1.2.3.4', 9100,
