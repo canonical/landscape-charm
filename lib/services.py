@@ -15,6 +15,7 @@ from lib.relations.leader import LeaderProvider, LeaderRequirer
 from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.callbacks.smtp import ConfigureSMTP
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 from lib.callbacks.apt import SetAPTSources
@@ -84,6 +85,8 @@ class ServicesHook(Hook):
                 WriteCustomSSLCertificate(paths=self._paths),
                 SchemaBootstrap(subprocess=self._subprocess),
                 WriteLicenseFile(host=self._host, paths=self._paths),
+                ConfigureSMTP(
+                    hookenv=self._hookenv, subprocess=self._subprocess),
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])

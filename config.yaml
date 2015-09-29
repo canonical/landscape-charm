@@ -50,3 +50,8 @@ options:
             base64 encoded private key for the default SSL certificate. If
             ssl_cert is not set, this will be ignored.
         default: ""
+    smtp-relay-host:
+        type: string
+        description: |
+            The SMTP server to use to deliver outgoing mail.
+        default: ""

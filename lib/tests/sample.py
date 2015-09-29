@@ -34,7 +34,8 @@ SAMPLE_AMQP_UNIT_DATA = {
 }
 
 SAMPLE_CONFIG = {
-    "source": "ppa:landscape/14.10"
+    "source": "ppa:landscape/14.10",
+    "smtp-relay-host": "",
 }
 
 SAMPLE_CONFIG_OPENID_DATA = SAMPLE_CONFIG.copy()

@@ -151,6 +151,7 @@ class SubprocessStub(object):
 
     def __init__(self):
         self.calls = []
+        self.processes = []
         self._fake_executables = {}
 
     def add_fake_executable(self, executable, args=None, stdout="", stderr="",
@@ -188,6 +189,18 @@ class SubprocessStub(object):
             raise subprocess.CalledProcessError(
                 returncode, command, output=stdout)
         return stdout
+
+    def Popen(self, args, **kwargs):
+
+        class Popen(object):
+            def communicate(process, input=None):
+                process.input = input
+                return self._call(args)
+
+        process = Popen()
+        process.kwargs = kwargs
+        self.processes.append(process)
+        return process
 
     def _call(self, command, **kwargs):
         """Helper method for executing either a fake or real call.
