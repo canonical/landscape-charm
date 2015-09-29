@@ -8,7 +8,8 @@ from lib.paths import LSCTL, SCHEMA_SCRIPT
 from lib.utils import get_required_data, update_persisted_data
 
 # Configuration keys for which, in case of change, a restart is not needed.
-NO_RESTART_CONFIG_KEYS = {"source", "key", "ssl-cert", "ssl-key"}
+NO_RESTART_CONFIG_KEYS = {
+    "source", "key", "ssl-cert", "ssl-key", "smtp-relay-host"}
 
 # Database relation keys for which, in case of change, a restart is not needed.
 NO_RESTART_DB_RELATION_KEYS = {"allowed-units", "state"}

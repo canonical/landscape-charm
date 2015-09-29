@@ -144,6 +144,18 @@ class LSCtlTest(HookenvTest):
         self.callback(self.manager, "landscape", "start")
         self.assertEqual([], self.subprocess.calls)
 
+    def test_config_changed_only_smtp(self):
+        """
+        The 'lsctl' script is not invoked if only the SMTP relay host changed.
+        """
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["smtp-relay-host"] = "mx.first"
+        config.save()
+        config["smtp-relay-host"] = "mx.second"
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual([], self.subprocess.calls)
+
     def test_db_connection_details_first_time(self):
         """
         The 'lsctl' script is invoked if no db connection details where
