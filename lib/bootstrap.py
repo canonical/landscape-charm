@@ -5,6 +5,8 @@ from charmhelpers.core import hookenv
 from lib.action import Action
 from lib.paths import SCHEMA_SCRIPT
 
+CREDENTIALS_MARKER = "API credentials:"
+
 
 class BootstrapAction(Action):
     """Action to bootstrap Landscape and create an initial admin user."""
@@ -22,4 +24,18 @@ class BootstrapAction(Action):
                admin_name, "--admin-email", admin_email,
                "--admin-password", admin_password)
 
-        self._subprocess.check_call(cmd)
+        output = self._subprocess.check_output(cmd)
+        key, secret = self._parse_schema_output(output)
+        result = {"api-credentials": {"key": key, "secret": secret}}
+
+        self._hookenv.action_set(result)
+
+    def _parse_schema_output(self, output):
+        """Extract API credentials from the schema bootstrap output."""
+        key = None
+        secret = None
+        for line in output.split("\n"):
+            if line.startswith(CREDENTIALS_MARKER):
+                line = line[len(CREDENTIALS_MARKER) + 1:]
+                key, secret = line.split(" ")[2:4]
+        return key, secret
