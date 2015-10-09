@@ -1,5 +1,0 @@
-- inform apache2 SSL endpoint of the configuration from landscape.  This would
-  mean passing it through haproxy to apache2, or establishing a configuration
-  relationship between landscape and apache2.  Right now, configuration is
-  supplied manually at deploy time.
-- Make sure all code is in python
