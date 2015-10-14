@@ -1,3 +1,5 @@
+from charmhelpers.core.services.base import ServiceManager
+
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
 from lib.callbacks.smtp import ConfigureSMTP
@@ -9,6 +11,7 @@ class ConfigureSMTPTest(HookenvTest):
     def setUp(self):
         super(ConfigureSMTPTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.manager = ServiceManager([])
         self.callback = ConfigureSMTP(
             hookenv=self.hookenv, subprocess=self.subprocess)
 
@@ -20,7 +23,7 @@ class ConfigureSMTPTest(HookenvTest):
         self.subprocess.add_fake_executable(DPKG_RECONFIGURE)
         config = self.hookenv.config()
         config["smtp-relay-host"] = "my.smtp.server"
-        self.callback(None, None, None)
+        self.callback(self.manager, "landscape", None)
         [process] = self.subprocess.processes
         self.assertIn("relayhost string my.smtp.server", process.input)
         self.assertIn(
@@ -35,18 +38,20 @@ class ConfigureSMTPTest(HookenvTest):
         self.subprocess.add_fake_executable(DPKG_RECONFIGURE)
         config = self.hookenv.config()
         config["smtp-relay-host"] = ""
-        self.callback(None, None, None)
+        self.callback(self.manager, "landscape", None)
         [process] = self.subprocess.processes
         self.assertIn("relayhost string ", process.input)
         self.assertIn("main_mailer_type select Internet Site", process.input)
 
     def test_run_no_change(self):
         """
-        Nothing is done if the configuration hasn't changed.
+        Nothing is done if the service had already been started and
+        configuration hasn't changed.
         """
+        self.manager.save_ready("landscape")
         config = self.hookenv.config()
         config["smtp-relay-host"] = "my.smtp.server"
         config.save()
         config.load_previous()
-        self.callback(None, None, None)
+        self.callback(self.manager, "landscape", None)
         self.assertEqual([], self.subprocess.calls)

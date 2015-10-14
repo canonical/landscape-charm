@@ -21,9 +21,10 @@ class ConfigureSMTP(ManagerCallback):
 
     def __call__(self, manager, service_name, event_name):
         config = self._hookenv.config()
-        if not config.changed("smtp-relay-host"):
-            # Nothing to do
-            return
+        if manager.was_ready(service_name):
+            if not config.changed("smtp-relay-host"):
+                # Nothing to do
+                return
 
         relay_host = config["smtp-relay-host"]
         if relay_host == "":
