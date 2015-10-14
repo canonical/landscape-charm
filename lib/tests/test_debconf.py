@@ -45,12 +45,13 @@ class DebConfTest(TestCase):
 
     def test_reconfigure(self):
         """
-        The reconfigure() method invokes dpkg-reconfigure with the
-        noninteractive frontend.
+        The reconfigure() method invokes dpkg-reconfigure with the 'editor'
+        frontend and pass /bin/true as EDITOR variable, in oder to avoid
+        user interaction.
         """
         self.subprocess.add_fake_executable(DPKG_RECONFIGURE)
         self.debconf.reconfigure()
         [call] = self.subprocess.calls
         self.assertEqual(
-            ([DPKG_RECONFIGURE, "-fnoninteractive", "some-package"], {}),
-            call)
+            [DPKG_RECONFIGURE, "-feditor", "some-package"], call[0])
+        self.assertEqual("/bin/true", call[1]["env"]["EDITOR"])
