@@ -52,6 +52,6 @@ class DebConfTest(TestCase):
         self.subprocess.add_fake_executable(DPKG_RECONFIGURE)
         self.debconf.reconfigure()
         [call] = self.subprocess.calls
-        self.assertEqual(
-            [DPKG_RECONFIGURE, "-feditor", "some-package"], call[0])
+        self.assertEqual([DPKG_RECONFIGURE, "some-package"], call[0])
         self.assertEqual("/bin/true", call[1]["env"]["EDITOR"])
+        self.assertEqual("editor", call[1]["env"]["DEBIAN_FRONTEND"])

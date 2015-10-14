@@ -34,14 +34,20 @@ class DebConf(object):
 
     def reconfigure(self):
         """Reconfigure the package in non-interactive mode."""
+        env = os.environ.copy()
+
         # XXX It seems that some packages (e.g. postfix) are not happy with
         #     the 'noninteractive' frontend, and don't really reconfigure
         #     anything in that case. Using the editor frontend and pointing
         #     the editor to a no-op like /bin/true workarounds the problem.
-        env = os.environ.copy()
         env["EDITOR"] = "/bin/true"
-        self._subprocess.check_call([
-            DPKG_RECONFIGURE, "-feditor", self._package], env=env)
+
+        # XXX Set the frontend using the environment variable and not the -f
+        #     command line options, since dpkg-reconfigure prefers the former
+        #     over the latter, and juju sets it to noninteractive by default.
+        env["DEBIAN_FRONTEND"] = "editor"
+
+        self._subprocess.check_call([DPKG_RECONFIGURE, self._package], env=env)
 
     def _format_option(self, name, value):
         """Format an option line to feed to debconf-set-selections."""
