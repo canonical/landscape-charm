@@ -1,13 +1,13 @@
 options:
     source:
-        default: "ppa:landscape/15.01"
+        default: "ppa:landscape/15.10"
         type: string
         description: |
             The source from which to install the landscape packages. Possible
             values are:
-                - A full deb line: "deb http://ppa.launchpad.net/landscape/15.01/ubuntu trusty main"
-                - A PPA URL: "ppa:landscape/15.01"
-                - A version number: "15.01"
+                - A full deb line: "deb http://ppa.launchpad.net/landscape/15.10/ubuntu trusty main"
+                - A PPA URL: "ppa:landscape/15.10"
+                - A version number: "15.10"
     key:
         default:
         type: string
