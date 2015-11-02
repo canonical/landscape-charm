@@ -1,3 +1,4 @@
+import psutil
 import subprocess
 
 from charmhelpers import fetch
@@ -21,13 +22,6 @@ from lib.callbacks.filesystem import (
 from lib.callbacks.apt import SetAPTSources
 
 
-SERVICE_COUNTS = {
-    "appserver": 2,
-    "message-server": 2,
-    "pingserver": 2,
-}
-
-
 class ServicesHook(Hook):
     """Execute service configuration logic.
 
@@ -44,6 +38,20 @@ class ServicesHook(Hook):
         self._subprocess = subprocess
         self._fetch = fetch
 
+    def _calculate_service_counts(self, hookenv=None, psutil=psutil):
+        """Return dict keyed by service names with desired number of processes.
+
+        Scales by CPU count and RAM size.
+        """
+        if hookenv is None:
+            hookenv = self._hookenv
+        service_count = hookenv.config().get("service-count", 2)
+        return {
+            "appserver": service_count,
+            "message-server": service_count,
+            "pingserver": service_count,
+        }
+
     def _run(self):
 
         # XXX We need to manually kick the leader provider because atm the
@@ -51,12 +59,13 @@ class ServicesHook(Hook):
         leader_provider = LeaderProvider(
             hookenv=self._hookenv, host=self._host)
         leader_provider.provide_data()
+        service_counts = self._calculate_service_counts()
 
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
-                HAProxyProvider(SERVICE_COUNTS, paths=self._paths),
+                HAProxyProvider(service_counts, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -68,7 +77,7 @@ class ServicesHook(Hook):
                 HAProxyRequirer(),
                 HostedRequirer(),
                 {"is_leader": self._hookenv.is_leader(),
-                 "service_counts": SERVICE_COUNTS},
+                 "service_counts": service_counts},
             ],
             "data_ready": [
                 render_template(
