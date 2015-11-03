@@ -34,7 +34,7 @@ class UpgradeActionTest(HookenvTest):
         self.assertEqual([True], self.fetch.updates)
         # And one apt_install with appropriate options.
         self.assertEqual(
-            [(("landscape-server",),
+            [(("landscape-server", "python-psutil"),
               ["--option=Dpkg::Options::=--force-confdef",
                "--option=Dpkg::Options::=--force-confold"],
               True)], self.fetch.installed)

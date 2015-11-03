@@ -195,7 +195,7 @@ class AptTest(HookenvTest):
         """
         The C{PACKAGES} tuple holds the packages expected to get installed.
         """
-        self.assertEqual(("landscape-server",), PACKAGES)
+        self.assertEqual(("landscape-server", "python-psutil"), PACKAGES)
 
     def test_install(self):
         """
