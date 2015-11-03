@@ -56,8 +56,9 @@ class ServicesHook(Hook):
             # For each extra CPU core and each extra 1GB of RAM (after 1GB),
             # we add another process.
             number_of_processes = 1 + cpu_cores + memory_in_gb - 2
-            # Landscape startup scripts can only accept values between 1 and 9.
-            service_count = max(1, min(number_of_processes, 9))
+
+        # Landscape startup scripts can only accept values between 1 and 9.
+        service_count = max(1, min(number_of_processes, 9))
         return {
             "appserver": service_count,
             "message-server": service_count,
