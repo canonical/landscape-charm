@@ -45,7 +45,15 @@ class ServicesHook(Hook):
         """
         if hookenv is None:
             hookenv = self._hookenv
-        service_count = hookenv.config().get("service-count", 2)
+        service_count = hookenv.config().get("service-count", None)
+        if service_count is None:
+            cpu_cores = psutil.NUM_CPUS
+            memory_in_gb = psutil.phymem_usage().total / (1024 ** 3)
+            # For each extra CPU core and each extra 1GB of RAM (after 1GB),
+            # we add another process.
+            number_of_processes = 1 + cpu_cores + memory_in_gb - 2
+            # Landscape startup scripts can only accept values between 1 and 9.
+            service_count = max(1, min(number_of_processes, 9))
         return {
             "appserver": service_count,
             "message-server": service_count,
