@@ -77,7 +77,7 @@ class ServicesHook(Hook):
                 HAProxyRequirer(),
                 HostedRequirer(),
                 {"is_leader": self._hookenv.is_leader(),
-                 "service_counts": service_counts},
+                 "per_service_counts": service_counts},
             ],
             "data_ready": [
                 render_template(

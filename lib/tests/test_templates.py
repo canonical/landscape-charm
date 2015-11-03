@@ -149,7 +149,7 @@ class LandscapeDefaultsTest(TemplateTest):
             "hosted": [SAMPLE_HOSTED_DATA.copy()],
             "config": {},
             "is_leader": True,
-            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
+            "per_service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
     def test_render_on_leader(self):

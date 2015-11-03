@@ -107,7 +107,7 @@ class ServicesHookTest(HookenvTest):
             "hosted": [SAMPLE_HOSTED_DATA],
             "config": SAMPLE_CONFIG,
             "is_leader": True,
-            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
+            "per_service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
@@ -165,7 +165,7 @@ class ServicesHookTest(HookenvTest):
             "config": SAMPLE_CONFIG_OPENID_DATA,
             "hosted": [SAMPLE_HOSTED_DATA],
             "is_leader": True,
-            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
+            "per_service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
@@ -254,4 +254,4 @@ class ServicesHookTest(HookenvTest):
         _, _, context, _, _, _ = self.renders[1]
         self.assertEqual(
             {"appserver": 7, "pingserver": 7, "message-server": 7},
-            context["service_counts"])
+            context["per_service_counts"])

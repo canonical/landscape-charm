@@ -99,9 +99,10 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, service_counts, hookenv=hookenv, paths=default_paths):
+    def __init__(self, per_service_counts, hookenv=hookenv,
+                 paths=default_paths):
         self._hookenv = hookenv
-        self._service_counts = service_counts
+        self._per_service_counts = per_service_counts
         self._paths = paths
         super(HAProxyProvider, self).__init__()
 
@@ -197,7 +198,7 @@ class HAProxyProvider(RelationContext):
         unit_name = self._hookenv.local_unit()
         server_name = "landscape-%s-%s" % (name, unit_name.replace("/", "-"))
         server_base_port = SERVER_BASE_PORTS[name]
-        requested_processes = self._service_counts.get(name, 1)
+        requested_processes = self._per_service_counts.get(name, 1)
 
         # When only one process for a service is started, return it.
         if requested_processes == 1:
