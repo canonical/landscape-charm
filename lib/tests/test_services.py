@@ -239,3 +239,19 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         data = yaml.load(self.hookenv.relations["website:1"]["services"])
         self.assertIsNotNone(data)
+
+    def test_service_count_changed(self):
+        """
+        If the count of services changes, /etc/default/landscape-server is
+        rendered with new counts.
+        """
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config.save()
+        config["service-count"] = 7
+        self.hook()
+        # Config option is turned into a per-service count.
+        _, _, context, _, _, _ = self.renders[1]
+        self.assertEqual(
+            {"appserver": 7, "pingserver": 7, "message-server": 7},
+            context["service_counts"])
