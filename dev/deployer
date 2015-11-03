@@ -138,7 +138,8 @@ def get_parser():
     parser.add_argument(
         "type", choices=("scalable", "dense", "dense-maas"),
         help="deploy type")
-    parser.add_argument("--flags", nargs="+", help="feature flags to enable")
+    parser.add_argument(
+        "--flags", nargs="+", default=[], help="feature flags to enable")
     return parser
 
 if __name__ == "__main__":
