@@ -50,7 +50,7 @@ deploy-dense-maas: bundles
 	./dev/deployer dense-maas
 
 deploy-dense-maas-dev: bundles
-	./dev/deployer dense-maas --flags juju-debug openstack-debug
+	./dev/deployer dense-maas --flags juju-debug
 
 deploy: bundles
 	./dev/deployer scalable
