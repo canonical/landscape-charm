@@ -5,10 +5,9 @@ import logging
 import shutil
 import subprocess
 import tempfile
-import sys
 import time
-
 import yaml
+from argparse import ArgumentParser
 
 CHARM_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -125,12 +124,26 @@ class Deployer(object):
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
 
+    def enable_flags(self, flags):
+        """Enable specified feature flags."""
+        command = "sudo /opt/canonical/landscape/featureflags enable {}"
+        for flag in flags:
+            subprocess.check_output(
+                ["juju", "run", "--unit", "landscape-server/0",
+                 command.format(flag)])
+
+
+def get_parser():
+    parser = ArgumentParser(description="Simple wrapper around juju-deployer")
+    parser.add_argument(
+        "type", choices=("scalable", "dense", "dense-maas"),
+        help="deploy type")
+    parser.add_argument("--flags", nargs="+", help="feature flags to enable")
+    return parser
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: %s <target>" % sys.argv[0])
-        print("   <target> can be either 'scalable', 'dense' or 'dense-maas'")
-        sys.exit(1)
+    args = get_parser().parse_args()
     logging.basicConfig(level=logging.INFO)
     deployer = Deployer()
-    deployer.deploy(sys.argv[1])
+    deployer.deploy(args.type)
+    deployer.enable_flags(args.flags)

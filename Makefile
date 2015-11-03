@@ -1,4 +1,3 @@
-#!/usr/bin/make
 PYTHON := /usr/bin/env python
 
 test:
@@ -50,6 +49,9 @@ integration-test-trunk: secrets
 deploy-dense-maas: bundles
 	./dev/deployer dense-maas
 
+deploy-dense-maas-dev: bundles
+	./dev/deployer dense-maas --flags juju-debug openstack-debug
+
 deploy: bundles
 	./dev/deployer scalable
 
@@ -70,6 +72,7 @@ clean:
 .PHONY: lint \
 	test-depends \
 	deploy-dense-maas \
+	deploy-dense-maas-dev \
 	integration-test \
 	verify-juju-test \
 	test \
