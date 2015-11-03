@@ -225,7 +225,7 @@ class SubprocessStub(object):
 
 
 class PsutilUsageStub(object):
-    """Testable stub for psutil.phymem_usage() return values."""
+    """Testable stub for psutil.virtual_memory() return values."""
     def __init__(self, total):
         self.total = total
 
@@ -237,5 +237,5 @@ class PsutilStub(object):
         self.NUM_CPUS = num_cpus
         self._physical_memory = physical_memory
 
-    def phymem_usage(self):
+    def virtual_memory(self):
         return PsutilUsageStub(self._physical_memory)
