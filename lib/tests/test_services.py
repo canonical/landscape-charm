@@ -32,9 +32,10 @@ class ServicesHookTest(HookenvTest):
         self.paths = self.root_dir.paths
         self.root_dir = self.useFixture(RootDir())
         self.fetch = FetchStub()
+        self.psutil = PsutilStub(num_cpus=2, physical_memory=1*1024**3)
         self.hook = ServicesHook(
             hookenv=self.hookenv, host=self.host, subprocess=self.subprocess,
-            paths=self.paths, fetch=self.fetch)
+            paths=self.paths, fetch=self.fetch, psutil=self.psutil)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.

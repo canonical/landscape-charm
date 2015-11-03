@@ -30,21 +30,25 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, host=host,
-                 subprocess=subprocess, paths=default_paths, fetch=fetch):
+                 subprocess=subprocess, paths=default_paths, fetch=fetch,
+                 psutil=psutil):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
         self._host = host
         self._paths = paths
+        self._psutil = psutil
         self._subprocess = subprocess
         self._fetch = fetch
 
-    def _calculate_service_counts(self, hookenv=None, psutil=psutil):
+    def _calculate_service_counts(self, hookenv=None, psutil=None):
         """Return dict keyed by service names with desired number of processes.
 
         Scales by CPU count and RAM size.
         """
         if hookenv is None:
             hookenv = self._hookenv
+        if psutil is None:
+            psutil = self._psutil
         service_count = hookenv.config().get("service-count", None)
         if service_count is None:
             cpu_cores = psutil.NUM_CPUS
