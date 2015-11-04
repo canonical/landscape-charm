@@ -86,9 +86,9 @@ class Deployer(object):
 
     def deploy(self, timeout=900):
         """
-        Use juju-deployer to install `target` on current `juju env`
+        Use juju-deployer to deploy the target deployment type on current
+        `juju env`.
 
-        @param target: target to deploye in the config file.
         @param timeout: timeout in seconds (int or string is OK)
         """
         target = self._args.target
