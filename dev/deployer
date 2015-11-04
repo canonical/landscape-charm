@@ -30,6 +30,9 @@ class Deployer(object):
     that can be used to provide custom parameters.
     """
 
+    def __init__(self, args):
+        self._args = args
+
     def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
         series_dest = os.path.join(deployer_dir, series)
@@ -81,13 +84,14 @@ class Deployer(object):
             f.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
-    def deploy(self, target, timeout=900):
+    def deploy(self, timeout=900):
         """
         Use juju-deployer to install `target` on current `juju env`
 
         @param target: target to deploye in the config file.
         @param timeout: timeout in seconds (int or string is OK)
         """
+        target = self._args.target
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
@@ -123,11 +127,12 @@ class Deployer(object):
         finally:
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
+        self._enable_flags()
 
-    def enable_flags(self, flags):
-        """Enable specified feature flags."""
+    def _enable_flags(self):
+        """Enable feature flags."""
         command = "sudo /opt/canonical/landscape/featureflags enable {}"
-        for flag in flags:
+        for flag in self._args.flags:
             subprocess.check_output(
                 ["juju", "run", "--unit", "landscape-server/0",
                  command.format(flag)])
@@ -136,8 +141,8 @@ class Deployer(object):
 def get_parser():
     parser = ArgumentParser(description="Simple wrapper around juju-deployer")
     parser.add_argument(
-        "type", choices=("scalable", "dense", "dense-maas"),
-        help="deploy type")
+        "target", choices=("scalable", "dense", "dense-maas"),
+        help="target deployment type")
     parser.add_argument(
         "--flags", nargs="+", default=[], help="feature flags to enable")
     return parser
@@ -145,6 +150,5 @@ def get_parser():
 if __name__ == "__main__":
     args = get_parser().parse_args()
     logging.basicConfig(level=logging.INFO)
-    deployer = Deployer()
-    deployer.deploy(args.type)
-    deployer.enable_flags(args.flags)
+    deployer = Deployer(args)
+    deployer.deploy()
