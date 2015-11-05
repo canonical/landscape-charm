@@ -5,10 +5,9 @@ import logging
 import shutil
 import subprocess
 import tempfile
-import sys
 import time
-
 import yaml
+from argparse import ArgumentParser
 
 CHARM_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -30,6 +29,9 @@ class Deployer(object):
 
     that can be used to provide custom parameters.
     """
+
+    def __init__(self, args):
+        self._args = args
 
     def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
@@ -82,13 +84,14 @@ class Deployer(object):
             f.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
-    def deploy(self, target, timeout=900):
+    def deploy(self, timeout=900):
         """
-        Use juju-deployer to install `target` on current `juju env`
+        Use juju-deployer to deploy the target deployment type on current
+        `juju env`.
 
-        @param target: target to deploye in the config file.
         @param timeout: timeout in seconds (int or string is OK)
         """
+        target = self._args.target
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
@@ -124,13 +127,28 @@ class Deployer(object):
         finally:
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
+        self._enable_flags()
 
+    def _enable_flags(self):
+        """Enable feature flags."""
+        command = "sudo /opt/canonical/landscape/featureflags enable {}"
+        for flag in self._args.flags:
+            subprocess.check_output(
+                ["juju", "run", "--unit", "landscape-server/0",
+                 command.format(flag)])
+
+
+def get_parser():
+    parser = ArgumentParser(description="Simple wrapper around juju-deployer")
+    parser.add_argument(
+        "target", choices=("scalable", "dense", "dense-maas"),
+        help="target deployment type")
+    parser.add_argument(
+        "--flags", nargs="+", default=[], help="feature flags to enable")
+    return parser
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: %s <target>" % sys.argv[0])
-        print("   <target> can be either 'scalable', 'dense' or 'dense-maas'")
-        sys.exit(1)
+    args = get_parser().parse_args()
     logging.basicConfig(level=logging.INFO)
-    deployer = Deployer()
-    deployer.deploy(sys.argv[1])
+    deployer = Deployer(args)
+    deployer.deploy()
