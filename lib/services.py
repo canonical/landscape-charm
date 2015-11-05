@@ -40,31 +40,6 @@ class ServicesHook(Hook):
         self._subprocess = subprocess
         self._fetch = fetch
 
-    def _calculate_service_counts(self, hookenv=None, psutil=None):
-        """Return dict keyed by service names with desired number of processes.
-
-        Scales by CPU count and RAM size.
-        """
-        if hookenv is None:
-            hookenv = self._hookenv
-        if psutil is None:
-            psutil = self._psutil
-        service_count = hookenv.config().get("service-count", None)
-        if service_count is None:
-            cpu_cores = psutil.NUM_CPUS
-            memory_in_gb = psutil.virtual_memory().total / (1024 ** 3)
-            # For each extra CPU core and each extra 1GB of RAM (after 1GB),
-            # we add another process.
-            service_count = 1 + cpu_cores + memory_in_gb - 2
-
-        # Landscape startup scripts can only accept values between 1 and 9.
-        service_count = max(1, min(service_count, 9))
-        return {
-            "appserver": service_count,
-            "message-server": service_count,
-            "pingserver": service_count,
-        }
-
     def _run(self):
 
         # XXX We need to manually kick the leader provider because atm the
@@ -72,25 +47,23 @@ class ServicesHook(Hook):
         leader_provider = LeaderProvider(
             hookenv=self._hookenv, host=self._host)
         leader_provider.provide_data()
-        service_counts = self._calculate_service_counts()
-
+        config_requirer = ConfigRequirer(hookenv=self._hookenv)
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
-                HAProxyProvider(service_counts, paths=self._paths),
+                HAProxyProvider(config_requirer, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
             "required_data": [
                 LeaderRequirer(hookenv=self._hookenv),
-                ConfigRequirer(hookenv=self._hookenv),
+                config_requirer,
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"is_leader": self._hookenv.is_leader(),
-                 "per_service_counts": service_counts},
+                {"is_leader": self._hookenv.is_leader()},
             ],
             "data_ready": [
                 render_template(

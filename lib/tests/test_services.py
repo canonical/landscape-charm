@@ -100,15 +100,18 @@ class ServicesHookTest(HookenvTest):
         schema and rewrites the service configuration.
         """
         self.hook()
+        config_expected = SAMPLE_CONFIG.copy()
+        config_expected["service-count"] = {
+            "appserver": 2, "message-server": 2, "pingserver": 2}
+
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "website": [SAMPLE_WEBSITE_UNIT_DATA],
             "hosted": [SAMPLE_HOSTED_DATA],
-            "config": SAMPLE_CONFIG,
+            "config": config_expected,
             "is_leader": True,
-            "per_service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
@@ -158,15 +161,17 @@ class ServicesHookTest(HookenvTest):
         """
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
+        config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
+        config_expected["service-count"] = {
+            "appserver": 2, "message-server": 2, "pingserver": 2}
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_DATA,
             "amqp": [SAMPLE_AMQP_UNIT_DATA],
             "website": [SAMPLE_WEBSITE_UNIT_DATA],
-            "config": SAMPLE_CONFIG_OPENID_DATA,
+            "config": config_expected,
             "hosted": [SAMPLE_HOSTED_DATA],
             "is_leader": True,
-            "per_service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
         self.assertEqual(
@@ -241,59 +246,6 @@ class ServicesHookTest(HookenvTest):
         data = yaml.load(self.hookenv.relations["website:1"]["services"])
         self.assertIsNotNone(data)
 
-    def test_calculate_service_counts(self):
-        """
-        Calculating service counts returns a number of processes each
-        service should use depending on the number of CPU cores and memory.
-
-        For each extra core and GB of memory, one process is added to the
-        minimum of 1.
-        """
-        psutil_stub = PsutilStub(num_cpus=2, physical_memory=2*1024**3)
-        self.assertEqual(
-            {"appserver": 3, "pingserver": 3, "message-server": 3},
-            self.hook._calculate_service_counts(self.hookenv, psutil_stub))
-
-    def test_calculate_service_counts_minimum(self):
-        """
-        Calculating service counts returns a minimum of 1 even if
-        number of CPU cores and physical memory is considered to be zero.
-        """
-        psutil_stub = PsutilStub(num_cpus=0, physical_memory=0)
-        self.assertEqual(
-            {"appserver": 1, "pingserver": 1, "message-server": 1},
-            self.hook._calculate_service_counts(self.hookenv, psutil_stub))
-
-    def test_calculate_service_counts_maximum(self):
-        """
-        Calculating service counts returns a maximum of 9 even if
-        number of CPU cores and physical memory is very large.
-        """
-        psutil_stub = PsutilStub(num_cpus=100, physical_memory=100*1024**3)
-        self.assertEqual(
-            {"appserver": 9, "pingserver": 9, "message-server": 9},
-            self.hook._calculate_service_counts(self.hookenv, psutil_stub))
-
-    def test_calculate_service_counts_cpu_scaling(self):
-        """
-        Calculating service counts scales with CPU cores.
-        """
-        # For each CPU core after the second, one process is added.
-        psutil_stub = PsutilStub(num_cpus=4, physical_memory=1*1024**3)
-        self.assertEqual(
-            {"appserver": 4, "pingserver": 4, "message-server": 4},
-            self.hook._calculate_service_counts(self.hookenv, psutil_stub))
-
-    def test_calculate_service_counts_memory_scaling(self):
-        """
-        Calculating service counts scales with total physical memory.
-        """
-        # For each extra 1GB of RAM after 1GB, one process is added.
-        psutil_stub = PsutilStub(num_cpus=1, physical_memory=4*1024**3)
-        self.assertEqual(
-            {"appserver": 4, "pingserver": 4, "message-server": 4},
-            self.hook._calculate_service_counts(self.hookenv, psutil_stub))
-
     def test_service_count_changed(self):
         """
         If the count of services changes, /etc/default/landscape-server is
@@ -308,4 +260,4 @@ class ServicesHookTest(HookenvTest):
         _, _, context, _, _, _ = self.renders[1]
         self.assertEqual(
             {"appserver": 7, "pingserver": 7, "message-server": 7},
-            context["per_service_counts"])
+            context["config"]["service-count"])

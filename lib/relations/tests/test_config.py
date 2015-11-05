@@ -1,4 +1,5 @@
 from lib.tests.helpers import HookenvTest
+from lib.tests.stubs import PsutilStub
 from lib.relations.config import (
     ConfigRequirer, OpenIDConfigurationError, RootUrlNotValidError)
 
@@ -56,8 +57,7 @@ class ServicesHookTest(HookenvTest):
         """
         self.hookenv.config().update({"root-url": "https://example.com/"})
         result = ConfigRequirer(hookenv=self.hookenv)
-        self.assertEqual({"config": {"root-url": "https://example.com/"}},
-                         result)
+        self.assertEqual("https://example.com/", result["config"]["root-url"])
 
     def test_openid_options_provider_missing(self):
         """
@@ -88,3 +88,61 @@ class ServicesHookTest(HookenvTest):
             "To set up OpenID authentication, both 'openid-provider-url' "
             "and 'openid-logout-url' must be provided.")
         self.assertEqual(expected, error.exception.message)
+
+    def test_service_counts(self):
+        """
+        Calculating service counts returns a number of processes each
+        service should use depending on the number of CPU cores and memory.
+
+        For each extra core and GB of memory, one process is added to the
+        minimum of 1.
+        """
+        psutil_stub = PsutilStub(num_cpus=2, physical_memory=2*1024**3)
+        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
+        self.assertEqual(
+            {"appserver": 3, "pingserver": 3, "message-server": 3},
+            result["config"]["service-count"])
+
+    def test_service_counts_minimum(self):
+        """
+        Calculating service counts returns a minimum of 1 even if
+        number of CPU cores and physical memory is considered to be zero.
+        """
+        psutil_stub = PsutilStub(num_cpus=0, physical_memory=0)
+        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
+        self.assertEqual(
+            {"appserver": 1, "pingserver": 1, "message-server": 1},
+            result["config"]["service-count"])
+
+    def test_service_counts_maximum(self):
+        """
+        Calculating service counts returns a maximum of 9 even if
+        number of CPU cores and physical memory is very large.
+        """
+        psutil_stub = PsutilStub(num_cpus=100, physical_memory=100*1024**3)
+        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
+        self.assertEqual(
+            {"appserver": 9, "pingserver": 9, "message-server": 9},
+            result["config"]["service-count"])
+
+    def test_service_counts_cpu_scaling(self):
+        """
+        Calculating service counts scales with CPU cores.
+        """
+        # For each CPU core after the second, one process is added.
+        psutil_stub = PsutilStub(num_cpus=4, physical_memory=1*1024**3)
+        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
+        self.assertEqual(
+            {"appserver": 4, "pingserver": 4, "message-server": 4},
+            result["config"]["service-count"])
+
+    def test_service_counts_memory_scaling(self):
+        """
+        Calculating service counts scales with total physical memory.
+        """
+        # For each extra 1GB of RAM after 1GB, one process is added.
+        psutil_stub = PsutilStub(num_cpus=1, physical_memory=4*1024**3)
+        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
+        self.assertEqual(
+            {"appserver": 4, "pingserver": 4, "message-server": 4},
+            result["config"]["service-count"])
