@@ -101,7 +101,7 @@ class ServicesHookTest(HookenvTest):
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 3, "pingserver": 3, "message-server": 3},
-            result["config"]["service-count"])
+            result["config"]["worker-counts"])
 
     def test_service_counts_minimum(self):
         """
@@ -112,7 +112,7 @@ class ServicesHookTest(HookenvTest):
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 1, "pingserver": 1, "message-server": 1},
-            result["config"]["service-count"])
+            result["config"]["worker-counts"])
 
     def test_service_counts_maximum(self):
         """
@@ -123,7 +123,7 @@ class ServicesHookTest(HookenvTest):
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 9, "pingserver": 9, "message-server": 9},
-            result["config"]["service-count"])
+            result["config"]["worker-counts"])
 
     def test_service_counts_cpu_scaling(self):
         """
@@ -134,7 +134,7 @@ class ServicesHookTest(HookenvTest):
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 4, "pingserver": 4, "message-server": 4},
-            result["config"]["service-count"])
+            result["config"]["worker-counts"])
 
     def test_service_counts_memory_scaling(self):
         """
@@ -145,4 +145,4 @@ class ServicesHookTest(HookenvTest):
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 4, "pingserver": 4, "message-server": 4},
-            result["config"]["service-count"])
+            result["config"]["worker-counts"])

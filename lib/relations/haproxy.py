@@ -103,7 +103,7 @@ class HAProxyProvider(RelationContext):
         self._config_requirer = config_requirer
         self._hookenv = hookenv
         self._worker_counts = config_requirer.get("config").get(
-            "service-count")
+            "worker-counts")
         self._paths = paths
         super(HAProxyProvider, self).__init__()
 

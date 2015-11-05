@@ -41,7 +41,7 @@ class HAProxyProviderTest(HookenvTest):
         Landscape unit runs. By default all services are run.
         """
         self.hookenv.leader = False
-        self.hookenv.config().update({"service-count": 2})
+        self.hookenv.config().update({"worker-counts": 2})
         config_requirer = ConfigRequirer(hookenv=self.hookenv)
         relation = HAProxyProvider(
             config_requirer, paths=self.paths, hookenv=self.hookenv)

@@ -101,7 +101,7 @@ class ServicesHookTest(HookenvTest):
         """
         self.hook()
         config_expected = SAMPLE_CONFIG.copy()
-        config_expected["service-count"] = {
+        config_expected["worker-counts"] = {
             "appserver": 2, "message-server": 2, "pingserver": 2}
 
         context = {
@@ -162,7 +162,7 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
         config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
-        config_expected["service-count"] = {
+        config_expected["worker-counts"] = {
             "appserver": 2, "message-server": 2, "pingserver": 2}
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
@@ -254,10 +254,10 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.hook = "config-changed"
         config = self.hookenv.config()
         config.save()
-        config["service-count"] = 7
+        config["worker-counts"] = 7
         self.hook()
         # Config option is turned into a per-service count.
         _, _, context, _, _, _ = self.renders[1]
         self.assertEqual(
             {"appserver": 7, "pingserver": 7, "message-server": 7},
-            context["config"]["service-count"])
+            context["config"]["worker-counts"])

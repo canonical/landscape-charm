@@ -147,7 +147,7 @@ class LandscapeDefaultsTest(TemplateTest):
         super(LandscapeDefaultsTest, self).setUp()
         self.context = {
             "hosted": [SAMPLE_HOSTED_DATA.copy()],
-            "config": {"service-count": SAMPLE_SERVICE_COUNT_DATA},
+            "config": {"worker-counts": SAMPLE_SERVICE_COUNT_DATA},
             "is_leader": True,
         }
 

@@ -34,7 +34,7 @@ SAMPLE_AMQP_UNIT_DATA = {
 }
 
 SAMPLE_CONFIG = {
-    "service-count": 2,
+    "worker-counts": 2,
     "source": "ppa:landscape/14.10",
     "smtp-relay-host": "",
 }

@@ -74,5 +74,5 @@ class ConfigRequirer(dict):
                 (not openid_provider_url and openid_logout_url)):
             raise OpenIDConfigurationError()
 
-        worker_count = config.get("service-count", None)
-        config["service-count"] = self._calculate_service_counts(worker_count)
+        worker_count = config.get("worker-counts", None)
+        config["worker-counts"] = self._calculate_service_counts(worker_count)

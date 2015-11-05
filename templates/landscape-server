@@ -12,11 +12,11 @@ RUN_ALL="no"
 # set the services you want to run to "yes".
 # If you want to start more than one copy of each service, use a number
 # instead of "yes" or "no". Currently, only msg, app and ping support this.
-RUN_APPSERVER="{{ config["service-count"]["appserver"] }}"
+RUN_APPSERVER="{{ config["worker-counts"]["appserver"] }}"
 RUN_ASYNC_FRONTEND="yes"
 RUN_JOBHANDLER="yes"
-RUN_MSGSERVER="{{ config["service-count"]["message-server"] }}"
-RUN_PINGSERVER="{{ config["service-count"]["pingserver"] }}"
+RUN_MSGSERVER="{{ config["worker-counts"]["message-server"] }}"
+RUN_PINGSERVER="{{ config["worker-counts"]["pingserver"] }}"
 RUN_APISERVER="yes"
 {% if is_leader and hosted[0]["deployment-mode"] == "standalone" %}
 RUN_JUJU_SYNC="yes"
