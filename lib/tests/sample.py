@@ -53,7 +53,7 @@ SAMPLE_HOSTED_DATA = {
     "deployment-mode": "standalone",
 }
 
-SAMPLE_SERVICE_COUNT_DATA = {
+SAMPLE_WORKER_COUNT_DATA = {
     "appserver": 2,
     "message-server": 2,
     "pingserver": 2,

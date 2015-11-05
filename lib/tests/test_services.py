@@ -9,7 +9,7 @@ from lib.tests.stubs import HostStub, PsutilStub, SubprocessStub, FetchStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
-    SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
+    SAMPLE_WORKER_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
 from lib.services import ServicesHook
 from lib.tests.rootdir import RootDir
 from lib.paths import (
@@ -162,8 +162,7 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
         config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
-        config_expected["worker-counts"] = {
-            "appserver": 2, "message-server": 2, "pingserver": 2}
+        config_expected["worker-counts"] = SAMPLE_WORKER_COUNT_DATA
         context = {
             "db": [SAMPLE_DB_UNIT_DATA],
             "leader": SAMPLE_LEADER_DATA,
@@ -246,17 +245,17 @@ class ServicesHookTest(HookenvTest):
         data = yaml.load(self.hookenv.relations["website:1"]["services"])
         self.assertIsNotNone(data)
 
-    def test_service_count_changed(self):
+    def test_worker_count_changed(self):
         """
-        If the count of services changes, /etc/default/landscape-server is
-        rendered with new counts.
+        If the count of service workers changes, /etc/default/landscape-server
+        is rendered with the new counts.
         """
         self.hookenv.hook = "config-changed"
         config = self.hookenv.config()
         config.save()
         config["worker-counts"] = 7
         self.hook()
-        # Config option is turned into a per-service count.
+        # Config option is turned into a per-service worker count.
         _, _, context, _, _, _ = self.renders[1]
         self.assertEqual(
             {"appserver": 7, "pingserver": 7, "message-server": 7},

@@ -11,7 +11,6 @@ from lib.relations.haproxy import (
     ErrorFilesConfigurationError)
 from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
-from lib.tests.sample import SAMPLE_SERVICE_COUNT_DATA
 from lib.tests.rootdir import RootDir
 
 HTTPS_INDEX = 1

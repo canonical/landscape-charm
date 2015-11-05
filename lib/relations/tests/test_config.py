@@ -89,9 +89,9 @@ class ServicesHookTest(HookenvTest):
             "and 'openid-logout-url' must be provided.")
         self.assertEqual(expected, error.exception.message)
 
-    def test_service_counts(self):
+    def test_worker_countss(self):
         """
-        Calculating service counts returns a number of processes each
+        Calculating worker counts returns a number of processes each
         service should use depending on the number of CPU cores and memory.
 
         For each extra core and GB of memory, one process is added to the
@@ -103,9 +103,9 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 3, "pingserver": 3, "message-server": 3},
             result["config"]["worker-counts"])
 
-    def test_service_counts_minimum(self):
+    def test_worker_countss_minimum(self):
         """
-        Calculating service counts returns a minimum of 1 even if
+        Calculating worker counts returns a minimum of 1 even if
         number of CPU cores and physical memory is considered to be zero.
         """
         psutil_stub = PsutilStub(num_cpus=0, physical_memory=0)
@@ -114,9 +114,9 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 1, "pingserver": 1, "message-server": 1},
             result["config"]["worker-counts"])
 
-    def test_service_counts_maximum(self):
+    def test_worker_countss_maximum(self):
         """
-        Calculating service counts returns a maximum of 9 even if
+        Calculating worker counts returns a maximum of 9 even if
         number of CPU cores and physical memory is very large.
         """
         psutil_stub = PsutilStub(num_cpus=100, physical_memory=100*1024**3)
@@ -125,9 +125,9 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 9, "pingserver": 9, "message-server": 9},
             result["config"]["worker-counts"])
 
-    def test_service_counts_cpu_scaling(self):
+    def test_worker_countss_cpu_scaling(self):
         """
-        Calculating service counts scales with CPU cores.
+        Calculating worker counts scales with CPU cores.
         """
         # For each CPU core after the second, one process is added.
         psutil_stub = PsutilStub(num_cpus=4, physical_memory=1*1024**3)
@@ -136,9 +136,9 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 4, "pingserver": 4, "message-server": 4},
             result["config"]["worker-counts"])
 
-    def test_service_counts_memory_scaling(self):
+    def test_worker_countss_memory_scaling(self):
         """
-        Calculating service counts scales with total physical memory.
+        Calculating worker counts scales with total physical memory.
         """
         # For each extra 1GB of RAM after 1GB, one process is added.
         psutil_stub = PsutilStub(num_cpus=1, physical_memory=4*1024**3)

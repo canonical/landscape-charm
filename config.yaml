@@ -14,7 +14,7 @@ options:
         description: |
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
-    service-count:
+    worker-counts:
         type: int
         description: |
             Number of processes to spawn for appserver, message-server and

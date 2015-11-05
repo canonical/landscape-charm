@@ -41,7 +41,7 @@ class ConfigRequirer(dict):
         self._validate(config)
         self.update({"config": config})
 
-    def _calculate_service_counts(self, worker_count=None):
+    def _calculate_worker_counts(self, worker_count=None):
         """Return dict keyed by service names with desired number of processes.
 
         Scales by CPU count and RAM size.
@@ -75,4 +75,4 @@ class ConfigRequirer(dict):
             raise OpenIDConfigurationError()
 
         worker_count = config.get("worker-counts", None)
-        config["worker-counts"] = self._calculate_service_counts(worker_count)
+        config["worker-counts"] = self._calculate_worker_counts(worker_count)
