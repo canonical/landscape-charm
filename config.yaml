@@ -20,7 +20,7 @@ options:
             Number of processes to spawn for appserver, message-server and
             ping-server. If not set, the charm will automatically pick a value
             trying to maximize the use of the compute/memory resources
-	    available on the unit.
+            available on the unit.
     license-file:
         description: |
             License file for LDS, either as a base64-encoded string containing
