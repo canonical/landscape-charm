@@ -106,7 +106,7 @@ class ConfigRequirerTest(HookenvTest):
         self.hookenv.config().update({"worker-counts": -2})
         result = ConfigRequirer(hookenv=self.hookenv)
         self.assertEqual(
-            {"appserver": 1, "pingserver": 1, "message-server": 1},
+            {"appserver": 2, "pingserver": 1, "message-server": 1},
             result["config"]["worker-counts"])
 
     def test_worker_counts_maximum(self):
@@ -117,7 +117,7 @@ class ConfigRequirerTest(HookenvTest):
         self.hookenv.config().update({"worker-counts": 10})
         result = ConfigRequirer(hookenv=self.hookenv)
         self.assertEqual(
-            {"appserver": 9, "pingserver": 9, "message-server": 9},
+            {"appserver": 2, "pingserver": 9, "message-server": 9},
             result["config"]["worker-counts"])
 
     def test_worker_counts_scaling(self):
@@ -133,7 +133,7 @@ class ConfigRequirerTest(HookenvTest):
         psutil_stub = PsutilStub(num_cpus=2, physical_memory=2*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
-            {"appserver": 3, "pingserver": 3, "message-server": 3},
+            {"appserver": 2, "pingserver": 3, "message-server": 3},
             result["config"]["worker-counts"])
 
     def test_worker_counts_cpu_scaling(self):
@@ -146,7 +146,7 @@ class ConfigRequirerTest(HookenvTest):
         psutil_stub = PsutilStub(num_cpus=4, physical_memory=1*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
-            {"appserver": 4, "pingserver": 4, "message-server": 4},
+            {"appserver": 2, "pingserver": 4, "message-server": 4},
             result["config"]["worker-counts"])
 
     def test_worker_counts_memory_scaling(self):
@@ -159,5 +159,5 @@ class ConfigRequirerTest(HookenvTest):
         psutil_stub = PsutilStub(num_cpus=1, physical_memory=4*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
-            {"appserver": 4, "pingserver": 4, "message-server": 4},
+            {"appserver": 2, "pingserver": 4, "message-server": 4},
             result["config"]["worker-counts"])

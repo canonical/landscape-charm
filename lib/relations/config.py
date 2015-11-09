@@ -4,6 +4,10 @@ from charmhelpers.core import hookenv
 from lib.error import CharmError
 from lib.utils import is_valid_url
 
+# We hard-code appserver worker process count to 2 because they
+# do not scale in the same way ping- and msg-server do.
+APPSERVER_WORKER_COUNT = 2
+
 
 class RootUrlNotValidError(CharmError):
     """Charm root-url is not a valid URL."""
@@ -57,7 +61,7 @@ class ConfigRequirer(dict):
         # Landscape startup scripts can only accept values between 1 and 9.
         worker_counts = max(1, min(worker_counts, 9))
         return {
-            "appserver": worker_counts,
+            "appserver": APPSERVER_WORKER_COUNT,
             "message-server": worker_counts,
             "pingserver": worker_counts,
         }

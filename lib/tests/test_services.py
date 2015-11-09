@@ -258,5 +258,5 @@ class ServicesHookTest(HookenvTest):
         # Config option is turned into a per-service worker count.
         _, _, context, _, _, _ = self.renders[1]
         self.assertEqual(
-            {"appserver": 7, "pingserver": 7, "message-server": 7},
+            {"appserver": 2, "pingserver": 7, "message-server": 7},
             context["config"]["worker-counts"])
