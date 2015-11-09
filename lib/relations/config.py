@@ -37,28 +37,28 @@ class ConfigRequirer(dict):
 
     def __init__(self, hookenv=hookenv, psutil=psutil):
         self._psutil = psutil
-        config = hookenv.config()
+        config = hookenv.config().copy()
         self._validate(config)
         self.update({"config": config})
 
-    def _calculate_worker_counts(self, worker_count=None):
+    def _calculate_worker_counts(self, worker_counts=None):
         """Return dict keyed by service names with desired number of processes.
 
         Scales by CPU count and RAM size.
         """
-        if worker_count is None:
+        if worker_counts is None:
             cpu_cores = self._psutil.NUM_CPUS
             memory_in_gb = self._psutil.virtual_memory().total / (1024 ** 3)
             # For each extra CPU core and each extra 1GB of RAM (after 1GB),
             # we add another process.
-            worker_count = 1 + cpu_cores + memory_in_gb - 2
+            worker_counts = 1 + cpu_cores + memory_in_gb - 2
 
         # Landscape startup scripts can only accept values between 1 and 9.
-        worker_count = max(1, min(worker_count, 9))
+        worker_counts = max(1, min(worker_counts, 9))
         return {
-            "appserver": worker_count,
-            "message-server": worker_count,
-            "pingserver": worker_count,
+            "appserver": worker_counts,
+            "message-server": worker_counts,
+            "pingserver": worker_counts,
         }
 
     def _validate(self, config):

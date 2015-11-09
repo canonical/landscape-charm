@@ -4,7 +4,7 @@ from lib.relations.config import (
     ConfigRequirer, OpenIDConfigurationError, RootUrlNotValidError)
 
 
-class ServicesHookTest(HookenvTest):
+class ConfigRequirerTest(HookenvTest):
 
     def test_root_url_is_set_and_invalid(self):
         """
@@ -89,7 +89,7 @@ class ServicesHookTest(HookenvTest):
             "and 'openid-logout-url' must be provided.")
         self.assertEqual(expected, error.exception.message)
 
-    def test_worker_countss(self):
+    def test_worker_counts(self):
         """
         Calculating worker counts returns a number of processes each
         service should use depending on the number of CPU cores and memory.
@@ -103,7 +103,7 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 3, "pingserver": 3, "message-server": 3},
             result["config"]["worker-counts"])
 
-    def test_worker_countss_minimum(self):
+    def test_worker_counts_minimum(self):
         """
         Calculating worker counts returns a minimum of 1 even if
         number of CPU cores and physical memory is considered to be zero.
@@ -114,7 +114,7 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 1, "pingserver": 1, "message-server": 1},
             result["config"]["worker-counts"])
 
-    def test_worker_countss_maximum(self):
+    def test_worker_counts_maximum(self):
         """
         Calculating worker counts returns a maximum of 9 even if
         number of CPU cores and physical memory is very large.
@@ -125,7 +125,7 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 9, "pingserver": 9, "message-server": 9},
             result["config"]["worker-counts"])
 
-    def test_worker_countss_cpu_scaling(self):
+    def test_worker_counts_cpu_scaling(self):
         """
         Calculating worker counts scales with CPU cores.
         """
@@ -136,7 +136,7 @@ class ServicesHookTest(HookenvTest):
             {"appserver": 4, "pingserver": 4, "message-server": 4},
             result["config"]["worker-counts"])
 
-    def test_worker_countss_memory_scaling(self):
+    def test_worker_counts_memory_scaling(self):
         """
         Calculating worker counts scales with total physical memory.
         """
