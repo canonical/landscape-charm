@@ -41,12 +41,13 @@ class ConfigRequirer(dict):
         self._validate(config)
         self.update({"config": config})
 
-    def _calculate_worker_counts(self, worker_counts=None):
+    def _calculate_worker_counts(self, worker_counts):
         """Return dict keyed by service names with desired number of processes.
 
-        Scales by CPU count and RAM size.
+        If worker_counts is 0, it uses an automatic-scaling by CPU count
+        and RAM size.
         """
-        if worker_counts is None:
+        if worker_counts == 0:
             cpu_cores = self._psutil.NUM_CPUS
             memory_in_gb = self._psutil.virtual_memory().total / (1024 ** 3)
             # For each extra CPU core and each extra 1GB of RAM (after 1GB),
@@ -74,5 +75,5 @@ class ConfigRequirer(dict):
                 (not openid_provider_url and openid_logout_url)):
             raise OpenIDConfigurationError()
 
-        worker_count = config.get("worker-counts", None)
+        worker_count = config.get("worker-counts", 2)
         config["worker-counts"] = self._calculate_worker_counts(worker_count)

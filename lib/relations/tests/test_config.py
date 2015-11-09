@@ -89,7 +89,38 @@ class ConfigRequirerTest(HookenvTest):
             "and 'openid-logout-url' must be provided.")
         self.assertEqual(expected, error.exception.message)
 
-    def test_worker_counts(self):
+    def test_worker_counts_defaults(self):
+        """
+        Default values for worker-counts are 2 per each service.
+        """
+        result = ConfigRequirer(hookenv=self.hookenv)
+        self.assertEqual(
+            {"appserver": 2, "pingserver": 2, "message-server": 2},
+            result["config"]["worker-counts"])
+
+    def test_worker_counts_minimum(self):
+        """
+        Calculating worker counts returns a minimum of 1 even if
+        less than 1 is requested.
+        """
+        self.hookenv.config().update({"worker-counts": -2})
+        result = ConfigRequirer(hookenv=self.hookenv)
+        self.assertEqual(
+            {"appserver": 1, "pingserver": 1, "message-server": 1},
+            result["config"]["worker-counts"])
+
+    def test_worker_counts_maximum(self):
+        """
+        Calculating worker counts returns a maximum of 9 even if more
+        is asked for.
+        """
+        self.hookenv.config().update({"worker-counts": 10})
+        result = ConfigRequirer(hookenv=self.hookenv)
+        self.assertEqual(
+            {"appserver": 9, "pingserver": 9, "message-server": 9},
+            result["config"]["worker-counts"])
+
+    def test_worker_counts_scaling(self):
         """
         Calculating worker counts returns a number of processes each
         service should use depending on the number of CPU cores and memory.
@@ -97,38 +128,20 @@ class ConfigRequirerTest(HookenvTest):
         For each extra core and GB of memory, one process is added to the
         minimum of 1.
         """
+        # Turn auto-scaling on.
+        self.hookenv.config().update({"worker-counts": 0})
         psutil_stub = PsutilStub(num_cpus=2, physical_memory=2*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
         self.assertEqual(
             {"appserver": 3, "pingserver": 3, "message-server": 3},
             result["config"]["worker-counts"])
 
-    def test_worker_counts_minimum(self):
-        """
-        Calculating worker counts returns a minimum of 1 even if
-        number of CPU cores and physical memory is considered to be zero.
-        """
-        psutil_stub = PsutilStub(num_cpus=0, physical_memory=0)
-        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
-        self.assertEqual(
-            {"appserver": 1, "pingserver": 1, "message-server": 1},
-            result["config"]["worker-counts"])
-
-    def test_worker_counts_maximum(self):
-        """
-        Calculating worker counts returns a maximum of 9 even if
-        number of CPU cores and physical memory is very large.
-        """
-        psutil_stub = PsutilStub(num_cpus=100, physical_memory=100*1024**3)
-        result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
-        self.assertEqual(
-            {"appserver": 9, "pingserver": 9, "message-server": 9},
-            result["config"]["worker-counts"])
-
     def test_worker_counts_cpu_scaling(self):
         """
         Calculating worker counts scales with CPU cores.
         """
+        # Turn auto-scaling on.
+        self.hookenv.config().update({"worker-counts": 0})
         # For each CPU core after the second, one process is added.
         psutil_stub = PsutilStub(num_cpus=4, physical_memory=1*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)
@@ -140,6 +153,8 @@ class ConfigRequirerTest(HookenvTest):
         """
         Calculating worker counts scales with total physical memory.
         """
+        # Turn auto-scaling on.
+        self.hookenv.config().update({"worker-counts": 0})
         # For each extra 1GB of RAM after 1GB, one process is added.
         psutil_stub = PsutilStub(num_cpus=1, physical_memory=4*1024**3)
         result = ConfigRequirer(hookenv=self.hookenv, psutil=psutil_stub)

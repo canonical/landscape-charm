@@ -15,12 +15,13 @@ options:
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
     worker-counts:
+        default: 2
         type: int
         description: |
-            Number of processes to spawn for appserver, message-server and
-            ping-server. If not set, the charm will automatically pick a value
-            trying to maximize the use of the compute/memory resources
-            available on the unit.
+            Number of processes to spawn for message-server and ping-server.
+            If set to 0, the charm will automatically pick a value trying to
+            maximize the use of the compute/memory resources available
+            on the unit.
     license-file:
         description: |
             License file for LDS, either as a base64-encoded string containing
