@@ -11,7 +11,7 @@ from charmhelpers.core import hookenv
 from lib.error import CharmError
 from lib.paths import default_paths
 
-PACKAGES = ("landscape-server",)
+PACKAGES = ("landscape-server", "python-psutil")
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 

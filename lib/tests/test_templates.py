@@ -4,7 +4,7 @@ from cStringIO import StringIO
 from lib.tests.helpers import TemplateTest
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_CONTEXT_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_HOSTED_DATA, SAMPLE_SERVICE_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA)
+    SAMPLE_HOSTED_DATA, SAMPLE_WORKER_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA)
 
 
 class ServiceConfTest(TemplateTest):
@@ -147,9 +147,8 @@ class LandscapeDefaultsTest(TemplateTest):
         super(LandscapeDefaultsTest, self).setUp()
         self.context = {
             "hosted": [SAMPLE_HOSTED_DATA.copy()],
-            "config": {},
+            "config": {"worker-counts": SAMPLE_WORKER_COUNT_DATA},
             "is_leader": True,
-            "service_counts": SAMPLE_SERVICE_COUNT_DATA,
         }
 
     def test_render_on_leader(self):
@@ -212,10 +211,10 @@ class LandscapeDefaultsTest(TemplateTest):
         buffer = self.template.render(self.context)
         self.assertIn('RUN_PACKAGESEARCH="no"\n', buffer)
 
-    def test_render_service_count(self):
+    def test_render_worker_counts(self):
         """
         Rendering landscape-server file sets RUN_PINGSERVER and
-        RUN_MSGSERVER both to 2 from the sample service count configuration.
+        RUN_MSGSERVER both to 2 from the sample worker count configuration.
         """
         buffer = self.template.render(self.context)
         self.assertIn('RUN_APPSERVER="2"\n', buffer)

@@ -222,3 +222,20 @@ class SubprocessStub(object):
                 **kwargs)
             stdout, stderr = process.communicate()
             return process.returncode, stdout, stderr
+
+
+class PsutilUsageStub(object):
+    """Testable stub for psutil.virtual_memory() return values."""
+    def __init__(self, total):
+        self.total = total
+
+
+class PsutilStub(object):
+    """Provide a testable stub for C{psutil}."""
+
+    def __init__(self, num_cpus, physical_memory):
+        self.NUM_CPUS = num_cpus
+        self._physical_memory = physical_memory
+
+    def virtual_memory(self):
+        return PsutilUsageStub(self._physical_memory)
