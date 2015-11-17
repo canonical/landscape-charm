@@ -29,7 +29,7 @@ bundles:
 	@if [ -d bundles ]; then \
 	    bzr up bundles; \
 	else \
-	    bzr co lp:~landscape/landscape-charm/bundles-trunk-new-charm bundles; \
+	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
 	fi
 
 secrets:
