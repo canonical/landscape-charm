@@ -52,6 +52,23 @@ class ActionTest(HookenvTest):
         action()
         self.assertEqual(["no go"], self.hookenv.action_fails)
 
+    def test_run_valid_status(self):
+        action = DummyAction(hookenv=self.hookenv)
+        action.valid_status = "active"
+        self.hookenv.status_set("active", "")
+        action()
+        self.assertTrue(action.executed)
+
+    def test_run_invalid_status(self):
+        action = DummyAction(hookenv=self.hookenv)
+        action.valid_status = "active"
+        self.hookenv.status_set("maintenance", "")
+        action()
+        self.assertFalse(action.executed)
+        self.assertEqual(
+            ["This action can only be called on a unit in status 'active'."],
+            self.hookenv.action_fails)
+
 
 class DummyMaintenanceAction(MaintenanceAction):
     executed = False
@@ -69,25 +86,23 @@ class MaintenanceActionTest(HookenvTest):
 
     def test_run(self):
         """Calling a dummy hook runs only with maintenance flag set."""
-
-        open(self.paths.maintenance_flag(), "w")
-        self.addCleanup(os.remove, self.paths.maintenance_flag())
-
+        self.hookenv.status_set("maintenance", "")
         action = DummyMaintenanceAction(
             hookenv=self.hookenv, paths=self.paths)
 
         action()
         self.assertTrue(action.executed)
 
-    def test_run_without_maintenance_flag(self):
+    def test_run_without_maintenance_status(self):
         """
-        When maintenance flag file is absent, maintenance hooks are no-ops.
         """
+        self.hookenv.status_set("active", "")
         action = DummyMaintenanceAction(
             hookenv=self.hookenv, paths=self.paths)
 
         action()
         self.assertFalse(action.executed)
         self.assertEqual(
-            ["This action can only be called on a unit in paused state."],
+            ["This action can only be called on a unit in status "
+             "'maintenance'."],
             self.hookenv.action_fails)
