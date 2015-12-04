@@ -93,6 +93,42 @@ class LSCtlTest(HookenvTest):
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])
 
+    def test_start_unknown_status(self):
+        """
+        """
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(("active", ""), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "unknown", "message": ""},
+             {"status": "maintenance", "message": "Starting services."},
+             {"status": "active", "message": ""}],
+            self.hookenv.statuses)
+
+    def test_start_active_status(self):
+        """
+        """
+        self.hookenv.statuses = [{"status": "active", "message": "Something."}]
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(("active", "Something."), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "active", "message": "Something."},
+             {"status": "maintenance", "message": "Restarting services."},
+             {"status": "active", "message": "Something."}],
+            self.hookenv.statuses)
+
+    def test_start_maintenance_status(self):
+        """
+        """
+        self.hookenv.statuses = [
+            {"status": "maintenance", "message": "Doing maintenance."}]
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(
+            ("maintenance", "Doing maintenance."), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "maintenance", "message": "Doing maintenance."}],
+            self.hookenv.statuses)
+        self.assertEqual([], self.subprocess.calls)
+
     def test_stop(self):
         """
         The 'lsctl' script is invoked with the 'stop' action if the event name
