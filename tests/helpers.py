@@ -332,10 +332,6 @@ class EnvironmentFixture(Fixture):
             service_status["stopped"].append(service_name)
         return service_status
 
-    def get_workload_status(self, service, unit=None):
-        unit = self._get_service_unit(service, unit=unit)
-
-
     def add_fake_db_patch(self, unit=None):
         """Add a fake DB patch to a landscape-server unit.
 

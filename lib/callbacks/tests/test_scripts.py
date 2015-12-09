@@ -95,6 +95,10 @@ class LSCtlTest(HookenvTest):
 
     def test_start_unknown_status(self):
         """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'unknown', the status while restarting
+        the services will way 'starting services' and the final status
+        will be 'active'.
         """
         self.callback(self.manager, "landscape", "start")
         self.assertEqual(("active", ""), self.hookenv.status_get())
@@ -106,6 +110,10 @@ class LSCtlTest(HookenvTest):
 
     def test_start_active_status(self):
         """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'active', the status while restarting
+        the services will way 'restarting services' and the final status
+        will be 'active'.
         """
         self.hookenv.statuses = [{"status": "active", "message": "Something."}]
         self.callback(self.manager, "landscape", "start")
@@ -118,6 +126,9 @@ class LSCtlTest(HookenvTest):
 
     def test_start_maintenance_status(self):
         """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'maintenance', the services won't be
+        restarted and the workload status won't be changed.
         """
         self.hookenv.statuses = [
             {"status": "maintenance", "message": "Doing maintenance."}]

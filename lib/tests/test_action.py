@@ -53,6 +53,10 @@ class ActionTest(HookenvTest):
         self.assertEqual(["no go"], self.hookenv.action_fails)
 
     def test_run_valid_status(self):
+        """
+        If valid_status is set, the action will be executed if the
+        current status is the same.
+        """
         action = DummyAction(hookenv=self.hookenv)
         action.valid_status = "active"
         self.hookenv.status_set("active", "")
@@ -60,6 +64,10 @@ class ActionTest(HookenvTest):
         self.assertTrue(action.executed)
 
     def test_run_invalid_status(self):
+        """
+        If valid_status is set, the action won't be executed if the
+        current status is different.
+        """
         action = DummyAction(hookenv=self.hookenv)
         action.valid_status = "active"
         self.hookenv.status_set("maintenance", "")
@@ -95,6 +103,8 @@ class MaintenanceActionTest(HookenvTest):
 
     def test_run_without_maintenance_status(self):
         """
+        If the workload status isn't 'maintenance', the maintenance
+        action won't be executed.
         """
         self.hookenv.status_set("active", "")
         action = DummyMaintenanceAction(

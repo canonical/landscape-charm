@@ -35,6 +35,8 @@ class ResumeActionTest(HookenvTest):
 
     def test_run_status(self):
         """
+        The status is set to 'maintenance' while starting the services
+        and is set to 'active' after the services have been started.
         """
         self.hookenv.status_set("maintenance", "")
 

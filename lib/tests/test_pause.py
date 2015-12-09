@@ -24,6 +24,8 @@ class PauseActionTest(HookenvTest):
 
     def test_run_status(self):
         """
+        The workload status is changed to 'maintenance' while stopping
+        the services and after the services have been stopped.
         """
         self.action()
         self.assertEqual(

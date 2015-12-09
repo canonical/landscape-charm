@@ -72,6 +72,7 @@ class ActionsMultipleUnitsTest(IntegrationTest):
 
     def test_non_leader_pause_resume(self):
         """
+        The non-leader unit can be paused and later resumed.
         """
         result = self.environment.pause_landscape(unit=self.non_leader)
         self.assertEqual("completed", result["status"])
