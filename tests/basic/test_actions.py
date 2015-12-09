@@ -3,7 +3,7 @@ Tests for the actions defined by the charm.
 """
 
 from helpers import IntegrationTest
-from layers import OneLandscapeUnitLayer
+from layers import OneLandscapeUnitLayer, TwoLandscapeUnitsLayer
 
 
 class ActionsTest(IntegrationTest):
@@ -60,3 +60,21 @@ class ActionsTest(IntegrationTest):
 
         # Logging in should now work.
         self.environment.login("foo@bar", "bar")
+
+
+class ActionsMultipleUnitsTest(IntegrationTest):
+
+    layer = TwoLandscapeUnitsLayer
+
+    def setUp(self):
+        super(ActionsMultipleUnitsTest, self).setUp()
+        [self.non_leader] = self.layer.non_leaders
+
+    def test_non_leader_pause_resume(self):
+        """
+        """
+        result = self.environment.pause_landscape(unit=self.non_leader)
+        self.assertEqual("completed", result["status"])
+
+        result = self.environment.resume_landscape(unit=self.non_leader)
+        self.assertEqual("completed", result["status"])

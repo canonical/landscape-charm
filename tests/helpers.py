@@ -332,6 +332,10 @@ class EnvironmentFixture(Fixture):
             service_status["stopped"].append(service_name)
         return service_status
 
+    def get_workload_status(self, service, unit=None):
+        unit = self._get_service_unit(service, unit=unit)
+
+
     def add_fake_db_patch(self, unit=None):
         """Add a fake DB patch to a landscape-server unit.
 
@@ -525,9 +529,10 @@ class EnvironmentFixture(Fixture):
             unit_name = "{}/{}".format(service, unit)
             unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
         else:
-            [unit_name] = [
+            unit_names = sorted(
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
-                if unit_name.startswith("{}/".format(service))]
+                if unit_name.startswith("{}/".format(service)))
+            unit_name = unit_names[0]
         return self._deployment.sentry.unit[unit_name]
 
     def _sanitize_ssh_output(self, output,
