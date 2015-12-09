@@ -1,5 +1,3 @@
-import os
-
 from lib.action import Action, MaintenanceAction
 from lib.error import CharmError
 

@@ -1,5 +1,3 @@
-import os
-
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.tests.stubs import SubprocessStub

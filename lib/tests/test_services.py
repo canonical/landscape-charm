@@ -165,15 +165,6 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
         config_expected["worker-counts"] = SAMPLE_WORKER_COUNT_DATA
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "leader": SAMPLE_LEADER_DATA,
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "website": [SAMPLE_WEBSITE_UNIT_DATA],
-            "config": config_expected,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "is_leader": True,
-        }
 
         rendered_context = self.renders[0][2]
         self.assertEqual(config_expected, rendered_context["config"])
