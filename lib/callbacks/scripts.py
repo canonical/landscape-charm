@@ -94,6 +94,8 @@ class LSCtl(ScriptCallback):
         if action == "restart":
             action_status_message = "Restarting services."
             if new_status == "unknown":
+                # If the status is unknown, it means that the services
+                # have not been started yet.
                 action_status_message = "Starting services."
                 new_status, new_status_message = "active", ""
             if new_status == "maintenance":

@@ -1,5 +1,3 @@
-import os.path
-
 from charmhelpers.core import hookenv
 
 from lib.error import CharmError
@@ -8,7 +6,11 @@ from lib.paths import default_paths
 
 
 class Action(Hook):
-    """Juju action abstraction, providing dependency injection for testing."""
+    """Juju action abstraction, providing dependency injection for testing.
+
+    @ivar valid_status: The status the unit has to be in when the action
+        is executed.
+    """
 
     valid_status = None
 
