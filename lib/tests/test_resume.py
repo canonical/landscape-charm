@@ -23,8 +23,7 @@ class ResumeActionTest(HookenvTest):
         enabling the cron service so that Landscape cron jobs can start
         running again.
         """
-        open(self.paths.maintenance_flag(), "w")
-        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.hookenv.status_set("maintenance", "")
 
         action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
@@ -38,6 +37,7 @@ class ResumeActionTest(HookenvTest):
         """
         When no maintenance flag file is present, resume action is a no-op.
         """
+        self.hookenv.status_set("active", "")
         action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
@@ -53,8 +53,8 @@ class ResumeActionTest(HookenvTest):
         The unit is stopped again, to ensure that the 'resume' action
         can run again after the problems have been addressed.
         """
-        open(self.paths.maintenance_flag(), "w")
-        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.hookenv.status_set("maintenance", "")
+
         self.subprocess.add_fake_executable(
             LSCTL, args=["start"], stdout="start output")
         self.subprocess.add_fake_executable(
