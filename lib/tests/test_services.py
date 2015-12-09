@@ -41,7 +41,7 @@ class ServicesHookTest(HookenvTest):
         #     any dependency injection here as well.
         self.renders = []
         self.addCleanup(setattr, templating, "render", templating.render)
-        templating.render = lambda *args: self.renders.append(args)
+        templating.render = lambda *args, **kwargs: self.renders.append(args)
 
         # Setup sample data for the "common" happy case (an LDS
         # deployment with postgresql, haproxy and rabbitmq-server).
