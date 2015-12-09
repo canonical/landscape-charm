@@ -21,3 +21,15 @@ class PauseActionTest(HookenvTest):
         self.action()
         self.assertEqual(
             [(("/usr/bin/lsctl", "stop"), {})], self.subprocess.calls)
+
+    def test_run_status(self):
+        """
+        """
+        self.action()
+        self.assertEqual(
+            ("maintenance", "Services stopped."), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "unknown", "message": ""},
+             {"status": "maintenance", "message": "Stopping services."},
+             {"status": "maintenance", "message": "Services stopped."}],
+            self.hookenv.statuses)

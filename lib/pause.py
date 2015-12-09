@@ -14,4 +14,6 @@ class PauseAction(Action):
         self._subprocess = subprocess
 
     def _run(self):
+        self._hookenv.status_set("maintenance", "Stopping services.")
         self._subprocess.check_call((LSCTL, "stop"))
+        self._hookenv.status_set("maintenance", "Services stopped.")
