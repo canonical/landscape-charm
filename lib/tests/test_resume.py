@@ -33,6 +33,22 @@ class ResumeActionTest(HookenvTest):
              (("/usr/bin/lsctl", "status"), {})],
             self.subprocess.calls)
 
+    def test_run_status(self):
+        """
+        """
+        self.hookenv.status_set("maintenance", "")
+
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
+        self.assertEqual(("active", ""), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "unknown", "message": ""},
+             {"status": "maintenance", "message": ""},
+             {"status": "maintenance", "message": "Starting services."},
+             {"status": "active", "message": ""}],
+            self.hookenv.statuses)
+
     def test_run_without_maintenance_flag(self):
         """
         When no maintenance flag file is present, resume action is a no-op.
@@ -64,6 +80,41 @@ class ResumeActionTest(HookenvTest):
         action = ResumeAction(
             hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
         action()
+        self.assertEqual(
+            ["Some services failed to start.\n\nstart output\n\n"
+             "status failure"],
+            self.hookenv.action_fails)
+        self.assertEqual(
+            [(("/usr/bin/lsctl", "start"), {}),
+             (("/usr/bin/lsctl", "status"), {}),
+             (("/usr/bin/lsctl", "stop"), {})],
+            self.subprocess.calls)
+
+    def test_run_fail_status(self):
+        """
+        """
+        self.hookenv.status_set("maintenance", "")
+
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["start"], stdout="start output")
+        self.subprocess.add_fake_executable(
+            LSCTL, args=["status"], stdout="status failure", return_code=3)
+        self.subprocess.add_fake_executable(LSCTL, args=["stop"])
+
+        action = ResumeAction(
+            hookenv=self.hookenv, subprocess=self.subprocess, paths=self.paths)
+        action()
+        self.assertEqual(
+            ("maintenance", "Services failed to start."),
+            self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "unknown", "message": ""},
+             {"status": "maintenance", "message": ""},
+             {"status": "maintenance", "message": "Starting services."},
+             {"status": "maintenance", "message": "Stopping services."},
+             {"status": "maintenance",
+              "message": "Services failed to start."}],
+            self.hookenv.statuses)
         self.assertEqual(
             ["Some services failed to start.\n\nstart output\n\n"
              "status failure"],
