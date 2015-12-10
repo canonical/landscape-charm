@@ -92,6 +92,12 @@ class ResumeActionTest(HookenvTest):
 
     def test_run_fail_status(self):
         """
+        If the action fails, the final status is put back to
+        maintenance, with a message saying that services failed to
+        start.
+
+        XXX: The final status probably should be 'error', but it's not
+             clear on how to recover from that.
         """
         self.hookenv.status_set("maintenance", "")
 
