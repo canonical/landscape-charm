@@ -41,7 +41,7 @@ class ServicesHookTest(HookenvTest):
         #     any dependency injection here as well.
         self.renders = []
         self.addCleanup(setattr, templating, "render", templating.render)
-        templating.render = lambda *args: self.renders.append(args)
+        templating.render = lambda *args, **kwargs: self.renders.append(args)
 
         # Setup sample data for the "common" happy case (an LDS
         # deployment with postgresql, haproxy and rabbitmq-server).
@@ -114,14 +114,16 @@ class ServicesHookTest(HookenvTest):
             "is_leader": True,
         }
 
+        for render in self.renders:
+            rendered_context = render[2]
+            for key in context.keys():
+                self.assertEqual(context[key], rendered_context[key])
         self.assertEqual(
-            ("service.conf", self.paths.service_conf(),
-             context, "landscape", "root", 416),
-            self.renders[0])
+            ("service.conf", self.paths.service_conf()),
+            self.renders[0][:2])
         self.assertEqual(
-            ("landscape-server", self.paths.default_file(), context,
-             "landscape", "root", 416),
-            self.renders[1])
+            ("landscape-server", self.paths.default_file()),
+            self.renders[1][:2])
         [call1, call2, call3, call4, call5] = self.subprocess.calls
         self.assertEqual(["/usr/bin/landscape-schema", "-h"], call1[0])
         self.assertEqual("/usr/bin/landscape-schema", call2[0][0])
@@ -163,20 +165,9 @@ class ServicesHookTest(HookenvTest):
         self.hook()
         config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
         config_expected["worker-counts"] = SAMPLE_WORKER_COUNT_DATA
-        context = {
-            "db": [SAMPLE_DB_UNIT_DATA],
-            "leader": SAMPLE_LEADER_DATA,
-            "amqp": [SAMPLE_AMQP_UNIT_DATA],
-            "website": [SAMPLE_WEBSITE_UNIT_DATA],
-            "config": config_expected,
-            "hosted": [SAMPLE_HOSTED_DATA],
-            "is_leader": True,
-        }
 
-        self.assertEqual(
-            ("service.conf", self.paths.service_conf(),
-             context, "landscape", "root", 416),
-            self.renders[0])
+        rendered_context = self.renders[0][2]
+        self.assertEqual(config_expected, rendered_context["config"])
 
     def test_remote_leader_not_ready(self):
         """
