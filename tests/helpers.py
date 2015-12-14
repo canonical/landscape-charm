@@ -44,6 +44,7 @@ DEFAULT_BUNDLE_CONTEXT = {
         },
     "haproxy": {},
     "landscape": {
+        "branch": ".",
         "memory": 128},
 }
 
