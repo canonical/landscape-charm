@@ -8,11 +8,11 @@ from lib.paths import default_paths
 class Action(Hook):
     """Juju action abstraction, providing dependency injection for testing.
 
-    @ivar valid_status: The status the unit has to be in when the action
+    @ivar required_status: The status the unit has to be in when the action
         is executed.
     """
 
-    valid_status = None
+    required_status = None
 
     def __call__(self):
         """
@@ -21,12 +21,12 @@ class Action(Hook):
         If _run() returns a value, set it using action_set().
         If _run() throws a CharmError, fail using action.fail().
         """
-        if self.valid_status is not None:
+        if self.required_status is not None:
             status, _ = self._hookenv.status_get()
-            if status != self.valid_status:
+            if status != self.required_status:
                 self._hookenv.action_fail(
                     "This action can only be called on a unit in status "
-                    "'{}'.".format(self.valid_status))
+                    "'{}'.".format(self.required_status))
                 return
         self._hookenv.log("Running action %s" % type(self).__name__)
         try:
@@ -40,7 +40,7 @@ class Action(Hook):
 class MaintenanceAction(Action):
     """Action that only runs when in maintenance mode."""
 
-    valid_status = "maintenance"
+    required_status = "maintenance"
 
     def __init__(self, hookenv=hookenv, paths=default_paths):
         """

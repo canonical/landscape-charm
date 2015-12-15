@@ -50,24 +50,24 @@ class ActionTest(HookenvTest):
         action()
         self.assertEqual(["no go"], self.hookenv.action_fails)
 
-    def test_run_valid_status(self):
+    def test_run_required_status(self):
         """
-        If valid_status is set, the action will be executed if the
+        If required_status is set, the action will be executed if the
         current status is the same.
         """
         action = DummyAction(hookenv=self.hookenv)
-        action.valid_status = "active"
+        action.required_status = "active"
         self.hookenv.status_set("active", "")
         action()
         self.assertTrue(action.executed)
 
     def test_run_invalid_status(self):
         """
-        If valid_status is set, the action won't be executed if the
+        If required_status is set, the action won't be executed if the
         current status is different.
         """
         action = DummyAction(hookenv=self.hookenv)
-        action.valid_status = "active"
+        action.required_status = "active"
         self.hookenv.status_set("maintenance", "")
         action()
         self.assertFalse(action.executed)
