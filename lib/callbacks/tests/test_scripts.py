@@ -113,15 +113,15 @@ class LSCtlTest(HookenvTest):
         If the 'lsctl' script is invoked with the 'restart' action when
         the workload status is 'active', the status while restarting
         the services will way 'restarting services' and the final status
-        will be 'active'.
+        will be 'active' with no status message.
         """
         self.hookenv.statuses = [{"status": "active", "message": "Something."}]
         self.callback(self.manager, "landscape", "start")
-        self.assertEqual(("active", "Something."), self.hookenv.status_get())
+        self.assertEqual(("active", ""), self.hookenv.status_get())
         self.assertEqual(
             [{"status": "active", "message": "Something."},
              {"status": "maintenance", "message": "Restarting services."},
-             {"status": "active", "message": "Something."}],
+             {"status": "active", "message": ""}],
             self.hookenv.statuses)
 
     def test_start_maintenance_status(self):
