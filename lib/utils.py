@@ -23,6 +23,13 @@ def get_required_data(manager, service_name, key):
 
     This function will scan the required_data of the given ServiceManager
     and search for an entry matching the given key.
+
+    @param manager: A ServiceManager instance.
+    @param service_name: The name of the service on which to access data. In
+        this charm's case, it is always "landscape", but simply passing the
+        service_name given to a callback's __call__ is safer.
+    @param key: The key for the particular value we are looking for inside all
+        of the service's required_data.
     """
     service = manager.get_service(service_name)
     for data in service["required_data"]:

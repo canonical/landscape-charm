@@ -5,6 +5,7 @@ from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 
 from lib.apt import Apt
+from lib.utils import get_required_data
 
 
 class SetAPTSources(ManagerCallback):
@@ -21,3 +22,22 @@ class SetAPTSources(ManagerCallback):
             hookenv=self._hookenv, fetch=self._fetch,
             subprocess=self._subprocess)
         apt.set_sources()
+
+
+class HoldPackages(ManagerCallback):
+    """Marks landscape pacakges for hold.
+
+    The exact list of pacakges depends on the deployment type, as passed by
+    the HostedRequirer (depends on the state of the hosted relation)."""
+
+    def __init__(self, subprocess=subprocess):
+        # We only care about subprocess here since our hold pacakges method
+        # on Apt needs nothing else.
+        self._subprocess = subprocess
+
+    def __call__(self, manager, service_name, event_name):
+        deployment_mode = get_required_data(
+            manager, service_name, "deployment-mode")
+
+        apt = Apt(subprocess=self._subprocess)
+        apt.hold_packages(deployment_mode=deployment_mode)

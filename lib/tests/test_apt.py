@@ -20,6 +20,7 @@ class AptTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.subprocess.add_fake_executable("add-apt-repository")
+        self.subprocess.add_fake_executable("apt-mark")
         self.subprocess.add_fake_executable(
             "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
@@ -270,3 +271,35 @@ class AptTest(HookenvTest):
 
         with open(real) as fd:
             self.assertEqual("sample", fd.read())
+
+    def test_hold_packages_standalone(self):
+        """
+        The hold pacakges method issues apt-mark commands for all standalone
+        packages.
+        """
+        self.apt.hold_packages()
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-server"],
+            self.subprocess.calls[0][0])
+
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-hashids"],
+            self.subprocess.calls[1][0])
+
+    def test_hold_packages_hosted(self):
+        """
+        The hold pacakges method issues apt-mark commands for all hosted
+        packages.
+        """
+        self.apt.hold_packages(deployment_mode="hosted")
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-server"],
+            self.subprocess.calls[0][0])
+
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-hashids"],
+            self.subprocess.calls[1][0])
+
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-hosted"],
+            self.subprocess.calls[2][0])

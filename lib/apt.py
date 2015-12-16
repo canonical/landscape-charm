@@ -12,6 +12,8 @@ from lib.error import CharmError
 from lib.paths import default_paths
 
 PACKAGES = ("landscape-server", "python-psutil")
+PACKAGES_HOLD = ("landscape-server", "landscape-hashids")
+PACKAGES_HOLD_HOSTED = ("landscape-hosted",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
@@ -90,6 +92,22 @@ class Apt(object):
             if not os.path.exists(real + ".orig"):
                 os.rename(real, real + ".orig")
                 shutil.copy(sample, real)
+
+    def hold_packages(self, deployment_mode="standalone"):
+        """
+        Mark the landscape package and the packages depending on it for "hold".
+
+        @param deployment_mode: The deployment mode for the landscape server
+            typically obtained by checking the "hosted" relation's
+            "deployment-mode" data entry.
+        """
+        packages = PACKAGES_HOLD
+
+        if deployment_mode != "standalone":
+            packages = packages + PACKAGES_HOLD_HOSTED
+
+        for package in packages:
+            self._subprocess.check_call(["apt-mark", "hold", package])
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""

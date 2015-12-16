@@ -19,7 +19,7 @@ from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.smtp import ConfigureSMTP
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
-from lib.callbacks.apt import SetAPTSources
+from lib.callbacks.apt import SetAPTSources, HoldPackages
 
 
 class ServicesHook(Hook):
@@ -76,6 +76,7 @@ class ServicesHook(Hook):
                 SetAPTSources(
                     hookenv=self._hookenv, fetch=self._fetch,
                     subprocess=self._subprocess),
+                HoldPackages(subprocess=self._subprocess),
                 EnsureConfigDir(paths=self._paths),
                 WriteCustomSSLCertificate(paths=self._paths),
                 SchemaBootstrap(subprocess=self._subprocess),
