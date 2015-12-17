@@ -69,6 +69,8 @@ class LSCtl(ScriptCallback):
         self._hookenv = hookenv
 
     def __call__(self, manager, service_name, event_name):
+        current_status, current_status_message = self._hookenv.status_get()
+        action_status_message = ""
         action = event_name
         if event_name == "start":
             # XXX the 'start' event in the services framework is called after
@@ -89,8 +91,18 @@ class LSCtl(ScriptCallback):
             elif hook_name == "db-relation-changed":
                 if not self._need_restart_db_relation_changed(db_new, db_old):
                     return
+        if action == "restart":
+            action_status_message = "Restarting services."
+            if current_status == "unknown":
+                # If the status is unknown, it means that the services
+                # have not been started yet.
+                action_status_message = "Starting services."
+            if current_status == "maintenance":
+                return
 
+        self._hookenv.status_set("maintenance", action_status_message)
         self._run(LSCTL, (action,))
+        self._hookenv.status_set("active", "")
 
     def _need_restart_config_changed(self):
         """Check whether we need to restart after a config change.

@@ -17,6 +17,7 @@ class HookenvStub(object):
         self.relations = {}
         self.action_fails = []
         self.action_sets = []
+        self.statuses = [{"status": "unknown", "message": ""}]
 
         # We should disable implicit saving since it runs at charm exit using
         # globals :(
@@ -94,6 +95,13 @@ class HookenvStub(object):
     def action_get(self, key):
         self.action_gets.append(key)
         return "%s-value" % key
+
+    def status_get(self):
+        current_status = self.statuses[-1]
+        return current_status["status"], current_status["message"]
+
+    def status_set(self, workload_state, message):
+        self.statuses.append({"status": workload_state, "message": message})
 
 
 class FetchStub(object):

@@ -1,5 +1,3 @@
-import os
-
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.tests.stubs import FetchStub
@@ -19,9 +17,7 @@ class UpgradeActionTest(HookenvTest):
         The UpgradeAction refreshes package indexes and upgrades
         landscape-server package.
         """
-
-        open(self.paths.maintenance_flag(), "w")
-        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.hookenv.status_set("maintenance", "")
 
         self.hookenv.config()["source"] = "ppa:my-ppa"
         action = UpgradeAction(
@@ -41,8 +37,10 @@ class UpgradeActionTest(HookenvTest):
 
     def test_run_without_maintenance_flag(self):
         """
-        When maintenance flag file is absent, upgrade action is a no-op.
+        If the unit is not in the 'maintenance' state, the upgrade
+        action is a no-op.
         """
+        self.hookenv.status_set("active", "")
 
         action = UpgradeAction(
             hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
