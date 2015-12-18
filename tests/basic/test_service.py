@@ -152,7 +152,6 @@ class ServiceTest(IntegrationTest):
             "apt-mark showhold", "landscape-server/0")
         self.assertIn("landscape-server", out)
         self.assertIn("landscape-hashid", out)
-        self.assertIn("landscape-hosted", out)
 
 
 class CronTest(IntegrationTest):
