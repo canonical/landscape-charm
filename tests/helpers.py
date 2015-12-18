@@ -310,7 +310,7 @@ class EnvironmentFixture(Fixture):
                              "stopped": [<list of stopped sevices]}
         """
         unit = self._get_service_unit("landscape-server", unit=unit)
-        output, _ = self._run("lsctl status", unit.info["unit_name"])
+        output, _ = self.run("lsctl status", unit.info["unit_name"])
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -424,7 +424,7 @@ class EnvironmentFixture(Fixture):
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
         self._deployment.sentry.wait()
 
-    def _run(self, command, unit):
+    def run(self, command, unit):
         """Run a command on the given unit.
 
         The unicode stdout and stderr are returned as a tuple.
