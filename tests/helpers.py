@@ -309,8 +309,8 @@ class EnvironmentFixture(Fixture):
         A dict is returned: {"running": [<list of running services],
                              "stopped": [<list of stopped sevices]}
         """
-        unit = self._get_service_unit("landscape-server", unit=unit)
-        output, _ = self.run("lsctl status", unit.info["unit_name"])
+        output, _ = self.run_command_on_landscape(
+            "lsctl status", unit)
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -415,6 +415,11 @@ class EnvironmentFixture(Fixture):
 
         return leader, sorted(non_leaders)
 
+    def run_command_on_landscape(self, command, unit=None):
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        output, error = self._run(command, unit.info["unit_name"])
+        return output, error
+
     def _wait_for_deployment_change_hooks(self):
         """Wait for hooks to finish firing after a change in the deployment."""
         # Wait for initial landscape-server hooks to fire
@@ -424,7 +429,7 @@ class EnvironmentFixture(Fixture):
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
         self._deployment.sentry.wait()
 
-    def run(self, command, unit):
+    def _run(self, command, unit):
         """Run a command on the given unit.
 
         The unicode stdout and stderr are returned as a tuple.

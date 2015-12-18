@@ -148,8 +148,7 @@ class ServiceTest(IntegrationTest):
         """
         Check that landscape pacakges are marked as "held" by apt-mark.
         """
-        out, _ = self.environment.run(
-            "apt-mark showhold", "landscape-server/0")
+        out, _ = self.environment.run_command_on_landscape("apt-mark showhold")
         self.assertIn("landscape-server", out)
         self.assertIn("landscape-hashid", out)
 
