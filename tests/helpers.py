@@ -416,6 +416,9 @@ class EnvironmentFixture(Fixture):
         return leader, sorted(non_leaders)
 
     def run_command_on_landscape(self, command, unit=None):
+        """
+        Execute the passed in command on the landscape server unit.
+        """
         unit = self._get_service_unit("landscape-server", unit=unit)
         output, error = self._run(command, unit.info["unit_name"])
         return output, error
