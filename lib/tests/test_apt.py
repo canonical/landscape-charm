@@ -274,7 +274,7 @@ class AptTest(HookenvTest):
 
     def test_hold_packages(self):
         """
-        The hold pacakges method issues apt-mark commands for all passed
+        The hold packages method issues apt-mark commands for all passed
         packages.
         """
         self.apt.hold_packages(["landscape-server", "landscape-hashids"])
