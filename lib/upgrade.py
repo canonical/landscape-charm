@@ -31,3 +31,4 @@ class UpgradeAction(MaintenanceAction):
             subprocess=self._subprocess)
         apt.set_sources(force_update=True)
         apt.install_packages(apt_install_options)
+        apt.hold_packages()

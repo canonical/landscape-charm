@@ -2,7 +2,7 @@ import os
 
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
-from lib.tests.stubs import FetchStub
+from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.upgrade import UpgradeAction
 
 
@@ -11,6 +11,8 @@ class UpgradeActionTest(HookenvTest):
     def setUp(self):
         super(UpgradeActionTest, self).setUp()
         self.fetch = FetchStub()
+        self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable("apt-mark")
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
 
@@ -25,7 +27,8 @@ class UpgradeActionTest(HookenvTest):
 
         self.hookenv.config()["source"] = "ppa:my-ppa"
         action = UpgradeAction(
-            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
+            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths,
+            subprocess=self.subprocess)
         action()
 
         self.assertEqual([("ppa:my-ppa", None)], self.fetch.sources)
@@ -45,7 +48,8 @@ class UpgradeActionTest(HookenvTest):
         """
 
         action = UpgradeAction(
-            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths)
+            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths,
+            subprocess=self.subprocess)
 
         action()
         # There were no apt_update calls or apt_install calls.

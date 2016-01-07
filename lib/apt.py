@@ -13,7 +13,6 @@ from lib.paths import default_paths
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
 INSTALL_PACKAGES =  LANDSCAPE_PACKAGES + ("python-psutil",)
-PACKAGES_HOSTED = ("landscape-hosted",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
@@ -93,20 +92,11 @@ class Apt(object):
                 os.rename(real, real + ".orig")
                 shutil.copy(sample, real)
 
-    def hold_packages(self, deployment_mode="standalone"):
+    def hold_packages(self):
         """
         Mark the landscape package and the packages depending on it for "hold".
-
-        @param deployment_mode: The deployment mode for the landscape server
-            typically obtained by checking the "hosted" relation's
-            "deployment-mode" data entry.
         """
-        packages = LANDSCAPE_PACKAGES
-
-        if deployment_mode != "standalone":
-            packages = packages + PACKAGES_HOSTED
-
-        packages = list(packages)
+        packages = list(LANDSCAPE_PACKAGES)
         self._subprocess.check_call(["apt-mark", "hold"] + packages)
 
     def _set_remote_source(self):

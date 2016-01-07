@@ -291,7 +291,7 @@ class AptTest(HookenvTest):
         The hold packages method issues apt-mark commands for all hosted
         packages.
         """
-        self.apt.hold_packages(deployment_mode="hosted")
+        self.apt.hold_packages()
         self.assertEqual(
-            ["apt-mark", "hold", "landscape-server", "landscape-hashids", "landscape-hosted"],
+            ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
             self.subprocess.calls[0][0])

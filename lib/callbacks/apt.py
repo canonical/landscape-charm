@@ -5,7 +5,6 @@ from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 
 from lib.apt import Apt
-from lib.utils import get_required_data
 
 
 class SetAPTSources(ManagerCallback):
@@ -36,8 +35,5 @@ class HoldPackages(ManagerCallback):
         self._subprocess = subprocess
 
     def __call__(self, manager, service_name, event_name):
-        deployment_mode = get_required_data(
-            manager, service_name, "deployment-mode")
-
         apt = Apt(subprocess=self._subprocess)
-        apt.hold_packages(deployment_mode=deployment_mode)
+        apt.hold_packages()
