@@ -39,7 +39,8 @@ class UpgradeActionTest(HookenvTest):
         self.assertEqual(
             [(("landscape-server", "landscape-hashids", "python-psutil"),
               ["--option=Dpkg::Options::=--force-confdef",
-               "--option=Dpkg::Options::=--force-confold"],
+               "--option=Dpkg::Options::=--force-confold",
+               "--force-yes"],
               True)], self.fetch.installed)
 
     def test_run_without_maintenance_flag(self):
