@@ -146,7 +146,7 @@ class ServiceTest(IntegrationTest):
 
     def test_landscape_packages_are_held(self):
         """
-        Check that landscape pacakges are marked as "held" by apt-mark.
+        Check that landscape packages are marked as "held" by apt-mark.
         """
         out, _ = self.environment.run_command_on_landscape("apt-mark showhold")
         self.assertIn("landscape-server", out)
