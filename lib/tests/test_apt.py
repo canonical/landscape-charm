@@ -274,7 +274,7 @@ class AptTest(HookenvTest):
 
     def test_hold_packages_standalone(self):
         """
-        The hold pacakges method issues apt-mark commands for all standalone
+        The hold packages method issues apt-mark commands for all standalone
         packages.
         """
         self.apt.hold_packages(["landscape-server", "landscape-hashids"])
@@ -284,7 +284,7 @@ class AptTest(HookenvTest):
 
     def test_hold_packages_hosted(self):
         """
-        The hold pacakges method issues apt-mark commands for all hosted
+        The hold packages method issues apt-mark commands for all hosted
         packages.
         """
         self.apt.hold_packages(

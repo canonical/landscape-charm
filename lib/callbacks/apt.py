@@ -28,13 +28,13 @@ class SetAPTSources(ManagerCallback):
 
 
 class HoldPackages(ManagerCallback):
-    """Marks landscape pacakges for hold.
+    """Marks landscape packages for hold.
 
-    The exact list of pacakges depends on the deployment type, as passed by
+    The exact list of packages depends on the deployment type, as passed by
     the HostedRequirer (depends on the state of the hosted relation)."""
 
     def __init__(self, subprocess=subprocess):
-        # We only care about subprocess here since our hold pacakges method
+        # We only care about subprocess here since our hold packages method
         # on Apt needs nothing else.
         self._subprocess = subprocess
 
