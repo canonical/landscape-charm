@@ -11,9 +11,9 @@ from charmhelpers.core import hookenv
 from lib.error import CharmError
 from lib.paths import default_paths
 
-PACKAGES = ("landscape-server", "python-psutil")
-PACKAGES_HOLD = ("landscape-server", "landscape-hashids")
-PACKAGES_HOLD_HOSTED = ("landscape-hosted",)
+LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
+INSTALL_PACKAGES =  LANDSCAPE_PACKAGES + ("python-psutil",)
+PACKAGES_HOSTED = ("landscape-hosted",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
@@ -83,7 +83,7 @@ class Apt(object):
             # We don't sign the locally built repository, so we need to tell
             # apt-get that we don't care.
             options.append("--allow-unauthenticated")
-        self._fetch.apt_install(PACKAGES, options=options, fatal=True)
+        self._fetch.apt_install(INSTALL_PACKAGES, options=options, fatal=True)
 
         if self._use_sample_hashids():
             config_dir = self._paths.config_dir()
@@ -101,13 +101,13 @@ class Apt(object):
             typically obtained by checking the "hosted" relation's
             "deployment-mode" data entry.
         """
-        packages = PACKAGES_HOLD
+        packages = LANDSCAPE_PACKAGES
 
         if deployment_mode != "standalone":
-            packages = packages + PACKAGES_HOLD_HOSTED
+            packages = packages + PACKAGES_HOSTED
 
-        for package in packages:
-            self._subprocess.check_call(["apt-mark", "hold", package])
+        packages = list(packages)
+        self._subprocess.check_call(["apt-mark", "hold"] + packages)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""

@@ -129,14 +129,12 @@ class ServicesHookTest(HookenvTest):
         calls = self.subprocess.calls
         executables = [call[0][0] for call in calls]
         self.assertEqual("apt-mark", executables[0])
-        self.assertEqual("apt-mark", executables[1])
-        self.assertEqual("apt-mark", executables[2])
-        self.assertEqual("/usr/bin/landscape-schema", executables[4])
-        self.assertEqual("/usr/bin/debconf-set-selections", executables[5])
-        self.assertEqual("/usr/sbin/dpkg-reconfigure", executables[6])
-        self.assertEqual("/usr/bin/lsctl", executables[7])
+        self.assertEqual("/usr/bin/landscape-schema", executables[2])
+        self.assertEqual("/usr/bin/debconf-set-selections", executables[3])
+        self.assertEqual("/usr/sbin/dpkg-reconfigure", executables[4])
+        self.assertEqual("/usr/bin/lsctl", executables[5])
 
-        self.assertEqual(["/usr/bin/landscape-schema", "-h"], calls[3][0])
+        self.assertEqual(["/usr/bin/landscape-schema", "-h"], calls[1][0])
 
     def test_ready_with_non_standalone_deployment_mode(self):
         """

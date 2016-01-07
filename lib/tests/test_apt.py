@@ -4,7 +4,7 @@ import subprocess
 from fixtures import TempDir
 
 from lib.apt import (
-    Apt, AptNoSourceConfigError, PACKAGES, DEFAULT_INSTALL_OPTIONS,
+    Apt, AptNoSourceConfigError, INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS,
     SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
@@ -194,9 +194,11 @@ class AptTest(HookenvTest):
 
     def test_packages(self):
         """
-        The C{PACKAGES} tuple holds the packages expected to get installed.
+        The C{INSTALL_PACKAGES} tuple holds the packages expected to get installed.
         """
-        self.assertEqual(("landscape-server", "python-psutil"), PACKAGES)
+        self.assertEqual(
+            ("landscape-server", "landscape-hashids", "python-psutil"),
+            INSTALL_PACKAGES)
 
     def test_install(self):
         """
@@ -205,7 +207,8 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS)
-        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+        self.assertEqual(
+            [(INSTALL_PACKAGES, options, True)], self.fetch.installed)
 
     def test_install_with_local_tarball(self):
         """
@@ -219,7 +222,8 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS) + ["--allow-unauthenticated"]
-        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+        self.assertEqual(
+            [(INSTALL_PACKAGES, options, True)], self.fetch.installed)
 
     def test_install_sample_hashids(self):
         """
@@ -279,12 +283,8 @@ class AptTest(HookenvTest):
         """
         self.apt.hold_packages()
         self.assertEqual(
-            ["apt-mark", "hold", "landscape-server"],
+            ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
             self.subprocess.calls[0][0])
-
-        self.assertEqual(
-            ["apt-mark", "hold", "landscape-hashids"],
-            self.subprocess.calls[1][0])
 
     def test_hold_packages_hosted(self):
         """
@@ -293,13 +293,5 @@ class AptTest(HookenvTest):
         """
         self.apt.hold_packages(deployment_mode="hosted")
         self.assertEqual(
-            ["apt-mark", "hold", "landscape-server"],
+            ["apt-mark", "hold", "landscape-server", "landscape-hashids", "landscape-hosted"],
             self.subprocess.calls[0][0])
-
-        self.assertEqual(
-            ["apt-mark", "hold", "landscape-hashids"],
-            self.subprocess.calls[1][0])
-
-        self.assertEqual(
-            ["apt-mark", "hold", "landscape-hosted"],
-            self.subprocess.calls[2][0])
