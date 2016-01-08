@@ -40,7 +40,7 @@ class UpgradeActionTest(HookenvTest):
             [(("landscape-server", "landscape-hashids", "python-psutil"),
               ["--option=Dpkg::Options::=--force-confdef",
                "--option=Dpkg::Options::=--force-confold",
-               "--force-yes"],
+               "--ignore-hold"],
               True)], self.fetch.installed)
 
     def test_run_without_maintenance_flag(self):
