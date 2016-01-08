@@ -99,6 +99,15 @@ class Apt(object):
         packages = list(LANDSCAPE_PACKAGES)
         self._subprocess.check_call(["apt-mark", "hold"] + packages)
 
+    def unhold_packages(self):
+        """
+        Unmark the landscape package and the packages depending on it for
+        "hold". This is the opposite of hold_packages, and is used during
+        upgrades.
+        """
+        packages = list(LANDSCAPE_PACKAGES)
+        self._subprocess.check_call(["apt-mark", "unhold"] + packages)
+
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
         config = self._hookenv.config()

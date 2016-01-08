@@ -276,7 +276,7 @@ class AptTest(HookenvTest):
         with open(real) as fd:
             self.assertEqual("sample", fd.read())
 
-    def test_hold_packages_standalone(self):
+    def test_hold_packages(self):
         """
         The hold packages method issues apt-mark commands for all standalone
         packages.
@@ -286,12 +286,12 @@ class AptTest(HookenvTest):
             ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
             self.subprocess.calls[0][0])
 
-    def test_hold_packages_hosted(self):
+    def test_unhold_packages(self):
         """
-        The hold packages method issues apt-mark commands for all hosted
+        The hold packages method issues apt-mark commands for all standalone
         packages.
         """
-        self.apt.hold_packages()
+        self.apt.unhold_packages()
         self.assertEqual(
-            ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
+            ["apt-mark", "unhold", "landscape-server", "landscape-hashids"],
             self.subprocess.calls[0][0])

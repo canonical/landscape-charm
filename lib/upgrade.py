@@ -31,5 +31,6 @@ class UpgradeAction(MaintenanceAction):
             hookenv=self._hookenv, fetch=self._fetch,
             subprocess=self._subprocess)
         apt.set_sources(force_update=True)
+        apt.unhold_packages()
         apt.install_packages(apt_install_options)
         apt.hold_packages()
