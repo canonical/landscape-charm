@@ -25,9 +25,15 @@ class ResumeAction(MaintenanceAction):
         self._subprocess = subprocess
 
     def _run(self):
+        self._hookenv.status_set("maintenance", "Starting services.")
         start_output = self._subprocess.check_output((LSCTL, "start"))
         try:
             self._subprocess.check_output((LSCTL, "status"))
         except subprocess.CalledProcessError as status_error:
+            self._hookenv.status_set("maintenance", "Stopping services.")
             self._subprocess.call((LSCTL, "stop"))
+            self._hookenv.status_set(
+                "maintenance", "Services failed to start.")
             raise ProcessesNotStartedError(start_output, status_error.output)
+        else:
+            self._hookenv.status_set("active", "")
