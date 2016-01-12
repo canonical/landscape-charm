@@ -25,7 +25,6 @@ class UpgradeAction(MaintenanceAction):
             # have not been changed (force-confdef).
             "--option=Dpkg::Options::=--force-confdef",
             "--option=Dpkg::Options::=--force-confold",
-            "--ignore-hold",  # We hold the landscape packages by default.
         ]
         apt = Apt(
             hookenv=self._hookenv, fetch=self._fetch,
