@@ -53,3 +53,22 @@ class UpgradeActionTest(HookenvTest):
         # There were no apt_update calls or apt_install calls.
         self.assertEqual([], self.fetch.updates)
         self.assertEqual([], self.fetch.installed)
+
+    def test_upgrade_holds_packages(self):
+        """
+        The upgrade action holds the landscape packages.
+        """
+        self.hookenv.status_set("maintenance", "")
+        self.hookenv.config()["source"] = "ppa:my-ppa"
+
+        action = UpgradeAction(
+            hookenv=self.hookenv, fetch=self.fetch, paths=self.paths,
+            subprocess=self.subprocess)
+        action()
+
+        unhold_call = [
+            "apt-mark", "unhold", "landscape-server", "landscape-hashids"]
+        hold_call = [
+            "apt-mark", "hold", "landscape-server", "landscape-hashids"]
+        self.assertEqual(unhold_call, self.subprocess.calls[0][0])
+        self.assertEqual(hold_call, self.subprocess.calls[1][0])
