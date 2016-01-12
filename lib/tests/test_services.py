@@ -28,7 +28,6 @@ class ServicesHookTest(HookenvTest):
         self.subprocess.add_fake_executable(LSCTL)
         self.subprocess.add_fake_executable(DEBCONF_SET_SELECTIONS)
         self.subprocess.add_fake_executable(DPKG_RECONFIGURE)
-        self.subprocess.add_fake_executable("apt-mark")
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.root_dir = self.useFixture(RootDir())
@@ -128,13 +127,12 @@ class ServicesHookTest(HookenvTest):
 
         calls = self.subprocess.calls
         executables = [call[0][0] for call in calls]
-        self.assertEqual("apt-mark", executables[0])
-        self.assertEqual("/usr/bin/landscape-schema", executables[2])
-        self.assertEqual("/usr/bin/debconf-set-selections", executables[3])
-        self.assertEqual("/usr/sbin/dpkg-reconfigure", executables[4])
-        self.assertEqual("/usr/bin/lsctl", executables[5])
+        self.assertEqual("/usr/bin/landscape-schema", executables[1])
+        self.assertEqual("/usr/bin/debconf-set-selections", executables[2])
+        self.assertEqual("/usr/sbin/dpkg-reconfigure", executables[3])
+        self.assertEqual("/usr/bin/lsctl", executables[4])
 
-        self.assertEqual(["/usr/bin/landscape-schema", "-h"], calls[1][0])
+        self.assertEqual(["/usr/bin/landscape-schema", "-h"], calls[0][0])
 
     def test_ready_with_non_standalone_deployment_mode(self):
         """

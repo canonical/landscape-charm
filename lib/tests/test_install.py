@@ -11,6 +11,7 @@ class InstallHookTest(HookenvTest):
         super(InstallHookTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable("apt-mark")
         self.hook = InstallHook(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
 
