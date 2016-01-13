@@ -104,6 +104,10 @@ class Apt(object):
         Unmark the landscape package and the packages depending on it for
         "hold". This is the opposite of hold_packages, and is used during
         upgrades.
+
+        Theoretically you would be able to ignore the lock by passing
+        --ignore-hold to apt, but unfortunately it seems not to work in
+        non-interactive mode (LP: #1226168)
         """
         packages = list(LANDSCAPE_PACKAGES)
         self._subprocess.check_call(["apt-mark", "unhold"] + packages)
