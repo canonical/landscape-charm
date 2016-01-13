@@ -194,7 +194,8 @@ class AptTest(HookenvTest):
 
     def test_packages(self):
         """
-        The C{INSTALL_PACKAGES} tuple holds the packages expected to get installed.
+        The C{INSTALL_PACKAGES} tuple holds the packages expected to get
+        installed.
         """
         self.assertEqual(
             ("landscape-server", "landscape-hashids", "python-psutil"),

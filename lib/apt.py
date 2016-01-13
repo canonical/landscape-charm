@@ -12,7 +12,7 @@ from lib.error import CharmError
 from lib.paths import default_paths
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
-INSTALL_PACKAGES =  LANDSCAPE_PACKAGES + ("python-psutil",)
+INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-psutil",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
