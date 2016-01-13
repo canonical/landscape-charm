@@ -144,6 +144,14 @@ class ServiceTest(IntegrationTest):
             "/etc/ssl/certs/landscape_server_ca.crt", "landscape-server")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
+    def test_landscape_packages_are_held(self):
+        """
+        Check that landscape packages are marked as "held" by apt-mark.
+        """
+        out, _ = self.environment.run_command_on_landscape("apt-mark showhold")
+        self.assertIn("landscape-server", out)
+        self.assertIn("landscape-hashid", out)
+
 
 class CronTest(IntegrationTest):
     """Host all the tests that expects the cron daemon to be stopped.

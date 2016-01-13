@@ -309,8 +309,8 @@ class EnvironmentFixture(Fixture):
         A dict is returned: {"running": [<list of running services],
                              "stopped": [<list of stopped sevices]}
         """
-        unit = self._get_service_unit("landscape-server", unit=unit)
-        output, _ = self._run("lsctl status", unit.info["unit_name"])
+        output, _ = self.run_command_on_landscape(
+            "lsctl status", unit)
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -414,6 +414,11 @@ class EnvironmentFixture(Fixture):
                 non_leaders.append(int(unit_number))
 
         return leader, sorted(non_leaders)
+
+    def run_command_on_landscape(self, command, unit=None):
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        output, error = self._run(command, unit.info["unit_name"])
+        return output, error
 
     def _wait_for_deployment_change_hooks(self):
         """Wait for hooks to finish firing after a change in the deployment."""

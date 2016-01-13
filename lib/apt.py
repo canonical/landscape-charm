@@ -11,7 +11,8 @@ from charmhelpers.core import hookenv
 from lib.error import CharmError
 from lib.paths import default_paths
 
-PACKAGES = ("landscape-server", "python-psutil")
+LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
+INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-psutil",)
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
@@ -81,7 +82,7 @@ class Apt(object):
             # We don't sign the locally built repository, so we need to tell
             # apt-get that we don't care.
             options.append("--allow-unauthenticated")
-        self._fetch.apt_install(PACKAGES, options=options, fatal=True)
+        self._fetch.apt_install(INSTALL_PACKAGES, options=options, fatal=True)
 
         if self._use_sample_hashids():
             config_dir = self._paths.config_dir()
@@ -90,6 +91,26 @@ class Apt(object):
             if not os.path.exists(real + ".orig"):
                 os.rename(real, real + ".orig")
                 shutil.copy(sample, real)
+
+    def hold_packages(self):
+        """
+        Mark the landscape package and the packages depending on it for "hold".
+        """
+        packages = list(LANDSCAPE_PACKAGES)
+        self._subprocess.check_call(["apt-mark", "hold"] + packages)
+
+    def unhold_packages(self):
+        """
+        Unmark the landscape package and the packages depending on it for
+        "hold". This is the opposite of hold_packages, and is used during
+        upgrades.
+
+        Theoretically you would be able to ignore the lock by passing
+        --ignore-hold to apt, but unfortunately it seems not to work in
+        non-interactive mode (LP: #1226168)
+        """
+        packages = list(LANDSCAPE_PACKAGES)
+        self._subprocess.check_call(["apt-mark", "unhold"] + packages)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
