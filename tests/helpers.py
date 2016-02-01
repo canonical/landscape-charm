@@ -34,7 +34,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "rabbitmq": {},
     "postgresql": {
         "max_connections": 100,
-        "memory": 128,
+        "memory": "2G",
         "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
         "shared_buffers": "64MB",
         "checkpoint_segments": 64,
@@ -45,7 +45,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "haproxy": {},
     "landscape": {
         "branch": ".",
-        "memory": 128},
+        "memory": "2G"},
 }
 
 
