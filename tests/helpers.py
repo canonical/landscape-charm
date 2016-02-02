@@ -423,11 +423,11 @@ class EnvironmentFixture(Fixture):
     def _wait_for_deployment_change_hooks(self):
         """Wait for hooks to finish firing after a change in the deployment."""
         # Wait for initial landscape-server hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for haproxy hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
 
     def _run(self, command, unit):
         """Run a command on the given unit.
