@@ -167,24 +167,24 @@ class CronTest(IntegrationTest):
         script = "/opt/canonical/landscape/scripts/maintenance.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_update_security_db_cron(self):
         """Verify that the update_security_db cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_security_db.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_update_alerts_cron(self):
         """Verify that the update_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_alerts.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_landscape_profiles_cron(self):
         """Verify that the landscape_profiles cron job runs without errors."""
@@ -198,40 +198,40 @@ class CronTest(IntegrationTest):
 
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_process_alerts_cron(self):
         """Verify that the process_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/process_alerts.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_meta_releases_cron(self):
         """Verify that the meta_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/meta_releases.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_sync_lds_releases_cron(self):
         """Verify that the sync_lds_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/sync_lds_releases.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
-        self.assertEqual(output, "")
         self.assertEqual(status, 0)
+        self.assertEqual(output, "")
 
     def test_root_url_is_set(self):
         """

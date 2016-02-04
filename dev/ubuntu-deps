@@ -19,4 +19,4 @@ sudo apt-get -y install juju-deployer juju-core charm-tools python3 \
 lsb_release -r | grep -q 12.04 || sudo apt-get -y install python3-flake8
 
 sudo apt-get -y install python-fixtures python-six python-yaml dpkg-dev \
-    pbuilder dh-make
+    pbuilder dh-make python-jinja2 python-psutil

@@ -1,7 +1,9 @@
 from helpers import IntegrationTest
 from layers import LandscapeLeaderDestroyedLayer
+import unittest
 
 
+@unittest.skip("Needs lp:1511659 fixed")
 class LandscapeLeaderDestroyedTest(IntegrationTest):
     """Test what happens when the landscape-server leader gets destroyed.
 

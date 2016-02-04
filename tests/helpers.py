@@ -34,7 +34,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "rabbitmq": {},
     "postgresql": {
         "max_connections": 100,
-        "memory": 128,
+        "memory": "2G",
         "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
         "shared_buffers": "64MB",
         "checkpoint_segments": 64,
@@ -45,7 +45,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "haproxy": {},
     "landscape": {
         "branch": ".",
-        "memory": 128},
+        "memory": "2G"},
 }
 
 
@@ -423,11 +423,11 @@ class EnvironmentFixture(Fixture):
     def _wait_for_deployment_change_hooks(self):
         """Wait for hooks to finish firing after a change in the deployment."""
         # Wait for initial landscape-server hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for haproxy hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
 
     def _run(self, command, unit):
         """Run a command on the given unit.

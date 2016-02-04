@@ -80,6 +80,9 @@ class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
 
     @classmethod
     def setUp(cls):
+        # XXX: https://bugs.launchpad.net/landscape-charm/+bug/1541128
+        #      https://bugs.launchpad.net/juju-core/+bug/1511659
+        return
         cls.environment.destroy_landscape_leader()
         cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
             "landscape-server")
