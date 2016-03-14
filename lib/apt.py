@@ -49,6 +49,14 @@ class AptNoSourceConfigError(CharmError):
         super(AptNoSourceConfigError, self).__init__(message)
 
 
+class AptSourceAndKeyDontMatch(CharmError):
+    """Raise the provided 'source' and 'key' config values don't match."""
+
+    def __init__(self):
+        message = "The 'source' and 'key' lists have different lengths"
+        super(AptSourceAndKeyDontMatch, self).__init__(message)
+
+
 class Apt(object):
     """Perform APT-related tasks as setting sources and installing packages.
 
@@ -121,25 +129,78 @@ class Apt(object):
 
         # The source can be i.e. "15.04" or "14.10" for public PPAs, and we'll
         # do the conversion automatically for UX
-        if re.match("[0-9]{2}\.[0-9]{2}$", source):
-            source = "ppa:landscape/%s" % source
+        repositories = self._parse_source(source)
 
-        # Check if we're setting the source for the first time, or replacing
-        # an existing value. In the latter case we'll no-op if the value is the
-        # same or take care to remove it from sources.list if it's not.
+        # For each repository, check if we're setting the repository for the
+        # first time, or replacing an existing value. In the latter case we'll
+        # no-op if the value is the same or take care to remove it from
+        # sources.list if it's not in the new list.
         previous_source = config.previous("source")
         if previous_source is not None:
-            if previous_source == source:
+            previous_repositories = self._parse_source(previous_source)
+            if set(previous_repositories) == set(repositories):
                 return False
-            self._subprocess.check_call(
-                ["add-apt-repository", "--remove", "--yes", previous_source])
+            for repository in set(previous_repositories) - set(repositories):
+                self._subprocess.check_call(
+                    ["add-apt-repository", "--remove", "--yes", repository])
 
-        self._fetch.add_source(source, config.get("key"))
+        if not config.get("key"):
+            keys = [None] * len(repositories)
+        else:
+            keys = self._parse_key(config.get("key"))
+
+        if len(repositories) != len(keys):
+            raise AptSourceAndKeyDontMatch()
+
+        for repository, key in zip(repositories, keys):
+            self._fetch.add_source(repository, key)
 
         if self._use_sample_hashids():
             self._fetch.add_source(SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
 
         return True
+
+    def _parse_source(self, source):
+        """Parse the string value of the 'source' config entry.
+
+        @param: A comma-separated string of the desired repositories.
+        @return: A list of actual repositories (shorcuts are converted).
+        """
+        repositories = []
+        for repository in source.split(","):
+            repository = self._convert_repository_shortcut(repository.strip())
+            repositories.append(repository)
+        return repositories
+
+    def _parse_key(self, key):
+        """Parse the string value of the 'key' config entry.
+
+        @param: A comma-separated string of the key IDs for the desired
+            repositories. The special value 'null' means no key is needed
+            for the given repository.
+        @return: A list of actual keys ('null' is converted to None).
+        """
+        keys = []
+        for entry in key.split(","):
+            entry = entry.strip()
+            if entry == "null":
+                entry = None
+            keys.append(entry)
+        return keys
+
+    def _convert_repository_shortcut(self, repository):
+        """Convert a PPA shortcut like '15.11' to 'ppa:landscape/15.11'.
+
+        For a nicer UX, we accept shortcuts as '15.11'. This method will
+        resolve them to the actual PPA value.
+
+        @param repository: A string repository to convert.
+        @return: The converted version if the input was shortcut, otherwise
+             the same string as the input.
+        """
+        if re.match("[0-9]{2}\.[0-9]{2}$", repository):
+            repository = "ppa:landscape/%s" % repository
+        return repository
 
     def _set_local_source(self):
         """Set the local APT repository for the Landscape tarball, if any."""

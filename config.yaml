@@ -8,12 +8,20 @@ options:
                 - A full deb line: "deb http://ppa.launchpad.net/landscape/15.11/ubuntu trusty main"
                 - A PPA URL: "ppa:landscape/15.11"
                 - A version number: "15.11"
+                - A comma-separated list of the previous values, e.g. "15.11, ppa:juju/devel"
     key:
         default:
         type: string
         description: |
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
+            In case multiple repositories are specified in the 'source' config key,
+            this should be a comma-separated list of key IDs, one for each
+            repository and in the same order. If a repository needs no key ID,
+            the special keyword 'null' should be passed.
+            Note that if 'source' (or one of its entries) is set to point ot a
+            Launchpad PPA, there's no need to specify a key, since it gets
+            automatically and securely fetched from Launchpad itself.
     worker-counts:
         default: 2
         type: int
