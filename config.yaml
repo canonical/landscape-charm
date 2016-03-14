@@ -10,7 +10,7 @@ options:
                 - A version number: "15.11"
                 - A comma-separated list of the previous values, e.g. "15.11, ppa:juju/devel"
     key:
-        default:
+        default: ""
         type: string
         description: |
             Key ID to import to the apt keyring to support use with arbitary source
@@ -36,9 +36,9 @@ options:
             the actual license file data, or a file://, http:// or https:// URL
             pointing to the license file for download.
         type: string
-        default:
+        default: ""
     openid-provider-url:
-        default:
+        default: ""
         type: string
         description: |
             OpenID provider URL to use for authentication to Landscape.
