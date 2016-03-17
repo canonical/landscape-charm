@@ -144,8 +144,8 @@ class AptTest(HookenvTest):
 
     def test_set_sources_and_keys_mismatch(self):
         """
-        If the number of repositories and keys don't match, and error is
-        raised.
+        If the number of repositories doesn't match the number of keys, an
+        error is raised.
         """
         self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
         self.hookenv.config()["key"] = "xyz"
