@@ -5,15 +5,26 @@ options:
         description: |
             The source from which to install the landscape packages. Possible
             values are:
-                - A full deb line: "deb http://ppa.launchpad.net/landscape/15.11/ubuntu trusty main"
-                - A PPA URL: "ppa:landscape/15.11"
                 - A version number: "15.11"
+                - A PPA URL: "ppa:landscape/15.11"
+                - A full deb line: "deb http://ppa.launchpad.net/landscape/15.11/ubuntu trusty main"
+                - A comma-separated list of the previous values, e.g. "15.11, ppa:juju/devel" (NOTE:
+                  using multiple repositories is meant for testing only, and not supported for
+                  production deployments, that should always just point to a single official
+                  Landscape PPA or a mirror of it).
     key:
-        default:
+        default: ""
         type: string
         description: |
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
+            In case multiple repositories are specified in the 'source' config key,
+            this should be a comma-separated list of key IDs, one for each
+            repository and in the same order. If a repository needs no key ID,
+            the special keyword 'null' should be passed.
+            Note that if 'source' (or one of its entries) is set to point ot a
+            Launchpad PPA, there's no need to specify a key, since it gets
+            automatically and securely fetched from Launchpad itself.
     worker-counts:
         default: 2
         type: int
@@ -28,9 +39,9 @@ options:
             the actual license file data, or a file://, http:// or https:// URL
             pointing to the license file for download.
         type: string
-        default:
+        default: ""
     openid-provider-url:
-        default:
+        default: ""
         type: string
         description: |
             OpenID provider URL to use for authentication to Landscape.

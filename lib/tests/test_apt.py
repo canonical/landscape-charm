@@ -4,8 +4,9 @@ import subprocess
 from fixtures import TempDir
 
 from lib.apt import (
-    Apt, AptNoSourceConfigError, INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS,
-    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
+    Apt, AptNoSourceConfigError, AptSourceAndKeyDontMatchError,
+    INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
+    SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
@@ -117,6 +118,42 @@ class AptTest(HookenvTest):
              (SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)],
             self.fetch.sources)
         self.assertEqual([True], self.fetch.updates)
+
+    def test_set_sources_multiple_values(self):
+        """
+        The set_sources method can handle comma-separated lists of multiple
+        repositories.
+        """
+        self.hookenv.config()["source"] = "15.11, ppa:juju/devel"
+        self.apt.set_sources()
+        self.assertItemsEqual(
+            [("ppa:landscape/15.11", None), ("ppa:juju/devel", None)],
+            self.fetch.sources)
+
+    def test_set_sources_and_keys_multiple_values(self):
+        """
+        The set_sources method can handle comma-separated lists of multiple
+        repositories and multiple keys.
+        """
+        self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
+        self.hookenv.config()["key"] = "null, xyz"
+        self.apt.set_sources()
+        self.assertItemsEqual(
+            [("ppa:landscape/15.11", None), ("deb http://host/ ./", "xyz")],
+            self.fetch.sources)
+
+    def test_set_sources_and_keys_mismatch(self):
+        """
+        If the number of repositories doesn't match the number of keys, an
+        error is raised.
+        """
+        self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
+        self.hookenv.config()["key"] = "xyz"
+        with self.assertRaises(AptSourceAndKeyDontMatchError) as error:
+            self.apt.set_sources()
+            self.assertEqual(
+                "The 'source' and 'key' lists have different lengths",
+                str(error))
 
     def test_local_tarball(self):
         """
