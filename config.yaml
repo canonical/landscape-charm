@@ -39,9 +39,9 @@ options:
             the actual license file data, or a file://, http:// or https:// URL
             pointing to the license file for download.
         type: string
-        default: ""
+        default:
     openid-provider-url:
-        default: ""
+        default:
         type: string
         description: |
             OpenID provider URL to use for authentication to Landscape.
