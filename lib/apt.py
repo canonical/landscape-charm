@@ -49,12 +49,12 @@ class AptNoSourceConfigError(CharmError):
         super(AptNoSourceConfigError, self).__init__(message)
 
 
-class AptSourceAndKeyDontMatch(CharmError):
-    """Raise the provided 'source' and 'key' config values don't match."""
+class AptSourceAndKeyDontMatchError(CharmError):
+    """Provided config values for 'source' and 'key' do not match.."""
 
     def __init__(self):
         message = "The 'source' and 'key' lists have different lengths"
-        super(AptSourceAndKeyDontMatch, self).__init__(message)
+        super(AptSourceAndKeyDontMatchError, self).__init__(message)
 
 
 class Apt(object):
@@ -150,7 +150,7 @@ class Apt(object):
             keys = self._parse_key(config.get("key"))
 
         if len(repositories) != len(keys):
-            raise AptSourceAndKeyDontMatch()
+            raise AptSourceAndKeyDontMatchError()
 
         for repository, key in zip(repositories, keys):
             self._fetch.add_source(repository, key)

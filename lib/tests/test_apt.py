@@ -4,7 +4,7 @@ import subprocess
 from fixtures import TempDir
 
 from lib.apt import (
-    Apt, AptNoSourceConfigError, AptSourceAndKeyDontMatch,
+    Apt, AptNoSourceConfigError, AptSourceAndKeyDontMatchError,
     INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
     SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
@@ -149,7 +149,7 @@ class AptTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
         self.hookenv.config()["key"] = "xyz"
-        with self.assertRaises(AptSourceAndKeyDontMatch) as error:
+        with self.assertRaises(AptSourceAndKeyDontMatchError) as error:
             self.apt.set_sources()
             self.assertEqual(
                 "The 'source' and 'key' lists have different lengths",
