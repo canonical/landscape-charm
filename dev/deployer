@@ -16,7 +16,7 @@ class Deployer(object):
     """Simple wrapper around juju-deployer.
 
     It creates a temporary directory that will act as local charm repository
-    for juju-deployer, so it can deploy the current charm branch as local
+    for juju-deployer so it can deploy the current charm branch as local
     charm.
 
     It also overrides the configuration in the stock bundles, accounting for
@@ -40,19 +40,19 @@ class Deployer(object):
         charm_dest = os.path.join(series_dest, "landscape-server")
         os.symlink(CHARM_SRC, charm_dest)
 
-    def _create_local_yaml(self, tmpdir, target_bundle_file):
+    def _create_local_yaml(self, tmpdir, source_bundle_file):
         """
         Create a local yaml file to adjust settings in the bundle.  Return the
         created file name to the caller.
 
         @param tmpdir: directory where we can write a yaml file.
-        @param target_bundle_file: The bundle target to override.
+        @param source_bundle_file: The bundle file to override.
         """
         # Will create a config file with option values overridden for use in
         # the juju deployer commandline to add a custom license-file to the
         # deployment.
         local_yaml_file = os.path.join(tmpdir, "99-local.yaml")
-        with open(target_bundle_file, "r") as bundle_content:
+        with open(source_bundle_file, "r") as bundle_content:
             local_yaml = yaml.safe_load(bundle_content.read())
 
         # overridden options in landscape-charm, with the filename in the
@@ -62,7 +62,7 @@ class Deployer(object):
                             "ssl-cert": "ssl-cert",
                             "ssl-key": "ssl-key"}
 
-        # Add out option values to existing YAML
+        # Add our option values to the existing YAML
         options = {}
         for option, filename in override_options.items():
             filepath = os.path.join(CHARM_SRC, "config", filename)
@@ -85,7 +85,7 @@ class Deployer(object):
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
-        config_file = os.path.join(CHARM_SRC, "bundles", target + ".yaml")
+        original_bundle = os.path.join(CHARM_SRC, "bundles", target + ".yaml")
         try:
             deployer_dir = tempfile.mkdtemp()
             # Stage deployer directory for all supported series, even though
@@ -93,11 +93,12 @@ class Deployer(object):
             # it's determined by a bundle, we have to be ready for whatever.
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-            config_file = self._create_local_yaml(deployer_dir, config_file)
+            updated_bundle_file = self._create_local_yaml(
+                deployer_dir, original_bundle)
             # The -w 30 is there to allow things to settle a bit before
             # issuing a 'juju run' to wait for all the relations to settle.
             args = ["juju-deployer", "-vdWL", "-w 30"]
-            args.extend(["-c", config_file])
+            args.extend(["-c", updated_bundle_file])
             if timeout is not None:
                 args.extend(["--timeout", str(timeout)])
             logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
