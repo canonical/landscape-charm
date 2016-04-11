@@ -40,20 +40,20 @@ class Deployer(object):
         charm_dest = os.path.join(series_dest, "landscape-server")
         os.symlink(CHARM_SRC, charm_dest)
 
-    def _create_local_yaml(self, tmpdir, target):
+    def _create_local_yaml(self, tmpdir, target_bundle_file):
         """
         Create a local yaml file to adjust settings in the bundle.  Return the
         created file name to the caller.
 
         @param tmpdir: directory where we can write a yaml file.
-        @param target: what bundle target to override.
+        @param target_bundle_file: The bundle target to override.
         """
-        # Will be appended to end of 'config_files' list.  This will in turn
-        # be specified last on the juju-deployer command line, and will be able
-        # to overwrite charm settings.  For instance we can use it to add a
-        # custom license-file to the deployment.
+        # Will create a config file with option values overridden for use in
+        # the juju deployer commandline to add a custom license-file to the
+        # deployment.
         local_yaml_file = os.path.join(tmpdir, "99-local.yaml")
-        local_yaml = {}
+        with open(target_bundle_file, "r") as bundle_content:
+            local_yaml = yaml.safe_load(bundle_content.read())
 
         # overridden options in landscape-charm, with the filename in the
         # config dir that we read.
@@ -62,23 +62,13 @@ class Deployer(object):
                             "ssl-cert": "ssl-cert",
                             "ssl-key": "ssl-key"}
 
-        # Base data structure for the landscape-charm that we will fill out
-        # with options.
-        landscape_service = {"charm": "landscape-server"}
+        # Add out option values to existing YAML
         options = {}
         for option, filename in override_options.items():
             filepath = os.path.join(CHARM_SRC, "config", filename)
             if os.path.exists(filepath):
                 options[option] = "include-file://%s" % filepath
-
-        # Can't include a blank options section, deployer will choke
-        if options:
-            landscape_service["options"] = options
-
-        # target name == filename in our bundles branches.
-        local_yaml[target] = {"services": {}}
-        for service in ["landscape-server"]:
-            local_yaml[target]["services"][service] = landscape_service
+        local_yaml["services"]["landscape-server"]["options"].update(options)
 
         with open(local_yaml_file, "w") as f:
             f.write(yaml.dump(local_yaml, default_flow_style=False))
@@ -95,7 +85,7 @@ class Deployer(object):
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
-        config_files = [os.path.join(CHARM_SRC, "bundles", target + ".yaml")]
+        config_file = os.path.join(CHARM_SRC, "bundles", target + ".yaml")
         try:
             deployer_dir = tempfile.mkdtemp()
             # Stage deployer directory for all supported series, even though
@@ -103,14 +93,11 @@ class Deployer(object):
             # it's determined by a bundle, we have to be ready for whatever.
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-            config_files.append(
-                self._create_local_yaml(deployer_dir, target))
+            config_file = self._create_local_yaml(deployer_dir, config_file)
             # The -w 30 is there to allow things to settle a bit before
             # issuing a 'juju run' to wait for all the relations to settle.
             args = ["juju-deployer", "-vdWL", "-w 30"]
-            for config_file in config_files:
-                args.extend(["-c", config_file])
-            args.append(target)
+            args.extend(["-c", config_file])
             if timeout is not None:
                 args.extend(["--timeout", str(timeout)])
             logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
