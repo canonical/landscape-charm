@@ -12,7 +12,7 @@ from lib.error import CharmError
 from lib.paths import default_paths
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
-INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-psutil",)
+INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-minimal", "python-psutil")
 PACKAGES_DEV = ("dpkg-dev", "pbuilder")
 TARBALL = "landscape-server_*.tar.gz"
 
@@ -255,8 +255,9 @@ class Apt(object):
 
     def _is_tarball_new(self, tarball):
         """Check if this is a new tarball and we need to build it."""
-        with open(tarball, "r") as fd:
-            digest = hashlib.md5(fd.read()).hexdigest()
+        with open(tarball, "rb") as fd:
+            data = fd.read()
+        digest = hashlib.md5(data).hexdigest()
 
         md5sum = tarball + ".md5sum"
         if os.path.exists(md5sum):

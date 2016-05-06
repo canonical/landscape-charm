@@ -30,6 +30,8 @@ import random
 import string
 import subprocess
 import hashlib
+import functools
+import itertools
 from contextlib import contextmanager
 from collections import OrderedDict
 
@@ -72,7 +74,9 @@ def service_pause(service_name, init_dir="/etc/init", initd_dir="/etc/init.d"):
         stopped = service_stop(service_name)
     upstart_file = os.path.join(init_dir, "{}.conf".format(service_name))
     sysv_file = os.path.join(initd_dir, service_name)
-    if os.path.exists(upstart_file):
+    if init_is_systemd():
+        service('disable', service_name)
+    elif os.path.exists(upstart_file):
         override_path = os.path.join(
             init_dir, '{}.override'.format(service_name))
         with open(override_path, 'w') as fh:
@@ -80,9 +84,9 @@ def service_pause(service_name, init_dir="/etc/init", initd_dir="/etc/init.d"):
     elif os.path.exists(sysv_file):
         subprocess.check_call(["update-rc.d", service_name, "disable"])
     else:
-        # XXX: Support SystemD too
         raise ValueError(
-            "Unable to detect {0} as either Upstart {1} or SysV {2}".format(
+            "Unable to detect {0} as SystemD, Upstart {1} or"
+            " SysV {2}".format(
                 service_name, upstart_file, sysv_file))
     return stopped
 
@@ -94,7 +98,9 @@ def service_resume(service_name, init_dir="/etc/init",
     Reenable starting again at boot. Start the service"""
     upstart_file = os.path.join(init_dir, "{}.conf".format(service_name))
     sysv_file = os.path.join(initd_dir, service_name)
-    if os.path.exists(upstart_file):
+    if init_is_systemd():
+        service('enable', service_name)
+    elif os.path.exists(upstart_file):
         override_path = os.path.join(
             init_dir, '{}.override'.format(service_name))
         if os.path.exists(override_path):
@@ -102,9 +108,9 @@ def service_resume(service_name, init_dir="/etc/init",
     elif os.path.exists(sysv_file):
         subprocess.check_call(["update-rc.d", service_name, "enable"])
     else:
-        # XXX: Support SystemD too
         raise ValueError(
-            "Unable to detect {0} as either Upstart {1} or SysV {2}".format(
+            "Unable to detect {0} as SystemD, Upstart {1} or"
+            " SysV {2}".format(
                 service_name, upstart_file, sysv_file))
 
     started = service_running(service_name)
@@ -115,22 +121,40 @@ def service_resume(service_name, init_dir="/etc/init",
 
 def service(action, service_name):
     """Control a system service"""
-    cmd = ['service', service_name, action]
+    if init_is_systemd():
+        cmd = ['systemctl', action, service_name]
+    else:
+        cmd = ['service', service_name, action]
     return subprocess.call(cmd) == 0
 
 
-def service_running(service):
+def systemv_services_running():
+    output = subprocess.check_output(
+        ['service', '--status-all'],
+        stderr=subprocess.STDOUT).decode('UTF-8')
+    return [row.split()[-1] for row in output.split('\n') if '[ + ]' in row]
+
+
+def service_running(service_name):
     """Determine whether a system service is running"""
-    try:
-        output = subprocess.check_output(
-            ['service', service, 'status'],
-            stderr=subprocess.STDOUT).decode('UTF-8')
-    except subprocess.CalledProcessError:
-        return False
+    if init_is_systemd():
+        return service('is-active', service_name)
     else:
-        if ("start/running" in output or "is running" in output):
-            return True
+        try:
+            output = subprocess.check_output(
+                ['service', service_name, 'status'],
+                stderr=subprocess.STDOUT).decode('UTF-8')
+        except subprocess.CalledProcessError:
+            return False
         else:
+            # This works for upstart scripts where the 'service' command
+            # returns a consistent string to represent running 'start/running'
+            if ("start/running" in output or "is running" in output or
+                    "up and running" in output):
+                return True
+            # Check System V scripts init script return codes
+            if service_name in systemv_services_running():
+                return True
             return False
 
 
@@ -146,10 +170,17 @@ def service_available(service_name):
         return True
 
 
+SYSTEMD_SYSTEM = '/run/systemd/system'
+
+
+def init_is_systemd():
+    """Return True if the host system uses systemd, False otherwise."""
+    return os.path.isdir(SYSTEMD_SYSTEM)
+
+
 def adduser(username, password=None, shell='/bin/bash', system_user=False,
             primary_group=None, secondary_groups=None):
-    """
-    Add a user to the system.
+    """Add a user to the system.
 
     Will log but otherwise succeed if the user already exists.
 
@@ -157,7 +188,7 @@ def adduser(username, password=None, shell='/bin/bash', system_user=False,
     :param str password: Password for user; if ``None``, create a system user
     :param str shell: The default shell for the user
     :param bool system_user: Whether to create a login or system user
-    :param str primary_group: Primary group for user; defaults to their username
+    :param str primary_group: Primary group for user; defaults to username
     :param list secondary_groups: Optional list of additional groups
 
     :returns: The password database entry struct, as returned by `pwd.getpwnam`
@@ -283,14 +314,12 @@ def write_file(path, content, owner='root', group='root', perms=0o444):
 
 
 def fstab_remove(mp):
-    """Remove the given mountpoint entry from /etc/fstab
-    """
+    """Remove the given mountpoint entry from /etc/fstab"""
     return Fstab.remove_by_mountpoint(mp)
 
 
 def fstab_add(dev, mp, fs, options=None):
-    """Adds the given device entry to the /etc/fstab file
-    """
+    """Adds the given device entry to the /etc/fstab file"""
     return Fstab.add(dev, mp, fs, options=options)
 
 
@@ -346,8 +375,7 @@ def fstab_mount(mountpoint):
 
 
 def file_hash(path, hash_type='md5'):
-    """
-    Generate a hash checksum of the contents of 'path' or None if not found.
+    """Generate a hash checksum of the contents of 'path' or None if not found.
 
     :param str hash_type: Any hash alrgorithm supported by :mod:`hashlib`,
                           such as md5, sha1, sha256, sha512, etc.
@@ -362,10 +390,9 @@ def file_hash(path, hash_type='md5'):
 
 
 def path_hash(path):
-    """
-    Generate a hash checksum of all files matching 'path'. Standard wildcards
-    like '*' and '?' are supported, see documentation for the 'glob' module for
-    more information.
+    """Generate a hash checksum of all files matching 'path'. Standard
+    wildcards like '*' and '?' are supported, see documentation for the 'glob'
+    module for more information.
 
     :return: dict: A { filename: hash } dictionary for all matched files.
                    Empty if none found.
@@ -377,8 +404,7 @@ def path_hash(path):
 
 
 def check_hash(path, checksum, hash_type='md5'):
-    """
-    Validate a file using a cryptographic checksum.
+    """Validate a file using a cryptographic checksum.
 
     :param str checksum: Value of the checksum used to validate the file.
     :param str hash_type: Hash algorithm used to generate `checksum`.
@@ -393,10 +419,11 @@ def check_hash(path, checksum, hash_type='md5'):
 
 
 class ChecksumError(ValueError):
+    """A class derived from Value error to indicate the checksum failed."""
     pass
 
 
-def restart_on_change(restart_map, stopstart=False):
+def restart_on_change(restart_map, stopstart=False, restart_functions=None):
     """Restart services based on configuration files changing
 
     This function is used a decorator, for example::
@@ -414,25 +441,56 @@ def restart_on_change(restart_map, stopstart=False):
     restarted if any file matching the pattern got changed, created
     or removed. Standard wildcards are supported, see documentation
     for the 'glob' module for more information.
+
+    @param restart_map: {path_file_name: [service_name, ...]
+    @param stopstart: DEFAULT false; whether to stop, start OR restart
+    @param restart_functions: nonstandard functions to use to restart services
+                              {svc: func, ...}
+    @returns result from decorated function
     """
     def wrap(f):
+        @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
-            checksums = {path: path_hash(path) for path in restart_map}
-            f(*args, **kwargs)
-            restarts = []
-            for path in restart_map:
-                if path_hash(path) != checksums[path]:
-                    restarts += restart_map[path]
-            services_list = list(OrderedDict.fromkeys(restarts))
-            if not stopstart:
-                for service_name in services_list:
-                    service('restart', service_name)
-            else:
-                for action in ['stop', 'start']:
-                    for service_name in services_list:
-                        service(action, service_name)
+            return restart_on_change_helper(
+                (lambda: f(*args, **kwargs)), restart_map, stopstart,
+                restart_functions)
         return wrapped_f
     return wrap
+
+
+def restart_on_change_helper(lambda_f, restart_map, stopstart=False,
+                             restart_functions=None):
+    """Helper function to perform the restart_on_change function.
+
+    This is provided for decorators to restart services if files described
+    in the restart_map have changed after an invocation of lambda_f().
+
+    @param lambda_f: function to call.
+    @param restart_map: {file: [service, ...]}
+    @param stopstart: whether to stop, start or restart a service
+    @param restart_functions: nonstandard functions to use to restart services
+                              {svc: func, ...}
+    @returns result of lambda_f()
+    """
+    if restart_functions is None:
+        restart_functions = {}
+    checksums = {path: path_hash(path) for path in restart_map}
+    r = lambda_f()
+    # create a list of lists of the services to restart
+    restarts = [restart_map[path]
+                for path in restart_map
+                if path_hash(path) != checksums[path]]
+    # create a flat list of ordered services without duplicates from lists
+    services_list = list(OrderedDict.fromkeys(itertools.chain(*restarts)))
+    if services_list:
+        actions = ('stop', 'start') if stopstart else ('restart',)
+        for service_name in services_list:
+            if service_name in restart_functions:
+                restart_functions[service_name](service_name)
+            else:
+                for action in actions:
+                    service(action, service_name)
+    return r
 
 
 def lsb_release():
@@ -498,7 +556,7 @@ def get_bond_master(interface):
 
 
 def list_nics(nic_type=None):
-    '''Return a list of nics of given type(s)'''
+    """Return a list of nics of given type(s)"""
     if isinstance(nic_type, six.string_types):
         int_types = [nic_type]
     else:
@@ -540,12 +598,13 @@ def list_nics(nic_type=None):
 
 
 def set_nic_mtu(nic, mtu):
-    '''Set MTU on a network interface'''
+    """Set the Maximum Transmission Unit (MTU) on a network interface."""
     cmd = ['ip', 'link', 'set', nic, 'mtu', mtu]
     subprocess.check_call(cmd)
 
 
 def get_nic_mtu(nic):
+    """Return the Maximum Transmission Unit (MTU) for a network interface."""
     cmd = ['ip', 'addr', 'show', nic]
     ip_output = subprocess.check_output(cmd).decode('UTF-8').split('\n')
     mtu = ""
@@ -557,6 +616,7 @@ def get_nic_mtu(nic):
 
 
 def get_nic_hwaddr(nic):
+    """Return the Media Access Control (MAC) for a network interface."""
     cmd = ['ip', '-o', '-0', 'addr', 'show', nic]
     ip_output = subprocess.check_output(cmd).decode('UTF-8')
     hwaddr = ""
@@ -567,7 +627,7 @@ def get_nic_hwaddr(nic):
 
 
 def cmp_pkgrevno(package, revno, pkgcache=None):
-    '''Compare supplied revno with the revno of the installed package
+    """Compare supplied revno with the revno of the installed package
 
     *  1 => Installed revno is greater than supplied arg
     *  0 => Installed revno is the same as supplied arg
@@ -576,7 +636,7 @@ def cmp_pkgrevno(package, revno, pkgcache=None):
     This function imports apt_cache function from charmhelpers.fetch if
     the pkgcache argument is None. Be sure to add charmhelpers.fetch if
     you call this function, or pass an apt_pkg.Cache() instance.
-    '''
+    """
     import apt_pkg
     if not pkgcache:
         from charmhelpers.fetch import apt_cache
@@ -586,19 +646,27 @@ def cmp_pkgrevno(package, revno, pkgcache=None):
 
 
 @contextmanager
-def chdir(d):
+def chdir(directory):
+    """Change the current working directory to a different directory for a code
+    block and return the previous directory after the block exits. Useful to
+    run commands from a specificed directory.
+
+    :param str directory: The directory path to change to for this context.
+    """
     cur = os.getcwd()
     try:
-        yield os.chdir(d)
+        yield os.chdir(directory)
     finally:
         os.chdir(cur)
 
 
 def chownr(path, owner, group, follow_links=True, chowntopdir=False):
-    """
-    Recursively change user and group ownership of files and directories
+    """Recursively change user and group ownership of files and directories
     in given path. Doesn't chown path itself by default, only its children.
 
+    :param str path: The string path to start changing ownership.
+    :param str owner: The owner string to use when looking up the uid.
+    :param str group: The group string to use when looking up the gid.
     :param bool follow_links: Also Chown links if True
     :param bool chowntopdir: Also chown path itself if True
     """
@@ -622,15 +690,23 @@ def chownr(path, owner, group, follow_links=True, chowntopdir=False):
 
 
 def lchownr(path, owner, group):
+    """Recursively change user and group ownership of files and directories
+    in a given path, not following symbolic links. See the documentation for
+    'os.lchown' for more information.
+
+    :param str path: The string path to start changing ownership.
+    :param str owner: The owner string to use when looking up the uid.
+    :param str group: The group string to use when looking up the gid.
+    """
     chownr(path, owner, group, follow_links=False)
 
 
 def get_total_ram():
-    '''The total amount of system RAM in bytes.
+    """The total amount of system RAM in bytes.
 
     This is what is reported by the OS, and may be overcommitted when
     there are multiple containers hosted on the same machine.
-    '''
+    """
     with open('/proc/meminfo', 'r') as f:
         for line in f.readlines():
             if line:

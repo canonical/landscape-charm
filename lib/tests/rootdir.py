@@ -19,6 +19,6 @@ class RootDir(TempDir):
         os.makedirs(self.paths.config_dir())
         os.makedirs(os.path.dirname(self.paths.ssl_certificate()))
         os.makedirs(self.paths.offline_dir())
-        for path in ERRORFILES_MAP.itervalues():
+        for path in ERRORFILES_MAP.values():
             with open(os.path.join(self.paths.offline_dir(), path), "w") as fd:
                 fd.write("Fake %s" % path)
