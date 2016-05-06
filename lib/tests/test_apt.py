@@ -126,7 +126,7 @@ class AptTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "15.11, ppa:juju/devel"
         self.apt.set_sources()
-        self.assertItemsEqual(
+        self.assertEqual(
             [("ppa:landscape/15.11", None), ("ppa:juju/devel", None)],
             self.fetch.sources)
 
@@ -138,7 +138,7 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
         self.hookenv.config()["key"] = "null, xyz"
         self.apt.set_sources()
-        self.assertItemsEqual(
+        self.assertEqual(
             [("ppa:landscape/15.11", None), ("deb http://host/ ./", "xyz")],
             self.fetch.sources)
 
@@ -235,7 +235,8 @@ class AptTest(HookenvTest):
         installed.
         """
         self.assertEqual(
-            ("landscape-server", "landscape-hashids", "python-psutil"),
+            ("landscape-server", "landscape-hashids", "python-minimal",
+             "python-psutil"),
             INSTALL_PACKAGES)
 
     def test_install(self):

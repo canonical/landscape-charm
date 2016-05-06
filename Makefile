@@ -2,6 +2,8 @@ PYTHON := /usr/bin/env python
 
 test:
 	trial lib
+	# For now only the install hook runs against python3
+	trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
 	./dev/ubuntu-deps

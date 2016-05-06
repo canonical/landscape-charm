@@ -36,7 +36,7 @@ class InstallHookTest(HookenvTest):
         os.makedirs(os.path.dirname(hook))
         with open(hook, "w") as fd:
             fd.write("#!/bin/sh\ntouch %s\n" % flag)
-        os.chmod(hook, 0755)
+        os.chmod(hook, 0o755)
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.hook()
         self.assertTrue(os.path.exists(flag))
@@ -50,7 +50,7 @@ class InstallHookTest(HookenvTest):
         os.makedirs(os.path.dirname(hook))
         with open(hook, "w") as fd:
             fd.write("#!/bin/sh\ntexit 127\n")
-        os.chmod(hook, 0755)
+        os.chmod(hook, 0o755)
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.assertEqual(1, self.hook())
         self.assertEqual(
@@ -71,7 +71,7 @@ class InstallHookTest(HookenvTest):
             fd.write("#!/bin/sh\ntouch %s\n" % flag)
         with open(hook2, "w") as fd:
             fd.write("#!/bin/sh\ntouch %s\n" % flag)
-        os.chmod(hook2, 0755)
+        os.chmod(hook2, 0o755)
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.hook()
         self.assertFalse(os.path.exists(flag))
