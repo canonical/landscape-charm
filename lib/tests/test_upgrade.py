@@ -2,7 +2,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.upgrade import UpgradeAction
-from lib.apit import INSTALL_PACKAGES
+from lib.api import INSTALL_PACKAGES
 
 
 class UpgradeActionTest(HookenvTest):
