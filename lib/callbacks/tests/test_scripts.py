@@ -1,3 +1,5 @@
+from fixtures import EnvironmentVariable
+
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.paths import LSCTL, SCHEMA_SCRIPT
@@ -21,12 +23,43 @@ class SchemaBootstrapTest(HookenvTest):
 
     def test_options(self):
         """
-        The schema script is invoked with the --bootstrap option.
+        The schema script is invoked with the --bootstrap option and the proxy
+        options.
         """
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
             ["/usr/bin/landscape-schema", "--bootstrap"],
-            self.subprocess.calls[0][0])
+            self.subprocess.calls[1][0])
+
+    def test_with_no_proxy_support_in_schema_script(self):
+        """
+        If there's no proxy support in the schema script, the relevant options
+        are not passed.
+        """
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: --foo --bar")
+        self.useFixture(EnvironmentVariable("http_proxy", "http://host:3128"))
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap"],
+            self.subprocess.calls[1][0])
+
+    def test_with_proxy_settings(self):
+        """
+        The proxy options are set according to the environment variables.
+        """
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: --with-http-proxy")
+        self.useFixture(EnvironmentVariable("http_proxy", "http://foo:3128"))
+        self.useFixture(EnvironmentVariable("https_proxy", "http://bar:3128"))
+        self.useFixture(EnvironmentVariable("no_proxy", "localhost"))
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual(
+            ["/usr/bin/landscape-schema", "--bootstrap",
+             "--with-http-proxy=http://foo:3128",
+             "--with-https-proxy=http://bar:3128",
+             "--with-no-proxy=localhost"],
+            self.subprocess.calls[1][0])
 
     def test_was_ready(self):
         """
@@ -59,6 +92,53 @@ class LSCtlTest(HookenvTest):
         self.callback(self.manager, "landscape", "start")
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])
+
+    def test_start_unknown_status(self):
+        """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'unknown', the status while restarting
+        the services will way 'starting services' and the final status
+        will be 'active'.
+        """
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(("active", ""), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "unknown", "message": ""},
+             {"status": "maintenance", "message": "Starting services."},
+             {"status": "active", "message": ""}],
+            self.hookenv.statuses)
+
+    def test_start_active_status(self):
+        """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'active', the status while restarting
+        the services will way 'restarting services' and the final status
+        will be 'active' with no status message.
+        """
+        self.hookenv.statuses = [{"status": "active", "message": "Something."}]
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(("active", ""), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "active", "message": "Something."},
+             {"status": "maintenance", "message": "Restarting services."},
+             {"status": "active", "message": ""}],
+            self.hookenv.statuses)
+
+    def test_start_maintenance_status(self):
+        """
+        If the 'lsctl' script is invoked with the 'restart' action when
+        the workload status is 'maintenance', the services won't be
+        restarted and the workload status won't be changed.
+        """
+        self.hookenv.statuses = [
+            {"status": "maintenance", "message": "Doing maintenance."}]
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(
+            ("maintenance", "Doing maintenance."), self.hookenv.status_get())
+        self.assertEqual(
+            [{"status": "maintenance", "message": "Doing maintenance."}],
+            self.hookenv.statuses)
+        self.assertEqual([], self.subprocess.calls)
 
     def test_stop(self):
         """
@@ -108,6 +188,18 @@ class LSCtlTest(HookenvTest):
         config.save()
         config["ssl-cert"] = "<new-cert>"
         config["ssl-key"] = "<new-key>"
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual([], self.subprocess.calls)
+
+    def test_config_changed_only_smtp(self):
+        """
+        The 'lsctl' script is not invoked if only the SMTP relay host changed.
+        """
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["smtp-relay-host"] = "mx.first"
+        config.save()
+        config["smtp-relay-host"] = "mx.second"
         self.callback(self.manager, "landscape", "start")
         self.assertEqual([], self.subprocess.calls)
 

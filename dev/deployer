@@ -5,10 +5,9 @@ import logging
 import shutil
 import subprocess
 import tempfile
-import sys
 import time
-
 import yaml
+from argparse import ArgumentParser
 
 CHARM_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,7 +16,7 @@ class Deployer(object):
     """Simple wrapper around juju-deployer.
 
     It creates a temporary directory that will act as local charm repository
-    for juju-deployer, so it can deploy the current charm branch as local
+    for juju-deployer so it can deploy the current charm branch as local
     charm.
 
     It also overrides the configuration in the stock bundles, accounting for
@@ -31,6 +30,9 @@ class Deployer(object):
     that can be used to provide custom parameters.
     """
 
+    def __init__(self, args):
+        self._args = args
+
     def _stage_deployer_dir(self, deployer_dir, series):
         """Stage the directory for calling deployer."""
         series_dest = os.path.join(deployer_dir, series)
@@ -38,20 +40,20 @@ class Deployer(object):
         charm_dest = os.path.join(series_dest, "landscape-server")
         os.symlink(CHARM_SRC, charm_dest)
 
-    def _create_local_yaml(self, tmpdir, target):
+    def _create_local_yaml(self, tmpdir, source_bundle_file):
         """
         Create a local yaml file to adjust settings in the bundle.  Return the
         created file name to the caller.
 
         @param tmpdir: directory where we can write a yaml file.
-        @param target: what bundle target to override.
+        @param source_bundle_file: The bundle file to override.
         """
-        # Will be appended to end of 'config_files' list.  This will in turn
-        # be specified last on the juju-deployer command line, and will be able
-        # to overwrite charm settings.  For instance we can use it to add a
-        # custom license-file to the deployment.
+        # Will create a config file with option values overridden for use in
+        # the juju deployer commandline to add a custom license-file to the
+        # deployment.
         local_yaml_file = os.path.join(tmpdir, "99-local.yaml")
-        local_yaml = {}
+        with open(source_bundle_file, "r") as bundle_content:
+            local_yaml = yaml.safe_load(bundle_content.read())
 
         # overridden options in landscape-charm, with the filename in the
         # config dir that we read.
@@ -60,39 +62,30 @@ class Deployer(object):
                             "ssl-cert": "ssl-cert",
                             "ssl-key": "ssl-key"}
 
-        # Base data structure for the landscape-charm that we will fill out
-        # with options.
-        landscape_service = {"charm": "landscape-server"}
+        # Add our option values to the existing YAML
         options = {}
         for option, filename in override_options.items():
             filepath = os.path.join(CHARM_SRC, "config", filename)
             if os.path.exists(filepath):
                 options[option] = "include-file://%s" % filepath
-
-        # Can't include a blank options section, deployer will choke
-        if options:
-            landscape_service["options"] = options
-
-        # target name == filename in our bundles branches.
-        local_yaml[target] = {"services": {}}
-        for service in ["landscape-server"]:
-            local_yaml[target]["services"][service] = landscape_service
+        local_yaml["services"]["landscape-server"]["options"].update(options)
 
         with open(local_yaml_file, "w") as f:
             f.write(yaml.dump(local_yaml, default_flow_style=False))
         return local_yaml_file
 
-    def deploy(self, target, timeout=900):
+    def deploy(self, timeout=900):
         """
-        Use juju-deployer to install `target` on current `juju env`
+        Use juju-deployer to deploy the target deployment type on current
+        `juju env`.
 
-        @param target: target to deploye in the config file.
         @param timeout: timeout in seconds (int or string is OK)
         """
+        target = self._args.target
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
-        config_files = [os.path.join(CHARM_SRC, "bundles", target + ".yaml")]
+        original_bundle = os.path.join(CHARM_SRC, "bundles", target + ".yaml")
         try:
             deployer_dir = tempfile.mkdtemp()
             # Stage deployer directory for all supported series, even though
@@ -100,14 +93,12 @@ class Deployer(object):
             # it's determined by a bundle, we have to be ready for whatever.
             for series in ["precise", "trusty"]:
                 self._stage_deployer_dir(deployer_dir, series)
-            config_files.append(
-                self._create_local_yaml(deployer_dir, target))
+            updated_bundle_file = self._create_local_yaml(
+                deployer_dir, original_bundle)
             # The -w 30 is there to allow things to settle a bit before
             # issuing a 'juju run' to wait for all the relations to settle.
             args = ["juju-deployer", "-vdWL", "-w 30"]
-            for config_file in config_files:
-                args.extend(["-c", config_file])
-            args.append(target)
+            args.extend(["-c", updated_bundle_file])
             if timeout is not None:
                 args.extend(["--timeout", str(timeout)])
             logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
@@ -124,13 +115,28 @@ class Deployer(object):
         finally:
             if deployer_dir is not None:
                 shutil.rmtree(deployer_dir)
+        self._enable_flags()
 
+    def _enable_flags(self):
+        """Enable feature flags."""
+        command = "sudo /opt/canonical/landscape/featureflags enable {}"
+        for flag in self._args.flags:
+            subprocess.check_output(
+                ["juju", "run", "--unit", "landscape-server/0",
+                 command.format(flag)])
+
+
+def get_parser():
+    parser = ArgumentParser(description="Simple wrapper around juju-deployer")
+    parser.add_argument(
+        "target", choices=("scalable", "dense", "dense-maas"),
+        help="target deployment type")
+    parser.add_argument(
+        "--flags", nargs="+", default=[], help="feature flags to enable")
+    return parser
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: %s <target>" % sys.argv[0])
-        print("   <target> can be either 'scalable', 'dense' or 'dense-maas'")
-        sys.exit(1)
+    args = get_parser().parse_args()
     logging.basicConfig(level=logging.INFO)
-    deployer = Deployer()
-    deployer.deploy(sys.argv[1])
+    deployer = Deployer(args)
+    deployer.deploy()

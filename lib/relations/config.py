@@ -1,6 +1,12 @@
+import psutil
+
 from charmhelpers.core import hookenv
 from lib.error import CharmError
 from lib.utils import is_valid_url
+
+# We hard-code appserver worker process count to 2 because they
+# do not scale in the same way ping- and msg-server do.
+APPSERVER_WORKER_COUNT = 2
 
 
 class RootUrlNotValidError(CharmError):
@@ -33,10 +39,32 @@ class ConfigRequirer(dict):
     Take care of validating and exposing configuration values for use
     in service manager callbacks."""
 
-    def __init__(self, hookenv=hookenv):
-        config = hookenv.config()
+    def __init__(self, hookenv=hookenv, psutil=psutil):
+        self._psutil = psutil
+        config = hookenv.config().copy()
         self._validate(config)
         self.update({"config": config})
+
+    def _calculate_worker_counts(self, worker_counts):
+        """Return dict keyed by service names with desired number of processes.
+
+        If worker_counts is 0, it uses an automatic-scaling by CPU count
+        and RAM size.
+        """
+        if worker_counts == 0:
+            cpu_cores = self._psutil.NUM_CPUS
+            memory_in_gb = self._psutil.virtual_memory().total / (1024 ** 3)
+            # For each extra CPU core and each extra 1GB of RAM (after 1GB),
+            # we add another process.
+            worker_counts = 1 + cpu_cores + memory_in_gb - 2
+
+        # Landscape startup scripts can only accept values between 1 and 9.
+        worker_counts = max(1, min(worker_counts, 9))
+        return {
+            "appserver": APPSERVER_WORKER_COUNT,
+            "message-server": worker_counts,
+            "pingserver": worker_counts,
+        }
 
     def _validate(self, config):
         root_url = config.get("root-url")
@@ -50,3 +78,6 @@ class ConfigRequirer(dict):
         if ((openid_provider_url and not openid_logout_url) or
                 (not openid_provider_url and openid_logout_url)):
             raise OpenIDConfigurationError()
+
+        worker_count = config.get("worker-counts", 2)
+        config["worker-counts"] = self._calculate_worker_counts(worker_count)

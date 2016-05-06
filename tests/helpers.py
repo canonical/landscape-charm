@@ -8,10 +8,12 @@ import yaml
 import os
 import subprocess
 import tempfile
-import shutil
 import json
 import time
+import re
 
+from contextlib import contextmanager
+from operator import itemgetter
 from os import getenv
 from time import sleep
 from configparser import ConfigParser
@@ -32,7 +34,7 @@ DEFAULT_BUNDLE_CONTEXT = {
     "rabbitmq": {},
     "postgresql": {
         "max_connections": 100,
-        "memory": 128,
+        "memory": "2G",
         "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
         "shared_buffers": "64MB",
         "checkpoint_segments": 64,
@@ -42,7 +44,8 @@ DEFAULT_BUNDLE_CONTEXT = {
         },
     "haproxy": {},
     "landscape": {
-        "memory": 128},
+        "branch": ".",
+        "memory": "2G"},
 }
 
 
@@ -61,7 +64,8 @@ class EnvironmentFixture(Fixture):
     _deployment = Deployment(series=_series)
     _new_unit_target = None
 
-    def __init__(self, config=None, deployment=None, subprocess=subprocess):
+    def __init__(self, config=None, deployment=None, subprocess=subprocess,
+                 tempfile=tempfile):
         """
         @param config: Optionally a dict with extra bundle template context
             values. It will be merged into DEFAULT_BUNDLE_CONTEXT when
@@ -72,6 +76,7 @@ class EnvironmentFixture(Fixture):
             self._deployment = deployment
         self._subprocess = subprocess
         self._dense_maas = os.environ.get("DENSE_MAAS", "0") == "1"
+        self._tempfile = tempfile
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
@@ -79,11 +84,8 @@ class EnvironmentFixture(Fixture):
             if self._dense_maas:
                 self._configure_for_dense_maas()
             self._deployment.load(self._get_bundle())
-            repo_dir = self._build_repo_dir()
-            try:
+            with self._enable_sample_hashids():
                 self._deployment.setup(timeout=self._timeout)
-            finally:
-                self._clean_repo_dir(repo_dir)
             self._deployment.sentry.wait(self._timeout)
 
     def get_haproxy_public_address(self, unit=None):
@@ -116,7 +118,7 @@ class EnvironmentFixture(Fixture):
         return config
 
     def check_url(self, path, good_content, proto="https", post_data=None,
-                  header=None, attempts=2, interval=5):
+                  header=None, attempts=2, interval=5, cookie_jar=None):
         """Polls the given path on the haproxy unit looking for good_content.
 
         If not found in the timeout period, will assert.  If found, returns
@@ -127,8 +129,9 @@ class EnvironmentFixture(Fixture):
         @param proto: either https or http
         @param post_data: optional POST data string
         @param header: optional request header string
-        @param interval: seconds two wait between attempts
+        @param interval: seconds to wait between attempts
         @param attempts: number of attempts to try
+        @param cookie_jar: file to store cookies in
         """
         url = "%s://%s%s" % (proto, self.get_haproxy_public_address(), path)
         output = ""
@@ -140,6 +143,8 @@ class EnvironmentFixture(Fixture):
             cmd.extend(["-d", post_data])
         if header:
             cmd.extend(["-H", header])
+        if cookie_jar:
+            cmd.extend(["--cookie-jar", cookie_jar, "-b", cookie_jar])
         for _ in range(attempts):
             output = self._subprocess.check_output(cmd).decode("utf-8").strip()
             if all(content in output for content in good_content):
@@ -153,6 +158,29 @@ class EnvironmentFixture(Fixture):
         output:{}
         """
         raise AssertionError(msg.format(url, good_content, output))
+
+    def login(self, email, password, cookie_file=None):
+        """
+        Logs into Landscape web service with the given email/password.
+
+        To re-use session ID cookies, you can pass cookie_file in.
+        """
+        if cookie_file is None:
+            cookie_jar = self._tempfile.NamedTemporaryFile()
+            cookie_file = cookie_jar.name
+        # The phrase "Access your account" should match the login form
+        # and not match the new-standalone-user form.
+        index_page = self.check_url(
+            "/", "Access your account", cookie_jar=cookie_file)
+        token_re = re.compile(
+            '<input type="hidden" name="form-security-token" '
+            'value="([0-9a-f-]*)"/>')
+        token = token_re.search(index_page).group(1)
+        post_data = ("login.email=%s&login.password=%s&login=Login&"
+                     "form-security-token=%s" % (email, password, token))
+        return self.check_url(
+            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
+            cookie_jar=cookie_file)
 
     def check_service(self, name, state="up", attempts=2, interval=5):
         """Check that a Landscape service is either up or down.
@@ -215,6 +243,20 @@ class EnvironmentFixture(Fixture):
         action_id = self._do_action("resume", unit.info["unit_name"])
         return self._fetch_action(action_id)
 
+    def bootstrap_landscape(self, admin_name, admin_email, admin_password,
+                            unit=None):
+        """Execute the 'bootstrap' action on a Landscape unit.
+
+        The results of the action is returned.
+        """
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        bootstrap_params = {"admin-name": admin_name,
+                            "admin-email": admin_email,
+                            "admin-password": admin_password}
+        action_id = self._do_action(
+            "bootstrap", unit.info["unit_name"], bootstrap_params)
+        return self._fetch_action(action_id)
+
     def wait_landscape_cron_jobs(self, unit=None):
         """Wait for running cron jobs to finish on the given Landscape unit."""
         unit = self._get_service_unit("landscape-server", unit=unit)
@@ -222,6 +264,32 @@ class EnvironmentFixture(Fixture):
             "sudo /opt/canonical/landscape/wait-batch-scripts")
         if code != 0:
             raise RuntimeError(output)
+
+    def run_script_on_cron_unit(self, script_location, layer):
+        """
+        Execute a script on the landscape cron unit, given the script location.
+
+        @param script_location: The full path to the script on the landscape
+            unit filesystem.
+        @param layer: The Layer in which this method is called. This is used
+            to determine which unit is the cron unit.
+        """
+        status = 0
+        cmd = ["juju", "ssh", layer.cron_unit, "sudo", "-u landscape",
+               script_location, "2>&1"]
+        try:
+            # The sanitize is a workaround for lp:1328269
+            output = self._sanitize_ssh_output(
+                self._subprocess.check_output(
+                    cmd,
+                    stderr=self._subprocess.STDOUT,
+                    stdin=self._subprocess.PIPE).decode("utf-8").strip())
+        except self._subprocess.CalledProcessError as e:
+            output = e.output.decode("utf-8").strip()
+            status = e.returncode
+        # these jobs currently don't set their exit status to non-zero
+        # if they fail, they just print things to stdout/stderr
+        return (output, status)
 
     def stop_landscape_service(self, service, unit=None, restore=True):
         """Stop the given service on the given Landscape unit.
@@ -245,8 +313,8 @@ class EnvironmentFixture(Fixture):
         A dict is returned: {"running": [<list of running services],
                              "stopped": [<list of stopped sevices]}
         """
-        unit = self._get_service_unit("landscape-server", unit=unit)
-        output, _ = self._run("lsctl status", unit.info["unit_name"])
+        output, _ = self.run_command_on_landscape(
+            "lsctl status", unit)
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
@@ -268,6 +336,18 @@ class EnvironmentFixture(Fixture):
         else:
             service_status["stopped"].append(service_name)
         return service_status
+
+    def add_fake_db_patch(self, unit=None):
+        """Add a fake DB patch to a landscape-server unit.
+
+        A function which can be called to remove the DB patch to clean
+        up is returned.
+        """
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        patch_dir = (
+            "/opt/canonical/landscape/canonical/landscape/schema/patch_9999")
+        unit.run("touch {}".format(patch_dir))
+        return lambda: unit.run("rm -f {}".format(patch_dir))
 
     def configure_ssl(self, cert, key):
         """Start the given Landscape service on the given unit."""
@@ -339,14 +419,19 @@ class EnvironmentFixture(Fixture):
 
         return leader, sorted(non_leaders)
 
+    def run_command_on_landscape(self, command, unit=None):
+        unit = self._get_service_unit("landscape-server", unit=unit)
+        output, error = self._run(command, unit.info["unit_name"])
+        return output, error
+
     def _wait_for_deployment_change_hooks(self):
         """Wait for hooks to finish firing after a change in the deployment."""
         # Wait for initial landscape-server hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for haproxy hooks to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
         # Wait for landscape-server hooks triggered by the haproxy ones to fire
-        self._deployment.sentry.wait()
+        self._deployment.sentry.wait(timeout=self._timeout)
 
     def _run(self, command, unit):
         """Run a command on the given unit.
@@ -359,16 +444,22 @@ class EnvironmentFixture(Fixture):
         stdout, stderr = process.communicate()
         return stdout.decode("utf-8"), stderr.decode("utf-8")
 
-    def _do_action(self, action, unit):
+    def _do_action(self, action, unit, action_params=None):
         """Execute an action on a unit, returning the id."""
-        result = json.loads(subprocess.check_output(
-            ["juju", "action", "do", "--format=json",
-             unit, action]).decode("utf-8"))
+        command = ["juju", "action", "do", "--format=json", unit, action]
+        if action_params is not None:
+            sorted_action_params = sorted(
+                action_params.items(), key=itemgetter(0))
+            for key, value in sorted_action_params:
+                if value is not None:
+                    command.append("%s=%s" % (key, value))
+        result = json.loads(
+            self._subprocess.check_output(command).decode("utf-8"))
         return result["Action queued with id"]
 
     def _fetch_action(self, action_id, wait=300):
         """Fetch the results of an action."""
-        return json.loads(subprocess.check_output(
+        return json.loads(self._subprocess.check_output(
             ["juju", "action", "fetch", "--format=json", "--wait", str(wait),
              action_id]).decode("utf-8"))
 
@@ -411,33 +502,14 @@ class EnvironmentFixture(Fixture):
         template = environment.get_template("landscape-template.jinja2")
         return yaml.safe_load(template.render(context))
 
-    def _build_repo_dir(self):
-        """Create a temporary charm repository directory.
-
-        XXX Apparently there's no way in Amulet to easily deploy uncommitted
-            changes, so we create a temporary charm repository with a symlink
-            to the branch.
-        """
-        config = self._deployment.services["landscape-server"]
-        config["charm"] = "local:trusty/landscape-server"
-        branch_dir = config.pop("branch")
-        repo_dir = tempfile.mkdtemp()
-        series_dir = os.path.join(repo_dir, self._series)
-        os.mkdir(series_dir)
-        charm_link = os.path.join(series_dir, "landscape-server")
-        os.symlink(branch_dir, charm_link)
-        os.environ["JUJU_REPOSITORY"] = repo_dir
-
-        # Enable sample hashids
-        with open(self._get_sample_hashids_path(), "w") as fd:
+    @contextmanager
+    def _enable_sample_hashids(self):
+        """Context manager to enable sample hashids around the tests"""
+        sample_hashids_path = self._get_sample_hashids_path()
+        with open(sample_hashids_path, "w") as fd:
             fd.write("")
-
-        return repo_dir
-
-    def _clean_repo_dir(self, repo_dir):
-        """Clean up the repository directory and the sample hashids flag."""
-        shutil.rmtree(repo_dir)
-        os.unlink(self._get_sample_hashids_path())
+        yield
+        os.unlink(sample_hashids_path)
 
     def _control_landscape_service(self, action, service, unit=None):
         """Start or stop the given Landscape service on the given unit."""
@@ -463,10 +535,29 @@ class EnvironmentFixture(Fixture):
             unit_name = "{}/{}".format(service, unit)
             unit = self._deployment.sentry.unit["landscape-server/%d" % unit]
         else:
-            [unit_name] = [
+            unit_names = sorted(
                 unit_name for unit_name in self._deployment.sentry.unit.keys()
-                if unit_name.startswith("{}/".format(service))]
+                if unit_name.startswith("{}/".format(service)))
+            unit_name = unit_names[0]
         return self._deployment.sentry.unit[unit_name]
+
+    def _sanitize_ssh_output(self, output,
+                             remove_text=["sudo: unable to resolve",
+                                          "Warning: Permanently added",
+                                          "Connection to"]):
+        """Strip some common warning messages from ssh output.
+
+        @param output: output to sanitize
+        @param remove_text: list of text that, if found at the beginning of
+                            the a output line, will have that line removed
+                            entirely.
+        """
+        new_output = []
+        for line in output.split("\n"):
+            if any(line.startswith(remove) for remove in remove_text):
+                continue
+            new_output.append(line)
+        return "\n".join(new_output)
 
     def _configure_for_dense_maas(self):
         """Configure the deployment for a dense MAAS configuration.
@@ -528,19 +619,14 @@ def get_ssl_certificate_over_wire(endpoint):
 
     @param endpoint: An SSL endpoint in the form <host:port>.
     """
-    # Call openssl s_client connect to get the actual certificate served.
-    # The command line program is a bit archaic and therefore we need
-    # to do a few things like send it a newline char (a user "return"), and
-    # filter some of the output (it print non-error messages on stderr).
-    process = subprocess.Popen(('echo', '-n'), stdout=subprocess.PIPE)
-    with open(os.devnull, 'w') as dev_null:
+    # Call openssl to get the actual certificate served.  The s_client command
+    # outputs the server certificate, but expects a request body, which we
+    # don't have, so we just pipe in /dev/null to generate an empty request.
+    # The server is likely to generate an error response. <shrug>
+    with open(os.devnull, "r+") as dev_null:
         output = subprocess.check_output(  # output is bytes
-            ['openssl', 's_client', '-connect', endpoint],
-            stdin=process.stdout, stderr=dev_null)
-    process.stdout.close()  # Close the pipe fd
-    process.wait()  # This closes the subprocess sending the newline.
-
-    # A regex might be nicer, but this works and is easy to read.
+            ["openssl", "s_client", "-connect", endpoint],
+            stdin=dev_null, stderr=dev_null)
     certificate = output.decode("utf-8")
     start = certificate.find("-----BEGIN CERTIFICATE-----")
     end = certificate.find("-----END CERTIFICATE-----") + len(

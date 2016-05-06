@@ -35,7 +35,7 @@ class HostedRequirer(RelationContext):
             # This means that we're not currently related to landscape-hosted,
             # so we set the deployment mode to standalone.
             self.update({self.name: [{"deployment-mode": "standalone"}]})
-        else:
+        elif len(data) > 0:
             # We're related to landscape-hosted, and it's safe to assume that
             # there's exactly one unit we're related to, since landscape-hosted
             # is a subordinate charm.

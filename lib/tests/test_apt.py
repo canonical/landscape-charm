@@ -4,8 +4,9 @@ import subprocess
 from fixtures import TempDir
 
 from lib.apt import (
-    Apt, AptNoSourceConfigError, PACKAGES, DEFAULT_INSTALL_OPTIONS,
-    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
+    Apt, AptNoSourceConfigError, AptSourceAndKeyDontMatchError,
+    INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
+    SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
@@ -20,6 +21,7 @@ class AptTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.subprocess.add_fake_executable("add-apt-repository")
+        self.subprocess.add_fake_executable("apt-mark")
         self.subprocess.add_fake_executable(
             "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
@@ -56,6 +58,16 @@ class AptTest(HookenvTest):
         refreshes it.
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        self.apt.set_sources()
+        self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
+        self.assertEqual([True], self.fetch.updates)
+
+    def test_set_shorthand_sources(self):
+        """
+        When the "source" config parameter is set to only the LDS version
+        number, the charm correctly expands it to the PPA URL.
+        """
+        self.hookenv.config()["source"] = "14.10"
         self.apt.set_sources()
         self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
         self.assertEqual([True], self.fetch.updates)
@@ -107,6 +119,42 @@ class AptTest(HookenvTest):
             self.fetch.sources)
         self.assertEqual([True], self.fetch.updates)
 
+    def test_set_sources_multiple_values(self):
+        """
+        The set_sources method can handle comma-separated lists of multiple
+        repositories.
+        """
+        self.hookenv.config()["source"] = "15.11, ppa:juju/devel"
+        self.apt.set_sources()
+        self.assertItemsEqual(
+            [("ppa:landscape/15.11", None), ("ppa:juju/devel", None)],
+            self.fetch.sources)
+
+    def test_set_sources_and_keys_multiple_values(self):
+        """
+        The set_sources method can handle comma-separated lists of multiple
+        repositories and multiple keys.
+        """
+        self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
+        self.hookenv.config()["key"] = "null, xyz"
+        self.apt.set_sources()
+        self.assertItemsEqual(
+            [("ppa:landscape/15.11", None), ("deb http://host/ ./", "xyz")],
+            self.fetch.sources)
+
+    def test_set_sources_and_keys_mismatch(self):
+        """
+        If the number of repositories doesn't match the number of keys, an
+        error is raised.
+        """
+        self.hookenv.config()["source"] = "15.11, deb http://host/ ./"
+        self.hookenv.config()["key"] = "xyz"
+        with self.assertRaises(AptSourceAndKeyDontMatchError) as error:
+            self.apt.set_sources()
+            self.assertEqual(
+                "The 'source' and 'key' lists have different lengths",
+                str(error))
+
     def test_local_tarball(self):
         """
         If a Landscape tarball is found, the C{set_sources} method builds local
@@ -152,8 +200,7 @@ class AptTest(HookenvTest):
         If an installed landscape-server package has an epoch,
         _get_local_epoch() returns the installed epoch + 1.
         """
-        self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (0, "1:1.2.3", ""))
+        self.subprocess.add_fake_executable("dpkg-query", stdout="1:1.2.3")
         self.assertEqual(2, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
@@ -164,8 +211,7 @@ class AptTest(HookenvTest):
         If an installed landscape-server package has no epoch,
         _get_local_epoch() returns the 1000.
         """
-        self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (0, "1.2.3", ""))
+        self.subprocess.add_fake_executable("dpkg-query", stdout="1.2.3")
         self.assertEqual(1000, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
@@ -177,7 +223,7 @@ class AptTest(HookenvTest):
         returns the 1000.
         """
         self.subprocess.add_fake_executable(
-            "dpkg-query", lambda *args, **kwargs: (1, "", "no such package"))
+            "dpkg-query", return_code=1, stderr="no such package")
         self.assertEqual(1000, self.apt._get_local_epoch())
         self.assertIn(
             (["dpkg-query", "-f", "${version}", "-W", "landscape-server"], {}),
@@ -185,9 +231,12 @@ class AptTest(HookenvTest):
 
     def test_packages(self):
         """
-        The C{PACKAGES} tuple holds the packages expected to get installed.
+        The C{INSTALL_PACKAGES} tuple holds the packages expected to get
+        installed.
         """
-        self.assertEqual(("landscape-server",), PACKAGES)
+        self.assertEqual(
+            ("landscape-server", "landscape-hashids", "python-psutil"),
+            INSTALL_PACKAGES)
 
     def test_install(self):
         """
@@ -196,7 +245,8 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS)
-        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+        self.assertEqual(
+            [(INSTALL_PACKAGES, options, True)], self.fetch.installed)
 
     def test_install_with_local_tarball(self):
         """
@@ -210,7 +260,8 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS) + ["--allow-unauthenticated"]
-        self.assertEqual([(PACKAGES, options, True)], self.fetch.installed)
+        self.assertEqual(
+            [(INSTALL_PACKAGES, options, True)], self.fetch.installed)
 
     def test_install_sample_hashids(self):
         """
@@ -262,3 +313,23 @@ class AptTest(HookenvTest):
 
         with open(real) as fd:
             self.assertEqual("sample", fd.read())
+
+    def test_hold_packages(self):
+        """
+        The hold packages method issues apt-mark commands for all standalone
+        packages.
+        """
+        self.apt.hold_packages()
+        self.assertEqual(
+            ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
+            self.subprocess.calls[0][0])
+
+    def test_unhold_packages(self):
+        """
+        The hold packages method issues apt-mark commands for all standalone
+        packages.
+        """
+        self.apt.unhold_packages()
+        self.assertEqual(
+            ["apt-mark", "unhold", "landscape-server", "landscape-hashids"],
+            self.subprocess.calls[0][0])

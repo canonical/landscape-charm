@@ -1,5 +1,3 @@
-import os
-
 from lib.migrate_schema import MigrateSchemaAction
 from lib.paths import SCHEMA_SCRIPT
 from lib.tests.helpers import HookenvTest
@@ -20,8 +18,7 @@ class MigrateSchemaActionTest(HookenvTest):
         """
         The MigrateSchemaAction calls the schema script.
         """
-        open(self.paths.maintenance_flag(), "w")
-        self.addCleanup(os.remove, self.paths.maintenance_flag())
+        self.hookenv.status_set("maintenance", "")
 
         action = MigrateSchemaAction(
             hookenv=self.hookenv, paths=self.paths, subprocess=self.subprocess)
@@ -30,8 +27,11 @@ class MigrateSchemaActionTest(HookenvTest):
 
     def test_run_without_maintenance_flag(self):
         """
-        The MigrateSchemaAction calls the schema script.
+        The MigrateSchemaAction doesn't call the schema script if the
+        unit is in an 'active' state.
         """
+        self.hookenv.status_set("active", "")
+
         action = MigrateSchemaAction(
             hookenv=self.hookenv, paths=self.paths, subprocess=self.subprocess)
         action()

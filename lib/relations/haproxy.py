@@ -36,8 +36,10 @@ SERVICE_OPTIONS = {
         "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
         "acl message path_beg -i /message-system",
+        "acl attachment path_beg -i /attachment",
         "acl api path_beg -i /api",
         "use_backend landscape-message if message",
+        "use_backend landscape-message if attachment",
         "use_backend landscape-api if api",
     ],
 }
@@ -97,9 +99,11 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, service_counts, hookenv=hookenv, paths=default_paths):
+    def __init__(self, config_requirer, hookenv=hookenv, paths=default_paths):
+        self._config_requirer = config_requirer
         self._hookenv = hookenv
-        self._service_counts = service_counts
+        self._worker_counts = config_requirer.get("config").get(
+            "worker-counts")
         self._paths = paths
         super(HAProxyProvider, self).__init__()
 
@@ -133,7 +137,9 @@ class HAProxyProvider(RelationContext):
                 " entry.")
             service["service_options"].extend([
                 "acl package-upload path_beg -i /upload",
-                "use_backend landscape-package-upload if package-upload"])
+                "use_backend landscape-package-upload if package-upload",
+                "reqrep ^([^\\ ]*)\\ /upload/(.*) \\1\ /\\2",
+            ])
             backends.append(
                 self._get_backend(
                     "package-upload", self._get_servers("package-upload")))
@@ -193,7 +199,7 @@ class HAProxyProvider(RelationContext):
         unit_name = self._hookenv.local_unit()
         server_name = "landscape-%s-%s" % (name, unit_name.replace("/", "-"))
         server_base_port = SERVER_BASE_PORTS[name]
-        requested_processes = self._service_counts.get(name, 1)
+        requested_processes = self._worker_counts.get(name, 1)
 
         # When only one process for a service is started, return it.
         if requested_processes == 1:

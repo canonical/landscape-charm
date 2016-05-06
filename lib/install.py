@@ -39,3 +39,4 @@ class InstallHook(Hook):
             subprocess=self._subprocess)
         apt.set_sources()
         apt.install_packages()
+        apt.hold_packages()

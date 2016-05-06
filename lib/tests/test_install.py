@@ -11,6 +11,7 @@ class InstallHookTest(HookenvTest):
         super(InstallHookTest, self).setUp()
         self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable("apt-mark")
         self.hook = InstallHook(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)
 
@@ -74,3 +75,13 @@ class InstallHookTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.hook()
         self.assertFalse(os.path.exists(flag))
+
+    def test_install_holds_packages(self):
+        """
+        The install hook holds the landscape packages.
+        """
+        self.hookenv.config()["source"] = "ppa:landscape/14.10"
+        self.hook()
+        expected_call = [
+            "apt-mark", "hold", "landscape-server", "landscape-hashids"]
+        self.assertEqual(expected_call, self.subprocess.calls[0][0])

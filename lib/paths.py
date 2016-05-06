@@ -16,6 +16,9 @@ LSCTL = "/usr/bin/lsctl"
 
 MAINTENANCE_FLAG = "/opt/canonical/landscape/maintenance.txt"
 
+DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
+DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
+
 
 class Paths(object):
     """Encapsulate all filesystem paths that the charm needs to know about.

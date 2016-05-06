@@ -1,15 +1,38 @@
 options:
     source:
-        default: ppa:landscape/14.10
+        default: "ppa:landscape/16.03"
         type: string
         description: |
-            APT repository to use for installing Landscape.
+            The source from which to install the landscape packages. Possible
+            values are:
+                - A version number: "16.03"
+                - A PPA URL: "ppa:landscape/16.03"
+                - A full deb line: "deb http://ppa.launchpad.net/landscape/16.03/ubuntu trusty main"
+                - A comma-separated list of the previous values, e.g. "16.03, ppa:juju/devel" (NOTE:
+                  using multiple repositories is meant for testing only, and not supported for
+                  production deployments, that should always just point to a single official
+                  Landscape PPA or a mirror of it).
     key:
-        default:
+        default: ""
         type: string
         description: |
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
+            In case multiple repositories are specified in the 'source' config key,
+            this should be a comma-separated list of key IDs, one for each
+            repository and in the same order. If a repository needs no key ID,
+            the special keyword 'null' should be passed.
+            Note that if 'source' (or one of its entries) is set to point ot a
+            Launchpad PPA, there's no need to specify a key, since it gets
+            automatically and securely fetched from Launchpad itself.
+    worker-counts:
+        default: 2
+        type: int
+        description: |
+            Number of processes to spawn for message-server and ping-server.
+            If set to 0, the charm will automatically pick a value trying to
+            maximize the use of the compute/memory resources available
+            on the unit.
     license-file:
         description: |
             License file for LDS, either as a base64-encoded string containing
@@ -27,30 +50,6 @@ options:
         type: string
         description: |
             OpenID provider URL to use to log out of Landscape.
-    admin-name:
-        description: |
-            Name of the account administrator. If this, admin-email and
-            admin-password are specified, then the standalone account will be
-            created as part of the deployment, and this person will be its
-            administrator. If not specified, Landscape will prompt for these
-            details when it is first accessed with a web browser. Has no
-            effect if changed after a deployment.
-        type: string
-        default:
-    admin-email:
-        description: |
-            Email of the account administrator. To have any effect, needs to
-            specified in conjunction with admin-name and admin-password. Has
-            no effect if changed after a deployment.
-        type: string
-        default:
-    admin-password:
-        description: |
-            Password of the account administrator. To have any effect, needs
-            to be specified in conjunction with admin-name and admin-email.
-            Has no effect if changed after a deployment.
-        type: string
-        default:
     root-url:
         description: |
             The root URL for this landscape deployment. If left blank the public
@@ -69,4 +68,9 @@ options:
         description: |
             base64 encoded private key for the default SSL certificate. If
             ssl_cert is not set, this will be ignored.
+        default: ""
+    smtp-relay-host:
+        type: string
+        description: |
+            The SMTP server to use to deliver outgoing mail.
         default: ""

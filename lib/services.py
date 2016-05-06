@@ -1,3 +1,4 @@
+import psutil
 import subprocess
 
 from charmhelpers import fetch
@@ -15,16 +16,10 @@ from lib.relations.leader import LeaderProvider, LeaderRequirer
 from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.callbacks.smtp import ConfigureSMTP
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 from lib.callbacks.apt import SetAPTSources
-
-
-SERVICE_COUNTS = {
-    "appserver": 2,
-    "message-server": 2,
-    "pingserver": 2,
-}
 
 
 class ServicesHook(Hook):
@@ -35,11 +30,13 @@ class ServicesHook(Hook):
     proceed with the configuration if ready.
     """
     def __init__(self, hookenv=hookenv, host=host,
-                 subprocess=subprocess, paths=default_paths, fetch=fetch):
+                 subprocess=subprocess, paths=default_paths, fetch=fetch,
+                 psutil=psutil):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
         self._host = host
         self._paths = paths
+        self._psutil = psutil
         self._subprocess = subprocess
         self._fetch = fetch
 
@@ -50,24 +47,23 @@ class ServicesHook(Hook):
         leader_provider = LeaderProvider(
             hookenv=self._hookenv, host=self._host)
         leader_provider.provide_data()
-
+        config_requirer = ConfigRequirer(hookenv=self._hookenv)
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
-                HAProxyProvider(SERVICE_COUNTS, paths=self._paths),
+                HAProxyProvider(config_requirer, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
             "required_data": [
                 LeaderRequirer(hookenv=self._hookenv),
-                ConfigRequirer(hookenv=self._hookenv),
+                config_requirer,
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
                 HostedRequirer(),
-                {"is_leader": self._hookenv.is_leader(),
-                 "service_counts": SERVICE_COUNTS},
+                {"is_leader": self._hookenv.is_leader()},
             ],
             "data_ready": [
                 render_template(
@@ -84,6 +80,8 @@ class ServicesHook(Hook):
                 WriteCustomSSLCertificate(paths=self._paths),
                 SchemaBootstrap(subprocess=self._subprocess),
                 WriteLicenseFile(host=self._host, paths=self._paths),
+                ConfigureSMTP(
+                    hookenv=self._hookenv, subprocess=self._subprocess),
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])

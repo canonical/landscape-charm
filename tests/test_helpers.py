@@ -1,6 +1,5 @@
+import json
 import os
-
-import logging
 import unittest
 
 from helpers import EnvironmentFixture
@@ -12,7 +11,8 @@ class UnitStub(object):
 
     def __init__(self, public_address=None):
         self.info = {
-            "public-address": public_address
+            "public-address": public_address,
+            "unit_name": "landscape-server/0"
         }
         self.commands = []
 
@@ -66,14 +66,28 @@ class SubprocessStub(object):
             return output
 
 
+class NamedTemporaryFileStub(object):
+
+    def __init__(self):
+        self.name = "TEMP-FILE"
+
+
+class TempfileStub(object):
+
+    def __init__(self):
+        self.NamedTemporaryFile = NamedTemporaryFileStub
+
+
 class EnvironmentFixtureTest(unittest.TestCase):
 
     def setUp(self):
         super(EnvironmentFixtureTest, self).setUp()
         self.subprocess = SubprocessStub()
+        self.tempfile = TempfileStub()
         self.deployment = DeploymentStub()
         self.fixture = EnvironmentFixture(
-            deployment=self.deployment, subprocess=self.subprocess)
+            deployment=self.deployment, subprocess=self.subprocess,
+            tempfile=self.tempfile)
 
     def test_setup(self):
         """
@@ -155,8 +169,41 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.assertIn("good_content:['hello']", message)
         self.assertIn("output:bar", message)
 
+    def test_login(self):
+        """
+        The check_url method can post data.
+        """
+        curl_index = (
+            "curl https://1.2.3.4/ -k -L -s --compressed "
+            "--cookie-jar TEMP-FILE -b TEMP-FILE")
+        curl_login = (
+            "curl https://1.2.3.4/redirect -k -L -s --compressed "
+            "-d login.email=FOO&login.password=BAR&login=Login&"
+            "form-security-token=f00 "
+            "--cookie-jar TEMP-FILE -b TEMP-FILE")
+        self.subprocess.outputs[curl_index] = (
+            b'Access your account'
+            b'<input type="hidden" name="form-security-token" value="f00"/>')
+        self.subprocess.outputs[curl_login] = b'<h2>Organisation</h2> Success!'
+        output = self.fixture.login("FOO", "BAR")
+        self.assertIn('Success!', output)
 
-if __name__ == "__main__":
-    logging.basicConfig(
-        level='DEBUG', format='%(asctime)s %(levelname)s %(message)s')
-    unittest.main(verbosity=2)
+    def test_bootstrap_landscape(self):
+        """
+        bootstrap_landscape method calls 'bootstrap' action on
+        a landscape-server unit.
+        """
+        action_do_command = (
+            "juju action do --format=json landscape-server/0 bootstrap "
+            "admin-email=admin@example.com admin-name=foo admin-password=bar")
+        self.subprocess.outputs[action_do_command] = json.dumps(
+            {"Action queued with id": "17"}).encode("utf-8")
+        action_fetch_command = "juju action fetch --format=json --wait 300 17"
+        self.subprocess.outputs[action_fetch_command] = json.dumps(
+            {"status": "fine"}).encode("utf-8")
+
+        self.assertEqual(
+            {"status": "fine"},
+            self.fixture.bootstrap_landscape(
+                admin_name="foo", admin_email="admin@example.com",
+                admin_password="bar"))

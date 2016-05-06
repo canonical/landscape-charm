@@ -1,4 +1,3 @@
-#!/usr/bin/make
 PYTHON := /usr/bin/env python
 
 test:
@@ -16,7 +15,7 @@ verify-juju-test:
 		exit 1;\
 	else \
 		echo "installed"; \
-	fi 
+	fi
 
 update-charm-revision-numbers: bundles
 	@dev/update-charm-revision-numbers \
@@ -30,7 +29,7 @@ bundles:
 	@if [ -d bundles ]; then \
 	    bzr up bundles; \
 	else \
-	    bzr co lp:~landscape/landscape-charm/bundles-trunk-new-charm bundles; \
+	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
 	fi
 
 secrets:
@@ -50,6 +49,9 @@ integration-test-trunk: secrets
 deploy-dense-maas: bundles
 	./dev/deployer dense-maas
 
+deploy-dense-maas-dev: bundles
+	./dev/deployer dense-maas --flags juju-debug
+
 deploy: bundles
 	./dev/deployer scalable
 
@@ -61,7 +63,7 @@ lint:
 	flake8 lib tests
 	pyflakes3 tests dev/update-charm-revision-numbers
 	find . -name *.py -not -path "./old/*" -not -path "*/charmhelpers/*" -print0 | xargs -0 flake8
-	flake8 tests dev/update-charm-revision-numbers 
+	flake8 tests dev/update-charm-revision-numbers
 
 clean:
 	@rm -rf bundles
@@ -70,6 +72,7 @@ clean:
 .PHONY: lint \
 	test-depends \
 	deploy-dense-maas \
+	deploy-dense-maas-dev \
 	integration-test \
 	verify-juju-test \
 	test \
@@ -81,7 +84,11 @@ clean:
 dev/charm_helpers_sync.py:
 	@mkdir -p dev
 	@bzr cat lp:charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py \
-        > dev/charm_helpers_sync.py
+            > dev/charm_helpers_sync.py
 
 sync: dev/charm_helpers_sync.py
 	$(PYTHON) dev/charm_helpers_sync.py -c charm-helpers.yaml
+
+build: secrets test-depends
+
+.DEFAULT_GOAL := build

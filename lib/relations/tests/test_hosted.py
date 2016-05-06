@@ -44,6 +44,20 @@ class HostedRequirerTest(HookenvTest):
         self.assertTrue(relation.is_ready())
         self.assertEqual([hosted_data], relation["hosted"])
 
+    def test_related_but_not_ready(self):
+        """
+        When the landscape-server service is related to landscape-hosted but
+        the remote landscape-hosted unit still has to pop up, the relation
+        is not ready.
+        """
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {}
+            }
+        }
+        relation = HostedRequirer()
+        self.assertFalse(relation.is_ready())
+
     def test_invalid_deployment_mode(self):
         """
         The deployment mode set on the relation must be a valid one, otherwise

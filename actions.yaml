@@ -1,7 +1,7 @@
 pause:
   description: Pause the Landscape unit. This action will interrupt any
     Landscape-related processing on the unit and prevent any further processing
-    from happening. It will also transition the unit to the blocked state.
+    from happening.
 resume:
   description: Resume the Landscape unit. This action will start all the
     Landscape services on the unit.
@@ -12,3 +12,18 @@ upgrade:
 migrate-schema:
   description: Upgrade the landscape schemas on the related databases.
     Unit must already be paused with the 'pause' action.
+bootstrap:
+  description: Bootstraps Landscape installation by creating an administrator
+    user account.
+  params:
+    admin-name:
+      type: string
+      description: Name for the administrator to add.
+    admin-email:
+      type: string
+      description: Email for the administrator to add.
+    admin-password:
+      type: string
+      description: Password for the administrator to add.
+  required: [admin-name, admin-email, admin-password]
+  additionalProperties: false

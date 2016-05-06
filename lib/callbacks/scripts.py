@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from charmhelpers.core import hookenv
@@ -7,7 +8,8 @@ from lib.paths import LSCTL, SCHEMA_SCRIPT
 from lib.utils import get_required_data, update_persisted_data
 
 # Configuration keys for which, in case of change, a restart is not needed.
-NO_RESTART_CONFIG_KEYS = {"source", "key", "ssl-cert", "ssl-key"}
+NO_RESTART_CONFIG_KEYS = {
+    "source", "key", "ssl-cert", "ssl-key", "smtp-relay-host"}
 
 # Database relation keys for which, in case of change, a restart is not needed.
 NO_RESTART_DB_RELATION_KEYS = {"allowed-units", "state"}
@@ -34,7 +36,29 @@ class SchemaBootstrap(ScriptCallback):
     """
     def __call__(self, manager, service_name, event_name):
         if not manager.was_ready(service_name):
-            self._run(SCHEMA_SCRIPT, ("--bootstrap",))
+            options = ["--bootstrap"]
+            options.extend(self._get_proxy_options())
+            self._run(SCHEMA_SCRIPT, options)
+
+    def _get_proxy_options(self):
+        """Return the HTTP proxy options to set.
+
+        This method will check if the schema script has support for setting
+        HTTP proxy options and if so return the appropriate ones by looking
+        at the environment variables that Juju sets for us.
+        """
+        options = []
+
+        help_output = self._subprocess.check_output([SCHEMA_SCRIPT, "-h"])
+        if "--with-http-proxy" in help_output:
+            # Forward any proxy configuration set in the environment
+            for proxy_variable in ("http_proxy", "https_proxy", "no_proxy"):
+                if proxy_variable in os.environ:
+                    options.append("--with-%s=%s" % (
+                        proxy_variable.replace("_", "-"),
+                        os.environ[proxy_variable]))
+
+        return options
 
 
 class LSCtl(ScriptCallback):
@@ -45,6 +69,8 @@ class LSCtl(ScriptCallback):
         self._hookenv = hookenv
 
     def __call__(self, manager, service_name, event_name):
+        current_status, current_status_message = self._hookenv.status_get()
+        action_status_message = ""
         action = event_name
         if event_name == "start":
             # XXX the 'start' event in the services framework is called after
@@ -65,8 +91,18 @@ class LSCtl(ScriptCallback):
             elif hook_name == "db-relation-changed":
                 if not self._need_restart_db_relation_changed(db_new, db_old):
                     return
+        if action == "restart":
+            action_status_message = "Restarting services."
+            if current_status == "unknown":
+                # If the status is unknown, it means that the services
+                # have not been started yet.
+                action_status_message = "Starting services."
+            if current_status == "maintenance":
+                return
 
+        self._hookenv.status_set("maintenance", action_status_message)
         self._run(LSCTL, (action,))
+        self._hookenv.status_set("active", "")
 
     def _need_restart_config_changed(self):
         """Check whether we need to restart after a config change.

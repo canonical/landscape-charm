@@ -4,7 +4,8 @@ This test creates a real landscape deployment, and runs some checks against it.
 FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
        lp:1281577 is addressed.
 """
-from subprocess import check_output, CalledProcessError, PIPE, STDOUT
+import tempfile
+from subprocess import check_output, PIPE
 
 from helpers import IntegrationTest
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
@@ -25,9 +26,9 @@ class ServiceTest(IntegrationTest):
         user form.
 
         Note: In order to work on a new server or a server with the
-          first admin user already created, this phrase should match
-          the new-standalone-user form, the login form, and not
-          the maintenance page.
+        first admin user already created, this phrase should match
+        the new-standalone-user form, the login form, and not
+        the maintenance page.
         """
         self.environment.check_service("appserver")
 
@@ -53,6 +54,20 @@ class ServiceTest(IntegrationTest):
         Specifically that it is reachable and returns its name.
         """
         self.environment.check_service("api")
+
+    def test_api_endpoint(self):
+        """Verify that API endpoint is correctly listed."""
+        self.environment.bootstrap_landscape(
+            admin_name="foo", admin_password="bar", admin_email="foo@bar")
+
+        cookie_jar = tempfile.NamedTemporaryFile()
+        cookie_file = cookie_jar.name
+        self.environment.login("foo@bar", "bar", cookie_file)
+
+        public_url = self.environment.get_haproxy_public_address()
+        self.environment.check_url(
+            "/settings", "https://%s/api/" % public_url,
+            cookie_jar=cookie_file)
 
     def test_upload(self):
         """Verify that the PACKAGE UPLOAD service is up.
@@ -129,6 +144,14 @@ class ServiceTest(IntegrationTest):
             "/etc/ssl/certs/landscape_server_ca.crt", "landscape-server")
         self.assertTrue(ssl_cert.startswith("-----BEGIN CERTIFICATE-----"))
 
+    def test_landscape_packages_are_held(self):
+        """
+        Check that landscape packages are marked as "held" by apt-mark.
+        """
+        out, _ = self.environment.run_command_on_landscape("apt-mark showhold")
+        self.assertIn("landscape-server", out)
+        self.assertIn("landscape-hashid", out)
+
 
 class CronTest(IntegrationTest):
     """Host all the tests that expects the cron daemon to be stopped.
@@ -139,60 +162,31 @@ class CronTest(IntegrationTest):
     """
     layer = OneLandscapeUnitNoCronLayer
 
-    def _sanitize_ssh_output(self, output,
-                             remove_text=["sudo: unable to resolve",
-                                          "Warning: Permanently added",
-                                          "Connection to"]):
-        """Strip some common warning messages from ssh output.
-
-        @param output: output to sanitize
-        @param remove_text: list of text that, if found at the beginning of
-                            the a output line, will have that line removed
-                            entirely.
-        """
-        new_output = []
-        for line in output.split("\n"):
-            if any(line.startswith(remove) for remove in remove_text):
-                continue
-            new_output.append(line)
-        return "\n".join(new_output)
-
-    def _run_cron(self, script):
-        status = 0
-        cmd = ["juju", "ssh", self.layer.cron_unit, "sudo", "-u landscape",
-               script, "2>&1"]
-        try:
-            # The sanitize is a workaround for lp:1328269
-            output = self._sanitize_ssh_output(
-                check_output(
-                    cmd, stderr=STDOUT, stdin=PIPE).decode("utf-8").strip())
-        except CalledProcessError as e:
-            output = e.output.decode("utf-8").strip()
-            status = e.returncode
-        # these jobs currently don't set their exit status to non-zero
-        # if they fail, they just print things to stdout/stderr
-        return (output, status)
+    def assertCronStatus(self, status, output, cron_name):
+        message = "{}: output:{} status:{}".format(cron_name, output, status)
+        self.assertEqual(status, 0, message)
+        self.assertEqual(output, "", message)
 
     def test_maintenance_cron(self):
         """Verify that the maintenance cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/maintenance.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "maintenance_cron")
 
     def test_update_security_db_cron(self):
         """Verify that the update_security_db cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_security_db.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "update_security_db_cron")
 
     def test_update_alerts_cron(self):
         """Verify that the update_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_alerts.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "update_alerts_cron")
 
     def test_landscape_profiles_cron(self):
         """Verify that the landscape_profiles cron job runs without errors."""
@@ -204,37 +198,37 @@ class CronTest(IntegrationTest):
         cmd = ["juju", "run", "--unit", self.layer.cron_unit, find_cmd]
         script = check_output(cmd, stderr=PIPE).decode("utf-8").strip()
 
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "profiles_cron")
 
     def test_process_alerts_cron(self):
         """Verify that the process_alerts cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/process_alerts.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "process_alerts_cron")
 
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "hash_id_databases_cron")
 
     def test_meta_releases_cron(self):
         """Verify that the meta_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/meta_releases.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "meta_releases_cron")
 
     def test_sync_lds_releases_cron(self):
         """Verify that the sync_lds_releases cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/sync_lds_releases.sh"
-        output, status = self._run_cron(script)
-        self.assertEqual(output, "")
-        self.assertEqual(status, 0)
+        output, status = self.environment.run_script_on_cron_unit(
+            script, self.layer)
+        self.assertCronStatus(status, output, "sync_lds_releases_cron")
 
     def test_root_url_is_set(self):
         """
