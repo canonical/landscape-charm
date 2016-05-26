@@ -19,3 +19,6 @@ provides:
   hosted:
     interface: landscape-hosted
     scope: container
+series:
+  - xenial
+  - trusty
