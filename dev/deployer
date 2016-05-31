@@ -85,7 +85,8 @@ class Deployer(object):
         start = time.time()
         target = "landscape-" + target
         deployer_dir = None
-        original_bundle = os.path.join(CHARM_SRC, "bundles", target + ".yaml")
+        original_bundle = os.path.join(
+            CHARM_SRC, "bundles", "build", target, "bundle.yaml")
         try:
             deployer_dir = tempfile.mkdtemp()
             # Stage deployer directory for all supported series, even though
