@@ -13,7 +13,7 @@ from lib.paths import default_paths
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
 INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-minimal", "python-psutil")
-PACKAGES_DEV = ("dpkg-dev", "pbuilder")
+PACKAGES_DEV = ("dpkg-dev", "pbuilder", "aptitude")
 TARBALL = "landscape-server_*.tar.gz"
 
 # XXX Eventually we'll want to use a dedicated PPA, populated by Jenkins.
