@@ -32,7 +32,7 @@ bundles:
 	    bzr up bundles; \
 	else \
 	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
-	fi \
+	fi; \
 	make -C bundles render;
 
 secrets:
