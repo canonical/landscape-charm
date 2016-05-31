@@ -33,7 +33,7 @@ bundles:
 	else \
 	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
 	fi; \
-	make -C bundles render;
+	make -C bundles render
 
 secrets:
 	@if [ -d secrets ]; then \
