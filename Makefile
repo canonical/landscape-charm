@@ -62,7 +62,7 @@ integration-test-trunk: secrets
 deploy-dense-maas: bundles
 	./dev/deployer dense-maas
 
-deploy-dense-maas-dev: bundles-local-branch
+deploy-dense-maas-dev: bundles-local-branch repo-file-trunk
 	./dev/deployer dense-maas --flags juju-debug
 
 deploy: bundles
