@@ -2,6 +2,8 @@ PYTHON := /usr/bin/env python
 
 test:
 	trial lib
+	# For now only the install hook runs against python3
+	trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
 	./dev/ubuntu-deps
@@ -25,12 +27,23 @@ update-charm-revision-numbers: bundles
 test-depends: verify-juju-test bundles
 	@cd tests && python3 test_helpers.py
 
-bundles:
+bundles-checkout:
 	@if [ -d bundles ]; then \
 	    bzr up bundles; \
 	else \
 	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
-	fi
+	fi; \
+	make -C bundles deps
+	make -C bundles clean
+
+bundles: bundles-checkout
+	bundles/render-bundles
+
+bundles-local-branch: bundles-checkout
+	bundles/render-bundles --landscape-branch $(CURDIR)
+
+bundles-local-charm: bundles-checkout
+	bundles/render-bundles --landscape-charm $(CURDIR)
 
 secrets:
 	@if [ -d secrets ]; then \
@@ -49,10 +62,13 @@ integration-test-trunk: secrets
 deploy-dense-maas: bundles
 	./dev/deployer dense-maas
 
-deploy-dense-maas-dev: bundles
+deploy-dense-maas-dev: bundles-local-branch repo-file-trunk
 	./dev/deployer dense-maas --flags juju-debug
 
 deploy: bundles
+	./dev/deployer scalable
+
+deploy-local: bundles-local-branch
 	./dev/deployer scalable
 
 repo-file-trunk: secrets

@@ -2,6 +2,7 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.upgrade import UpgradeAction
+from lib.apt import INSTALL_PACKAGES
 
 
 class UpgradeActionTest(HookenvTest):
@@ -33,7 +34,7 @@ class UpgradeActionTest(HookenvTest):
         self.assertEqual([True], self.fetch.updates)
         # And one apt_install with appropriate options.
         self.assertEqual(
-            [(("landscape-server", "landscape-hashids", "python-psutil"),
+            [(INSTALL_PACKAGES,
               ["--option=Dpkg::Options::=--force-confdef",
                "--option=Dpkg::Options::=--force-confold"],
               True)], self.fetch.installed)
