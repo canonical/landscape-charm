@@ -50,8 +50,8 @@ example:
 
 Or, if you already have the environment bootstrapped:
 
-    DENSE_MAAS=1 LS_CHARM_SOURCE=lds-trunk zope-testrunner3 -vv --path tests \
-        --tests-pattern basic --test some_test
+    DENSE_MAAS=1 LS_CHARM_SOURCE=lds-trunk-ppa zope-testrunner3 -vv \
+        --path tests --tests-pattern basic --test some_test
 
 
 Testing with Dependent Upstream Charms
