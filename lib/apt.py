@@ -77,8 +77,6 @@ class Apt(object):
         needs_update = force_update
         if self._set_remote_source():
             needs_update = True
-        if self._set_local_source():
-            needs_update = True
         if needs_update:
             self._fetch.apt_update(fatal=True)
 
@@ -87,6 +85,7 @@ class Apt(object):
         if options is None:
             options = list(DEFAULT_INSTALL_OPTIONS)
         if self._get_local_tarball() is not None:
+            self._build_local_source()
             # We don't sign the locally built repository, so we need to tell
             # apt-get that we don't care.
             options.append("--allow-unauthenticated")
@@ -137,10 +136,13 @@ class Apt(object):
         # sources.list if it's not in the new list.
         previous_source = config.previous("source")
         if previous_source is not None:
+            self._hookenv.log("Found previous source: " + previous_source)
             previous_repositories = self._parse_source(previous_source)
             if set(previous_repositories) == set(repositories):
+                self._hookenv.log("Previous source is the same as before.")
                 return False
             for repository in set(previous_repositories) - set(repositories):
+                self._hookenv.log("Removing repository: " + repository)
                 self._subprocess.check_call(
                     ["add-apt-repository", "--remove", "--yes", repository])
 
@@ -153,6 +155,7 @@ class Apt(object):
             raise AptSourceAndKeyDontMatchError()
 
         for repository, key in zip(repositories, keys):
+            self._hookenv.log("Adding repository: " + repository)
             self._fetch.add_source(repository, key)
 
         if self._use_sample_hashids():
@@ -202,7 +205,7 @@ class Apt(object):
             repository = "ppa:landscape/%s" % repository
         return repository
 
-    def _set_local_source(self):
+    def _build_local_source(self):
         """Set the local APT repository for the Landscape tarball, if any."""
         tarball = self._get_local_tarball()
         if tarball is None:
@@ -227,6 +230,7 @@ class Apt(object):
             BUILD_LOCAL_ARCHIVE.format(epoch), shell=True, cwd=build_dir)
 
         self._fetch.add_source("deb file://%s/ ./" % build_dir)
+        self._fetch.apt_update(fatal=True)
 
         return True
 
