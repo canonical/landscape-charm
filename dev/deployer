@@ -92,7 +92,7 @@ class Deployer(object):
             # Stage deployer directory for all supported series, even though
             # typically in a deploy attempt only one series is used.  Since
             # it's determined by a bundle, we have to be ready for whatever.
-            for series in ["precise", "trusty"]:
+            for series in ["trusty", "xenial"]:
                 self._stage_deployer_dir(deployer_dir, series)
             updated_bundle_file = self._create_local_yaml(
                 deployer_dir, original_bundle)
