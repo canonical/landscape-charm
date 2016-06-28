@@ -37,7 +37,6 @@ DEFAULT_BUNDLE_CONTEXT = {
         "memory": "2G",
         "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
         "shared_buffers": "64MB",
-        "checkpoint_segments": 64,
         "maintenance_work_mem": "64MB",
         "work_mem": "64MB",
         "effective_cache_size": "64MB",
@@ -311,10 +310,16 @@ class EnvironmentFixture(Fixture):
         """
         output, _ = self.run_command_on_landscape(
             "lsctl status", unit)
+        if "systemd" in output:
+            return self._get_landscape_services_status_systemd(output)
+        else:
+            return self._get_landscape_services_status_trusty(output)
+
+    def _get_landscape_services_status_trusty(self, output):
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
-            line = line.strip()
+            line = line.strip().lower()
             if not line.startswith("* "):
                 continue
             service_name = line[2:line.index(" is ")]
@@ -331,6 +336,28 @@ class EnvironmentFixture(Fixture):
             service_status["running"].append(service_name)
         else:
             service_status["stopped"].append(service_name)
+        return service_status
+
+    def _get_landscape_services_status_systemd(self, output):
+        service_status = {"running": [], "stopped": []}
+        lines = output.splitlines()
+        service_name = None
+        for line in lines:
+            line = line.strip()
+            if service_name is None and not line.startswith("=="):
+                continue
+            if line.startswith("=="):
+                service_name = line.split(" ")[1]
+                continue
+
+            if line.startswith("Active:"):
+                if line.startswith("Active: active"):
+                    service_status["running"].append(service_name)
+                elif line.startswith("Active: inactive"):
+                    service_status["stopped"].append(service_name)
+                else:
+                    raise AssertionError("Unknown status line: " + line)
+                service_name = None
         return service_status
 
     def add_fake_db_patch(self, unit=None):
