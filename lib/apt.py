@@ -26,10 +26,11 @@ DEFAULT_INSTALL_OPTIONS = ("--option=Dpkg::Options::=--force-confold",)
 
 BASE_EPOCH = 1000
 # Shell commands to build the debs and publish them in a local repository
-BUILD_LOCAL_ARCHIVE = """
+BUILD_LOCAL_PACKAGE = """
 dch -v {}:$(dpkg-parsechangelog|grep ^Version:|cut -d ' ' -f 2) \
     development --distribution $(lsb_release -cs) &&
-dpkg-buildpackage -us -uc &&
+dpkg-buildpackage -us -uc"""
+BUILD_LOCAL_REPO = """
 mv ../*.deb . &&
 dpkg-scanpackages -m . /dev/null > Packages &&
 cat Packages | bzip2 -9 > Packages.bz2 &&
@@ -221,15 +222,21 @@ class Apt(object):
         shutil.rmtree(build_dir, ignore_errors=True)
         os.makedirs(build_dir)
 
+        repo_dir = os.path.join(self._hookenv.charm_dir(), "build", "repo")
+        shutil.rmtree(repo_dir, ignore_errors=True)
+        os.makedirs(repo_dir)
+
         epoch = self._get_local_epoch()
         self._subprocess.check_call(
             ["tar", "--strip=1", "-xf", tarball], cwd=build_dir)
         self._subprocess.check_call(
             ["/usr/lib/pbuilder/pbuilder-satisfydepends"], cwd=build_dir)
         self._subprocess.check_call(
-            BUILD_LOCAL_ARCHIVE.format(epoch), shell=True, cwd=build_dir)
+            BUILD_LOCAL_PACKAGE.format(epoch), shell=True, cwd=build_dir)
+        self._subprocess.check_call(
+            BUILD_LOCAL_REPO.format(epoch), shell=True, cwd=repo_dir)
 
-        self._fetch.add_source("deb file://%s/ ./" % build_dir)
+        self._fetch.add_source("deb file://%s/ ./" % repo_dir)
         self._fetch.apt_update(fatal=True)
 
         return True
