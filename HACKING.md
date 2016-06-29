@@ -34,7 +34,9 @@ testrunner directly. For example:
 If the different services already are deployed, the command above is enough.
 But if you run it against an empty environment, you have to remember to pass
 along environment variables that affect the deployment, such as
-LS_CHARM_SOURCE=lds-trunk-ppa.
+LS_CHARM_SOURCE=lds-trunk-ppa as to generate the secrets and bundles:
+
+    make secrets bundles
 
 
 Running integration tests on dense MAAS deployment
