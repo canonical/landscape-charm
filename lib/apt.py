@@ -207,7 +207,7 @@ class Apt(object):
         return repository
 
     def _build_local_source(self):
-        """Set the local APT repository for the Landscape tarball, if any."""
+        """Build the local APT repository for the Landscape tarball, if any."""
         tarball = self._get_local_tarball()
         if tarball is None:
             return False
