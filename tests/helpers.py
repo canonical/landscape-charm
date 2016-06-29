@@ -62,6 +62,7 @@ class EnvironmentFixture(Fixture):
     _timeout = 3000
     _series = "trusty"
     _deployment = Deployment(series=_series)
+    _new_unit_target = None
 
     def __init__(self, config=None, deployment=None, subprocess=subprocess,
                  tempfile=tempfile):
@@ -74,11 +75,14 @@ class EnvironmentFixture(Fixture):
         if deployment is not None:
             self._deployment = deployment
         self._subprocess = subprocess
+        self._dense_maas = os.environ.get("DENSE_MAAS", "0") == "1"
         self._tempfile = tempfile
 
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
+            if self._dense_maas:
+                self._configure_for_dense_maas()
             self._deployment.load(self._get_bundle())
             with self._enable_sample_hashids():
                 self._deployment.setup(timeout=self._timeout)
@@ -367,7 +371,7 @@ class EnvironmentFixture(Fixture):
         if current_count == new_count:
             return
         while current_count < new_count:
-            self._deployment.add_unit(service)
+            self._deployment.add_unit(service, target=self._new_unit_target)
             current_count += 1
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
@@ -554,6 +558,18 @@ class EnvironmentFixture(Fixture):
                 continue
             new_output.append(line)
         return "\n".join(new_output)
+
+    def _configure_for_dense_maas(self):
+        """Configure the deployment for a dense MAAS configuration.
+
+        All units will be placed in an LXC on the bootstrap node.
+        """
+        self._new_unit_target = "lxc:0"
+        services = [
+            service for service in DEFAULT_BUNDLE_CONTEXT.keys()
+            if service != "name"]
+        for service in services:
+            DEFAULT_BUNDLE_CONTEXT[service]["to"] = self._new_unit_target
 
 
 class IntegrationTest(TestWithFixtures):
