@@ -99,5 +99,3 @@ Or if you want to use the LDS packages from the lds-trunk PPA:
 
 The JUJU_ENV environment variable can be omitted if you want to use the
 current juju environment (as set by "juju switch").
-
-Test
