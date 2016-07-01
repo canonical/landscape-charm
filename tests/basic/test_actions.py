@@ -45,8 +45,8 @@ class ActionsTest(IntegrationTest):
         self.assertEqual("failed", result["status"])
         self.assertIn(
             "ERROR:root:main has unapplied patches", result["message"])
-        #XXX: check that the unit status is in maintenance and 'Services
-        #     stopped'. On xenial, this is no longer the case.
+        #XXX: Check that the unit status is maintenance and 'Services 
+        #     stopped'. On xenial, this is no longer the case. Bug #1598016
 
         remove_fake_db_patch()
         result = self.environment.resume_landscape()
