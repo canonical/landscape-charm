@@ -1,6 +1,5 @@
 from helpers import IntegrationTest
 from layers import LandscapeLeaderDestroyedLayer
-import unittest
 
 
 class LandscapeLeaderDestroyedTest(IntegrationTest):
