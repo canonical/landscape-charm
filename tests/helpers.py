@@ -355,9 +355,9 @@ class EnvironmentFixture(Fixture):
                 continue
 
             if line.startswith("Active:"):
-                if line.startswith("Active: active"):
+                if line.startswith("Active: active (running)"):
                     service_status["running"].append(service_name)
-                elif line.startswith("Active: inactive"):
+                elif line.startswith("Active: inactive (dead)"):
                     service_status["stopped"].append(service_name)
                 else:
                     raise AssertionError("Unknown status line: " + line)
