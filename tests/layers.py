@@ -15,7 +15,7 @@ class OneLandscapeUnitLayer(object):
         cls.environment.setUp()
 
     @classmethod
-    def testTearDown(cls):
+    def tearDown(cls):
         cls.environment.cleanUp()
 
 
@@ -69,6 +69,15 @@ class TwoLandscapeUnitsLayer(OneLandscapeUnitLayer):
         cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
             "landscape-server")
 
+    @classmethod
+    def tearDown(cls):
+        """Empty teardown.
+
+        This method needs to be here, in order to avoid
+        OneLandscapeUnitLayer.tearDown from being called when
+        TwoLandscapeUnitsLayer gets teared down.
+        """
+
 
 class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
     """Layer for tests meant to run when the leader has been destroyed.
@@ -80,9 +89,6 @@ class LandscapeLeaderDestroyedLayer(TwoLandscapeUnitsLayer):
 
     @classmethod
     def setUp(cls):
-        # XXX: https://bugs.launchpad.net/landscape-charm/+bug/1541128
-        #      https://bugs.launchpad.net/juju-core/+bug/1511659
-        return
         cls.environment.destroy_landscape_leader()
         cls.leader, cls.non_leaders = cls.environment.get_unit_ids(
             "landscape-server")
