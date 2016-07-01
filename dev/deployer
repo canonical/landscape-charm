@@ -92,7 +92,7 @@ class Deployer(object):
             # Stage deployer directory for all supported series, even though
             # typically in a deploy attempt only one series is used.  Since
             # it's determined by a bundle, we have to be ready for whatever.
-            for series in ["precise", "trusty"]:
+            for series in ["trusty", "xenial"]:
                 self._stage_deployer_dir(deployer_dir, series)
             updated_bundle_file = self._create_local_yaml(
                 deployer_dir, original_bundle)
@@ -122,8 +122,10 @@ class Deployer(object):
         """Enable feature flags."""
         command = "sudo /opt/canonical/landscape/featureflags enable {}"
         for flag in self._args.flags:
+            # Run the command on all units, rather than having to figure
+            # out which unit to run it on.
             subprocess.check_output(
-                ["juju", "run", "--unit", "landscape-server/0",
+                ["juju", "run", "--service", "landscape-server",
                  command.format(flag)])
 
 

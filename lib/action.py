@@ -33,7 +33,7 @@ class Action(Hook):
             return_values = self._run()
             if return_values is not None:
                 self._hookenv.action_set(return_values)
-        except CharmError, error:
+        except CharmError as error:
             self._hookenv.action_fail(str(error))
 
 
