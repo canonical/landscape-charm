@@ -37,6 +37,7 @@ DEFAULT_BUNDLE_CONTEXT = {
         "memory": "2G",
         "manual_tuning": getenv("PG_MANUAL_TUNING", "1") == "1",
         "shared_buffers": "64MB",
+        "checkpoint_segments": 64,
         "maintenance_work_mem": "64MB",
         "work_mem": "64MB",
         "effective_cache_size": "64MB",
