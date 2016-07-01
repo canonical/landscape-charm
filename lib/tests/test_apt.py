@@ -37,7 +37,9 @@ class AptTest(HookenvTest):
         package_name = "{}-{}".format(name, version)
         package_dir = build_dir.join(package_name)
         os.mkdir(package_dir)
-        subprocess.check_output(["dh_make", "-n", "-i", "-y"], cwd=package_dir)
+        subprocess.check_output(
+            ["dh_make", "-n", "-i", "-y", "-e", "stan@example.com"],
+            cwd=package_dir)
         tarball = os.path.join(
             self.hookenv.charm_dir(), "{}_{}.tar.gz".format(name, version))
         subprocess.check_output(
@@ -163,10 +165,12 @@ class AptTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self._create_local_tarball("landscape-server", "1.2.3")
         self.apt.set_sources()
+        self.apt.install_packages()
 
         build_dir = os.path.join(self.hookenv.charm_dir(), "build", "package")
+        repo_dir = os.path.join(self.hookenv.charm_dir(), "build", "repo")
         self.assertTrue(os.path.exists(os.path.join(
-            build_dir, "landscape-server_1.2.3_all.deb")))
+            repo_dir, "landscape-server_1.2.3_all.deb")))
 
         self.assertIn(
             (["/usr/lib/pbuilder/pbuilder-satisfydepends"],
@@ -175,7 +179,7 @@ class AptTest(HookenvTest):
 
         self.assertEqual(
             [("ppa:landscape/14.10", None),
-             ("deb file://%s/build/package/ ./" % self.hookenv.charm_dir(),
+             ("deb file://%s/build/repo/ ./" % self.hookenv.charm_dir(),
               None)],
             self.fetch.sources)
         # XXX: We should check that the generated repository is valid.
@@ -186,7 +190,7 @@ class AptTest(HookenvTest):
         """
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self._create_local_tarball("landscape-server", "1.2.3")
-        self.apt.set_sources()
+        self.apt.install_packages()
 
         # Reset the recorded sources and subprocess calls and run again
         self.subprocess.calls[:] = []
@@ -254,15 +258,13 @@ class AptTest(HookenvTest):
         The C{install_packages} method allows unauthenticated packages if we
         have a locally built repository.
         """
-        tarball = os.path.join(
-            self.hookenv.charm_dir(), "landscape-server_1.2.3.tar.gz")
-        with open(tarball, "w") as fd:
-            fd.write("")
+        self._create_local_tarball("landscape-server", "1.2.3")
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.apt.install_packages()
         options = list(DEFAULT_INSTALL_OPTIONS) + ["--allow-unauthenticated"]
-        self.assertEqual(
-            [(INSTALL_PACKAGES, options, True)], self.fetch.installed)
+        packages, options, _ = self.fetch.installed[-1]
+        self.assertIn("landscape-server", packages)
+        self.assertIn("--allow-unauthenticated", options)
 
     def test_install_sample_hashids(self):
         """
