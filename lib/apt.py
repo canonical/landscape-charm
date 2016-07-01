@@ -233,8 +233,7 @@ class Apt(object):
             ["/usr/lib/pbuilder/pbuilder-satisfydepends"], cwd=build_dir)
         self._subprocess.check_call(
             BUILD_LOCAL_PACKAGE.format(epoch), shell=True, cwd=build_dir)
-        self._subprocess.check_call(
-            BUILD_LOCAL_REPO.format(epoch), shell=True, cwd=repo_dir)
+        self._subprocess.check_call(BUILD_LOCAL_REPO, shell=True, cwd=repo_dir)
 
         self._fetch.add_source("deb file://%s/ ./" % repo_dir)
         self._fetch.apt_update(fatal=True)
