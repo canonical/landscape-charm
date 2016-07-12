@@ -73,3 +73,59 @@ class UpgradeActionTest(HookenvTest):
             "apt-mark", "hold", "landscape-server", "landscape-hashids"]
         self.assertEqual(unhold_call, self.subprocess.calls[0][0])
         self.assertEqual(hold_call, self.subprocess.calls[1][0])
+
+    def test_run_logging(self):
+        """Make sure that logging for the action happens correctly."""
+        self.subprocess.add_fake_executable('apt-mark',
+                                            ['unhold', 'landscape-server',
+                                             'landscape-hashids'])
+        self.subprocess.add_fake_executable('apt-mark',
+                                            ['hold', 'landscape-server',
+                                             'landscape-hashids'])
+        self.hookenv.status_set("maintenance", "")
+        self.hookenv.config()["source"] = "ppa:my-ppa"
+        action = UpgradeAction(hookenv=self.hookenv, fetch=self.fetch,
+                               paths=self.paths, subprocess=self.subprocess)
+
+        action()
+
+        self.assertEqual(self.hookenv.messages,
+                         [('Running action UpgradeAction', None),
+                          ('Adding repository: ppa:my-ppa', None),
+                          ('running \'apt-mark unhold landscape-server '
+                           'landscape-hashids\'',
+                           self.hookenv.DEBUG),
+                          ('running \'apt-mark hold landscape-server '
+                           'landscape-hashids\'',
+                           self.hookenv.DEBUG),
+                          ])
+
+    def test_run_failure(self):
+        """Make sure the upgrade action handles failures correctly.
+
+        This entails logging and setting the failure in the hook env.
+        """
+        self.subprocess.add_fake_executable('apt-mark',
+                                            ['unhold', 'landscape-server',
+                                             'landscape-hashids'],
+                                            return_code=1)
+        self.hookenv.status_set("maintenance", "")
+        self.hookenv.config()["source"] = "ppa:my-ppa"
+        action = UpgradeAction(hookenv=self.hookenv, fetch=self.fetch,
+                               paths=self.paths, subprocess=self.subprocess)
+
+        action()
+
+        self.assertEqual(self.hookenv.messages,
+                         [('Running action UpgradeAction', None),
+                          ('Adding repository: ppa:my-ppa', None),
+                          ('running \'apt-mark unhold landscape-server '
+                           'landscape-hashids\'',
+                           self.hookenv.DEBUG),
+                          ('got return code 1 running \'apt-mark unhold '
+                           'landscape-server landscape-hashids\'',
+                           self.hookenv.ERROR),
+                          ])
+        self.assertEqual(self.hookenv.action_fails,
+                         ['command failed (see unit logs): apt-mark unhold '
+                          'landscape-server landscape-hashids'])
