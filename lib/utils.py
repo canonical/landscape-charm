@@ -1,7 +1,10 @@
 import os
+import subprocess
 import yaml
 
 from charmhelpers.core import hookenv
+
+from lib.error import CharmError
 
 
 def is_valid_url(value):
@@ -58,3 +61,65 @@ def update_persisted_data(key, value, hookenv=hookenv):
     with open(filename, "w") as fd:
         data = yaml.dump(data, fd)
     return old
+
+
+class CommandRunner(object):
+    """A landscape-charm-specific wrapper around subprocess.
+
+    All calls are logged and failures are converted into CharmError (as
+    well as logging the return code).
+    """
+
+    _HOOKENV = hookenv
+    _SUBPROCESS = subprocess
+
+    def __init__(self, hookenv=None, subprocess=None):
+        if hookenv is None:
+            hookenv = self._HOOKENV
+        if subprocess is None:
+            subprocess = self._SUBPROCESS
+
+        self._hookenv = hookenv
+        self._subprocess = subprocess
+        self._cwd = None
+
+    def in_dir(self, dirname):
+        """Return a new runner that runs commands in the given directory."""
+        runner = self.__class__(hookenv=self._hookenv,
+                                subprocess=self._subprocess)
+        runner._cwd = dirname
+        return runner
+
+    def _run(self, args, shell=False):
+        kwargs = {}
+        if shell:
+            kwargs.update(shell=True)
+        if self._cwd:
+            kwargs.update(cwd=self._cwd)
+        cmdstr = args if isinstance(args, str) else ' '.join(args)
+
+        self._hookenv.log('running {!r}'.format(cmdstr),
+                          level=self._hookenv.DEBUG)
+        try:
+            self._subprocess.check_call(args, **kwargs)
+        except subprocess.CalledProcessError as err:
+            self._hookenv.log('got return code {} running {!r}'
+                              .format(err.returncode, cmdstr),
+                              level=self._hookenv.ERROR)
+            raise CharmError('command failed (see unit logs): {}'
+                             .format(cmdstr))
+
+    def run(self, cmd, *args):
+        """Run cmd with the given arguments."""
+        args = list(args)
+        args.insert(0, cmd)
+        self._run(args)
+
+    def shell(self, cmd, *args):
+        """Run cmd through the shell.
+
+        The provided args, if any, are combined with cmd into a single
+        string.
+        """
+        args = cmd if not args else cmd + ' ' + ' '.join(args)
+        self._run(args, shell=True)

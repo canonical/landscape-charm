@@ -8,6 +8,7 @@ import subprocess
 from charmhelpers import fetch
 from charmhelpers.core import hookenv
 
+from lib import utils
 from lib.error import CharmError
 from lib.paths import default_paths
 
@@ -73,6 +74,8 @@ class Apt(object):
         self._subprocess = subprocess
         self._paths = paths
 
+        self._runner = utils.CommandRunner(hookenv, subprocess)
+
     def set_sources(self, force_update=False):
         """Configure the extra APT sources to use."""
         needs_update = force_update
@@ -105,7 +108,7 @@ class Apt(object):
         Mark the landscape package and the packages depending on it for "hold".
         """
         packages = list(LANDSCAPE_PACKAGES)
-        self._cmd("apt-mark", "hold", *packages)
+        self._runner.run("apt-mark", "hold", *packages)
 
     def unhold_packages(self):
         """
@@ -118,12 +121,7 @@ class Apt(object):
         non-interactive mode (LP: #1226168)
         """
         packages = list(LANDSCAPE_PACKAGES)
-        self._cmd("apt-mark", "unhold", *packages)
-
-    def _cmd(self, cmd, *args, **kwargs):
-        args = list(args)
-        args.insert(0, cmd)
-        self._subprocess.check_call(args, **kwargs)
+        self._runner.run("apt-mark", "unhold", *packages)
 
     def _set_remote_source(self):
         """Set the remote APT repository to use, if new or changed."""
@@ -149,7 +147,8 @@ class Apt(object):
                 return False
             for repository in set(previous_repositories) - set(repositories):
                 self._hookenv.log("Removing repository: " + repository)
-                self._cmd("add-apt-repository", "--remove", "--yes", repository)
+                self._runner.run("add-apt-repository", "--remove", "--yes",
+                                 repository)
 
         if not config.get("key"):
             keys = [None] * len(repositories)
@@ -225,16 +224,17 @@ class Apt(object):
         build_dir = os.path.join(self._hookenv.charm_dir(), "build", "package")
         shutil.rmtree(build_dir, ignore_errors=True)
         os.makedirs(build_dir)
+        runner = self._runner.in_dir(build_dir)
+        runner.run("tar", "--strip=1", "-xf", tarball)
+        runner.run("/usr/lib/pbuilder/pbuilder-satisfydepends")
+        epoch = self._get_local_epoch()
+        runner.shell(BUILD_LOCAL_PACKAGE.format(epoch))
 
         repo_dir = os.path.join(self._hookenv.charm_dir(), "build", "repo")
         shutil.rmtree(repo_dir, ignore_errors=True)
         os.makedirs(repo_dir)
-
-        epoch = self._get_local_epoch()
-        self._cmd("tar", "--strip=1", "-xf", tarball, cwd=build_dir)
-        self._cmd("/usr/lib/pbuilder/pbuilder-satisfydepends", cwd=build_dir)
-        self._cmd(BUILD_LOCAL_PACKAGE.format(epoch), shell=True, cwd=build_dir)
-        self._cmd(BUILD_LOCAL_REPO, shell=True, cwd=repo_dir)
+        runner = self._runner.in_dir(repo_dir)
+        runner.shell(BUILD_LOCAL_REPO)
 
         self._fetch.add_source("deb file://%s/ ./" % repo_dir)
         self._fetch.apt_update(fatal=True)

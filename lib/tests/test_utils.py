@@ -2,8 +2,11 @@ from unittest import TestCase
 
 from charmhelpers.core.services.base import ServiceManager
 
-from lib.utils import is_valid_url, get_required_data, update_persisted_data
+from lib.error import CharmError
+from lib.utils import (is_valid_url, get_required_data, update_persisted_data,
+                       CommandRunner)
 from lib.tests.helpers import HookenvTest
+from lib.tests.stubs import SubprocessStub
 
 
 class IsValidURLTest(TestCase):
@@ -73,3 +76,72 @@ class UpdatePersistedDataTest(HookenvTest):
         update_persisted_data("foo", "bar", hookenv=self.hookenv)
         self.assertEqual(
             "bar", update_persisted_data("foo", "bar", hookenv=self.hookenv))
+
+
+class CommandRunnerTest(HookenvTest):
+
+    CMD = '/bin/some-command'
+    ARGS = ('x', 'y', 'z')
+
+    def setUp(self):
+        super(CommandRunnerTest, self).setUp()
+        self.subprocess = SubprocessStub()
+        self.subprocess.add_fake_executable(self.CMD)
+        self.subprocess.add_fake_executable(self.CMD, self.ARGS)
+        self.runner = CommandRunner(self.hookenv, self.subprocess)
+
+    def test_run_with_args(self):
+        """Make sure everything's fine when we pass in args."""
+        self.runner.run(self.CMD, 'x', 'y', 'z')
+
+        self.assertEqual(([self.CMD, 'x', 'y', 'z'], {}),
+                         self.subprocess.calls[0])
+
+    def test_run_without_args(self):
+        """Make sure everything's fine even with no args."""
+        self.runner.run(self.CMD)
+
+        self.assertEqual(([self.CMD], {}),
+                         self.subprocess.calls[0])
+
+    def test_run_in_dir(self):
+        """Check the behavior of running a command in a directory."""
+        runner = self.runner.in_dir('/tmp')
+
+        runner.run(self.CMD)
+
+        self.assertEqual(([self.CMD], {'cwd': '/tmp'}),
+                         self.subprocess.calls[0])
+
+    def test_run_logging(self):
+        """Make sure that the command gets logged."""
+        self.runner.run(self.CMD, 'x', 'y', 'z')
+
+        self.assertEqual(self.hookenv.messages,
+                         [('running \'/bin/some-command x y z\'',
+                           self.hookenv.DEBUG),
+                          ])
+
+    def test_run_failure(self):
+        """Make sure that failures are properly handled.
+
+        "properly handled" includes logging.
+        """
+        self.subprocess.add_fake_executable(self.CMD, self.ARGS, return_code=1)
+
+        with self.assertRaises(CharmError) as cm:
+            self.runner.run(self.CMD, 'x', 'y', 'z')
+
+        self.assertEqual(str(cm.exception),
+                         'command failed (see unit logs): '
+                         '/bin/some-command x y z')
+        self.assertEqual(self.hookenv.messages,
+                         [('running \'/bin/some-command x y z\'',
+                           self.hookenv.DEBUG),
+                          ('got return code 1 running '
+                           '\'/bin/some-command x y z\'',
+                           self.hookenv.ERROR),
+                          ])
+
+    def test_shell(self):
+        return

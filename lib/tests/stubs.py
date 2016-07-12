@@ -1,5 +1,6 @@
 import subprocess
 
+from charmhelpers.core import hookenv
 from charmhelpers.core.hookenv import Config
 
 
@@ -11,6 +12,9 @@ class HookenvStub(object):
     unit = "landscape-server/0"
     relid = None
     leader = True
+
+    DEBUG = hookenv.DEBUG
+    ERROR = hookenv.ERROR
 
     def __init__(self, charm_dir):
         self.messages = []
