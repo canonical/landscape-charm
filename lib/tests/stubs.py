@@ -1,7 +1,6 @@
 import subprocess
 
-from charmhelpers.core import hookenv
-from charmhelpers.core.hookenv import Config
+from charmhelpers.core.hookenv import DEBUG, ERROR, Config
 
 
 class HookenvStub(object):
@@ -13,8 +12,8 @@ class HookenvStub(object):
     relid = None
     leader = True
 
-    DEBUG = hookenv.DEBUG
-    ERROR = hookenv.ERROR
+    DEBUG = DEBUG
+    ERROR = ERROR
 
     def __init__(self, charm_dir):
         self.messages = []

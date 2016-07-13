@@ -8,9 +8,9 @@ import subprocess
 from charmhelpers import fetch
 from charmhelpers.core import hookenv
 
-from lib import utils
 from lib.error import CharmError
 from lib.paths import default_paths
+from lib.utils import CommandRunner
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
 INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-minimal", "python-psutil")
@@ -74,7 +74,7 @@ class Apt(object):
         self._subprocess = subprocess
         self._paths = paths
 
-        self._runner = utils.CommandRunner(hookenv, subprocess)
+        self._runner = CommandRunner(hookenv, subprocess)
 
     def set_sources(self, force_update=False):
         """Configure the extra APT sources to use."""
