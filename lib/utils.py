@@ -115,11 +115,6 @@ class CommandRunner(object):
         args.insert(0, cmd)
         self._run(args)
 
-    def shell(self, cmd, *args):
-        """Run cmd through the shell.
-
-        The provided args, if any, are combined with cmd into a single
-        string.
-        """
-        args = cmd if not args else cmd + ' ' + ' '.join(args)
-        self._run(args, shell=True)
+    def shell(self, script):
+        """Run a shell script."""
+        self._run(script, shell=True)
