@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.error import CharmError
@@ -124,7 +125,7 @@ class CommandRunnerTest(HookenvTest):
 
         self.assertEqual(self.hookenv.messages,
                          [('running \'/bin/some-command x y z\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ])
 
     def test_run_failure(self):
@@ -142,10 +143,10 @@ class CommandRunnerTest(HookenvTest):
                          '/bin/some-command x y z')
         self.assertEqual(self.hookenv.messages,
                          [('running \'/bin/some-command x y z\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ('got return code 1 running '
                            '\'/bin/some-command x y z\'',
-                           self.hookenv.ERROR),
+                           hookenv.ERROR),
                           ])
 
     def test_shell_subprocess_calls(self):
@@ -172,7 +173,7 @@ class CommandRunnerTest(HookenvTest):
 
         self.assertEqual(self.hookenv.messages,
                          [('running \'/bin/some-command x y z\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ])
 
     def test_shell_failure(self):
@@ -193,8 +194,8 @@ class CommandRunnerTest(HookenvTest):
                           ])
         self.assertEqual(self.hookenv.messages,
                          [('running \'/bin/some-command x y z\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ('got return code 1 running '
                            '\'/bin/some-command x y z\'',
-                           self.hookenv.ERROR),
+                           hookenv.ERROR),
                           ])

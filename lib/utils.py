@@ -99,13 +99,13 @@ class CommandRunner(object):
         cmdstr = args if isinstance(args, str) else ' '.join(args)
 
         self._hookenv.log('running {!r}'.format(cmdstr),
-                          level=self._hookenv.DEBUG)
+                          level=hookenv.DEBUG)
         try:
             self._subprocess.check_call(args, **kwargs)
         except subprocess.CalledProcessError as err:
             self._hookenv.log('got return code {} running {!r}'
                               .format(err.returncode, cmdstr),
-                              level=self._hookenv.ERROR)
+                              level=hookenv.ERROR)
             raise CharmError('command failed (see unit logs): {}'
                              .format(cmdstr))
 

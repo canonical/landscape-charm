@@ -1,3 +1,5 @@
+from charmhelpers.core import hookenv
+
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
 from lib.tests.stubs import FetchStub, SubprocessStub
@@ -94,10 +96,10 @@ class UpgradeActionTest(HookenvTest):
                           ('Adding repository: ppa:my-ppa', None),
                           ('running \'apt-mark unhold landscape-server '
                            'landscape-hashids\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ('running \'apt-mark hold landscape-server '
                            'landscape-hashids\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ])
 
     def test_run_failure(self):
@@ -121,10 +123,10 @@ class UpgradeActionTest(HookenvTest):
                           ('Adding repository: ppa:my-ppa', None),
                           ('running \'apt-mark unhold landscape-server '
                            'landscape-hashids\'',
-                           self.hookenv.DEBUG),
+                           hookenv.DEBUG),
                           ('got return code 1 running \'apt-mark unhold '
                            'landscape-server landscape-hashids\'',
-                           self.hookenv.ERROR),
+                           hookenv.ERROR),
                           ])
         self.assertEqual(self.hookenv.action_fails,
                          ['command failed (see unit logs): apt-mark unhold '
