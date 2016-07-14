@@ -70,15 +70,7 @@ class CommandRunner(object):
     well as logging the return code).
     """
 
-    _HOOKENV = hookenv
-    _SUBPROCESS = subprocess
-
-    def __init__(self, hookenv=None, subprocess=None):
-        if hookenv is None:
-            hookenv = self._HOOKENV
-        if subprocess is None:
-            subprocess = self._SUBPROCESS
-
+    def __init__(self, hookenv=hookenv, subprocess=subprocess):
         self._hookenv = hookenv
         self._subprocess = subprocess
         self._cwd = None
