@@ -168,14 +168,14 @@ class AptTest(HookenvTest):
         self.apt.install_packages()
 
         build_dir = os.path.join(self.hookenv.charm_dir(), "build", "package")
-        repo_dir = os.path.join(self.hookenv.charm_dir(), "build", "repo")
-        self.assertTrue(os.path.exists(os.path.join(
-            repo_dir, "landscape-server_1.2.3_all.deb")))
-
         self.assertIn(
             (["/usr/lib/pbuilder/pbuilder-satisfydepends"],
              {"cwd": build_dir}),
             self.subprocess.calls)
+
+        repo_dir = os.path.join(self.hookenv.charm_dir(), "build", "repo")
+        self.assertTrue(os.path.exists(os.path.join(
+            repo_dir, "landscape-server_1.2.3_all.deb")))
 
         self.assertEqual(
             [("ppa:landscape/14.10", None),

@@ -181,6 +181,12 @@ class SubprocessStub(object):
         self._fake_executables.setdefault(executable, {})[args] = (
             return_code, stdout, stderr)
 
+    def add_fake_script(self, script, stdout="", stderr="", return_code=0):
+        """Register the fake results for a script."""
+        args = None
+        result = (return_code, stdout, stderr)
+        self._fake_executables.setdefault(script, {})[args] = result
+
     def call(self, command, **kwargs):
         returncode, stdout, stderr = self._call(command, **kwargs)
         return returncode
@@ -218,7 +224,11 @@ class SubprocessStub(object):
         module.
         """
         self.calls.append((command, kwargs))
-        fake_command = self._fake_executables.get(command[0])
+
+        key = command
+        if not isinstance(command, str):
+            key = command[0]
+        fake_command = self._fake_executables.get(key)
         if fake_command is not None:
             args = tuple(command[1:])
             if args not in fake_command:
