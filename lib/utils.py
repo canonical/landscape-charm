@@ -85,9 +85,9 @@ class CommandRunner(object):
     def _run(self, args, shell=False):
         kwargs = {}
         if shell:
-            kwargs.update(shell=True)
+            kwargs['shell'] = True
         if self._cwd:
-            kwargs.update(cwd=self._cwd)
+            kwargs['cwd'] = self._cwd
         cmdstr = args if isinstance(args, str) else ' '.join(args)
 
         self._hookenv.log('running {!r}'.format(cmdstr),
