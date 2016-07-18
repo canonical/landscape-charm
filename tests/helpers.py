@@ -318,7 +318,7 @@ class EnvironmentFixture(Fixture):
         if "systemd" in output:
             return self._get_landscape_services_status_systemd(output)
         else:
-            return self._get_landscape_services_status_trusty(output)
+            return self._get_landscape_services_status_sysv(output)
 
     def _get_landscape_services_status_sysv(self, output):
         """Get the landscape service status from sysvinitoutput.
