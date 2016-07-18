@@ -323,7 +323,7 @@ class EnvironmentFixture(Fixture):
     def _get_landscape_services_status_sysv(self, output):
         """Get the landscape service status from sysvinitoutput.
 
-        This method can be removed when we don't support trusty anymore.
+        XXX: This method can be removed when we don't support trusty anymore.
         """
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
