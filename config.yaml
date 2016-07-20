@@ -1,14 +1,14 @@
 options:
     source:
-        default: "ppa:landscape/16.03"
+        default: "ppa:landscape/16.06"
         type: string
         description: |
             The source from which to install the landscape packages. Possible
             values are:
-                - A version number: "16.03"
-                - A PPA URL: "ppa:landscape/16.03"
-                - A full deb line: "deb http://ppa.launchpad.net/landscape/16.03/ubuntu trusty main"
-                - A comma-separated list of the previous values, e.g. "16.03, ppa:juju/devel" (NOTE:
+                - A version number: "16.06"
+                - A PPA URL: "ppa:landscape/16.06"
+                - A full deb line: "deb http://ppa.launchpad.net/landscape/16.06/ubuntu xenial main"
+                - A comma-separated list of the previous values, e.g. "16.06, ppa:juju/devel" (NOTE:
                   using multiple repositories is meant for testing only, and not supported for
                   production deployments, that should always just point to a single official
                   Landscape PPA or a mirror of it).
