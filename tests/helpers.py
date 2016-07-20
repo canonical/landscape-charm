@@ -315,10 +315,20 @@ class EnvironmentFixture(Fixture):
         """
         output, _ = self.run_command_on_landscape(
             "lsctl status", unit)
+        if "systemd" in output:
+            return self._get_landscape_services_status_systemd(output)
+        else:
+            return self._get_landscape_services_status_sysv(output)
+
+    def _get_landscape_services_status_sysv(self, output):
+        """Get the landscape service status from sysvinitoutput.
+
+        XXX: This method can be removed when we don't support trusty anymore.
+        """
         service_status = {"running": [], "stopped": []}
         lines = output.splitlines()
         for line in lines:
-            line = line.strip()
+            line = line.strip().lower()
             if not line.startswith("* "):
                 continue
             service_name = line[2:line.index(" is ")]
@@ -335,6 +345,29 @@ class EnvironmentFixture(Fixture):
             service_status["running"].append(service_name)
         else:
             service_status["stopped"].append(service_name)
+        return service_status
+
+    def _get_landscape_services_status_systemd(self, output):
+        """Get the landscape service status from systemd output."""
+        service_status = {"running": [], "stopped": []}
+        lines = output.splitlines()
+        service_name = None
+        for line in lines:
+            line = line.strip()
+            if service_name is None and not line.startswith("=="):
+                continue
+            if line.startswith("=="):
+                service_name = line.split(" ")[1]
+                continue
+
+            if line.startswith("Active:"):
+                if line.startswith("Active: active (running)"):
+                    service_status["running"].append(service_name)
+                elif line.startswith("Active: inactive (dead)"):
+                    service_status["stopped"].append(service_name)
+                else:
+                    raise AssertionError("Unknown status line: " + line)
+                service_name = None
         return service_status
 
     def add_fake_db_patch(self, unit=None):
