@@ -25,7 +25,8 @@ SERVICE_OPTIONS = {
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "acl ping path_beg -i /ping",
-        "redirect scheme https unless ping",
+        "acl repository path_beg -i /repository",
+        "redirect scheme https unless ping OR repository",
         "use_backend landscape-ping if ping",
     ],
     "https": [
