@@ -1,9 +1,5 @@
-#!/usr/bin/python
-import sys
+#!/usr/bin/python3
+from charmhelpers.core import hookenv
 
-from lib.upgradecharm import UpgradeCharmHook
-
-
-if __name__ == "__main__":
-    hook = UpgradeCharmHook()
-    sys.exit(hook())
+hookenv.log("upgrade-charm hook was called. Please use the 'upgrade' action "
+            "instead. Noop.")
