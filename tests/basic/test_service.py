@@ -92,7 +92,7 @@ class ServiceTest(IntegrationTest):
         Verify that the frontend shows the styled unavailable page.
         """
         self.environment.stop_landscape_service("landscape-appserver")
-        self.environment.check_url("/", "please phone us")
+        self.environment.check_url("/", "Service will resume shortly")
 
     def test_msg_unavailable_page(self):
         """
