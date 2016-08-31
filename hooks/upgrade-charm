@@ -1,5 +1,0 @@
-#!/usr/bin/python3
-from charmhelpers.core import hookenv
-
-hookenv.log("upgrade-charm hook was called. Please use the 'upgrade' action "
-            "instead. Noop.")
