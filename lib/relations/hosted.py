@@ -13,6 +13,15 @@ class InvalidDeploymentModeError(CharmError):
         super(InvalidDeploymentModeError, self).__init__(message)
 
 
+class DuplicateArchiveNameError(CharmError):
+    """Same archive name was used at least twice in a hosted relation data."""
+
+    def __init__(self, deployment_mode):
+        message = "Duplicate archive name '%s' used for proxy-ppas." % (
+            deployment_mode)
+        super(DuplicateArchiveNameError, self).__init__(message)
+
+
 class HostedRequirer(RelationContext):
     """Relation data requirer for the 'hosted' interface.
 
@@ -42,3 +51,20 @@ class HostedRequirer(RelationContext):
             deployment_mode = data[0]["deployment-mode"]
             if deployment_mode not in DEPLOYMENT_MODES:
                 raise InvalidDeploymentModeError(deployment_mode)
+
+            proxy_ppas = data[0].get("proxy-ppas")
+            archives = {}
+            if proxy_ppas:
+                for archive in proxy_ppas.split(","):
+                    archive_name, archive_url = archive.split("=", 1)
+                    if archive_name.strip() not in archives:
+                        archives[archive_name.strip()] = archive_url.strip()
+                    else:
+                        raise DuplicateArchiveNameError(archive_name.strip())
+                data[0].update({"proxy-ppas": archives})
+
+            supported_releases = data[0].get("supported-release-ppas")
+            if supported_releases:
+                releases = [release.strip()
+                            for release in supported_releases.split(",")]
+                data[0].update({"supported-release-ppas": releases})
