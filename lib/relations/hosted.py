@@ -52,19 +52,19 @@ class HostedRequirer(RelationContext):
             if deployment_mode not in DEPLOYMENT_MODES:
                 raise InvalidDeploymentModeError(deployment_mode)
 
-            proxy_ppas = data[0].get("proxy-ppas")
+            ppas_to_proxy = data[0].get("ppas-to-proxy")
             archives = {}
-            if proxy_ppas:
-                for archive in proxy_ppas.split(","):
+            if ppas_to_proxy:
+                for archive in ppas_to_proxy.split(","):
                     archive_name, archive_url = archive.split("=", 1)
                     if archive_name.strip() not in archives:
                         archives[archive_name.strip()] = archive_url.strip()
                     else:
                         raise DuplicateArchiveNameError(archive_name.strip())
-                data[0].update({"proxy-ppas": archives})
+                data[0].update({"ppas-to-proxy": archives})
 
-            supported_releases = data[0].get("supported-release-ppas")
+            supported_releases = data[0].get("supported-releases")
             if supported_releases:
                 releases = [release.strip()
                             for release in supported_releases.split(",")]
-                data[0].update({"supported-release-ppas": releases})
+                data[0].update({"supported-releases": releases})
