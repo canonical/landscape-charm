@@ -46,3 +46,7 @@ RUN_PACKAGEUPLOADSERVER="yes"
 {% else %}
 RUN_PACKAGEUPLOADSERVER="no"
 {% endif %}
+
+{% if hosted[0]["ppas-to-proxy"] %}
+RUN_PPPA_PROXY="yes"
+{% endif %}
