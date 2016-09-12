@@ -83,14 +83,17 @@ class HostedRequirerTest(HookenvTest):
         self.assertEqual(
             "Invalid deployment-mode 'foo'", error.exception.message)
 
-    def test_missing_supported_release(self):
+    def test_get_data_pppa_proxy(self):
         """
-        A release is listed in supported-releases but the URL for it is not
-        provided in ppas-to-proxy attribute of the hosted relation data.
+        Hosted relation data "ppas-to-proxy" is parsed into a dict,
+        and "supported-releases" is parsed into a list.
         """
-        hosted_data = {"deployment-mode": "edge",
-                       "supported-releases": "16.06",
-                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        hosted_data = {
+            "deployment-mode": "edge",
+            "supported-releases": "16.03, 16.06",
+            "ppas-to-proxy": (
+                "16.03=http://foo/16.03/ubuntu,16.06=http://foo/16.06/ubuntu"),
+        }
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {
@@ -98,13 +101,13 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        with self.assertRaises(MissingSupportedReleaseUrlError) as error:
-            HostedRequirer()
-
+        relation = HostedRequirer()
         self.assertEqual(
-            ("PPA '16.06' listed in supported-releases does not have "
-             "the URL defined in ppas-to-proxy."),
-            error.exception.message)
+            {"16.03": "http://foo/16.03/ubuntu",
+             "16.06": "http://foo/16.06/ubuntu"},
+            relation["hosted"][0]["ppas-to-proxy"])
+        self.assertEqual(["16.03", "16.06"],
+                         relation["hosted"][0]["supported-releases"])
 
     def test_duplicate_archive_name(self):
         """
@@ -129,4 +132,27 @@ class HostedRequirerTest(HookenvTest):
 
         self.assertEqual(
             "Archive name '16.03' used twice in ppas-to-proxy.",
+            error.exception.message)
+
+    def test_missing_supported_release(self):
+        """
+        A release is listed in supported-releases but the URL for it is not
+        provided in ppas-to-proxy attribute of the hosted relation data.
+        """
+        hosted_data = {"deployment-mode": "edge",
+                       "supported-releases": "16.06",
+                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        with self.assertRaises(MissingSupportedReleaseUrlError) as error:
+            HostedRequirer()
+
+        self.assertEqual(
+            ("PPA '16.06' listed in supported-releases does not have "
+             "the URL defined in ppas-to-proxy."),
             error.exception.message)
