@@ -195,6 +195,23 @@ class LandscapeDefaultsTest(TemplateTest):
         buffer = self.template.render(self.context)
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
 
+    def test_render_ppa_proxy_nothing_by_default(self):
+        """
+        By default RUN_PPPA_PROXY is not rendered at all.
+        """
+        buffer = self.template.render(self.context)
+        self.assertNotIn('RUN_PPPA_PROXY', buffer)
+
+    def test_render_ppa_proxy(self):
+        """
+        If hosted relation provides ppas-to-proxy, RUN_PPPA_PROXY is added.
+        """
+        self.context["hosted"][0]["ppas-to-proxy"] = {
+            "16.03": "http://ppa.launchpad.net/landscape/16.06/ubuntu",
+        }
+        buffer = self.template.render(self.context)
+        self.assertIn('RUN_PPPA_PROXY="yes"\n', buffer)
+
     def test_render_package_search(self):
         """
         If the landscape-server unit is the leader, package-search will be run.
