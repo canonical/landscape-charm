@@ -1,6 +1,8 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.sample import SAMPLE_HOSTED_DATA
-from lib.relations.hosted import HostedRequirer, InvalidDeploymentModeError
+from lib.relations.hosted import (
+    DuplicateArchiveNameError, HostedRequirer, InvalidDeploymentModeError,
+    MissingSupportedReleaseUrlError)
 
 
 class HostedRequirerTest(HookenvTest):
@@ -14,7 +16,7 @@ class HostedRequirerTest(HookenvTest):
         considered ready.
         """
         self.assertItemsEqual(
-            ["deployment-mode"],
+            ["deployment-mode", "ppas-to-proxy", "supported-releases"],
             HostedRequirer.required_keys)
 
     def test_not_related(self):
@@ -32,7 +34,9 @@ class HostedRequirerTest(HookenvTest):
         When the landscape-server service is related to landscape-hosted
         the deployment-mode is the one set on the relation.
         """
-        hosted_data = {"deployment-mode": "production"}
+        hosted_data = {"deployment-mode": "production",
+                       "supported-releases": "16.03",
+                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {
@@ -63,7 +67,9 @@ class HostedRequirerTest(HookenvTest):
         The deployment mode set on the relation must be a valid one, otherwise
         an error is raised.
         """
-        hosted_data = {"deployment-mode": "foo"}
+        hosted_data = {"deployment-mode": "foo",
+                       "supported-releases": "16.03",
+                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {
@@ -76,3 +82,51 @@ class HostedRequirerTest(HookenvTest):
 
         self.assertEqual(
             "Invalid deployment-mode 'foo'", error.exception.message)
+
+    def test_missing_supported_release(self):
+        """
+        A release is listed in supported-releases but the URL for it is not
+        provided in ppas-to-proxy attribute of the hosted relation data.
+        """
+        hosted_data = {"deployment-mode": "edge",
+                       "supported-releases": "16.06",
+                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        with self.assertRaises(MissingSupportedReleaseUrlError) as error:
+            HostedRequirer()
+
+        self.assertEqual(
+            ("PPA '16.06' listed in supported-releases does not have "
+             "the URL defined in ppas-to-proxy."),
+            error.exception.message)
+
+    def test_duplicate_archive_name(self):
+        """
+        Specifying the same short name for a PPA in ppas-to-proxy throws
+        an exception.
+        """
+        hosted_data = {
+            "deployment-mode": "edge",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": (
+                "16.03=http://foo/16.03/ubuntu,16.03=http://foo/16.06/ubuntu"),
+        }
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        with self.assertRaises(DuplicateArchiveNameError) as error:
+            HostedRequirer()
+
+        self.assertEqual(
+            "Duplicate archive name '16.03' used twice in proxy-ppas.",
+            error.exception.message)

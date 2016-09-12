@@ -17,9 +17,19 @@ class DuplicateArchiveNameError(CharmError):
     """Same archive name was used at least twice in a hosted relation data."""
 
     def __init__(self, deployment_mode):
-        message = "Duplicate archive name '%s' used for proxy-ppas." % (
+        message = "Duplicate archive name '%s' used twice in proxy-ppas." % (
             deployment_mode)
         super(DuplicateArchiveNameError, self).__init__(message)
+
+
+class MissingSupportedReleaseUrlError(CharmError):
+    """PPA was provided in supported-releases, but is not defined at all."""
+
+    def __init__(self, release_name):
+        message = (
+            "PPA '%s' listed in supported-releases does not have "
+            "the URL defined in ppas-to-proxy." % (release_name))
+        super(MissingSupportedReleaseUrlError, self).__init__(message)
 
 
 class HostedRequirer(RelationContext):
@@ -34,7 +44,10 @@ class HostedRequirer(RelationContext):
     name = "hosted"
     interface = "landscape-hosted"
     required_keys = [
-        "deployment-mode",  # Can be standalone/edge/staging/production.
+        "deployment-mode",     # Can be standalone/edge/staging/production.
+        "supported-releases",  # A comma-separated list of release short names.
+        "ppas-to-proxy",       # A map of release names to archive URLs in the
+                               # name1=url1,name2=url2 format.
     ]
 
     def get_data(self):
@@ -65,6 +78,10 @@ class HostedRequirer(RelationContext):
 
             supported_releases = data[0].get("supported-releases")
             if supported_releases:
-                releases = [release.strip()
-                            for release in supported_releases.split(",")]
+                releases = []
+                for release in supported_releases.split(","):
+                    release = release.strip()
+                    if release not in ppas_to_proxy:
+                        raise MissingSupportedReleaseUrlError(release)
+                    releases.append(release)
                 data[0].update({"supported-releases": releases})
