@@ -128,5 +128,5 @@ class HostedRequirerTest(HookenvTest):
             HostedRequirer()
 
         self.assertEqual(
-            "Duplicate archive name '16.03' used twice in proxy-ppas.",
+            "Archive name '16.03' used twice in ppas-to-proxy.",
             error.exception.message)

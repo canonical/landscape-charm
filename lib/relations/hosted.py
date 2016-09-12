@@ -17,7 +17,7 @@ class DuplicateArchiveNameError(CharmError):
     """Same archive name was used at least twice in a hosted relation data."""
 
     def __init__(self, deployment_mode):
-        message = "Duplicate archive name '%s' used twice in proxy-ppas." % (
+        message = "Archive name '%s' used twice in ppas-to-proxy." % (
             deployment_mode)
         super(DuplicateArchiveNameError, self).__init__(message)
 
