@@ -168,7 +168,7 @@ class ServiceConfTest(TemplateTest):
             "supported-releases": ["16.03", "16.06"],
             # It's required to have ppas-to-proxy to even get the pppa-proxy
             # config section.
-            "ppas-to-proxy": { "16.03": "foo"},
+            "ppas-to-proxy": {"16.03": "foo"},
         })
         buffer = StringIO(self.template.render(self.context))
         config = ConfigParser()
