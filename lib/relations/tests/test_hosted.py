@@ -140,7 +140,7 @@ class HostedRequirerTest(HookenvTest):
         provided in ppas-to-proxy attribute of the hosted relation data.
         """
         hosted_data = {"deployment-mode": "edge",
-                       "supported-releases": "16.06",
+                       "supported-releases": "16.06,16.09",
                        "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
         self.hookenv.relations = {
             "hosted": {
@@ -153,6 +153,6 @@ class HostedRequirerTest(HookenvTest):
             HostedRequirer()
 
         self.assertEqual(
-            ("PPA '16.06' listed in supported-releases does not have "
-             "the URL defined in ppas-to-proxy."),
+            ("Some archives (16.06, 16.09) listed in 'supported-releases' do "
+             "not have their URLs defined in 'ppas-to-proxy'."),
             error.exception.message)

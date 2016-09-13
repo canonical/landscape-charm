@@ -16,19 +16,20 @@ class InvalidDeploymentModeError(CharmError):
 class DuplicateArchiveNameError(CharmError):
     """Same archive name was used at least twice in a hosted relation data."""
 
-    def __init__(self, deployment_mode):
+    def __init__(self, archive_name):
         message = "Archive name '%s' used twice in ppas-to-proxy." % (
-            deployment_mode)
+            archive_name)
         super(DuplicateArchiveNameError, self).__init__(message)
 
 
 class MissingSupportedReleaseUrlError(CharmError):
     """PPA was provided in supported-releases, but is not defined at all."""
 
-    def __init__(self, release_name):
+    def __init__(self, releases):
+        release_names = ", ".join(releases)
         message = (
-            "PPA '%s' listed in supported-releases does not have "
-            "the URL defined in ppas-to-proxy." % (release_name))
+            "Some archives (%s) listed in 'supported-releases' do not have "
+            "their URLs defined in 'ppas-to-proxy'." % (release_names))
         super(MissingSupportedReleaseUrlError, self).__init__(message)
 
 
@@ -65,7 +66,7 @@ class HostedRequirer(RelationContext):
             if deployment_mode not in DEPLOYMENT_MODES:
                 raise InvalidDeploymentModeError(deployment_mode)
 
-            ppas_to_proxy = data[0].get("ppas-to-proxy")
+            ppas_to_proxy = data[0]["ppas-to-proxy"]
             archives = {}
             if ppas_to_proxy:
                 for archive in ppas_to_proxy.split(","):
@@ -76,12 +77,12 @@ class HostedRequirer(RelationContext):
                         raise DuplicateArchiveNameError(archive_name.strip())
                 data[0].update({"ppas-to-proxy": archives})
 
-            supported_releases = data[0].get("supported-releases")
+            supported_releases = data[0]["supported-releases"]
             if supported_releases:
-                releases = []
-                for release in supported_releases.split(","):
-                    release = release.strip()
-                    if release not in ppas_to_proxy:
-                        raise MissingSupportedReleaseUrlError(release)
-                    releases.append(release)
+                releases = [release.strip()
+                            for release in supported_releases.split(",")]
+
+                missing_releases = set(releases) - set(archives.keys())
+                if missing_releases:
+                    raise MissingSupportedReleaseUrlError(missing_releases)
                 data[0].update({"supported-releases": releases})
