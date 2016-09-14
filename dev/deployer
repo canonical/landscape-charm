@@ -129,13 +129,12 @@ class Deployer(object):
             # Run the command on all units, rather than having to figure
             # out which unit to run it on.
             if self.juju_version == 1:
-                subprocess.check_output([
-                    "juju", "run", "--service", "landscape-server",
-                    command.format(flag)])
+                option = "--service"
             else:
-                subprocess.check_output([
-                    "juju", "run", "--application", "landscape-server",
-                    command.format(flag)])
+                option = "--application"
+            subprocess.check_output([
+                "juju", "run", option, "landscape-server",
+                command.format(flag)])
 
 
 def get_parser():
