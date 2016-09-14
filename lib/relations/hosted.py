@@ -73,11 +73,12 @@ class HostedRequirer(RelationContext):
             if ppas_to_proxy:
                 for archive in ppas_to_proxy.split(","):
                     archive_name, archive_url = archive.split("=", 1)
-                    if archive_name.strip() not in archives:
-                        archives[archive_name.strip()] = archive_url.strip()
+                    archive_name = archive_name.strip()
+                    if archive_name not in archives:
+                        archives[archive_name] = archive_url.strip()
                     else:
-                        raise DuplicateArchiveNameError(archive_name.strip())
-                data[0].update({"ppas-to-proxy": archives})
+                        raise DuplicateArchiveNameError(archive_name)
+                data[0]["ppas-to-proxy"] = archives
 
             supported_releases = data[0]["supported-releases"]
             if supported_releases:
@@ -87,4 +88,4 @@ class HostedRequirer(RelationContext):
                 missing_releases = set(releases) - set(archives.keys())
                 if missing_releases:
                     raise MissingSupportedReleaseUrlError(missing_releases)
-                data[0].update({"supported-releases": releases})
+                data[0]["supported-releases"] = releases
