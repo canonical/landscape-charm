@@ -9,7 +9,8 @@ class InvalidDeploymentModeError(CharmError):
     """Invalid deployment mode."""
 
     def __init__(self, deployment_mode):
-        message = "Invalid deployment-mode '%s'" % deployment_mode
+        message = "Invalid deployment-mode '{mode}'".format(
+            mode=deployment_mode)
         super(InvalidDeploymentModeError, self).__init__(message)
 
 
@@ -17,8 +18,8 @@ class DuplicateArchiveNameError(CharmError):
     """Same archive name was used at least twice in a hosted relation data."""
 
     def __init__(self, archive_name):
-        message = "Archive name '%s' used twice in ppas-to-proxy." % (
-            archive_name)
+        message = "Archive name '{archive_name}' used twice in ppas-to-proxy."
+        message = message.format(archive_name=archive_name)
         super(DuplicateArchiveNameError, self).__init__(message)
 
 
@@ -28,8 +29,9 @@ class MissingSupportedReleaseUrlError(CharmError):
     def __init__(self, releases):
         release_names = ", ".join(releases)
         message = (
-            "Some archives (%s) listed in 'supported-releases' do not have "
-            "their URLs defined in 'ppas-to-proxy'." % (release_names))
+            "Some archives ({archives}) listed in 'supported-releases' do not "
+            "have their URLs defined in 'ppas-to-proxy'.".format(
+                archives=release_names))
         super(MissingSupportedReleaseUrlError, self).__init__(message)
 
 
