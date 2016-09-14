@@ -31,6 +31,10 @@ class Deployer(object):
     """
 
     def __init__(self, args):
+        self.juju_version = 1
+        version = subprocess.check_output(["juju", "version"]).decode("utf-8")
+        if version.startswith("2"):
+            self.juju_version = 2
         self._args = args
 
     def _stage_deployer_dir(self, deployer_dir, series):
@@ -124,9 +128,14 @@ class Deployer(object):
         for flag in self._args.flags:
             # Run the command on all units, rather than having to figure
             # out which unit to run it on.
-            subprocess.check_output(
-                ["juju", "run", "--service", "landscape-server",
-                 command.format(flag)])
+            if self.juju_version == 1:
+                subprocess.check_output([
+                    "juju", "run", "--service", "landscape-server",
+                    command.format(flag)])
+            else:
+                subprocess.check_output([
+                    "juju", "run", "--application", "landscape-server",
+                    command.format(flag)])
 
 
 def get_parser():
