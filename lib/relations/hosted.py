@@ -9,8 +9,30 @@ class InvalidDeploymentModeError(CharmError):
     """Invalid deployment mode."""
 
     def __init__(self, deployment_mode):
-        message = "Invalid deployment-mode '%s'" % deployment_mode
+        message = "Invalid deployment-mode '{mode}'".format(
+            mode=deployment_mode)
         super(InvalidDeploymentModeError, self).__init__(message)
+
+
+class DuplicateArchiveNameError(CharmError):
+    """Same archive name was used at least twice in a hosted relation data."""
+
+    def __init__(self, archive_name):
+        message = "Archive name '{archive_name}' used twice in ppas-to-proxy."
+        message = message.format(archive_name=archive_name)
+        super(DuplicateArchiveNameError, self).__init__(message)
+
+
+class MissingSupportedReleaseUrlError(CharmError):
+    """PPA was provided in supported-releases, but is not defined at all."""
+
+    def __init__(self, releases):
+        release_names = ", ".join(releases)
+        message = (
+            "Some archives ({archives}) listed in 'supported-releases' do not "
+            "have their URLs defined in 'ppas-to-proxy'.".format(
+                archives=release_names))
+        super(MissingSupportedReleaseUrlError, self).__init__(message)
 
 
 class HostedRequirer(RelationContext):
@@ -25,7 +47,10 @@ class HostedRequirer(RelationContext):
     name = "hosted"
     interface = "landscape-hosted"
     required_keys = [
-        "deployment-mode",  # Can be standalone/edge/staging/production.
+        "deployment-mode",     # Can be standalone/edge/staging/production.
+        "supported-releases",  # A comma-separated list of release short names.
+        "ppas-to-proxy",       # A map of release names to archive URLs in the
+                               # name1=url1,name2=url2 format.
     ]
 
     def get_data(self):
@@ -42,3 +67,25 @@ class HostedRequirer(RelationContext):
             deployment_mode = data[0]["deployment-mode"]
             if deployment_mode not in DEPLOYMENT_MODES:
                 raise InvalidDeploymentModeError(deployment_mode)
+
+            ppas_to_proxy = data[0]["ppas-to-proxy"]
+            archives = {}
+            if ppas_to_proxy:
+                for archive in ppas_to_proxy.split(","):
+                    archive_name, archive_url = archive.split("=", 1)
+                    archive_name = archive_name.strip()
+                    if archive_name not in archives:
+                        archives[archive_name] = archive_url.strip()
+                    else:
+                        raise DuplicateArchiveNameError(archive_name)
+                data[0]["ppas-to-proxy"] = archives
+
+            supported_releases = data[0]["supported-releases"]
+            if supported_releases:
+                releases = [release.strip()
+                            for release in supported_releases.split(",")]
+
+                missing_releases = set(releases) - set(archives.keys())
+                if missing_releases:
+                    raise MissingSupportedReleaseUrlError(missing_releases)
+                data[0]["supported-releases"] = releases

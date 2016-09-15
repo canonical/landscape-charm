@@ -141,6 +141,8 @@ class ServicesHookTest(HookenvTest):
         """
         hosted_data = SAMPLE_HOSTED_DATA.copy()
         hosted_data["deployment-mode"] = "edge"
+        hosted_data["ppas-to-proxy"] = ""
+        hosted_data["supported-releases"] = ""
         self.hookenv.relations.update({
             "hosted": {
                 "hosted:1": {

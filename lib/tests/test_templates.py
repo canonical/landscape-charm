@@ -138,6 +138,44 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual(
             "https://8.8.8.8/", config.get("package-upload", "root-url"))
 
+    def test_render_with_pppa_proxy(self):
+        """
+        With ppas-to-proxy defined in the hosted relation, pppa-proxy section
+        is added to the service configuration listing URLs for all PPAs.
+        """
+        self.context["hosted"][0].update({
+            "ppas-to-proxy": {
+                "16.03": "http://ppa.launchpad.net/landscape/16.03/ubuntu",
+                "16.06": "http://ppa.launchpad.net/landscape/16.06/ubuntu",
+            },
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual(
+            "http://ppa.launchpad.net/landscape/16.03/ubuntu",
+            config.get("pppa-proxy", "16.03-url"))
+        self.assertEqual(
+            "http://ppa.launchpad.net/landscape/16.06/ubuntu",
+            config.get("pppa-proxy", "16.06-url"))
+
+    def test_render_with_pppa_proxy_supported_releases(self):
+        """
+        With supported-releases defined in the hosted relation, pppa-proxy
+        section with the "supported-releases" key.
+        """
+        self.context["hosted"][0].update({
+            "supported-releases": ["16.03", "16.06"],
+            # It's required to have ppas-to-proxy to even get the pppa-proxy
+            # config section.
+            "ppas-to-proxy": {"16.03": "foo"},
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual(
+            "16.03 16.06", config.get("pppa-proxy", "supported-releases"))
+
 
 class LandscapeDefaultsTest(TemplateTest):
 
@@ -194,6 +232,23 @@ class LandscapeDefaultsTest(TemplateTest):
         hosted_data["deployment-mode"] = "production"
         buffer = self.template.render(self.context)
         self.assertIn('RUN_JUJU_SYNC="no"\n', buffer)
+
+    def test_render_ppa_proxy_nothing_by_default(self):
+        """
+        By default RUN_PPPA_PROXY is not rendered at all.
+        """
+        buffer = self.template.render(self.context)
+        self.assertNotIn('RUN_PPPA_PROXY', buffer)
+
+    def test_render_ppa_proxy(self):
+        """
+        If hosted relation provides ppas-to-proxy, RUN_PPPA_PROXY is added.
+        """
+        self.context["hosted"][0]["ppas-to-proxy"] = {
+            "16.06": "http://ppa.launchpad.net/landscape/16.06/ubuntu",
+        }
+        buffer = self.template.render(self.context)
+        self.assertIn('RUN_PPPA_PROXY="yes"\n', buffer)
 
     def test_render_package_search(self):
         """
