@@ -7,7 +7,7 @@ from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.utils import update_persisted_data
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
-from lib.tests.sample import SAMPLE_DB_UNIT_DATA
+from lib.tests.sample import SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_DATA
 
 
 class SchemaBootstrapTest(HookenvTest):
@@ -80,7 +80,11 @@ class LSCtlTest(HookenvTest):
         self.subprocess.add_fake_executable(LSCTL)
         self.services = [{
             "service": "landscape",
-            "required_data": [{"db": [SAMPLE_DB_UNIT_DATA]}]}]
+            "required_data": [
+                {"db": [SAMPLE_DB_UNIT_DATA]},
+                {"leader": SAMPLE_LEADER_DATA},
+            ]
+        }]
         self.manager = ServiceManager(services=self.services)
         self.callback = LSCtl(subprocess=self.subprocess, hookenv=self.hookenv)
 
@@ -247,3 +251,29 @@ class LSCtlTest(HookenvTest):
         self.callback(self.manager, "landscape", "start")
         self.assertEqual(
             ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])
+
+    def test_leader_elected(self):
+        """
+        The 'lsctl' script is invoked if leader details have changed, for
+        example if a non-leader unit becomes the leader.
+        """
+        old = SAMPLE_LEADER_DATA.copy()
+        old["is_leader"] = False
+        update_persisted_data("leader", old, hookenv=self.hookenv)
+        self.hookenv.hook = "leader-settings-changed"
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual(
+            ["/usr/bin/lsctl", "restart"], self.subprocess.calls[0][0])
+
+    def test_leader_deposed(self):
+        """
+        The 'lsctl' script is not invoked if leader details have changed
+        because the unit was the leader but got deposed.
+        """
+        old = SAMPLE_LEADER_DATA.copy()
+        old["is_leader"] = True
+        update_persisted_data("leader", old, hookenv=self.hookenv)
+        self.hookenv.leader = False
+        self.hookenv.hook = "leader-settings-changed"
+        self.callback(self.manager, "landscape", "start")
+        self.assertEqual([], self.subprocess.calls)
