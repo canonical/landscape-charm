@@ -1,5 +1,5 @@
 """
-Common helpers for landscpae integration tests.
+Common helpers for landscape integration tests.
 """
 
 import logging
@@ -291,17 +291,13 @@ class EnvironmentFixture(Fixture):
         # if they fail, they just print things to stdout/stderr
         return (output, status)
 
-    def stop_landscape_service(self, service, unit=None, restore=True):
+    def stop_landscape_service(self, service, unit=None):
         """Stop the given service on the given Landscape unit.
 
         @param service: The service to stop.
         @param unit: The Landscape unit to act on.
-        @param restore: Whether the service should be automatically restarted
-            upon cleanUp.
         """
         self._control_landscape_service("stop", service, unit)
-        if restore:
-            self.addCleanup(self.start_landscape_service, service, unit=unit)
 
     def start_landscape_service(self, service, unit=None):
         """Start the given Landscape service on the given unit."""
@@ -404,7 +400,8 @@ class EnvironmentFixture(Fixture):
         if current_count == new_count:
             return
         while current_count < new_count:
-            self._deployment.add_unit(service, target=self._new_unit_target)
+            self._deployment.add_unit(
+                service, target=self._new_unit_target, timeout=self._timeout)
             current_count += 1
         while current_count > new_count:
             self._deployment.destroy_unit(existing_units.pop())
@@ -603,6 +600,31 @@ class EnvironmentFixture(Fixture):
             if service != "name"]
         for service in services:
             DEFAULT_BUNDLE_CONTEXT[service]["to"] = self._new_unit_target
+
+
+class StoppedService(Fixture):
+    """Temporarily stop a Landscape service and restart it upon cleanup."""
+
+    def __init__(self, environment, service, unit=None):
+        """
+        @param environment: The EnvironmentFixture to use to drive the
+            unit.
+        @param service: The Landscape service to stop.
+        @param unit: The unit stop the service on. If None, it's
+            assumed that the service has only one unit.
+        """
+        super(StoppedService, self).__init__()
+        self._environment = environment
+        self._service = service
+        self._unit = unit
+
+    def setUp(self):
+        super(StoppedService, self).setUp()
+        self._environment.stop_landscape_service(
+            self._service, unit=self._unit)
+        self.addCleanup(
+            self._environment.start_landscape_service,
+            self._service, unit=self._unit)
 
 
 class IntegrationTest(TestWithFixtures):

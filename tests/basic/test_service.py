@@ -7,7 +7,7 @@ FIXME: revert to using ssh -q, stderr=STDOUT instead of 2>&1, stderr=PIPE once
 import tempfile
 from subprocess import check_output, PIPE
 
-from helpers import IntegrationTest
+from helpers import IntegrationTest, StoppedService
 from layers import OneLandscapeUnitLayer, OneLandscapeUnitNoCronLayer
 
 
@@ -91,14 +91,16 @@ class ServiceTest(IntegrationTest):
         """
         Verify that the frontend shows the styled unavailable page.
         """
-        self.environment.stop_landscape_service("landscape-appserver")
+        self.useFixture(
+            StoppedService(self.environment, "landscape-appserver"))
         self.environment.check_url("/", "Service will resume shortly")
 
     def test_msg_unavailable_page(self):
         """
         Verify that the frontend shows the unavailable page for msg.
         """
-        self.environment.stop_landscape_service("landscape-msgserver")
+        self.useFixture(
+            StoppedService(self.environment, "landscape-msgserver"))
         self.environment.check_url(
             "/message-system", "Landscape is unavailable")
 
@@ -106,7 +108,8 @@ class ServiceTest(IntegrationTest):
         """
         Verify that the frontend shows the unavailable page for ping.
         """
-        self.environment.stop_landscape_service("landscape-pingserver")
+        self.useFixture(
+            StoppedService(self.environment, "landscape-pingserver"))
         self.environment.check_url(
             "/ping", "Landscape is unavailable", proto="http")
 
@@ -211,6 +214,15 @@ class CronTest(IntegrationTest):
 
     def test_hash_id_databases_cron(self):
         """Verify that the hash_id_databases cron job runs without errors."""
+
+        # Use the sample hashids config file, to avoid pulling APT lists
+        # for the whole Ubuntu archive.
+        config_dir = "/opt/canonical/landscape/configs/standalone"
+        self.environment.run_command_on_landscape(
+            "sudo cp {config_dir}/hash-id-databases-sample.conf"
+            " {config_dir}/hash-id-databases.conf".format(
+                config_dir=config_dir))
+
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)

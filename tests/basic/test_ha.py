@@ -1,4 +1,4 @@
-from helpers import IntegrationTest
+from helpers import IntegrationTest, StoppedService
 from layers import TwoLandscapeUnitsLayer
 
 
@@ -21,64 +21,64 @@ class LandscapeHATest(IntegrationTest):
         """
         Verify that the APP service is up when the leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-appserver", unit=self.leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-appserver", unit=self.leader))
         self.environment.check_service("appserver", attempts=25, interval=1)
 
     def test_app_non_leader_down(self):
         """
         Verify that the APP service is up when a non-leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-appserver", unit=self.non_leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-appserver", unit=self.non_leader))
         self.environment.check_service("appserver", attempts=25, interval=1)
 
     def test_msg_leader_down(self):
         """
         Verify that the MSG service is up when the leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-msgserver", unit=self.leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-msgserver", unit=self.leader))
         self.environment.check_service("msgserver", attempts=25, interval=1)
 
     def test_msg_non_leader_down(self):
         """
         Verify that the MSG service is up when a non-leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-msgserver", unit=self.non_leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-msgserver", unit=self.non_leader))
         self.environment.check_service("msgserver", attempts=25, interval=1)
 
     def test_ping_leader_down(self):
         """
         Verify that the PING service is up when the leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-pingserver", unit=self.leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-pingserver", unit=self.leader))
         self.environment.check_service("pingserver", attempts=25, interval=1)
 
     def test_ping_non_leader_down(self):
         """
         Verify that the PING service is up when a non-leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-pingserver", unit=self.non_leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-pingserver", unit=self.non_leader))
         self.environment.check_service("pingserver", attempts=25, interval=1)
 
     def test_api_leader_down(self):
         """
         Verify that the API service is up when the leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-api", unit=self.leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-api", unit=self.leader))
         self.environment.check_service("api", attempts=25, interval=1)
 
     def test_api_non_leader_down(self):
         """
         Verify that the API service is up when a non-leader unit goes down.
         """
-        self.environment.stop_landscape_service(
-            "landscape-api", unit=self.non_leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-api", unit=self.non_leader))
         self.environment.check_service("api", attempts=25, interval=1)
 
     def test_upload_leader_down(self):
@@ -87,8 +87,8 @@ class LandscapeHATest(IntegrationTest):
         well. We don't have shared storage yet, so the package upload
         service is run on the leader only.
         """
-        self.environment.stop_landscape_service(
-            "landscape-package-upload", unit=self.leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-package-upload", unit=self.leader))
         self.environment.check_service("package-upload", state="down")
 
     def test_upload_non_leader_down(self):
@@ -97,6 +97,6 @@ class LandscapeHATest(IntegrationTest):
         continues to work, since the package upload service is running
         on the leader.
         """
-        self.environment.stop_landscape_service(
-            "landscape-package-upload", unit=self.non_leader)
+        self.useFixture(StoppedService(
+            self.environment, "landscape-package-upload", self.non_leader))
         self.environment.check_service("package-upload")

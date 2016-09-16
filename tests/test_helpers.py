@@ -118,7 +118,7 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.assertEqual(
             "sudo service landscape-appserver start", unit.commands[0])
 
-    def test_stop_landscape_service_on_cleanup(self):
+    def test_stop_landscape_service(self):
         """
         The stop_landscape_service method stops the requested service.
         """
@@ -127,9 +127,6 @@ class EnvironmentFixtureTest(unittest.TestCase):
         unit = self.deployment.sentry.unit["landscape-server/0"]
         self.assertEqual(
             "sudo service landscape-appserver stop", unit.commands[0])
-        self.fixture.cleanUp()
-        self.assertEqual(
-            "sudo service landscape-appserver start", unit.commands[1])
 
     def test_check_url(self):
         """
