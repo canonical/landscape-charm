@@ -82,6 +82,12 @@ class LSCtl(ScriptCallback):
         db_new = get_required_data(manager, service_name, "db")[0]
         db_old = update_persisted_data("db", db_new, hookenv=self._hookenv)
 
+        # Persist the new leader settings and fetch the old ones
+        leader_new = get_required_data(manager, service_name, "leader").copy()
+        leader_new["is_leader"] = self._hookenv.is_leader()
+        leader_old = update_persisted_data(
+            "leader", leader_new, hookenv=self._hookenv)
+
         if action == "restart":
             # Check if we really need to kick a restart
             hook_name = self._hookenv.hook_name()
@@ -91,7 +97,11 @@ class LSCtl(ScriptCallback):
             elif hook_name == "db-relation-changed":
                 if not self._need_restart_db_relation_changed(db_new, db_old):
                     return
-        if action == "restart":
+            elif hook_name == "leader-settings-changed":
+                if not self._need_restart_leader_settings_changed(
+                        leader_new, leader_old):
+                    return
+
             action_status_message = "Restarting services."
             if current_status == "unknown":
                 # If the status is unknown, it means that the services
@@ -134,3 +144,39 @@ class LSCtl(ScriptCallback):
             new.pop(key)
             old.pop(key, None)
         return new != old
+
+    def _need_restart_leader_settings_changed(self, leader_new, leader_old):
+        """Check whether we need to restart after leader settings changed.
+
+        Juju has no "leader-deposed" hook yet, however when a new leader gets
+        elected the old leader unit that gets deposed will fire the
+        "leader-settings-changed" hook, and we can then compare the new
+        output of is-leader with the old one that we persisted, for determining
+        if the leader unit is indeed being deposed.
+
+        When the leader unit gets deposed we assume that it's because it is
+        being removed, and so we avoid restarting services (which could
+        error, for example if the postgresql charm has already fired
+        its db-relation-departed hook and has removed our IP from the ACL).
+
+        A better approach would be to not depend on juju leadership for
+        deciding if a certain service should run or not, but rather use
+        hacluster or make it possible to run all services on all units.
+
+        See also the "guarantee that a long-lived process runs on just
+        one unit at once" section here:
+
+        https://jujucharms.com/docs/2.0/authors-charm-leadership
+
+        There'a s bug to fix this in the long term: #1625500.
+        """
+        # We know that we have been the leader so far if it's not the first
+        # hook invokation and in the previous invokation "hookenv.is_leader()"
+        # was returning True.
+        was_leader = leader_old is not None and leader_old["is_leader"]
+
+        # If we were the leader, but we aren't anymore, don't restart.
+        if was_leader and not leader_new["is_leader"]:
+            return False
+
+        return leader_new != leader_old
