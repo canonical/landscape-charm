@@ -149,7 +149,7 @@ class LSCtl(ScriptCallback):
         """Check whether we need to restart after leader settings changed.
 
         Juju has no "leader-deposed" hook yet, however when a new leader gets
-        elected the old the leader unit that gets deposed will fire the
+        elected the old leader unit that gets deposed will fire the
         "leader-settings-changed" hook, and we can then compare the new
         output of is-leader with the old one that we persisted, for determining
         if the leader unit is indeed being deposed.
@@ -168,7 +168,13 @@ class LSCtl(ScriptCallback):
 
         https://jujucharms.com/docs/2.0/authors-charm-leadership
         """
-        if leader_old is not None and not leader_new["is_leader"]:
-            if leader_new["is_leader"] != leader_old["is_leader"]:
-                return False
+        # We know that we have been the leader so far if it's not the first
+        # hook invokation and in the previous invokation "hookenv.is_leader()"
+        # was returning True.
+        was_leader = leader_old is not None and leader_old["is_leader"]
+
+        # If we were the leader, but we aren't anymore, don't restart.
+        if was_leader and not leader_new["is_leader"]:
+            return False
+
         return leader_new != leader_old
