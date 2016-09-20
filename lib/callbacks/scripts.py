@@ -167,6 +167,8 @@ class LSCtl(ScriptCallback):
         one unit at once" section here:
 
         https://jujucharms.com/docs/2.0/authors-charm-leadership
+
+        There'a s bug to fix this in the long term: #1625500.
         """
         # We know that we have been the leader so far if it's not the first
         # hook invokation and in the previous invokation "hookenv.is_leader()"
