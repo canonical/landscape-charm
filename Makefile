@@ -53,7 +53,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 3000s
+	juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
 
 # Run integration tests using the LDS package from the lds-trunk PPA
 integration-test-trunk: secrets
