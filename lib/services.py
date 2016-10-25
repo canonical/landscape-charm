@@ -47,12 +47,15 @@ class ServicesHook(Hook):
         leader_provider = LeaderProvider(
             hookenv=self._hookenv, host=self._host)
         leader_provider.provide_data()
+
         config_requirer = ConfigRequirer(hookenv=self._hookenv)
+        hosted_requirer = HostedRequirer()
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
             "provided_data": [
-                HAProxyProvider(config_requirer, paths=self._paths),
+                HAProxyProvider(
+                    config_requirer, hosted_requirer, paths=self._paths),
                 RabbitMQProvider(),
             ],
             # Required data is available to the render_template calls below.
@@ -62,7 +65,7 @@ class ServicesHook(Hook):
                 PostgreSQLRequirer(),
                 RabbitMQRequirer(),
                 HAProxyRequirer(),
-                HostedRequirer(),
+                hosted_requirer,
                 {"is_leader": self._hookenv.is_leader()},
             ],
             "data_ready": [

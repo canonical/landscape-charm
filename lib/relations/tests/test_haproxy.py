@@ -124,7 +124,11 @@ class HAProxyProviderTest(HookenvTest):
                  {"backend_name": "landscape-api",
                   "servers": [
                       ["landscape-api-landscape-server-0",
-                       "1.2.3.4", 9080, SERVER_OPTIONS]]}]}],
+                       "1.2.3.4", 9080, SERVER_OPTIONS]]},
+                 {"backend_name": "landscape-pppa-proxy",
+                  "servers": [
+                      ["landscape-pppa-proxy-landscape-server-0",
+                       "1.2.3.4", 9298, SERVER_OPTIONS]]}]}],
             services)
 
     def test_provide_data_error_files(self):
