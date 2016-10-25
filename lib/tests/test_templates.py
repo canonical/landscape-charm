@@ -176,6 +176,29 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual(
             "16.03 16.06", config.get("pppa-proxy", "supported-releases"))
 
+    def test_render_with_gpg_options(self):
+        """
+        With gpg-home-path and gpg-passphrase-path defined in the hosted
+        relation, landscape and api sections get them too.
+        """
+        self.context["hosted"][0].update({
+            "gpg-home-path": "/etc/landscape/gpg",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual(
+            "/etc/landscape/gpg", config.get("landscape", "gpg-home-path"))
+        self.assertEqual(
+            "/etc/landscape/gpg-passphrase.txt",
+            config.get("landscape", "gpg-passphrase-path"))
+        self.assertEqual(
+            "/etc/landscape/gpg", config.get("api", "gpg-home-path"))
+        self.assertEqual(
+            "/etc/landscape/gpg-passphrase.txt",
+            config.get("api", "gpg-passphrase-path"))
+
 
 class LandscapeDefaultsTest(TemplateTest):
 
