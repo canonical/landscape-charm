@@ -16,7 +16,8 @@ class HostedRequirerTest(HookenvTest):
         considered ready.
         """
         self.assertItemsEqual(
-            ["deployment-mode", "ppas-to-proxy", "supported-releases"],
+            ["deployment-mode", "ppas-to-proxy", "supported-releases",
+             "gpg-passphrase-path", "gpg-home-path"],
             HostedRequirer.required_keys)
 
     def test_not_related(self):
@@ -34,9 +35,12 @@ class HostedRequirerTest(HookenvTest):
         When the landscape-server service is related to landscape-hosted
         the deployment-mode is the one set on the relation.
         """
-        hosted_data = {"deployment-mode": "production",
-                       "supported-releases": "16.03",
-                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        hosted_data = {
+            "deployment-mode": "production",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg"}
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {
@@ -67,9 +71,13 @@ class HostedRequirerTest(HookenvTest):
         The deployment mode set on the relation must be a valid one, otherwise
         an error is raised.
         """
-        hosted_data = {"deployment-mode": "foo",
-                       "supported-releases": "16.03",
-                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        hosted_data = {
+            "deployment-mode": "foo",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg",
+        }
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {
@@ -93,6 +101,8 @@ class HostedRequirerTest(HookenvTest):
             "supported-releases": "16.03, 16.06",
             "ppas-to-proxy": (
                 "16.03=http://foo/16.03/ubuntu,16.06=http://foo/16.06/ubuntu"),
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg",
         }
         self.hookenv.relations = {
             "hosted": {
@@ -119,6 +129,8 @@ class HostedRequirerTest(HookenvTest):
             "supported-releases": "16.03",
             "ppas-to-proxy": (
                 "16.03=http://foo/16.03/ubuntu,16.03=http://foo/16.06/ubuntu"),
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg",
         }
         self.hookenv.relations = {
             "hosted": {
@@ -139,9 +151,13 @@ class HostedRequirerTest(HookenvTest):
         A release is listed in supported-releases but the URL for it is not
         provided in ppas-to-proxy attribute of the hosted relation data.
         """
-        hosted_data = {"deployment-mode": "edge",
-                       "supported-releases": "16.06,16.09",
-                       "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu"}
+        hosted_data = {
+            "deployment-mode": "edge",
+            "supported-releases": "16.06,16.09",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg",
+        }
         self.hookenv.relations = {
             "hosted": {
                 "hosted:1": {

@@ -48,6 +48,8 @@ class HostedRequirer(RelationContext):
     interface = "landscape-hosted"
     required_keys = [
         "deployment-mode",     # Can be standalone/edge/staging/production.
+        "gpg-home-path",       # Path to the GPG home directory.
+        "gpg-passphrase-path",  # Path to the secret GPG key passphrase file.
         "supported-releases",  # A comma-separated list of release short names.
         "ppas-to-proxy",       # A map of release names to archive URLs in the
                                # name1=url1,name2=url2 format.
