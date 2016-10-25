@@ -137,12 +137,14 @@ class ServicesHookTest(HookenvTest):
     def test_ready_with_non_standalone_deployment_mode(self):
         """
         If deployment-mode is set to 'edge' an appropriate config symlink will
-        be created
+        be created.
         """
         hosted_data = SAMPLE_HOSTED_DATA.copy()
         hosted_data["deployment-mode"] = "edge"
         hosted_data["ppas-to-proxy"] = ""
         hosted_data["supported-releases"] = ""
+        hosted_data["gpg-passphrase-path"] = "/etc/landscape/gpg-passphrase"
+        hosted_data["gpg-home-path"] = "/etc/landscape/gpg"
         self.hookenv.relations.update({
             "hosted": {
                 "hosted:1": {
