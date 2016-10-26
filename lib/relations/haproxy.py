@@ -160,14 +160,17 @@ class HAProxyProvider(RelationContext):
             # to /archive.
             root_url = self._get_root_url()
             if root_url:
-                acl_line = "acl pppa_proxy hdr(host) -i archive.{}".format(
-                    root_url)
+                acl_lines = [
+                    "acl pppa_proxy hdr(host) -i archive.{}".format(root_url),
+                ]
             else:
-                acl_line = "acl pppa-proxy path_beg -i /archive"
-            service["service_options"].extend([
-                acl_line,
-                "use_backend landscape-pppa-proxy if pppa-proxy",
-            ])
+                acl_lines = [
+                    "acl pppa-proxy path_beg -i /archive",
+                    "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",
+                ]
+            service["service_options"].extend(acl_lines)
+            service["service_options"].append(
+                "use_backend landscape-pppa-proxy if pppa-proxy")
 
         if self._hookenv.is_leader():
             self._hookenv.log(
