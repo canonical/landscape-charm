@@ -1,5 +1,6 @@
 import base64
 import os
+import urlparse
 import yaml
 
 from charmhelpers.core import hookenv
@@ -124,12 +125,16 @@ class HAProxyProvider(RelationContext):
         hosted_data = self._hosted_requirer.get("hosted")
         return hosted_data and "ppas-to-proxy" in hosted_data[0]
 
-    def _get_root_url(self):
+    def _get_root_hostname(self):
         """
-        Return root_url if defined and not an IP address.
+        Return hostname from the root_url if defined.
         """
         config_data = self._config_requirer.get("config")
-        return config_data.get("root-url")
+        if root_url:
+            root_url = config_data.get("root-url")
+            hostname = urlparse.urlparse(root_url).hostname
+            return hostname
+        return None
 
     def _get_http(self):
         """Return the service configuration for the HTTP frontend."""
@@ -158,10 +163,10 @@ class HAProxyProvider(RelationContext):
 
             # Use archive.<root_url> if root_url is set, otherwise fall-back
             # to /archive.
-            root_url = self._get_root_url()
+            root_url = self._get_root_hostname()
             if root_url:
                 acl_lines = [
-                    "acl pppa_proxy hdr(host) -i archive.{}".format(root_url),
+                    "acl pppa-proxy hdr(host) -i archive.{}".format(root_url),
                 ]
             else:
                 acl_lines = [
