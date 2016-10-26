@@ -368,6 +368,57 @@ class HAProxyProviderTest(HookenvTest):
             ['check', 'inter 5000', 'rise 2', 'fall 5', 'maxconn 50']]
         self.assertEqual(expected, package_upload["servers"][0])
 
+    def test_provide_data_with_pppa_proxy(self):
+        """
+        When HostedProvider specifies pppa-proxy configuration, entries
+        for pppa-proxy backend and /archive frontend are introduced.
+        """
+        self.hookenv.leader = False
+        hosted_data = [{
+            "ppas-to-proxy": (
+                "16.03=http://ppa.launchpad.net/landscape/16.03/ubuntu,"
+                "16.06=http://ppa.launchpad.net/landscape/16.06/ubuntu"),
+            "supported-releases": "16.06",
+        }]
+        hosted_requirer = {"hosted": hosted_data}
+        relation = HAProxyProvider(
+            self.config_requirer, hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
+
+        data = relation.provide_data()
+
+        services = yaml.safe_load(data["services"])
+        https_service = services[1]
+        self.assertEqual(
+            [
+                "mode http",
+                "timeout client 300000",
+                "timeout server 300000",
+                "balance leastconn",
+                "http-request set-header X-Forwarded-Proto https",
+                "acl message path_beg -i /message-system",
+                "acl attachment path_beg -i /attachment",
+                "acl api path_beg -i /api",
+                "use_backend landscape-message if message",
+                "use_backend landscape-message if attachment",
+                "use_backend landscape-api if api",
+                "acl pppa-proxy path_beg -i /archive",
+                "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\\ /\\2",
+                "use_backend landscape-pppa-proxy if pppa-proxy",
+            ],
+            https_service["service_options"])
+
+        backends = https_service["backends"]
+        pppa_proxy_backends = [
+            backend for backend in backends
+            if backend["backend_name"] == "landscape-pppa-proxy"]
+        self.assertEqual(
+            {"backend_name": "landscape-pppa-proxy",
+             "servers": [
+                 ["landscape-pppa-proxy-landscape-server-0",
+                  "1.2.3.4", 9298, SERVER_OPTIONS]]},
+            pppa_proxy_backends[0])
+
 
 class HAProxyRequirerTest(HookenvTest):
 
