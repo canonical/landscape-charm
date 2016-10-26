@@ -9,7 +9,6 @@ from lib.relations.haproxy import (
     HAProxyProvider, HAProxyRequirer, SERVER_OPTIONS, ERRORFILES_MAP,
     SSLCertificateKeyMissingError, SSLCertificateInvalidDataError,
     ErrorFilesConfigurationError)
-from lib.relations.hosted import HostedRequirer
 from lib.paths import Paths
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
@@ -102,7 +101,7 @@ class HAProxyProviderTest(HookenvTest):
                  "timeout client 300000",
                  "timeout server 300000",
                  "balance leastconn",
-                 #"option httpchk HEAD / HTTP/1.0",
+                 # "option httpchk HEAD / HTTP/1.0",
                  "http-request set-header X-Forwarded-Proto https",
                  "acl message path_beg -i /message-system",
                  "acl attachment path_beg -i /attachment",
@@ -404,6 +403,59 @@ class HAProxyProviderTest(HookenvTest):
                 "use_backend landscape-api if api",
                 "acl pppa-proxy path_beg -i /archive",
                 "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\\ /\\2",
+                "use_backend landscape-pppa-proxy if pppa-proxy",
+            ],
+            https_service["service_options"])
+
+        backends = https_service["backends"]
+        pppa_proxy_backends = [
+            backend for backend in backends
+            if backend["backend_name"] == "landscape-pppa-proxy"]
+        self.assertEqual(
+            {"backend_name": "landscape-pppa-proxy",
+             "servers": [
+                 ["landscape-pppa-proxy-landscape-server-0",
+                  "1.2.3.4", 9298, SERVER_OPTIONS]]},
+            pppa_proxy_backends[0])
+
+    def test_provide_data_with_pppa_proxy_with_root_url(self):
+        """
+        When HostedProvider specifies pppa-proxy configuration, and
+        root url is defined for landscape server charm, pppa-proxy is
+        configured to serve under https://archive.<root-hostname>/ instead of
+        /archive relative path.
+        """
+        self.hookenv.leader = False
+        self.config_requirer["config"]["root-url"] = "https://landscape.dev/"
+        hosted_data = [{
+            "ppas-to-proxy": (
+                "16.03=http://ppa.launchpad.net/landscape/16.03/ubuntu,"
+                "16.06=http://ppa.launchpad.net/landscape/16.06/ubuntu"),
+            "supported-releases": "16.06",
+        }]
+        hosted_requirer = {"hosted": hosted_data}
+        relation = HAProxyProvider(
+            self.config_requirer, hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
+
+        data = relation.provide_data()
+
+        services = yaml.safe_load(data["services"])
+        https_service = services[1]
+        self.assertEqual(
+            [
+                "mode http",
+                "timeout client 300000",
+                "timeout server 300000",
+                "balance leastconn",
+                "http-request set-header X-Forwarded-Proto https",
+                "acl message path_beg -i /message-system",
+                "acl attachment path_beg -i /attachment",
+                "acl api path_beg -i /api",
+                "use_backend landscape-message if message",
+                "use_backend landscape-message if attachment",
+                "use_backend landscape-api if api",
+                "acl pppa-proxy hdr(host) -i archive.landscape.dev",
                 "use_backend landscape-pppa-proxy if pppa-proxy",
             ],
             https_service["service_options"])
