@@ -115,9 +115,6 @@ class HAProxyProvider(RelationContext):
 
     def provide_data(self):
         services = [self._get_http(), self._get_https()]
-
-        if self._has_pppa_proxy():
-            services.append(self._get_pppa_proxy())
         return {"services": yaml.safe_dump(services)}
 
     def _has_pppa_proxy(self):
@@ -125,7 +122,14 @@ class HAProxyProvider(RelationContext):
         Return True if 'ppas-to-proxy' key is present in the hosted relation.
         """
         hosted_data = self._hosted_requirer.get("hosted")
-        return "ppas-to-proxy" in hosted_data[0]
+        return hosted_data and "ppas-to-proxy" in hosted_data[0]
+
+    def _get_root_url(self):
+        """
+        Return root_url if defined and not an IP address.
+        """
+        config_data = self._config_requirer.get("config")
+        return config_data.get("root-url")
 
     def _get_http(self):
         """Return the service configuration for the HTTP frontend."""
@@ -151,9 +155,18 @@ class HAProxyProvider(RelationContext):
             backends.append(
                 self._get_backend(
                     "pppa-proxy", self._get_servers("pppa-proxy")))
+
+            # Use archive.<root_url> if root_url is set, otherwise fall-back
+            # to /archive.
+            root_url = self._get_root_url()
+            if root_url:
+                acl_line = "acl pppa_proxy hdr(host) -i archive.{}".format(
+                    root_url)
+            else:
+                acl_line = "acl pppa-proxy path_beg -i /archive"
             service["service_options"].extend([
-                "acl package-upload path_beg -i /archive",
-                "use_backend landscape-ppa-proxy if ppa_proxy",
+                acl_line,
+                "use_backend landscape-pppa-proxy if pppa-proxy",
             ])
 
         if self._hookenv.is_leader():
