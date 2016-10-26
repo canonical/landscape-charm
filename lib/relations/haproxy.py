@@ -130,8 +130,8 @@ class HAProxyProvider(RelationContext):
         Return hostname from the root_url if defined.
         """
         config_data = self._config_requirer.get("config")
+        root_url = config_data.get("root-url")
         if root_url:
-            root_url = config_data.get("root-url")
             hostname = urlparse.urlparse(root_url).hostname
             return hostname
         return None
