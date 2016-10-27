@@ -1,7 +1,12 @@
 import base64
 import os
-import urlparse
 import yaml
+
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
+
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
@@ -132,7 +137,7 @@ class HAProxyProvider(RelationContext):
         config_data = self._config_requirer.get("config")
         root_url = config_data.get("root-url")
         if root_url:
-            hostname = urlparse.urlparse(root_url).hostname
+            hostname = urlparse(root_url).hostname
             return hostname
         return None
 
