@@ -148,6 +148,29 @@ class HAProxyProvider(RelationContext):
         })
         return service
 
+    def _add_pppa_proxy_backends(self, backends, service_options):
+        """
+        Adds a pppa-proxy backend and extends service options to expose it.
+        """
+        backends.append(
+            self._get_backend("pppa-proxy", self._get_servers("pppa-proxy")))
+
+        # Use archive.<root_url> if root_url is set, otherwise fall-back
+        # to /archive.
+        root_url = self._get_root_hostname()
+        if root_url:
+            acl_lines = [
+                "acl pppa-proxy hdr(host) -i archive.{}".format(root_url),
+            ]
+        else:
+            acl_lines = [
+                "acl pppa-proxy path_beg -i /archive",
+                "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",
+            ]
+        service_options.extend(acl_lines)
+        service_options.append(
+            "use_backend landscape-pppa-proxy if pppa-proxy")
+
     def _get_https(self):
         """Return the service configuration for the HTTPS frontend."""
 
@@ -158,25 +181,7 @@ class HAProxyProvider(RelationContext):
         ]
 
         if self._has_pppa_proxy():
-            backends.append(
-                self._get_backend(
-                    "pppa-proxy", self._get_servers("pppa-proxy")))
-
-            # Use archive.<root_url> if root_url is set, otherwise fall-back
-            # to /archive.
-            root_url = self._get_root_hostname()
-            if root_url:
-                acl_lines = [
-                    "acl pppa-proxy hdr(host) -i archive.{}".format(root_url),
-                ]
-            else:
-                acl_lines = [
-                    "acl pppa-proxy path_beg -i /archive",
-                    "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",
-                ]
-            service["service_options"].extend(acl_lines)
-            service["service_options"].append(
-                "use_backend landscape-pppa-proxy if pppa-proxy")
+            self._add_pppa_proxy_backends(backends, service["service_options"])
 
         if self._hookenv.is_leader():
             self._hookenv.log(
