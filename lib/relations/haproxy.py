@@ -119,13 +119,6 @@ class HAProxyProvider(RelationContext):
         services = [self._get_http(), self._get_https()]
         return {"services": yaml.safe_dump(services)}
 
-    def _has_pppa_proxy(self):
-        """
-        Return True if 'ppas-to-proxy' key is present in the hosted relation.
-        """
-        hosted_data = self._hosted_requirer.get("hosted")
-        return hosted_data and "ppas-to-proxy" in hosted_data[0]
-
     def _get_root_hostname(self):
         """
         Return hostname from the root_url if defined.
@@ -180,7 +173,8 @@ class HAProxyProvider(RelationContext):
             self._get_backend("api", self._get_servers("api")),
         ]
 
-        if self._has_pppa_proxy():
+        # If there is a hosted relation, we add pppa-proxy rules too.
+        if self._hosted_requirer.get("hosted"):
             self._add_pppa_proxy_backends(backends, service["service_options"])
 
         if self._hookenv.is_leader():
