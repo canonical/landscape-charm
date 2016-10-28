@@ -2,11 +2,7 @@ import base64
 import os
 import yaml
 
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-
+from six.moves.urllib.parse import urlparse
 
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
