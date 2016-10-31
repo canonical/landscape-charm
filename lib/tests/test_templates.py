@@ -96,7 +96,7 @@ class ServiceConfTest(TemplateTest):
             "/var/run/landscape/landscape-package-search.pid",
             config.get("package-search", "pid-path"))
         self.assertEqual(
-            "800", config.get("package-search", "account-threshold"))
+            "0", config.get("package-search", "account-threshold"))
 
     def test_render_with_package_search_on_non_leader(self):
         """
