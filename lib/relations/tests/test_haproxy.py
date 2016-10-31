@@ -25,6 +25,7 @@ class HAProxyProviderTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.config_requirer = ConfigRequirer(hookenv=self.hookenv)
+        self.hosted_requirer = {}
 
     def test_required_keys(self):
         """
@@ -45,7 +46,8 @@ class HAProxyProviderTest(HookenvTest):
         config_requirer = ConfigRequirer(hookenv=self.hookenv)
         self.config_requirer["config"]["worker-counts"] = 2
         relation = HAProxyProvider(
-            config_requirer, paths=self.paths, hookenv=self.hookenv)
+            config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         # Provide some fake ssl-cert and ssl-key config entries
         config = self.hookenv.config()
@@ -99,7 +101,7 @@ class HAProxyProviderTest(HookenvTest):
                  "timeout client 300000",
                  "timeout server 300000",
                  "balance leastconn",
-                 "option httpchk HEAD / HTTP/1.0",
+                 # "option httpchk HEAD / HTTP/1.0",
                  "http-request set-header X-Forwarded-Proto https",
                  "acl message path_beg -i /message-system",
                  "acl attachment path_beg -i /attachment",
@@ -144,7 +146,8 @@ class HAProxyProviderTest(HookenvTest):
                 fd.write("{} error page".format(name))
 
         relation = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         data = relation.provide_data()
         services = yaml.safe_load(data["services"])
@@ -165,8 +168,8 @@ class HAProxyProviderTest(HookenvTest):
         # Create an empty root tree
         temp_dir = self.useFixture(TempDir())
         provider = HAProxyProvider(
-            self.config_requirer, paths=Paths(temp_dir.path),
-            hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer,
+            paths=Paths(temp_dir.path), hookenv=self.hookenv)
 
         self.assertRaises(ErrorFilesConfigurationError, provider.provide_data)
 
@@ -177,7 +180,8 @@ class HAProxyProviderTest(HookenvTest):
         """
         self.hookenv.leader = True
         relation = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         data = relation.provide_data()
 
@@ -208,7 +212,8 @@ class HAProxyProviderTest(HookenvTest):
         """
         self.hookenv.leader = False
         relation = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         data = relation.provide_data()
 
@@ -238,7 +243,8 @@ class HAProxyProviderTest(HookenvTest):
         ["DEFAULT"] for the HAproxy SSL cert.
         """
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
 
@@ -255,7 +261,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = base64.b64encode("a cert")
         config["ssl-key"] = base64.b64encode("a key")
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
@@ -276,7 +283,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-key"] = base64.b64encode("a key")
 
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameters are not valid"
@@ -296,7 +304,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-key"] = "something"  # Not base64 encoded!
 
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         expected = (
             "The supplied 'ssl-cert' or 'ssl-key' parameters are not valid"
@@ -315,7 +324,8 @@ class HAProxyProviderTest(HookenvTest):
         config["ssl-cert"] = base64.b64encode("a cert")
         # Not setting 'ssl-key'
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         expected = "'ssl-cert' is specified but 'ssl-key' is missing!"
 
@@ -330,7 +340,8 @@ class HAProxyProviderTest(HookenvTest):
         """
         self.hookenv.leader = True
         provider = HAProxyProvider(
-            self.config_requirer, paths=self.paths, hookenv=self.hookenv)
+            self.config_requirer, self.hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
 
         data = provider.provide_data()
         services = yaml.safe_load(data["services"])
@@ -355,6 +366,110 @@ class HAProxyProviderTest(HookenvTest):
             'landscape-package-upload-landscape-server-0', '1.2.3.4', 9100,
             ['check', 'inter 5000', 'rise 2', 'fall 5', 'maxconn 50']]
         self.assertEqual(expected, package_upload["servers"][0])
+
+    def test_provide_data_with_pppa_proxy(self):
+        """
+        When HostedProvider specifies pppa-proxy configuration, entries
+        for pppa-proxy backend and /archive frontend are introduced.
+        """
+        self.hookenv.leader = False
+        hosted_data = [{
+            "ppas-to-proxy": (
+                "16.03=http://ppa.launchpad.net/landscape/16.03/ubuntu,"
+                "16.06=http://ppa.launchpad.net/landscape/16.06/ubuntu"),
+            "supported-releases": "16.06",
+        }]
+        hosted_requirer = {"hosted": hosted_data}
+        relation = HAProxyProvider(
+            self.config_requirer, hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
+
+        data = relation.provide_data()
+
+        services = yaml.safe_load(data["services"])
+        https_service = services[1]
+        self.assertEqual(
+            [
+                "mode http",
+                "timeout client 300000",
+                "timeout server 300000",
+                "balance leastconn",
+                "http-request set-header X-Forwarded-Proto https",
+                "acl message path_beg -i /message-system",
+                "acl attachment path_beg -i /attachment",
+                "acl api path_beg -i /api",
+                "use_backend landscape-message if message",
+                "use_backend landscape-message if attachment",
+                "use_backend landscape-api if api",
+                "acl pppa-proxy path_beg -i /archive",
+                "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\\ /\\2",
+                "use_backend landscape-pppa-proxy if pppa-proxy",
+            ],
+            https_service["service_options"])
+
+        backends = https_service["backends"]
+        pppa_proxy_backends = [
+            backend for backend in backends
+            if backend["backend_name"] == "landscape-pppa-proxy"]
+        self.assertEqual(
+            {"backend_name": "landscape-pppa-proxy",
+             "servers": [
+                 ["landscape-pppa-proxy-landscape-server-0",
+                  "1.2.3.4", 9298, SERVER_OPTIONS]]},
+            pppa_proxy_backends[0])
+
+    def test_provide_data_with_pppa_proxy_with_root_url(self):
+        """
+        When HostedProvider specifies pppa-proxy configuration, and
+        root url is defined for landscape server charm, pppa-proxy is
+        configured to serve under https://archive.<root-hostname>/ instead of
+        /archive relative path.
+        """
+        self.hookenv.leader = False
+        self.config_requirer["config"]["root-url"] = "https://landscape.dev/"
+        hosted_data = [{
+            "ppas-to-proxy": (
+                "16.03=http://ppa.launchpad.net/landscape/16.03/ubuntu,"
+                "16.06=http://ppa.launchpad.net/landscape/16.06/ubuntu"),
+            "supported-releases": "16.06",
+        }]
+        hosted_requirer = {"hosted": hosted_data}
+        relation = HAProxyProvider(
+            self.config_requirer, hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
+
+        data = relation.provide_data()
+
+        services = yaml.safe_load(data["services"])
+        https_service = services[1]
+        self.assertEqual(
+            [
+                "mode http",
+                "timeout client 300000",
+                "timeout server 300000",
+                "balance leastconn",
+                "http-request set-header X-Forwarded-Proto https",
+                "acl message path_beg -i /message-system",
+                "acl attachment path_beg -i /attachment",
+                "acl api path_beg -i /api",
+                "use_backend landscape-message if message",
+                "use_backend landscape-message if attachment",
+                "use_backend landscape-api if api",
+                "acl pppa-proxy hdr(host) -i archive.landscape.dev",
+                "use_backend landscape-pppa-proxy if pppa-proxy",
+            ],
+            https_service["service_options"])
+
+        backends = https_service["backends"]
+        pppa_proxy_backends = [
+            backend for backend in backends
+            if backend["backend_name"] == "landscape-pppa-proxy"]
+        self.assertEqual(
+            {"backend_name": "landscape-pppa-proxy",
+             "servers": [
+                 ["landscape-pppa-proxy-landscape-server-0",
+                  "1.2.3.4", 9298, SERVER_OPTIONS]]},
+            pppa_proxy_backends[0])
 
 
 class HAProxyRequirerTest(HookenvTest):

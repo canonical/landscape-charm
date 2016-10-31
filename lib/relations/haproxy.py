@@ -2,6 +2,8 @@ import base64
 import os
 import yaml
 
+from six.moves.urllib.parse import urlparse
+
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.helpers import RelationContext
 
@@ -34,7 +36,9 @@ SERVICE_OPTIONS = {
         "timeout client 300000",
         "timeout server 300000",
         "balance leastconn",
-        "option httpchk HEAD / HTTP/1.0",
+        # XXX 2016-10-25 Danilo - commented out until we can figure out a way
+        # for pppa-proxy to respond to this successfully.
+        # "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
         "acl message path_beg -i /message-system",
         "acl attachment path_beg -i /attachment",
@@ -50,6 +54,7 @@ SERVER_BASE_PORTS = {
     "message-server": 8090,
     "api": 9080,
     "package-upload": 9100,
+    "pppa-proxy": 9298,
 }
 SERVER_OPTIONS = [
     "check",
@@ -100,8 +105,10 @@ class HAProxyProvider(RelationContext):
     interface = "http"
     required_keys = ["services"]
 
-    def __init__(self, config_requirer, hookenv=hookenv, paths=default_paths):
+    def __init__(self, config_requirer, hosted_requirer, hookenv=hookenv,
+                 paths=default_paths):
         self._config_requirer = config_requirer
+        self._hosted_requirer = hosted_requirer
         self._hookenv = hookenv
         self._worker_counts = config_requirer.get("config").get(
             "worker-counts")
@@ -109,9 +116,19 @@ class HAProxyProvider(RelationContext):
         super(HAProxyProvider, self).__init__()
 
     def provide_data(self):
-        return {
-            "services": yaml.safe_dump([self._get_http(), self._get_https()])
-        }
+        services = [self._get_http(), self._get_https()]
+        return {"services": yaml.safe_dump(services)}
+
+    def _get_root_hostname(self):
+        """
+        Return hostname from the root_url if defined.
+        """
+        config_data = self._config_requirer.get("config")
+        root_url = config_data.get("root-url")
+        if root_url:
+            hostname = urlparse(root_url).hostname
+            return hostname
+        return None
 
     def _get_http(self):
         """Return the service configuration for the HTTP frontend."""
@@ -124,6 +141,29 @@ class HAProxyProvider(RelationContext):
         })
         return service
 
+    def _add_pppa_proxy_backends(self, backends, service_options):
+        """
+        Adds a pppa-proxy backend and extends service options to expose it.
+        """
+        backends.append(
+            self._get_backend("pppa-proxy", self._get_servers("pppa-proxy")))
+
+        # Use archive.<root_url> if root_url is set, otherwise fall-back
+        # to /archive.
+        root_url = self._get_root_hostname()
+        if root_url:
+            acl_lines = [
+                "acl pppa-proxy hdr(host) -i archive.{}".format(root_url),
+            ]
+        else:
+            acl_lines = [
+                "acl pppa-proxy path_beg -i /archive",
+                "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",
+            ]
+        service_options.extend(acl_lines)
+        service_options.append(
+            "use_backend landscape-pppa-proxy if pppa-proxy")
+
     def _get_https(self):
         """Return the service configuration for the HTTPS frontend."""
 
@@ -132,6 +172,11 @@ class HAProxyProvider(RelationContext):
             self._get_backend("message", self._get_servers("message-server")),
             self._get_backend("api", self._get_servers("api")),
         ]
+
+        # If there is a hosted relation, we add pppa-proxy rules too.
+        if self._hosted_requirer.get("hosted"):
+            self._add_pppa_proxy_backends(backends, service["service_options"])
+
         if self._hookenv.is_leader():
             self._hookenv.log(
                 "This unit is the juju leader: Writing package-upload backends"
@@ -148,7 +193,6 @@ class HAProxyProvider(RelationContext):
             self._hookenv.log(
                 "This unit is not the juju leader: not writing package-upload"
                 " backends entry.")
-
         service.update({
             "crts": self._get_ssl_certificate(),
             "servers": self._get_servers("appserver"),
