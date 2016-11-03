@@ -5,7 +5,7 @@ from charmhelpers.core.services.base import ServiceManager
 
 from lib.error import CharmError
 from lib.utils import (is_valid_url, get_required_data, update_persisted_data,
-                       CommandRunner)
+                       get_archive_url, CommandRunner)
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
 
@@ -77,6 +77,29 @@ class UpdatePersistedDataTest(HookenvTest):
         update_persisted_data("foo", "bar", hookenv=self.hookenv)
         self.assertEqual(
             "bar", update_persisted_data("foo", "bar", hookenv=self.hookenv))
+
+
+class GetArchiveUrlTest(TestCase):
+
+    def test_no_root_url(self):
+        """When root-url is not set, returns "/archive"."""
+        self.assertEqual("/archive", get_archive_url({}))
+
+    def test_simple_root_url(self):
+        """When root-url is set to a hostname, prepends "archive." to it."""
+        self.assertEqual(
+            "https://archive.landscape.canonical.com/",
+            get_archive_url({"root-url": "https://landscape.canonical.com/"}))
+
+    def test_all_url_components(self):
+        """
+        When root-url is set to a URL with query string etc. "archive." is
+        still prepended and all the other components of the URL are kept.
+        """
+        self.assertEqual(
+            "http://archive.test:8080/some/path;param?arg=yes#top",
+            get_archive_url(
+                {"root-url": "http://test:8080/some/path;param?arg=yes#top"}))
 
 
 class CommandRunnerTest(HookenvTest):
