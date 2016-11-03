@@ -25,7 +25,7 @@ class HostedRequirerTest(HookenvTest):
         When the landscape-server service is not related to landscape-hosted
         the deployment-mode is standalone.
         """
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertTrue(relation.is_ready())
         self.assertEqual("standalone", SAMPLE_HOSTED_DATA["deployment-mode"])
         self.assertEqual([SAMPLE_HOSTED_DATA], relation["hosted"])
@@ -48,7 +48,7 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertTrue(relation.is_ready())
         self.assertEqual([hosted_data], relation["hosted"])
 
@@ -63,7 +63,7 @@ class HostedRequirerTest(HookenvTest):
                 "hosted:1": {}
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertFalse(relation.is_ready())
 
     def test_invalid_deployment_mode(self):
@@ -86,7 +86,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(InvalidDeploymentModeError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             "Invalid deployment-mode 'foo'", error.exception.message)
@@ -111,7 +111,7 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertEqual(
             {"16.03": "http://foo/16.03/ubuntu",
              "16.06": "http://foo/16.06/ubuntu"},
@@ -140,7 +140,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(DuplicateArchiveNameError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             "Archive name '16.03' used twice in ppas-to-proxy.",
@@ -166,7 +166,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(MissingSupportedReleaseUrlError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             ("Some archives (16.06, 16.09) listed in 'supported-releases' do "

@@ -1,6 +1,7 @@
 from charmhelpers.core.services.helpers import RelationContext
 
 from lib.error import CharmError
+from lib.utils import get_archive_url
 
 DEPLOYMENT_MODES = ("standalone", "edge", "staging", "production")
 
@@ -55,6 +56,10 @@ class HostedRequirer(RelationContext):
         "ppas-to-proxy",        # A map of release names to archive URLs in the
                                 # name1=url1,name2=url2 format.
     ]
+
+    def __init__(self, config_requirer):
+        self._config_requirer = config_requirer
+        super(HostedRequirer, self).__init__()
 
     def get_data(self):
         super(HostedRequirer, self).get_data()

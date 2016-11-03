@@ -15,6 +15,7 @@ from lib.relations.haproxy import HAProxyProvider, HAProxyRequirer
 from lib.relations.leader import LeaderProvider, LeaderRequirer
 from lib.relations.config import ConfigRequirer
 from lib.relations.hosted import HostedRequirer
+from lib.utils import get_archive_url
 from lib.callbacks.scripts import SchemaBootstrap, LSCtl
 from lib.callbacks.smtp import ConfigureSMTP
 from lib.callbacks.filesystem import (
@@ -49,7 +50,7 @@ class ServicesHook(Hook):
         leader_provider.provide_data()
 
         config_requirer = ConfigRequirer(hookenv=self._hookenv)
-        hosted_requirer = HostedRequirer()
+        hosted_requirer = HostedRequirer(config_requirer)
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],
