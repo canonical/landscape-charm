@@ -159,6 +159,23 @@ class ServiceConfTest(TemplateTest):
             "http://ppa.launchpad.net/landscape/16.06/ubuntu",
             config.get("pppa-proxy", "16.06-url"))
 
+    def test_render_archive_url_with_pppa_proxy(self):
+        """
+        With ppas-to-proxy defined in the hosted relation, pppa-proxy section
+        is added with archive_url set based on get_archive_url() value.
+        """
+        self.context["hosted"][0].update({
+            "ppas-to-proxy": {
+                "16.03": "http://ppa.launchpad.net/landscape/16.03/ubuntu",
+            },
+            "archive-url": "https://archive.landscape/",
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("https://archive.landscape/",
+                         config.get("pppa-proxy", "archive-url"))
+
     def test_render_with_pppa_proxy_supported_releases(self):
         """
         With supported-releases defined in the hosted relation, pppa-proxy

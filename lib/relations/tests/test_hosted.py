@@ -172,3 +172,47 @@ class HostedRequirerTest(HookenvTest):
             ("Some archives (16.06, 16.09) listed in 'supported-releases' do "
              "not have their URLs defined in 'ppas-to-proxy'."),
             error.exception.message)
+
+    def test_archive_url(self):
+        """
+        When the landscape-server service is related to landscape-hosted
+        the archive-url is the one set on the relation.
+        """
+        hosted_data = {
+            "deployment-mode": "production",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        relation = HostedRequirer({"config": {}})
+        self.assertEqual("/archive", relation["hosted"][0]["archive-url"])
+
+    def test_archive_url_from_root_url(self):
+        """
+        When the landscape-server service is related to landscape-hosted
+        the archive-url is set based on the root-url from configuration.
+        """
+        hosted_data = {
+            "deployment-mode": "production",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        relation = HostedRequirer({"config": {
+            "root-url": "https://landscape.canonical.com/"}})
+        self.assertEqual("https://archive.landscape.canonical.com/",
+                         relation["hosted"][0]["archive-url"])

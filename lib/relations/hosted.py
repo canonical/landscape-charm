@@ -97,3 +97,7 @@ class HostedRequirer(RelationContext):
                 if missing_releases:
                     raise MissingSupportedReleaseUrlError(missing_releases)
                 data[0]["supported-releases"] = releases
+
+            # Set archive-url on the hosted relation based on root-url if set.
+            config_data = self._config_requirer.get("config")
+            data[0]["archive-url"] = get_archive_url(config_data)
