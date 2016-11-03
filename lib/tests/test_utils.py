@@ -82,8 +82,8 @@ class UpdatePersistedDataTest(HookenvTest):
 class GetArchiveUrlTest(TestCase):
 
     def test_no_root_url(self):
-        """When root-url is not set, returns "/archive"."""
-        self.assertEqual("/archive", get_archive_url({}))
+        """When root-url is not set, returns "RELATIVE"."""
+        self.assertEqual("RELATIVE", get_archive_url({}))
 
     def test_simple_root_url(self):
         """When root-url is set to a hostname, prepends "archive." to it."""

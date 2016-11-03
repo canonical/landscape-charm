@@ -192,7 +192,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         relation = HostedRequirer({"config": {}})
-        self.assertEqual("/archive", relation["hosted"][0]["archive-url"])
+        self.assertEqual("RELATIVE", relation["hosted"][0]["archive-url"])
 
     def test_archive_url_from_root_url(self):
         """

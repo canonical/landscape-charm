@@ -126,7 +126,7 @@ class HAProxyProvider(RelationContext):
         """
         config_data = self._config_requirer.get("config")
         archive_url = get_archive_url(config_data)
-        if archive_url == "/archive":
+        if archive_url == "RELATIVE":
             return archive_url
         else:
             hostname = urlparse(archive_url).hostname
@@ -153,7 +153,7 @@ class HAProxyProvider(RelationContext):
         # Get absolute archive URL based on root_url if set, or configure
         # relative path otherwise.
         archive_hostname = self._get_archive_hostname()
-        if archive_hostname == "/archive":
+        if archive_hostname == "RELATIVE":
             acl_lines = [
                 "acl pppa-proxy path_beg -i /archive",
                 "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",

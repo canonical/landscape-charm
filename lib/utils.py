@@ -70,7 +70,7 @@ def get_archive_url(config_data):
     Return the archive URL (absolute or relative).
 
     If root-url is set, prepends "archive." to the hostname, otherwise
-    returns a string "/archive".
+    returns a string "RELATIVE".
     """
     root_url = config_data.get("root-url")
     if root_url:
@@ -79,7 +79,7 @@ def get_archive_url(config_data):
         return urlunparse(
             (parsed_url.scheme, netloc, parsed_url.path, parsed_url.params,
              parsed_url.query, parsed_url.fragment))
-    return "/archive"
+    return "RELATIVE"
 
 
 class CommandRunner(object):
