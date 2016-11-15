@@ -122,7 +122,7 @@ class HAProxyProvider(RelationContext):
 
     def _get_archive_hostname(self):
         """
-        Return hostname from the root_url if defined.
+        Return hostname derived from root_url if defined or RELATIVE otherwise.
         """
         config_data = self._config_requirer.get("config")
         archive_url = get_archive_url(config_data)
