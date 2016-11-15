@@ -25,7 +25,7 @@ class HostedRequirerTest(HookenvTest):
         When the landscape-server service is not related to landscape-hosted
         the deployment-mode is standalone.
         """
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertTrue(relation.is_ready())
         self.assertEqual("standalone", SAMPLE_HOSTED_DATA["deployment-mode"])
         self.assertEqual([SAMPLE_HOSTED_DATA], relation["hosted"])
@@ -48,7 +48,7 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertTrue(relation.is_ready())
         self.assertEqual([hosted_data], relation["hosted"])
 
@@ -63,7 +63,7 @@ class HostedRequirerTest(HookenvTest):
                 "hosted:1": {}
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertFalse(relation.is_ready())
 
     def test_invalid_deployment_mode(self):
@@ -86,7 +86,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(InvalidDeploymentModeError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             "Invalid deployment-mode 'foo'", error.exception.message)
@@ -111,7 +111,7 @@ class HostedRequirerTest(HookenvTest):
                 }
             }
         }
-        relation = HostedRequirer()
+        relation = HostedRequirer({"config": {}})
         self.assertEqual(
             {"16.03": "http://foo/16.03/ubuntu",
              "16.06": "http://foo/16.06/ubuntu"},
@@ -140,7 +140,7 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(DuplicateArchiveNameError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             "Archive name '16.03' used twice in ppas-to-proxy.",
@@ -166,9 +166,53 @@ class HostedRequirerTest(HookenvTest):
             }
         }
         with self.assertRaises(MissingSupportedReleaseUrlError) as error:
-            HostedRequirer()
+            HostedRequirer({"config": {}})
 
         self.assertEqual(
             ("Some archives (16.06, 16.09) listed in 'supported-releases' do "
              "not have their URLs defined in 'ppas-to-proxy'."),
             error.exception.message)
+
+    def test_archive_url(self):
+        """
+        When the landscape-server service is related to landscape-hosted
+        the archive-url is the one set on the relation.
+        """
+        hosted_data = {
+            "deployment-mode": "production",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        relation = HostedRequirer({"config": {}})
+        self.assertEqual("RELATIVE", relation["hosted"][0]["archive-url"])
+
+    def test_archive_url_from_root_url(self):
+        """
+        When the landscape-server service is related to landscape-hosted
+        the archive-url is set based on the root-url from configuration.
+        """
+        hosted_data = {
+            "deployment-mode": "production",
+            "supported-releases": "16.03",
+            "ppas-to-proxy": "16.03=http://foo/16.03/ubuntu",
+            "gpg-passphrase-path": "/etc/landscape/gpg-passphrase.txt",
+            "gpg-home-path": "/etc/landscape/gpg"}
+        self.hookenv.relations = {
+            "hosted": {
+                "hosted:1": {
+                    "landscape-hosted/1": hosted_data,
+                }
+            }
+        }
+        relation = HostedRequirer({"config": {
+            "root-url": "https://landscape.canonical.com/"}})
+        self.assertEqual("https://archive.landscape.canonical.com/",
+                         relation["hosted"][0]["archive-url"])

@@ -1,6 +1,7 @@
 from charmhelpers.core.services.helpers import RelationContext
 
 from lib.error import CharmError
+from lib.utils import get_archive_url
 
 DEPLOYMENT_MODES = ("standalone", "edge", "staging", "production")
 
@@ -56,6 +57,10 @@ class HostedRequirer(RelationContext):
                                 # name1=url1,name2=url2 format.
     ]
 
+    def __init__(self, config_requirer):
+        self._config_requirer = config_requirer
+        super(HostedRequirer, self).__init__()
+
     def get_data(self):
         super(HostedRequirer, self).get_data()
         data = self.get(self.name)
@@ -92,3 +97,7 @@ class HostedRequirer(RelationContext):
                 if missing_releases:
                     raise MissingSupportedReleaseUrlError(missing_releases)
                 data[0]["supported-releases"] = releases
+
+            # Set archive-url on the hosted relation based on root-url if set.
+            config_data = self._config_requirer.get("config")
+            data[0]["archive-url"] = get_archive_url(config_data)

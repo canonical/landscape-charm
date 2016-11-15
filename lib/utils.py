@@ -2,6 +2,8 @@ import os
 import subprocess
 import yaml
 
+from six.moves.urllib.parse import urlparse, urlunparse
+
 from charmhelpers.core import hookenv
 
 from lib.error import CharmError
@@ -61,6 +63,23 @@ def update_persisted_data(key, value, hookenv=hookenv):
     with open(filename, "w") as fd:
         data = yaml.dump(data, fd)
     return old
+
+
+def get_archive_url(config_data):
+    """
+    Return the archive URL (absolute or relative).
+
+    If root-url is set, prepends "archive." to the hostname, otherwise
+    returns a string "RELATIVE".
+    """
+    root_url = config_data.get("root-url")
+    if root_url:
+        parsed_url = urlparse(root_url)
+        netloc = "archive." + parsed_url.netloc
+        return urlunparse(
+            (parsed_url.scheme, netloc, parsed_url.path, parsed_url.params,
+             parsed_url.query, parsed_url.fragment))
+    return "RELATIVE"
 
 
 class CommandRunner(object):

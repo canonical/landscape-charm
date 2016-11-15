@@ -49,7 +49,7 @@ class ServicesHook(Hook):
         leader_provider.provide_data()
 
         config_requirer = ConfigRequirer(hookenv=self._hookenv)
-        hosted_requirer = HostedRequirer()
+        hosted_requirer = HostedRequirer(config_requirer)
         manager = ServiceManager(services=[{
             "service": "landscape",
             "ports": [],

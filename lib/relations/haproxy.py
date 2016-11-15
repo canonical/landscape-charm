@@ -9,6 +9,7 @@ from charmhelpers.core.services.helpers import RelationContext
 
 from lib.error import CharmError
 from lib.paths import default_paths
+from lib.utils import get_archive_url
 
 
 SERVICE_PORTS = {
@@ -119,16 +120,17 @@ class HAProxyProvider(RelationContext):
         services = [self._get_http(), self._get_https()]
         return {"services": yaml.safe_dump(services)}
 
-    def _get_root_hostname(self):
+    def _get_archive_hostname(self):
         """
-        Return hostname from the root_url if defined.
+        Return hostname derived from root_url if defined or RELATIVE otherwise.
         """
         config_data = self._config_requirer.get("config")
-        root_url = config_data.get("root-url")
-        if root_url:
-            hostname = urlparse(root_url).hostname
+        archive_url = get_archive_url(config_data)
+        if archive_url == "RELATIVE":
+            return archive_url
+        else:
+            hostname = urlparse(archive_url).hostname
             return hostname
-        return None
 
     def _get_http(self):
         """Return the service configuration for the HTTP frontend."""
@@ -148,17 +150,17 @@ class HAProxyProvider(RelationContext):
         backends.append(
             self._get_backend("pppa-proxy", self._get_servers("pppa-proxy")))
 
-        # Use archive.<root_url> if root_url is set, otherwise fall-back
-        # to /archive.
-        root_url = self._get_root_hostname()
-        if root_url:
-            acl_lines = [
-                "acl pppa-proxy hdr(host) -i archive.{}".format(root_url),
-            ]
-        else:
+        # Get absolute archive URL based on root_url if set, or configure
+        # relative path otherwise.
+        archive_hostname = self._get_archive_hostname()
+        if archive_hostname == "RELATIVE":
             acl_lines = [
                 "acl pppa-proxy path_beg -i /archive",
                 "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\ /\\2",
+            ]
+        else:
+            acl_lines = [
+                "acl pppa-proxy hdr(host) -i {}".format(archive_hostname),
             ]
         service_options.extend(acl_lines)
         service_options.append(
