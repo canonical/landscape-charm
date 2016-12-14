@@ -59,13 +59,13 @@ integration-test: test-depends
 integration-test-trunk: secrets
 	LS_CHARM_SOURCE=lds-trunk-ppa $(MAKE) $(subst -trunk,,$@)
 
-deploy-dense-maas: bundles
+deploy-dense-maas: bundles-local-branch
 	./dev/deployer dense-maas
 
 deploy-dense-maas-dev: bundles-local-branch repo-file-trunk
 	./dev/deployer dense-maas --flags juju-debug
 
-deploy: bundles
+deploy: bundles-local-branch
 	./dev/deployer scalable
 
 deploy-local: bundles-local-branch
