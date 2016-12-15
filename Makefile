@@ -68,9 +68,6 @@ deploy-dense-maas-dev: bundles-local-branch repo-file-trunk
 deploy: bundles-local-branch
 	./dev/deployer scalable
 
-deploy-local: bundles-local-branch
-	./dev/deployer scalable
-
 repo-file-trunk: secrets
 	grep -e "^source:" secrets/lds-trunk-ppa | cut -f 2- -d " " > config/repo-file
 
