@@ -31,7 +31,7 @@ bundles-checkout:
 	@if [ -d bundles ]; then \
 	    bzr up bundles; \
 	else \
-	    bzr co lp:~landscape/landscape-charm/bundles-trunk bundles; \
+	    bzr co lp:landscape-bundles bundles; \
 	fi; \
 	make -C bundles deps
 	make -C bundles clean
