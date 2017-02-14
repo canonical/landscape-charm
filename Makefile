@@ -6,25 +6,16 @@ test:
 	trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
+	pip install --user bundletester juju-deployer
 	./dev/ubuntu-deps
 	$(MAKE) test lint
-
-verify-juju-test:
-	@echo "Checking for ... "
-	@echo -n "juju-test: "
-	@if [ -z `which juju-test` ]; then \
-		echo -e "\nRun ./dev/ubuntu-deps to get the juju-test command installed"; \
-		exit 1;\
-	else \
-		echo "installed"; \
-	fi
 
 update-charm-revision-numbers: bundles
 	@dev/update-charm-revision-numbers \
 		$(EXTRA_UPDATE_ARGUMENTS) \
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
-test-depends: verify-juju-test bundles
+test-depends: bundles
 	@cd tests && python3 test_helpers.py
 
 bundles-checkout:
@@ -53,6 +44,7 @@ secrets:
 	fi
 
 integration-test: test-depends
+	bundletester --skip-implicit -t .
 	juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
 
 # Run integration tests using the LDS package from the lds-trunk PPA
