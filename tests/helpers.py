@@ -60,7 +60,7 @@ class EnvironmentFixture(Fixture):
     """
 
     _timeout = 3000
-    _series = "trusty"
+    _series = "xenial"
     _deployment = Deployment(series=_series)
     _new_unit_target = None
 
