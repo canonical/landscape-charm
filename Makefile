@@ -1,6 +1,6 @@
 PYTHON := /usr/bin/env python
 
-#export PATH := $(PATH):~/.local/bin
+export PATH := $(PATH):~/.local/bin
 
 test:
 	trial lib
@@ -48,7 +48,7 @@ secrets:
 
 integration-test: test-depends
 	bundletester --skip-implicit -t .
-	juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
+	# juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
 
 # Run integration tests using the LDS package from the lds-trunk PPA
 integration-test-trunk: secrets
