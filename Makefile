@@ -1,6 +1,6 @@
 PYTHON := /usr/bin/env python
 
-export PATH := $(PATH):~/.local/bin
+#export PATH := $(PATH):~/.local/bin
 
 test:
 	trial lib
@@ -19,6 +19,7 @@ update-charm-revision-numbers: bundles
 test-depends: bundles
 	@cd tests && python3 test_helpers.py
 	pip install --user bundletester juju-deployer
+	echo $(PATH)
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
