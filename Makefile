@@ -1,7 +1,5 @@
 PYTHON := /usr/bin/env python
 
-export PYTHONPATH="~/.local/lib/python3.5/site-packages"
-
 test:
 	trial lib
 	# For now only the install hook runs against python3
