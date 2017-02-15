@@ -17,7 +17,7 @@ update-charm-revision-numbers: bundles
 test-depends: bundles
 	pip install --user bundletester juju-deployer
 	pip3 install --user amulet
- 	cd tests && PYTHONPATH="~/.local/lib/python3.5/site-packages" python3 test_helpers.py
+	cd tests && PYTHONPATH="~/.local/lib/python3.5/site-packages" python3 test_helpers.py
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
