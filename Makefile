@@ -44,7 +44,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	~/.local/bin/bundletester --skip-implicit -t .
+	~/.local/bin/bundletester --skip-implicit -t . -e 'localhost:'
 	# juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
 
 # Run integration tests using the LDS package from the lds-trunk PPA
