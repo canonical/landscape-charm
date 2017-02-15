@@ -1,6 +1,6 @@
 PYTHON := /usr/bin/env python
 
-export PYTHONPATH = "~/.local/lib/python2.7/site-packages"
+export PYTHONPATH="~/.local/lib/python3.5/site-packages"
 
 test:
 	trial lib
@@ -17,8 +17,9 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: bundles
-	pip3 install --user bundletester juju-deployer amulet
-	@cd tests && python3 test_helpers.py
+	pip install --user bundletester juju-deployer
+	pip3 install --user amulet
+ 	cd tests && PYTHONPATH="~/.local/lib/python3.5/site-packages" python3 test_helpers.py
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
