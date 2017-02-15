@@ -8,7 +8,6 @@ test:
 	trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
-	pip3 install --user bundletester juju-deployer
 	./dev/ubuntu-deps
 	$(MAKE) test lint
 
@@ -19,6 +18,7 @@ update-charm-revision-numbers: bundles
 
 test-depends: bundles
 	@cd tests && python3 test_helpers.py
+	pip3 install --user bundletester juju-deployer
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
