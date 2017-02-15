@@ -1,5 +1,7 @@
 PYTHON := /usr/bin/env python
 
+export PYTHONPATH = "~/.local/lib/python2.7/site-packages"
+
 test:
 	trial lib
 	# For now only the install hook runs against python3
@@ -16,7 +18,7 @@ update-charm-revision-numbers: bundles
 
 test-depends: bundles
 	@cd tests && python3 test_helpers.py
-	pip install --user bundletester juju-deployer
+	pip install --user bundletester juju-deployer amulet
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
