@@ -18,7 +18,7 @@ update-charm-revision-numbers: bundles
 
 test-depends: bundles
 	@cd tests && python3 test_helpers.py
-	pip3 install --user bundletester juju-deployer
+	pip install --user bundletester juju-deployer
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
