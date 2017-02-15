@@ -1,7 +1,5 @@
 PYTHON := /usr/bin/env python
 
-export PATH := $(PATH):~/.local/bin
-
 test:
 	trial lib
 	# For now only the install hook runs against python3
@@ -19,7 +17,6 @@ update-charm-revision-numbers: bundles
 test-depends: bundles
 	@cd tests && python3 test_helpers.py
 	pip install --user bundletester juju-deployer
-	echo $(PATH)
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
@@ -47,7 +44,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	bundletester --skip-implicit -t .
+	~/.local/bin/bundletester --skip-implicit -t .
 	# juju test --set-e -p LS_CHARM_SOURCE,JUJU_HOME,JUJU_ENV,PG_MANUAL_TUNING,DENSE_MAAS -v --timeout 7200s
 
 # Run integration tests using the LDS package from the lds-trunk PPA
