@@ -1,6 +1,6 @@
 PYTHON := /usr/bin/env python
 
-export PATH = $(PATH):~/.local/bin
+export PATH := $(PATH):~/.local/bin
 
 test:
 	trial lib
