@@ -6,7 +6,7 @@ test:
 	trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
-	pip install --user bundletester juju-deployer
+	pip3 install --user bundletester juju-deployer
 	./dev/ubuntu-deps
 	$(MAKE) test lint
 
