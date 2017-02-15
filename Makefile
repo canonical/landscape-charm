@@ -45,7 +45,7 @@ secrets:
 	fi
 
 integration-test: test-depends
-	~/.local/bin/bundletester --skip-implicit -t .
+	~/.local/bin/bundletester -v -l DEBUG --skip-implicit -t .
 
 # Run integration tests using the LDS package from the lds-trunk PPA
 integration-test-trunk: secrets
