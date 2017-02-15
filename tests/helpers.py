@@ -476,7 +476,7 @@ class EnvironmentFixture(Fixture):
 
     def _do_action(self, action, unit, action_params=None):
         """Execute an action on a unit, returning the id."""
-        command = ["juju", "action", "do", "--format=json", unit, action]
+        command = ["juju", "run-action", "--format=json", unit, action]
         if action_params is not None:
             sorted_action_params = sorted(
                 action_params.items(), key=itemgetter(0))
@@ -490,8 +490,8 @@ class EnvironmentFixture(Fixture):
     def _fetch_action(self, action_id, wait=300):
         """Fetch the results of an action."""
         return json.loads(self._subprocess.check_output(
-            ["juju", "action", "fetch", "--format=json", "--wait", str(wait),
-             action_id]).decode("utf-8"))
+            ["juju", "show-action-output", "--format=json", "--wait",
+             str(wait), action_id]).decode("utf-8"))
 
     def _get_charm_dir(self):
         """Get the path to the root of the charm directory."""
@@ -592,9 +592,9 @@ class EnvironmentFixture(Fixture):
     def _configure_for_dense_maas(self):
         """Configure the deployment for a dense MAAS configuration.
 
-        All units will be placed in an LXC on the bootstrap node.
+        All units will be placed in an LXD on the bootstrap node.
         """
-        self._new_unit_target = "lxc:0"
+        self._new_unit_target = "lxd:0"
         services = [
             service for service in DEFAULT_BUNDLE_CONTEXT.keys()
             if service != "name"]
