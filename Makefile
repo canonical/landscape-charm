@@ -1,5 +1,7 @@
 PYTHON := /usr/bin/env python
 
+export PATH = $(PATH):~/.local/bin
+
 test:
 	trial lib
 	# For now only the install hook runs against python3
