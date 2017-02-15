@@ -17,8 +17,8 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: bundles
+	pip3 install --user bundletester juju-deployer amulet
 	@cd tests && python3 test_helpers.py
-	pip install --user bundletester juju-deployer amulet
 
 bundles-checkout:
 	@if [ -d bundles ]; then \
