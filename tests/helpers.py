@@ -592,7 +592,7 @@ class EnvironmentFixture(Fixture):
     def _configure_for_dense_maas(self):
         """Configure the deployment for a dense MAAS configuration.
 
-        All units will be placed in an LXD on the bootstrap node.
+        All units will be placed in an LXD on the controller.
         """
         self._new_unit_target = "lxd:0"
         services = [
