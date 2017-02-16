@@ -17,7 +17,7 @@ directory.  You can run it as follows:
 N.B., It will deploy into a the current juju model. It uses the bundletester
 command to facilitate this. the `JUJU_MODEL` environment variable can be passed
 to specify a different model.  It will use a number of machines to do this test
--- it should work on a local environment (LXD), but could be quite resource
+-- it should work on a local controller (LXD), but could be quite resource
 intensive.
 
 
