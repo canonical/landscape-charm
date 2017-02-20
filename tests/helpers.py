@@ -225,7 +225,7 @@ class EnvironmentFixture(Fixture):
             attempts=attempts, interval=interval)
 
     def pause_landscape(self, unit=None):
-        """Execute tnhe 'pause' action on a Landscape unit.
+        """Execute the 'pause' action on a Landscape unit.
 
         The results of the action is returned.
         """
