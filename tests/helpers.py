@@ -13,7 +13,6 @@ import time
 import re
 
 from contextlib import contextmanager
-from operator import itemgetter
 from os import getenv
 from time import sleep
 from configparser import ConfigParser
@@ -226,13 +225,13 @@ class EnvironmentFixture(Fixture):
             attempts=attempts, interval=interval)
 
     def pause_landscape(self, unit=None):
-        """Execute the 'pause' action on a Landscape unit.
+        """Execute tnhe 'pause' action on a Landscape unit.
 
         The results of the action is returned.
         """
         unit = self._get_service_unit("landscape-server", unit=unit)
-        action_id = self._do_action("pause", unit.info["unit_name"])
-        return self._fetch_action(action_id)
+        action_id = self._deployment.action_do(unit.info["unit_name"], "pause")
+        return self._deployment.action_fetch(action_id)
 
     def resume_landscape(self, unit=None):
         """Execute the 'resume' action on a Landscape unit.
@@ -240,8 +239,9 @@ class EnvironmentFixture(Fixture):
         The results of the action is returned.
         """
         unit = self._get_service_unit("landscape-server", unit=unit)
-        action_id = self._do_action("resume", unit.info["unit_name"])
-        return self._fetch_action(action_id)
+        action_id = self._deployment.action_do(
+            unit.info["unit_name"], "resume")
+        return self._deployment.action_fetch(action_id)
 
     def bootstrap_landscape(self, admin_name, admin_email, admin_password,
                             unit=None):
@@ -253,9 +253,9 @@ class EnvironmentFixture(Fixture):
         bootstrap_params = {"admin-name": admin_name,
                             "admin-email": admin_email,
                             "admin-password": admin_password}
-        action_id = self._do_action(
-            "bootstrap", unit.info["unit_name"], bootstrap_params)
-        return self._fetch_action(action_id)
+        action_id = self._deployment.action_do(
+            unit.info["unit_name"], "bootstrap", bootstrap_params)
+        return self._deployment.action_fetch(action_id)
 
     def wait_landscape_cron_jobs(self, unit=None):
         """Wait for running cron jobs to finish on the given Landscape unit."""
@@ -473,25 +473,6 @@ class EnvironmentFixture(Fixture):
             stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
         return stdout.decode("utf-8"), stderr.decode("utf-8")
-
-    def _do_action(self, action, unit, action_params=None):
-        """Execute an action on a unit, returning the id."""
-        command = ["juju", "action", "do", "--format=json", unit, action]
-        if action_params is not None:
-            sorted_action_params = sorted(
-                action_params.items(), key=itemgetter(0))
-            for key, value in sorted_action_params:
-                if value is not None:
-                    command.append("%s=%s" % (key, value))
-        result = json.loads(
-            self._subprocess.check_output(command).decode("utf-8"))
-        return result["Action queued with id"]
-
-    def _fetch_action(self, action_id, wait=300):
-        """Fetch the results of an action."""
-        return json.loads(self._subprocess.check_output(
-            ["juju", "action", "fetch", "--format=json", "--wait", str(wait),
-             action_id]).decode("utf-8"))
 
     def _get_charm_dir(self):
         """Get the path to the root of the charm directory."""
