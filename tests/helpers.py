@@ -231,7 +231,7 @@ class EnvironmentFixture(Fixture):
         """
         unit = self._get_service_unit("landscape-server", unit=unit)
         action_id = self._deployment.action_do(unit.info["unit_name"], "pause")
-        return self._deployment.action_fetch(action_id)
+        return self._deployment.action_fetch(action_id, full_output=True)
 
     def resume_landscape(self, unit=None):
         """Execute the 'resume' action on a Landscape unit.
@@ -241,7 +241,7 @@ class EnvironmentFixture(Fixture):
         unit = self._get_service_unit("landscape-server", unit=unit)
         action_id = self._deployment.action_do(
             unit.info["unit_name"], "resume")
-        return self._deployment.action_fetch(action_id)
+        return self._deployment.action_fetch(action_id, full_output=True)
 
     def bootstrap_landscape(self, admin_name, admin_email, admin_password,
                             unit=None):
@@ -255,7 +255,7 @@ class EnvironmentFixture(Fixture):
                             "admin-password": admin_password}
         action_id = self._deployment.action_do(
             unit.info["unit_name"], "bootstrap", bootstrap_params)
-        return self._deployment.action_fetch(action_id)
+        return self._deployment.action_fetch(action_id, full_output=True)
 
     def wait_landscape_cron_jobs(self, unit=None):
         """Wait for running cron jobs to finish on the given Landscape unit."""
