@@ -99,7 +99,7 @@ class EnvironmentFixtureTest(unittest.TestCase):
         self.assertEqual(3000, self.deployment.timeout)
         self.assertEqual(3000, self.deployment.sentry.timeout)
         config = self.deployment.services["landscape-server"]
-        self.assertEqual("local:trusty/landscape-server", config["charm"])
+        self.assertEqual("local:xenial/landscape-server", config["charm"])
         self.assertTrue(os.environ["JUJU_REPOSITORY"].startswith("/tmp"))
 
     def test_get_haproxy_public_address(self):

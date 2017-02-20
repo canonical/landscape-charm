@@ -59,7 +59,7 @@ class EnvironmentFixture(Fixture):
     """
 
     _timeout = 3000
-    _series = "trusty"
+    _series = "xenial"
     _deployment = Deployment(series=_series)
     _new_unit_target = None
 
@@ -573,9 +573,9 @@ class EnvironmentFixture(Fixture):
     def _configure_for_dense_maas(self):
         """Configure the deployment for a dense MAAS configuration.
 
-        All units will be placed in an LXC on the bootstrap node.
+        All units will be placed in an LXD on the controller.
         """
-        self._new_unit_target = "lxc:0"
+        self._new_unit_target = "lxd:0"
         services = [
             service for service in DEFAULT_BUNDLE_CONTEXT.keys()
             if service != "name"]

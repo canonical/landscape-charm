@@ -90,12 +90,12 @@ This charm makes use of juju-deployer and the charm-tools package to enable
 end-to-end integration testing.  This is how you proceed with running
 them:
 
-    # Make sure your JUJU_ENV is *not* bootstrapped, and:
-    $ JUJU_ENV=<env> make integration-test
+    $ juju bootstrap localhost
+    $ make integration-test
 
 Or if you want to use the LDS packages from the lds-trunk PPA:
 
-    $ JUJU_ENV=<env> make integration-test-trunk
+    $ JUJU_MODEL=<model> make integration-test-trunk
 
-The JUJU_ENV environment variable can be omitted if you want to use the
-current juju environment (as set by "juju switch").
+The JUJU_MDOEL environment variable can be omitted if you want to use the
+current model.
