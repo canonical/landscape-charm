@@ -37,9 +37,7 @@ SERVICE_OPTIONS = {
         "timeout client 300000",
         "timeout server 300000",
         "balance leastconn",
-        # XXX 2016-10-25 Danilo - commented out until we can figure out a way
-        # for pppa-proxy to respond to this successfully.
-        # "option httpchk HEAD / HTTP/1.0",
+        "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
         "acl message path_beg -i /message-system",
         "acl attachment path_beg -i /attachment",
