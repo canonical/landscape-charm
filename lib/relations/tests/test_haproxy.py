@@ -367,6 +367,37 @@ class HAProxyProviderTest(HookenvTest):
             ['check', 'inter 5000', 'rise 2', 'fall 5', 'maxconn 50']]
         self.assertEqual(expected, package_upload["servers"][0])
 
+    def test_provide_data_without_pppa_proxy(self):
+        """
+        When HostedProvider only specifies deployment-mode, that means that
+        there is not really a hosted relation, thus pppa-proxy should not be
+        configured.
+        """
+        self.hookenv.leader = False
+        hosted_data = []
+        hosted_requirer = {"hosted": hosted_data}
+        relation = HAProxyProvider(
+            self.config_requirer, hosted_requirer, paths=self.paths,
+            hookenv=self.hookenv)
+
+        data = relation.provide_data()
+
+        services = yaml.safe_load(data["services"])
+        https_service = services[1]
+        service_options = https_service["service_options"]
+        self.assertNotIn(
+            "acl pppa-proxy path_beg -i /archive", service_options)
+        self.assertNotIn(
+            "reqrep ^([^\\ ]*)\\ /archive/(.*) \\1\\ /\\2", service_options)
+        self.assertNotIn(
+            "use_backend landscape-pppa-proxy if pppa-proxy", service_options)
+
+        backends = https_service["backends"]
+        pppa_proxy_backends = [
+            backend for backend in backends
+            if backend["backend_name"] == "landscape-pppa-proxy"]
+        self.assertEqual([], pppa_proxy_backends)
+
     def test_provide_data_with_pppa_proxy(self):
         """
         When HostedProvider specifies pppa-proxy configuration, entries
