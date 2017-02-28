@@ -174,7 +174,9 @@ class HAProxyProvider(RelationContext):
         ]
 
         # If there is a hosted relation, we add pppa-proxy rules too.
-        if self._hosted_requirer.get("hosted"):
+        hosted_relation = self._hosted_requirer.get("hosted")
+        if hosted_relation and any(
+                "ppas-to-proxy" in data for data in hosted_relation):
             self._add_pppa_proxy_backends(backends, service["service_options"])
 
         if self._hookenv.is_leader():
