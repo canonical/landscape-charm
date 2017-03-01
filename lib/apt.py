@@ -14,7 +14,7 @@ from lib.utils import CommandRunner
 
 LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
 INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-minimal", "python-psutil")
-PACKAGES_DEV = ("dpkg-dev", "pbuilder", "aptitude")
+PACKAGES_DEV = ("dpkg-dev", "devscripts", "pbuilder", "aptitude", "build-essential")
 TARBALL = "landscape-server_*.tar.gz"
 
 # XXX Eventually we'll want to use a dedicated PPA, populated by Jenkins.
