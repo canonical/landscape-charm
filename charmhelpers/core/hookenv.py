@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 "Interactions with the Juju environment"
 # Copyright 2013 Canonical Ltd.
@@ -334,6 +332,8 @@ def config(scope=None):
     config_cmd_line = ['config-get']
     if scope is not None:
         config_cmd_line.append(scope)
+    else:
+        config_cmd_line.append('--all')
     config_cmd_line.append('--format=json')
     try:
         config_data = json.loads(
@@ -616,6 +616,20 @@ def close_port(port, protocol="TCP"):
     subprocess.check_call(_args)
 
 
+def open_ports(start, end, protocol="TCP"):
+    """Opens a range of service network ports"""
+    _args = ['open-port']
+    _args.append('{}-{}/{}'.format(start, end, protocol))
+    subprocess.check_call(_args)
+
+
+def close_ports(start, end, protocol="TCP"):
+    """Close a range of service network ports"""
+    _args = ['close-port']
+    _args.append('{}-{}/{}'.format(start, end, protocol))
+    subprocess.check_call(_args)
+
+
 @cached
 def unit_get(attribute):
     """Get the unit ID for the remote unit"""
@@ -845,6 +859,20 @@ def translate_exc(from_exc, to_exc):
     return inner_translate_exc1
 
 
+def application_version_set(version):
+    """Charm authors may trigger this command from any hook to output what
+    version of the application is running. This could be a package version,
+    for instance postgres version 9.5. It could also be a build number or
+    version control revision identifier, for instance git sha 6fb7ba68. """
+
+    cmd = ['application-version-set']
+    cmd.append(version)
+    try:
+        subprocess.check_call(cmd)
+    except OSError:
+        log("Application Version: {}".format(version))
+
+
 @translate_exc(from_exc=OSError, to_exc=NotImplementedError)
 def is_leader():
     """Does the current unit hold the juju leadership
@@ -1006,4 +1034,35 @@ def network_get_primary_address(binding):
     :raise: NotImplementedError if run on Juju < 2.0
     '''
     cmd = ['network-get', '--primary-address', binding]
-    return subprocess.check_output(cmd).strip()
+    return subprocess.check_output(cmd).decode('UTF-8').strip()
+
+
+def add_metric(*args, **kwargs):
+    """Add metric values. Values may be expressed with keyword arguments. For
+    metric names containing dashes, these may be expressed as one or more
+    'key=value' positional arguments. May only be called from the collect-metrics
+    hook."""
+    _args = ['add-metric']
+    _kvpairs = []
+    _kvpairs.extend(args)
+    _kvpairs.extend(['{}={}'.format(k, v) for k, v in kwargs.items()])
+    _args.extend(sorted(_kvpairs))
+    try:
+        subprocess.check_call(_args)
+        return
+    except EnvironmentError as e:
+        if e.errno != errno.ENOENT:
+            raise
+    log_message = 'add-metric failed: {}'.format(' '.join(_kvpairs))
+    log(log_message, level='INFO')
+
+
+def meter_status():
+    """Get the meter status, if running in the meter-status-changed hook."""
+    return os.environ.get('JUJU_METER_STATUS')
+
+
+def meter_info():
+    """Get the meter status information, if running in the meter-status-changed
+    hook."""
+    return os.environ.get('JUJU_METER_INFO')
