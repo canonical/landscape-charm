@@ -1,6 +1,6 @@
 options:
     source:
-        default: "ppa:landscape/16.06"
+        default: "ppa:landscape/17.03"
         type: string
         description: |
             The source from which to install the landscape packages. Possible
