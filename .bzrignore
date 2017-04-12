@@ -1,7 +1,6 @@
 _trial_temp
 bundles
-config/license-file
-config/repo-file
+config
 hooks/_trial_temp
 tags
 secrets
