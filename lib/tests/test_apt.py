@@ -179,7 +179,7 @@ class AptTest(HookenvTest):
 
         self.assertEqual(
             [("ppa:landscape/14.10", None),
-             ("deb file://%s/build/repo/ ./" % self.hookenv.charm_dir(),
+             ("deb [trusted=yes] file://%s/build/repo/ ./" % self.hookenv.charm_dir(),
               None)],
             self.fetch.sources)
         # XXX: We should check that the generated repository is valid.

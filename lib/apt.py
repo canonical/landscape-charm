@@ -237,7 +237,7 @@ class Apt(object):
         runner = self._runner.in_dir(repo_dir)
         runner.shell(BUILD_LOCAL_REPO)
 
-        self._fetch.add_source("deb file://%s/ ./" % repo_dir)
+        self._fetch.add_source("deb [trusted=yes] file://%s/ ./" % repo_dir)
         self._fetch.apt_update(fatal=True)
 
         return True
