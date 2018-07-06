@@ -69,11 +69,13 @@ class Apt(object):
     """
 
     def __init__(self, hookenv=hookenv, fetch=fetch, subprocess=subprocess,
-                 paths=default_paths):
+                 paths=default_paths, sources_file=None):
         self._hookenv = hookenv
         self._fetch = fetch
         self._subprocess = subprocess
         self._paths = paths
+        self._sources_file = (sources_file
+                              or "/etc/apt/sources.list.d/landscape.list")
 
         self._runner = CommandRunner(hookenv, subprocess)
 
@@ -237,7 +239,9 @@ class Apt(object):
         runner = self._runner.in_dir(repo_dir)
         runner.shell(BUILD_LOCAL_REPO)
 
-        self._fetch.add_source("deb [trusted=yes] file://%s/ ./" % repo_dir)
+        # SoftwareProperties does not store trusted flag.
+        with open(self._sources_file, "w") as sources:
+            sources.write("deb [trusted=yes] file://%s/ ./" % repo_dir)
         self._fetch.apt_update(fatal=True)
 
         return True

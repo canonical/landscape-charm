@@ -20,13 +20,14 @@ class AptTest(HookenvTest):
         self.subprocess = SubprocessStub()
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
+        self.sources_file = self.useFixture(TempDir()).join("landscape.list")
         self.subprocess.add_fake_executable("add-apt-repository")
         self.subprocess.add_fake_executable("apt-mark")
         self.subprocess.add_fake_executable(
             "/usr/lib/pbuilder/pbuilder-satisfydepends")
         self.apt = Apt(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess,
-            paths=self.paths)
+            paths=self.paths, sources_file=self.sources_file)
 
     def _create_local_tarball(self, name, version):
         """Create a local minimal source package tarball that can be built.
@@ -177,12 +178,15 @@ class AptTest(HookenvTest):
         self.assertTrue(os.path.exists(os.path.join(
             repo_dir, "landscape-server_1.2.3_all.deb")))
 
-        self.assertEqual(
-            [("ppa:landscape/14.10", None),
-             ("deb [trusted=yes] file://%s/build/repo/ ./" % self.hookenv.charm_dir(),
-              None)],
-            self.fetch.sources)
+        self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
         # XXX: We should check that the generated repository is valid.
+
+        with open(self.sources_file) as sources_file:
+            sources = sources_file.read()
+        self.assertEqual(
+            "deb [trusted=yes] file://{}/build/repo/ ./".format(
+                self.hookenv.charm_dir()),
+            sources)
 
     def test_local_tarball_not_new(self):
         """
