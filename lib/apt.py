@@ -74,8 +74,8 @@ class Apt(object):
         self._fetch = fetch
         self._subprocess = subprocess
         self._paths = paths
-        self._sources_file = (sources_file
-                              or "/etc/apt/sources.list.d/landscape.list")
+        self._sources_file = (
+            sources_file or "/etc/apt/sources.list.d/landscape.list")
 
         self._runner = CommandRunner(hookenv, subprocess)
 
