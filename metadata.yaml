@@ -20,5 +20,6 @@ provides:
     interface: landscape-hosted
     scope: container
 series:
+  - bionic
   - xenial
   - trusty
