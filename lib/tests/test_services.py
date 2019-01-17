@@ -31,7 +31,7 @@ class ServicesHookTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
         self.root_dir = self.useFixture(RootDir())
-        self.fetch = FetchStub()
+        self.fetch = FetchStub(self.hookenv.config)
         self.psutil = PsutilStub(num_cpus=2, physical_memory=1*1024**3)
         self.hook = ServicesHook(
             hookenv=self.hookenv, host=self.host, subprocess=self.subprocess,

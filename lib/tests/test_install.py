@@ -9,7 +9,7 @@ class InstallHookTest(HookenvTest):
 
     def setUp(self):
         super(InstallHookTest, self).setUp()
-        self.fetch = FetchStub()
+        self.fetch = FetchStub(self.hookenv.config)
         self.subprocess = SubprocessStub()
         self.subprocess.add_fake_executable("apt-mark")
         self.hook = InstallHook(

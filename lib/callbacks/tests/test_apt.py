@@ -7,7 +7,7 @@ class SetAPTSourcesTest(HookenvTest):
 
     def setUp(self):
         super(SetAPTSourcesTest, self).setUp()
-        self.fetch = FetchStub()
+        self.fetch = FetchStub(self.hookenv.config)
         self.subprocess = SubprocessStub()
         self.callback = SetAPTSources(
             hookenv=self.hookenv, fetch=self.fetch, subprocess=self.subprocess)

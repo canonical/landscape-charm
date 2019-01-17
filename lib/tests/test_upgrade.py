@@ -11,7 +11,7 @@ class UpgradeActionTest(HookenvTest):
 
     def setUp(self):
         super(UpgradeActionTest, self).setUp()
-        self.fetch = FetchStub()
+        self.fetch = FetchStub(self.hookenv.config)
         self.subprocess = SubprocessStub()
         self.subprocess.add_fake_executable("apt-mark")
         self.root_dir = self.useFixture(RootDir())
