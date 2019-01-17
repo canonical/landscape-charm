@@ -5,8 +5,8 @@ from fixtures import TempDir
 
 from lib.apt import (
     Apt, AptNoSourceConfigError, AptSourceAndKeyDontMatchError,
-    SourceConflictError, INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS,
-    SAMPLE_HASHIDS_PPA, SAMPLE_HASHIDS_KEY)
+    INSTALL_PACKAGES, DEFAULT_INSTALL_OPTIONS, SAMPLE_HASHIDS_PPA,
+    SAMPLE_HASHIDS_KEY)
 from lib.tests.stubs import FetchStub, SubprocessStub
 from lib.tests.helpers import HookenvTest
 from lib.tests.rootdir import RootDir
@@ -16,9 +16,7 @@ class AptTest(HookenvTest):
 
     def setUp(self):
         super(AptTest, self).setUp()
-        # charmhelpers.fetch doesn't support dependency injection, so
-        # we pass in our config to be able to inspect what was used
-        self.fetch = FetchStub(self.hookenv.config)
+        self.fetch = FetchStub()
         self.subprocess = SubprocessStub()
         self.root_dir = self.useFixture(RootDir())
         self.paths = self.root_dir.paths
@@ -66,8 +64,6 @@ class AptTest(HookenvTest):
         self.apt.set_sources()
         self.assertEqual([("ppa:landscape/14.10", None)], self.fetch.sources)
         self.assertEqual([True], self.fetch.updates)
-        # With source set, fetch.configure_sources is not called
-        self.assertEqual(self.fetch.configured_sources, [])
 
     def test_set_shorthand_sources(self):
         """
@@ -158,33 +154,9 @@ class AptTest(HookenvTest):
         self.hookenv.config()["key"] = "xyz"
         with self.assertRaises(AptSourceAndKeyDontMatchError) as error:
             self.apt.set_sources()
-        self.assertEqual(
-            "The 'source' and 'key' lists have different lengths",
-            str(error.exception))
-
-    def test_set_sources_and_install_sources(self):
-        """
-        If sources and install_sources are set set_sources complains.
-        """
-        self.hookenv.config()["source"] = "ppa:landscape/14.10"
-        self.hookenv.config()["install_sources"] = "anything"
-        with self.assertRaises(SourceConflictError) as error:
-            self.apt.set_sources()
-        self.assertEqual(
-            "install_sources: 'anything' and source: 'ppa:landscape/14.10' "
-            "are mutually exclusive.",
-            str(error.exception))
-
-    def test_install_sources(self):
-        """
-        If install_sources is set, it's passed to fetch.configure_sources.
-        """
-        self.hookenv.config()["install_sources"] = "ppa:landscape/19.01"
-        self.hookenv.config()["install_keys"] = "DEADBEEF"
-        self.apt.set_sources()
-        self.assertEqual(
-            self.fetch.configured_sources,
-            [('ppa:landscape/19.01', 'DEADBEEF')])
+            self.assertEqual(
+                "The 'source' and 'key' lists have different lengths",
+                str(error))
 
     def test_local_tarball(self):
         """
