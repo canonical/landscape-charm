@@ -1,29 +1,8 @@
 options:
-    install_sources:
-        default: "['ppa:landscape/18.03']"
-        type: string
-        description: >
-          List of extra apt sources, per charm-helpers standard format (a
-          yaml list of strings encoded as a string). Each source may be either a line
-          that can be added directly to sources.list(5), or in the form ppa:<user>/<ppa-name>
-          for adding Personal Package Archives, or a distribution component to enable.
-    install_keys:
-        default: ""
-        type: string
-        description: >
-          List of signing keys for install_sources package sources, per
-          charmhelpers standard format (a yaml list of strings encoded as a string).
-          The keys should be the full ASCII armoured GPG public keys. While GPG key
-          ids are also supported and looked up on a keyserver, operators should be aware
-          that this mechanism is insecure. null can be used if a standard package signing
-          key is used that will already be installed on the machine, and for PPA sources
-          where the package signing key is securely retrieved from Launchpad.\n"
     source:
-        default: ""
+        default: "ppa:landscape/18.03"
         type: string
         description: |
-            *DEPRECATED*. See install_sources
-
             The source from which to install the landscape packages. Possible
             values are:
                 - A version number: "16.06"
@@ -37,8 +16,6 @@ options:
         default: ""
         type: string
         description: |
-            *DEPRECATED*. See install_keys
-
             Key ID to import to the apt keyring to support use with arbitary source
             configuration from outside of Launchpad archives or PPA's.
             In case multiple repositories are specified in the 'source' config key,
