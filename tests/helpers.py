@@ -501,8 +501,8 @@ class EnvironmentFixture(Fixture):
                     extra_config = yaml.safe_load(fd.read())
             else:
                 extra_config = {
-                    "source": source,
-                    "key": os.environ.get("LS_CHARM_KEY", "4652B4E6")
+                    "install_sources": source,
+                    "install_keys": os.environ.get("LS_CHARM_KEY", "4652B4E6")
                 }
             context["landscape"].update(extra_config)
 

@@ -107,7 +107,9 @@ class HookenvStub(object):
 class FetchStub(object):
     """Provide a testable stub for C{charmhelpers.fetch}."""
 
-    def __init__(self):
+    def __init__(self, config):
+        self._config = config
+        self.configured_sources = []
         self.sources = []
         self.updates = []
         self.filtered = []
@@ -125,6 +127,11 @@ class FetchStub(object):
 
     def apt_install(self, packages, options=None, fatal=False):
         self.installed.append((packages, options, fatal))
+
+    def configure_sources(self):
+        install_sources = self._config().get('install_sources')
+        install_keys = self._config().get('install_keys')
+        self.configured_sources.append((install_sources, install_keys))
 
 
 class HostStub(object):
