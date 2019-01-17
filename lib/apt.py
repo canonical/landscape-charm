@@ -53,11 +53,20 @@ class AptNoSourceConfigError(CharmError):
 
 
 class AptSourceAndKeyDontMatchError(CharmError):
-    """Provided config values for 'source' and 'key' do not match.."""
+    """Provided config values for 'source' and 'key' do not match."""
 
     def __init__(self):
         message = "The 'source' and 'key' lists have different lengths"
         super(AptSourceAndKeyDontMatchError, self).__init__(message)
+
+
+class SourceConflictError(CharmError):
+    """Config values for 'source' and 'install_sources' are present."""
+
+    def __init__(self, install_sources, source):
+        message = ("install_sources: {!r} and source: {!r} are "
+                   "mutually exclusive.").format(install_sources, source)
+        super(SourceConflictError, self).__init__(message)
 
 
 class Apt(object):
@@ -130,6 +139,14 @@ class Apt(object):
         """Set the remote APT repository to use, if new or changed."""
         config = self._hookenv.config()
         source = config.get("source")
+
+        # New style install sources
+        install_sources = config.get("install_sources")
+        if install_sources and source:
+            raise SourceConflictError(install_sources, source)
+        if install_sources:
+            self._fetch.configure_sources()
+            return
         if not source:
             raise AptNoSourceConfigError()
 
