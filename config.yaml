@@ -1,6 +1,6 @@
 options:
     install_sources:
-        default: "['ppa:landscape/18.03']"
+        default: "['ppa:landscape/19.01']"
         type: string
         description: >
           List of extra apt sources, per charm-helpers standard format (a
