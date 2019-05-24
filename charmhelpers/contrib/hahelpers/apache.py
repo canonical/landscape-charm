@@ -23,8 +23,8 @@
 #
 
 import os
-import subprocess
 
+from charmhelpers.core import host
 from charmhelpers.core.hookenv import (
     config as config_get,
     relation_get,
@@ -65,7 +65,8 @@ def get_ca_cert():
     if ca_cert is None:
         log("Inspecting identity-service relations for CA SSL certificate.",
             level=INFO)
-        for r_id in relation_ids('identity-service'):
+        for r_id in (relation_ids('identity-service') +
+                     relation_ids('identity-credentials')):
             for unit in relation_list(r_id):
                 if ca_cert is None:
                     ca_cert = relation_get('ca_cert',
@@ -76,20 +77,10 @@ def get_ca_cert():
 def retrieve_ca_cert(cert_file):
     cert = None
     if os.path.isfile(cert_file):
-        with open(cert_file, 'r') as crt:
+        with open(cert_file, 'rb') as crt:
             cert = crt.read()
     return cert
 
 
 def install_ca_cert(ca_cert):
-    if ca_cert:
-        cert_file = ('/usr/local/share/ca-certificates/'
-                     'keystone_juju_ca_cert.crt')
-        old_cert = retrieve_ca_cert(cert_file)
-        if old_cert and old_cert == ca_cert:
-            log("CA cert is the same as installed version", level=INFO)
-        else:
-            log("Installing new CA cert", level=INFO)
-            with open(cert_file, 'w') as crt:
-                crt.write(ca_cert)
-            subprocess.check_call(['update-ca-certificates', '--fresh'])
+    host.install_ca_cert(ca_cert, 'keystone_juju_ca_cert')

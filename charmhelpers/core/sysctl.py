@@ -28,27 +28,38 @@ from charmhelpers.core.hookenv import (
 __author__ = 'Jorge Niedbalski R. <jorge.niedbalski@canonical.com>'
 
 
-def create(sysctl_dict, sysctl_file):
+def create(sysctl_dict, sysctl_file, ignore=False):
     """Creates a sysctl.conf file from a YAML associative array
 
-    :param sysctl_dict: a YAML-formatted string of sysctl options eg "{ 'kernel.max_pid': 1337 }"
+    :param sysctl_dict: a dict or YAML-formatted string of sysctl
+                        options eg "{ 'kernel.max_pid': 1337 }"
     :type sysctl_dict: str
     :param sysctl_file: path to the sysctl file to be saved
     :type sysctl_file: str or unicode
+    :param ignore: If True, ignore "unknown variable" errors.
+    :type ignore: bool
     :returns: None
     """
-    try:
-        sysctl_dict_parsed = yaml.safe_load(sysctl_dict)
-    except yaml.YAMLError:
-        log("Error parsing YAML sysctl_dict: {}".format(sysctl_dict),
-            level=ERROR)
-        return
+    if type(sysctl_dict) is not dict:
+        try:
+            sysctl_dict_parsed = yaml.safe_load(sysctl_dict)
+        except yaml.YAMLError:
+            log("Error parsing YAML sysctl_dict: {}".format(sysctl_dict),
+                level=ERROR)
+            return
+    else:
+        sysctl_dict_parsed = sysctl_dict
 
     with open(sysctl_file, "w") as fd:
         for key, value in sysctl_dict_parsed.items():
             fd.write("{}={}\n".format(key, value))
 
-    log("Updating sysctl_file: %s values: %s" % (sysctl_file, sysctl_dict_parsed),
+    log("Updating sysctl_file: {} values: {}".format(sysctl_file,
+                                                     sysctl_dict_parsed),
         level=DEBUG)
 
-    check_call(["sysctl", "-p", sysctl_file])
+    call = ["sysctl", "-p", sysctl_file]
+    if ignore:
+        call.append("-e")
+
+    check_call(call)

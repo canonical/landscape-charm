@@ -88,8 +88,7 @@ clean:
 
 dev/charm_helpers_sync.py:
 	@mkdir -p dev
-	@bzr cat lp:charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py \
-            > dev/charm_helpers_sync.py
+	@curl https://git.launchpad.net/charm-helpers/plain/tools/charm_helpers_sync/charm_helpers_sync.py > dev/charm_helpers_sync.py
 
 sync: dev/charm_helpers_sync.py
 	$(PYTHON) dev/charm_helpers_sync.py -c charm-helpers.yaml

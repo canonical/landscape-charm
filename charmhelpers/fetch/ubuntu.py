@@ -12,29 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import OrderedDict
 import os
+import platform
+import re
 import six
 import time
 import subprocess
 
-from tempfile import NamedTemporaryFile
-from charmhelpers.core.host import (
-    lsb_release
-)
-from charmhelpers.core.hookenv import log
-from charmhelpers.fetch import SourceConfigError
+from charmhelpers.core.host import get_distrib_codename
 
+from charmhelpers.core.hookenv import (
+    log,
+    DEBUG,
+    WARNING,
+    env_proxy_settings,
+)
+from charmhelpers.fetch import SourceConfigError, GPGKeyError
+
+PROPOSED_POCKET = (
+    "# Proposed\n"
+    "deb http://archive.ubuntu.com/ubuntu {}-proposed main universe "
+    "multiverse restricted\n")
+PROPOSED_PORTS_POCKET = (
+    "# Proposed\n"
+    "deb http://ports.ubuntu.com/ubuntu-ports {}-proposed main universe "
+    "multiverse restricted\n")
+# Only supports 64bit and ppc64 at the moment.
+ARCH_TO_PROPOSED_POCKET = {
+    'x86_64': PROPOSED_POCKET,
+    'ppc64le': PROPOSED_PORTS_POCKET,
+    'aarch64': PROPOSED_PORTS_POCKET,
+    's390x': PROPOSED_PORTS_POCKET,
+}
+CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
+CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
 CLOUD_ARCHIVE = """# Ubuntu Cloud Archive
 deb http://ubuntu-cloud.archive.canonical.com/ubuntu {} main
 """
-
-PROPOSED_POCKET = """# Proposed
-deb http://archive.ubuntu.com/ubuntu {}-proposed main universe multiverse restricted
-"""
-
 CLOUD_ARCHIVE_POCKETS = {
     # Folsom
     'folsom': 'precise-updates/folsom',
+    'folsom/updates': 'precise-updates/folsom',
     'precise-folsom': 'precise-updates/folsom',
     'precise-folsom/updates': 'precise-updates/folsom',
     'precise-updates/folsom': 'precise-updates/folsom',
@@ -43,6 +62,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'precise-proposed/folsom': 'precise-proposed/folsom',
     # Grizzly
     'grizzly': 'precise-updates/grizzly',
+    'grizzly/updates': 'precise-updates/grizzly',
     'precise-grizzly': 'precise-updates/grizzly',
     'precise-grizzly/updates': 'precise-updates/grizzly',
     'precise-updates/grizzly': 'precise-updates/grizzly',
@@ -51,6 +71,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'precise-proposed/grizzly': 'precise-proposed/grizzly',
     # Havana
     'havana': 'precise-updates/havana',
+    'havana/updates': 'precise-updates/havana',
     'precise-havana': 'precise-updates/havana',
     'precise-havana/updates': 'precise-updates/havana',
     'precise-updates/havana': 'precise-updates/havana',
@@ -59,6 +80,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'precise-proposed/havana': 'precise-proposed/havana',
     # Icehouse
     'icehouse': 'precise-updates/icehouse',
+    'icehouse/updates': 'precise-updates/icehouse',
     'precise-icehouse': 'precise-updates/icehouse',
     'precise-icehouse/updates': 'precise-updates/icehouse',
     'precise-updates/icehouse': 'precise-updates/icehouse',
@@ -67,6 +89,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'precise-proposed/icehouse': 'precise-proposed/icehouse',
     # Juno
     'juno': 'trusty-updates/juno',
+    'juno/updates': 'trusty-updates/juno',
     'trusty-juno': 'trusty-updates/juno',
     'trusty-juno/updates': 'trusty-updates/juno',
     'trusty-updates/juno': 'trusty-updates/juno',
@@ -75,6 +98,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'trusty-proposed/juno': 'trusty-proposed/juno',
     # Kilo
     'kilo': 'trusty-updates/kilo',
+    'kilo/updates': 'trusty-updates/kilo',
     'trusty-kilo': 'trusty-updates/kilo',
     'trusty-kilo/updates': 'trusty-updates/kilo',
     'trusty-updates/kilo': 'trusty-updates/kilo',
@@ -83,6 +107,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'trusty-proposed/kilo': 'trusty-proposed/kilo',
     # Liberty
     'liberty': 'trusty-updates/liberty',
+    'liberty/updates': 'trusty-updates/liberty',
     'trusty-liberty': 'trusty-updates/liberty',
     'trusty-liberty/updates': 'trusty-updates/liberty',
     'trusty-updates/liberty': 'trusty-updates/liberty',
@@ -91,6 +116,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'trusty-proposed/liberty': 'trusty-proposed/liberty',
     # Mitaka
     'mitaka': 'trusty-updates/mitaka',
+    'mitaka/updates': 'trusty-updates/mitaka',
     'trusty-mitaka': 'trusty-updates/mitaka',
     'trusty-mitaka/updates': 'trusty-updates/mitaka',
     'trusty-updates/mitaka': 'trusty-updates/mitaka',
@@ -99,6 +125,7 @@ CLOUD_ARCHIVE_POCKETS = {
     'trusty-proposed/mitaka': 'trusty-proposed/mitaka',
     # Newton
     'newton': 'xenial-updates/newton',
+    'newton/updates': 'xenial-updates/newton',
     'xenial-newton': 'xenial-updates/newton',
     'xenial-newton/updates': 'xenial-updates/newton',
     'xenial-updates/newton': 'xenial-updates/newton',
@@ -107,17 +134,51 @@ CLOUD_ARCHIVE_POCKETS = {
     'xenial-proposed/newton': 'xenial-proposed/newton',
     # Ocata
     'ocata': 'xenial-updates/ocata',
+    'ocata/updates': 'xenial-updates/ocata',
     'xenial-ocata': 'xenial-updates/ocata',
     'xenial-ocata/updates': 'xenial-updates/ocata',
     'xenial-updates/ocata': 'xenial-updates/ocata',
     'ocata/proposed': 'xenial-proposed/ocata',
     'xenial-ocata/proposed': 'xenial-proposed/ocata',
-    'xenial-ocata/newton': 'xenial-proposed/ocata',
+    'xenial-proposed/ocata': 'xenial-proposed/ocata',
+    # Pike
+    'pike': 'xenial-updates/pike',
+    'xenial-pike': 'xenial-updates/pike',
+    'xenial-pike/updates': 'xenial-updates/pike',
+    'xenial-updates/pike': 'xenial-updates/pike',
+    'pike/proposed': 'xenial-proposed/pike',
+    'xenial-pike/proposed': 'xenial-proposed/pike',
+    'xenial-proposed/pike': 'xenial-proposed/pike',
+    # Queens
+    'queens': 'xenial-updates/queens',
+    'xenial-queens': 'xenial-updates/queens',
+    'xenial-queens/updates': 'xenial-updates/queens',
+    'xenial-updates/queens': 'xenial-updates/queens',
+    'queens/proposed': 'xenial-proposed/queens',
+    'xenial-queens/proposed': 'xenial-proposed/queens',
+    'xenial-proposed/queens': 'xenial-proposed/queens',
+    # Rocky
+    'rocky': 'bionic-updates/rocky',
+    'bionic-rocky': 'bionic-updates/rocky',
+    'bionic-rocky/updates': 'bionic-updates/rocky',
+    'bionic-updates/rocky': 'bionic-updates/rocky',
+    'rocky/proposed': 'bionic-proposed/rocky',
+    'bionic-rocky/proposed': 'bionic-proposed/rocky',
+    'bionic-proposed/rocky': 'bionic-proposed/rocky',
+    # Stein
+    'stein': 'bionic-updates/stein',
+    'bionic-stein': 'bionic-updates/stein',
+    'bionic-stein/updates': 'bionic-updates/stein',
+    'bionic-updates/stein': 'bionic-updates/stein',
+    'stein/proposed': 'bionic-proposed/stein',
+    'bionic-stein/proposed': 'bionic-proposed/stein',
+    'bionic-proposed/stein': 'bionic-proposed/stein',
 }
+
 
 APT_NO_LOCK = 100  # The return code for "couldn't acquire lock" in APT.
 CMD_RETRY_DELAY = 10  # Wait 10 seconds between command retries.
-CMD_RETRY_COUNT = 30  # Retry a failing fatal command X times.
+CMD_RETRY_COUNT = 3  # Retry a failing fatal command X times.
 
 
 def filter_installed_packages(packages):
@@ -135,6 +196,18 @@ def filter_installed_packages(packages):
     return _pkgs
 
 
+def filter_missing_packages(packages):
+    """Return a list of packages that are installed.
+
+    :param packages: list of packages to evaluate.
+    :returns list: Packages that are installed.
+    """
+    return list(
+        set(packages) -
+        set(filter_installed_packages(packages))
+    )
+
+
 def apt_cache(in_memory=True, progress=None):
     """Build and return an apt cache."""
     from apt import apt_pkg
@@ -145,7 +218,7 @@ def apt_cache(in_memory=True, progress=None):
     return apt_pkg.Cache(progress)
 
 
-def install(packages, options=None, fatal=False):
+def apt_install(packages, options=None, fatal=False):
     """Install one or more packages."""
     if options is None:
         options = ['--option=Dpkg::Options::=--force-confold']
@@ -162,7 +235,7 @@ def install(packages, options=None, fatal=False):
     _run_apt_command(cmd, fatal)
 
 
-def upgrade(options=None, fatal=False, dist=False):
+def apt_upgrade(options=None, fatal=False, dist=False):
     """Upgrade all packages."""
     if options is None:
         options = ['--option=Dpkg::Options::=--force-confold']
@@ -177,13 +250,13 @@ def upgrade(options=None, fatal=False, dist=False):
     _run_apt_command(cmd, fatal)
 
 
-def update(fatal=False):
+def apt_update(fatal=False):
     """Update local apt cache."""
     cmd = ['apt-get', 'update']
     _run_apt_command(cmd, fatal)
 
 
-def purge(packages, fatal=False):
+def apt_purge(packages, fatal=False):
     """Purge one or more packages."""
     cmd = ['apt-get', '--assume-yes', 'purge']
     if isinstance(packages, six.string_types):
@@ -191,6 +264,14 @@ def purge(packages, fatal=False):
     else:
         cmd.extend(packages)
     log("Purging {}".format(packages))
+    _run_apt_command(cmd, fatal)
+
+
+def apt_autoremove(purge=True, fatal=False):
+    """Purge one or more packages."""
+    cmd = ['apt-get', '--assume-yes', 'autoremove']
+    if purge:
+        cmd.append('--purge')
     _run_apt_command(cmd, fatal)
 
 
@@ -217,7 +298,159 @@ def apt_unhold(packages, fatal=False):
     return apt_mark(packages, 'unhold', fatal=fatal)
 
 
-def add_source(source, key=None):
+def import_key(key):
+    """Import an ASCII Armor key.
+
+    A Radix64 format keyid is also supported for backwards
+    compatibility. In this case Ubuntu keyserver will be
+    queried for a key via HTTPS by its keyid. This method
+    is less preferrable because https proxy servers may
+    require traffic decryption which is equivalent to a
+    man-in-the-middle attack (a proxy server impersonates
+    keyserver TLS certificates and has to be explicitly
+    trusted by the system).
+
+    :param key: A GPG key in ASCII armor format,
+                  including BEGIN and END markers or a keyid.
+    :type key: (bytes, str)
+    :raises: GPGKeyError if the key could not be imported
+    """
+    key = key.strip()
+    if '-' in key or '\n' in key:
+        # Send everything not obviously a keyid to GPG to import, as
+        # we trust its validation better than our own. eg. handling
+        # comments before the key.
+        log("PGP key found (looks like ASCII Armor format)", level=DEBUG)
+        if ('-----BEGIN PGP PUBLIC KEY BLOCK-----' in key and
+                '-----END PGP PUBLIC KEY BLOCK-----' in key):
+            log("Writing provided PGP key in the binary format", level=DEBUG)
+            if six.PY3:
+                key_bytes = key.encode('utf-8')
+            else:
+                key_bytes = key
+            key_name = _get_keyid_by_gpg_key(key_bytes)
+            key_gpg = _dearmor_gpg_key(key_bytes)
+            _write_apt_gpg_keyfile(key_name=key_name, key_material=key_gpg)
+        else:
+            raise GPGKeyError("ASCII armor markers missing from GPG key")
+    else:
+        log("PGP key found (looks like Radix64 format)", level=WARNING)
+        log("SECURELY importing PGP key from keyserver; "
+            "full key not provided.", level=WARNING)
+        # as of bionic add-apt-repository uses curl with an HTTPS keyserver URL
+        # to retrieve GPG keys. `apt-key adv` command is deprecated as is
+        # apt-key in general as noted in its manpage. See lp:1433761 for more
+        # history. Instead, /etc/apt/trusted.gpg.d is used directly to drop
+        # gpg
+        key_asc = _get_key_by_keyid(key)
+        # write the key in GPG format so that apt-key list shows it
+        key_gpg = _dearmor_gpg_key(key_asc)
+        _write_apt_gpg_keyfile(key_name=key, key_material=key_gpg)
+
+
+def _get_keyid_by_gpg_key(key_material):
+    """Get a GPG key fingerprint by GPG key material.
+    Gets a GPG key fingerprint (40-digit, 160-bit) by the ASCII armor-encoded
+    or binary GPG key material. Can be used, for example, to generate file
+    names for keys passed via charm options.
+
+    :param key_material: ASCII armor-encoded or binary GPG key material
+    :type key_material: bytes
+    :raises: GPGKeyError if invalid key material has been provided
+    :returns: A GPG key fingerprint
+    :rtype: str
+    """
+    # Use the same gpg command for both Xenial and Bionic
+    cmd = 'gpg --with-colons --with-fingerprint'
+    ps = subprocess.Popen(cmd.split(),
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          stdin=subprocess.PIPE)
+    out, err = ps.communicate(input=key_material)
+    if six.PY3:
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+    if 'gpg: no valid OpenPGP data found.' in err:
+        raise GPGKeyError('Invalid GPG key material provided')
+    # from gnupg2 docs: fpr :: Fingerprint (fingerprint is in field 10)
+    return re.search(r"^fpr:{9}([0-9A-F]{40}):$", out, re.MULTILINE).group(1)
+
+
+def _get_key_by_keyid(keyid):
+    """Get a key via HTTPS from the Ubuntu keyserver.
+    Different key ID formats are supported by SKS keyservers (the longer ones
+    are more secure, see "dead beef attack" and https://evil32.com/). Since
+    HTTPS is used, if SSLBump-like HTTPS proxies are in place, they will
+    impersonate keyserver.ubuntu.com and generate a certificate with
+    keyserver.ubuntu.com in the CN field or in SubjAltName fields of a
+    certificate. If such proxy behavior is expected it is necessary to add the
+    CA certificate chain containing the intermediate CA of the SSLBump proxy to
+    every machine that this code runs on via ca-certs cloud-init directive (via
+    cloudinit-userdata model-config) or via other means (such as through a
+    custom charm option). Also note that DNS resolution for the hostname in a
+    URL is done at a proxy server - not at the client side.
+
+    8-digit (32 bit) key ID
+    https://keyserver.ubuntu.com/pks/lookup?search=0x4652B4E6
+    16-digit (64 bit) key ID
+    https://keyserver.ubuntu.com/pks/lookup?search=0x6E85A86E4652B4E6
+    40-digit key ID:
+    https://keyserver.ubuntu.com/pks/lookup?search=0x35F77D63B5CEC106C577ED856E85A86E4652B4E6
+
+    :param keyid: An 8, 16 or 40 hex digit keyid to find a key for
+    :type keyid: (bytes, str)
+    :returns: A key material for the specified GPG key id
+    :rtype: (str, bytes)
+    :raises: subprocess.CalledProcessError
+    """
+    # options=mr - machine-readable output (disables html wrappers)
+    keyserver_url = ('https://keyserver.ubuntu.com'
+                     '/pks/lookup?op=get&options=mr&exact=on&search=0x{}')
+    curl_cmd = ['curl', keyserver_url.format(keyid)]
+    # use proxy server settings in order to retrieve the key
+    return subprocess.check_output(curl_cmd,
+                                   env=env_proxy_settings(['https']))
+
+
+def _dearmor_gpg_key(key_asc):
+    """Converts a GPG key in the ASCII armor format to the binary format.
+
+    :param key_asc: A GPG key in ASCII armor format.
+    :type key_asc: (str, bytes)
+    :returns: A GPG key in binary format
+    :rtype: (str, bytes)
+    :raises: GPGKeyError
+    """
+    ps = subprocess.Popen(['gpg', '--dearmor'],
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          stdin=subprocess.PIPE)
+    out, err = ps.communicate(input=key_asc)
+    # no need to decode output as it is binary (invalid utf-8), only error
+    if six.PY3:
+        err = err.decode('utf-8')
+    if 'gpg: no valid OpenPGP data found.' in err:
+        raise GPGKeyError('Invalid GPG key material. Check your network setup'
+                          ' (MTU, routing, DNS) and/or proxy server settings'
+                          ' as well as destination keyserver status.')
+    else:
+        return out
+
+
+def _write_apt_gpg_keyfile(key_name, key_material):
+    """Writes GPG key material into a file at a provided path.
+
+    :param key_name: A key name to use for a key file (could be a fingerprint)
+    :type key_name: str
+    :param key_material: A GPG key material (binary)
+    :type key_material: (str, bytes)
+    """
+    with open('/etc/apt/trusted.gpg.d/{}.gpg'.format(key_name),
+              'wb') as keyf:
+        keyf.write(key_material)
+
+
+def add_source(source, key=None, fail_invalid=False):
     """Add a package source to this system.
 
     @param source: a URL or sources.list entry, as supported by
@@ -233,6 +466,33 @@ def add_source(source, key=None):
         such as 'cloud:icehouse'
         'distro' may be used as a noop
 
+    Full list of source specifications supported by the function are:
+
+    'distro': A NOP; i.e. it has no effect.
+    'proposed': the proposed deb spec [2] is wrtten to
+      /etc/apt/sources.list/proposed
+    'distro-proposed': adds <version>-proposed to the debs [2]
+    'ppa:<ppa-name>': add-apt-repository --yes <ppa_name>
+    'deb <deb-spec>': add-apt-repository --yes deb <deb-spec>
+    'http://....': add-apt-repository --yes http://...
+    'cloud-archive:<spec>': add-apt-repository -yes cloud-archive:<spec>
+    'cloud:<release>[-staging]': specify a Cloud Archive pocket <release> with
+      optional staging version.  If staging is used then the staging PPA [2]
+      with be used.  If staging is NOT used then the cloud archive [3] will be
+      added, and the 'ubuntu-cloud-keyring' package will be added for the
+      current distro.
+
+    Otherwise the source is not recognised and this is logged to the juju log.
+    However, no error is raised, unless sys_error_on_exit is True.
+
+    [1] deb http://ubuntu-cloud.archive.canonical.com/ubuntu {} main
+        where {} is replaced with the derived pocket name.
+    [2] deb http://archive.ubuntu.com/ubuntu {}-proposed \
+        main universe multiverse restricted
+        where {} is replaced with the lsb_release codename (e.g. xenial)
+    [3] deb http://ubuntu-cloud.archive.canonical.com/ubuntu <pocket>
+        to /etc/apt/sources.list.d/cloud-archive-list
+
     @param key: A key to be added to the system's APT keyring and used
     to verify the signatures on packages. Ideally, this should be an
     ASCII format GPG public key including the block headers. A GPG key
@@ -240,51 +500,152 @@ def add_source(source, key=None):
     available to retrieve the actual public key from a public keyserver
     placing your Juju environment at risk. ppa and cloud archive keys
     are securely added automtically, so sould not be provided.
+
+    @param fail_invalid: (boolean) if True, then the function raises a
+    SourceConfigError is there is no matching installation source.
+
+    @raises SourceConfigError() if for cloud:<pocket>, the <pocket> is not a
+    valid pocket in CLOUD_ARCHIVE_POCKETS
     """
+    _mapping = OrderedDict([
+        (r"^distro$", lambda: None),  # This is a NOP
+        (r"^(?:proposed|distro-proposed)$", _add_proposed),
+        (r"^cloud-archive:(.*)$", _add_apt_repository),
+        (r"^((?:deb |http:|https:|ppa:).*)$", _add_apt_repository),
+        (r"^cloud:(.*)-(.*)\/staging$", _add_cloud_staging),
+        (r"^cloud:(.*)-(.*)$", _add_cloud_distro_check),
+        (r"^cloud:(.*)$", _add_cloud_pocket),
+        (r"^snap:.*-(.*)-(.*)$", _add_cloud_distro_check),
+    ])
     if source is None:
-        log('Source is not present. Skipping')
-        return
-
-    if (source.startswith('ppa:') or
-        source.startswith('http') or
-        source.startswith('deb ') or
-            source.startswith('cloud-archive:')):
-        cmd = ['add-apt-repository', '--yes', source]
-        _run_with_retries(cmd)
-    elif source.startswith('cloud:'):
-        install(filter_installed_packages(['ubuntu-cloud-keyring']),
-                fatal=True)
-        pocket = source.split(':')[-1]
-        if pocket not in CLOUD_ARCHIVE_POCKETS:
-            raise SourceConfigError(
-                'Unsupported cloud: source option %s' %
-                pocket)
-        actual_pocket = CLOUD_ARCHIVE_POCKETS[pocket]
-        with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as apt:
-            apt.write(CLOUD_ARCHIVE.format(actual_pocket))
-    elif source == 'proposed':
-        release = lsb_release()['DISTRIB_CODENAME']
-        with open('/etc/apt/sources.list.d/proposed.list', 'w') as apt:
-            apt.write(PROPOSED_POCKET.format(release))
-    elif source == 'distro':
-        pass
+        source = ''
+    for r, fn in six.iteritems(_mapping):
+        m = re.match(r, source)
+        if m:
+            if key:
+                # Import key before adding the source which depends on it,
+                # as refreshing packages could fail otherwise.
+                try:
+                    import_key(key)
+                except GPGKeyError as e:
+                    raise SourceConfigError(str(e))
+            # call the associated function with the captured groups
+            # raises SourceConfigError on error.
+            fn(*m.groups())
+            break
     else:
-        log("Unknown source: {!r}".format(source))
+        # nothing matched.  log an error and maybe sys.exit
+        err = "Unknown source: {!r}".format(source)
+        log(err)
+        if fail_invalid:
+            raise SourceConfigError(err)
 
-    if key:
-        if '-----BEGIN PGP PUBLIC KEY BLOCK-----' in key:
-            with NamedTemporaryFile('w+') as key_file:
-                key_file.write(key)
-                key_file.flush()
-                key_file.seek(0)
-                subprocess.check_call(['apt-key', 'add', '-'], stdin=key_file)
-        else:
-            # Note that hkp: is in no way a secure protocol. Using a
-            # GPG key id is pointless from a security POV unless you
-            # absolutely trust your network and DNS.
-            subprocess.check_call(['apt-key', 'adv', '--keyserver',
-                                   'hkp://keyserver.ubuntu.com:80', '--recv',
-                                   key])
+
+def _add_proposed():
+    """Add the PROPOSED_POCKET as /etc/apt/source.list.d/proposed.list
+
+    Uses get_distrib_codename to determine the correct stanza for
+    the deb line.
+
+    For intel architecutres PROPOSED_POCKET is used for the release, but for
+    other architectures PROPOSED_PORTS_POCKET is used for the release.
+    """
+    release = get_distrib_codename()
+    arch = platform.machine()
+    if arch not in six.iterkeys(ARCH_TO_PROPOSED_POCKET):
+        raise SourceConfigError("Arch {} not supported for (distro-)proposed"
+                                .format(arch))
+    with open('/etc/apt/sources.list.d/proposed.list', 'w') as apt:
+        apt.write(ARCH_TO_PROPOSED_POCKET[arch].format(release))
+
+
+def _add_apt_repository(spec):
+    """Add the spec using add_apt_repository
+
+    :param spec: the parameter to pass to add_apt_repository
+    :type spec: str
+    """
+    if '{series}' in spec:
+        series = get_distrib_codename()
+        spec = spec.replace('{series}', series)
+    # software-properties package for bionic properly reacts to proxy settings
+    # passed as environment variables (See lp:1433761). This is not the case
+    # LTS and non-LTS releases below bionic.
+    _run_with_retries(['add-apt-repository', '--yes', spec],
+                      cmd_env=env_proxy_settings(['https']))
+
+
+def _add_cloud_pocket(pocket):
+    """Add a cloud pocket as /etc/apt/sources.d/cloud-archive.list
+
+    Note that this overwrites the existing file if there is one.
+
+    This function also converts the simple pocket in to the actual pocket using
+    the CLOUD_ARCHIVE_POCKETS mapping.
+
+    :param pocket: string representing the pocket to add a deb spec for.
+    :raises: SourceConfigError if the cloud pocket doesn't exist or the
+        requested release doesn't match the current distro version.
+    """
+    apt_install(filter_installed_packages(['ubuntu-cloud-keyring']),
+                fatal=True)
+    if pocket not in CLOUD_ARCHIVE_POCKETS:
+        raise SourceConfigError(
+            'Unsupported cloud: source option %s' %
+            pocket)
+    actual_pocket = CLOUD_ARCHIVE_POCKETS[pocket]
+    with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as apt:
+        apt.write(CLOUD_ARCHIVE.format(actual_pocket))
+
+
+def _add_cloud_staging(cloud_archive_release, openstack_release):
+    """Add the cloud staging repository which is in
+    ppa:ubuntu-cloud-archive/<openstack_release>-staging
+
+    This function checks that the cloud_archive_release matches the current
+    codename for the distro that charm is being installed on.
+
+    :param cloud_archive_release: string, codename for the release.
+    :param openstack_release: String, codename for the openstack release.
+    :raises: SourceConfigError if the cloud_archive_release doesn't match the
+        current version of the os.
+    """
+    _verify_is_ubuntu_rel(cloud_archive_release, openstack_release)
+    ppa = 'ppa:ubuntu-cloud-archive/{}-staging'.format(openstack_release)
+    cmd = 'add-apt-repository -y {}'.format(ppa)
+    _run_with_retries(cmd.split(' '))
+
+
+def _add_cloud_distro_check(cloud_archive_release, openstack_release):
+    """Add the cloud pocket, but also check the cloud_archive_release against
+    the current distro, and use the openstack_release as the full lookup.
+
+    This just calls _add_cloud_pocket() with the openstack_release as pocket
+    to get the correct cloud-archive.list for dpkg to work with.
+
+    :param cloud_archive_release:String, codename for the distro release.
+    :param openstack_release: String, spec for the release to look up in the
+        CLOUD_ARCHIVE_POCKETS
+    :raises: SourceConfigError if this is the wrong distro, or the pocket spec
+        doesn't exist.
+    """
+    _verify_is_ubuntu_rel(cloud_archive_release, openstack_release)
+    _add_cloud_pocket("{}-{}".format(cloud_archive_release, openstack_release))
+
+
+def _verify_is_ubuntu_rel(release, os_release):
+    """Verify that the release is in the same as the current ubuntu release.
+
+    :param release: String, lowercase for the release.
+    :param os_release: String, the os_release being asked for
+    :raises: SourceConfigError if the release is not the same as the ubuntu
+        release.
+    """
+    ubuntu_rel = get_distrib_codename()
+    if release != ubuntu_rel:
+        raise SourceConfigError(
+            'Invalid Cloud Archive release specified: {}-{} on this Ubuntu'
+            'version ({})'.format(release, os_release, ubuntu_rel))
 
 
 def _run_with_retries(cmd, max_retries=CMD_RETRY_COUNT, retry_exitcodes=(1,),
@@ -300,9 +661,12 @@ def _run_with_retries(cmd, max_retries=CMD_RETRY_COUNT, retry_exitcodes=(1,),
     :param: cmd_env: dict: Environment variables to add to the command run.
     """
 
-    env = os.environ.copy()
+    env = None
+    kwargs = {}
     if cmd_env:
+        env = os.environ.copy()
         env.update(cmd_env)
+        kwargs['env'] = env
 
     if not retry_message:
         retry_message = "Failed executing '{}'".format(" ".join(cmd))
@@ -314,7 +678,8 @@ def _run_with_retries(cmd, max_retries=CMD_RETRY_COUNT, retry_exitcodes=(1,),
     retry_results = (None,) + retry_exitcodes
     while result in retry_results:
         try:
-            result = subprocess.check_call(cmd, env=env)
+            # result = subprocess.check_call(cmd, env=env)
+            result = subprocess.check_call(cmd, **kwargs)
         except subprocess.CalledProcessError as e:
             retry_count = retry_count + 1
             if retry_count > max_retries:
@@ -327,6 +692,7 @@ def _run_with_retries(cmd, max_retries=CMD_RETRY_COUNT, retry_exitcodes=(1,),
 def _run_apt_command(cmd, fatal=False):
     """Run an apt command with optional retries.
 
+    :param: cmd: str: The apt command to run.
     :param: fatal: bool: Whether the command's output should be checked and
         retried.
     """
@@ -353,7 +719,7 @@ def get_upstream_version(package):
     cache = apt_cache()
     try:
         pkg = cache[package]
-    except:
+    except Exception:
         # the package is unknown to the current apt cache.
         return None
 
