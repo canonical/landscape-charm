@@ -70,9 +70,11 @@ class UpgradeActionTest(HookenvTest):
         action()
 
         unhold_call = [
-            "apt-mark", "unhold", "landscape-server", "landscape-hashids"]
+            "apt-mark", "unhold", "landscape-server", "landscape-hashids",
+            "landscape-api"]
         hold_call = [
-            "apt-mark", "hold", "landscape-server", "landscape-hashids"]
+            "apt-mark", "hold", "landscape-server", "landscape-hashids",
+            "landscape-api"]
         self.assertEqual(unhold_call, self.subprocess.calls[0][0])
         self.assertEqual(hold_call, self.subprocess.calls[1][0])
 
@@ -95,10 +97,10 @@ class UpgradeActionTest(HookenvTest):
                          [('Running action UpgradeAction', None),
                           ('Adding repository: ppa:my-ppa', None),
                           ('running \'apt-mark unhold landscape-server '
-                           'landscape-hashids\'',
+                           'landscape-hashids landscape-api\'',
                            hookenv.DEBUG),
                           ('running \'apt-mark hold landscape-server '
-                           'landscape-hashids\'',
+                           'landscape-hashids landscape-api\'',
                            hookenv.DEBUG),
                           ])
 
@@ -109,7 +111,8 @@ class UpgradeActionTest(HookenvTest):
         """
         self.subprocess.add_fake_executable('apt-mark',
                                             ['unhold', 'landscape-server',
-                                             'landscape-hashids'],
+                                             'landscape-hashids',
+                                             'landscape-api'],
                                             return_code=1)
         self.hookenv.status_set("maintenance", "")
         self.hookenv.config()["source"] = "ppa:my-ppa"
@@ -122,12 +125,13 @@ class UpgradeActionTest(HookenvTest):
                          [('Running action UpgradeAction', None),
                           ('Adding repository: ppa:my-ppa', None),
                           ('running \'apt-mark unhold landscape-server '
-                           'landscape-hashids\'',
+                           'landscape-hashids landscape-api\'',
                            hookenv.DEBUG),
                           ('got return code 1 running \'apt-mark unhold '
-                           'landscape-server landscape-hashids\'',
+                           'landscape-server landscape-hashids '
+                           'landscape-api\'',
                            hookenv.ERROR),
                           ])
         self.assertEqual(self.hookenv.action_fails,
                          ['command failed (see unit logs): apt-mark unhold '
-                          'landscape-server landscape-hashids'])
+                          'landscape-server landscape-hashids landscape-api'])

@@ -1,11 +1,10 @@
+import json
 import subprocess
 
 from charmhelpers.core import hookenv
 
 from lib.action import Action
-from lib.paths import SCHEMA_SCRIPT
-
-CREDENTIALS_MARKER = "API credentials:"
+from lib.paths import API_SCRIPT
 
 
 class BootstrapAction(Action):
@@ -19,12 +18,22 @@ class BootstrapAction(Action):
         admin_name = self._hookenv.action_get("admin-name")
         admin_email = self._hookenv.action_get("admin-email")
         admin_password = self._hookenv.action_get("admin-password")
+        registration_key = self._hookenv.action_get("registration-key")
 
-        cmd = (SCHEMA_SCRIPT, "--create-lds-account-only", "--admin-name",
-               admin_name, "--admin-email", admin_email,
-               "--admin-password", admin_password)
+        environment = {
+            "LANDSCAPE_API_KEY": "anonymous",
+            "LANDSCAPE_API_SECRET": "anonymous",
+            "LANDSCAPE_API_URI": "http://localhost:9080/api/",
+        }
+        cmd = [
+            API_SCRIPT, "call", "BootstrapLDS", "--json",
+            "admin_name={}".format(admin_name),
+            "admin_email={}".format(admin_email),
+            "admin_password={}".format(admin_password)]
+        if registration_key:
+            cmd.append("registration_key={}".format(registration_key))
 
-        output = self._subprocess.check_output(cmd)
+        output = self._subprocess.check_output(cmd, env=environment)
         key, secret = self._parse_schema_output(output)
         result = {"api-credentials": {"key": key, "secret": secret}}
 
@@ -32,10 +41,7 @@ class BootstrapAction(Action):
 
     def _parse_schema_output(self, output):
         """Extract API credentials from the schema bootstrap output."""
-        key = None
-        secret = None
-        for line in output.split("\n"):
-            if line.startswith(CREDENTIALS_MARKER):
-                line = line[len(CREDENTIALS_MARKER) + 1:]
-                key, secret = line.split(" ")[2:4]
+        credentials = json.loads(output)
+        key = credentials.get("LANDSCAPE_API_KEY")
+        secret = credentials.get("LANDSCAPE_API_SECRET")
         return key, secret

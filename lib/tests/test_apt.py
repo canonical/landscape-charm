@@ -271,8 +271,8 @@ class AptTest(HookenvTest):
         installed.
         """
         self.assertEqual(
-            ("landscape-server", "landscape-hashids", "python-minimal",
-             "python-psutil"),
+            ("landscape-server", "landscape-hashids", "landscape-api",
+             "python-minimal", "python-psutil"),
             INSTALL_PACKAGES)
 
     def test_install(self):
@@ -356,7 +356,10 @@ class AptTest(HookenvTest):
         """
         self.apt.hold_packages()
         self.assertEqual(
-            ["apt-mark", "hold", "landscape-server", "landscape-hashids"],
+            [
+                "apt-mark", "hold", "landscape-server", "landscape-hashids",
+                "landscape-api",
+            ],
             self.subprocess.calls[0][0])
 
     def test_unhold_packages(self):
@@ -366,5 +369,8 @@ class AptTest(HookenvTest):
         """
         self.apt.unhold_packages()
         self.assertEqual(
-            ["apt-mark", "unhold", "landscape-server", "landscape-hashids"],
+            [
+                "apt-mark", "unhold", "landscape-server", "landscape-hashids",
+                "landscape-api",
+            ],
             self.subprocess.calls[0][0])

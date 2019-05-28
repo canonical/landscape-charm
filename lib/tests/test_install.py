@@ -83,5 +83,6 @@ class InstallHookTest(HookenvTest):
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.hook()
         expected_call = [
-            "apt-mark", "hold", "landscape-server", "landscape-hashids"]
+            "apt-mark", "hold", "landscape-server", "landscape-hashids",
+            "landscape-api"]
         self.assertEqual(expected_call, self.subprocess.calls[0][0])
