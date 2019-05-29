@@ -50,10 +50,13 @@ class BootstrapActionTest(HookenvTest):
         The BootstrapAction calls the landscape-api to create an
         administrator account without setting the registration_key.
         """
-        self.hookenv.action_set({"registration-key": ""})
+        # patch the stub with fixed values
+        self.hookenv.action_get = {
+            "admin-name": "admin-name-value",
+            "admin-email": "admin-email-value",
+            "admin-password": "admin-password-value"}.get
+
         self.action()
-        # HookenvStub.action_get returns 'key-value' as
-        # the value for each 'key'.
         [(command, kwargs)] = self.subprocess.calls
         self.assertEqual(
             ["/usr/bin/landscape-api", "call",
