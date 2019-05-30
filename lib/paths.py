@@ -9,6 +9,7 @@ INSTALL_DIR = "/opt/canonical/landscape"
 CONFIG_DIR = INSTALL_DIR + "/configs/standalone"
 OFFLINE_DIR = INSTALL_DIR + "/canonical/landscape/offline"
 
+API_SCRIPT = "/usr/bin/landscape-api"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 
 LICENSE_FILE = "/etc/landscape/license.txt"

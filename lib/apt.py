@@ -12,7 +12,7 @@ from lib.error import CharmError
 from lib.paths import default_paths
 from lib.utils import CommandRunner
 
-LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids")
+LANDSCAPE_PACKAGES = ("landscape-server", "landscape-hashids", "landscape-api")
 INSTALL_PACKAGES = LANDSCAPE_PACKAGES + ("python-minimal", "python-psutil")
 PACKAGES_DEV = (
     "dpkg-dev", "devscripts", "pbuilder", "aptitude", "build-essential")

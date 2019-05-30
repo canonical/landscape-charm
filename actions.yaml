@@ -25,5 +25,8 @@ bootstrap:
     admin-password:
       type: string
       description: Password for the administrator to add.
+    registration-key:
+      type: string
+      description: Registration key to set on the account.
   required: [admin-name, admin-email, admin-password]
   additionalProperties: false
