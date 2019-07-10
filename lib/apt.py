@@ -145,7 +145,7 @@ class Apt(object):
         if install_sources and source:
             raise SourceConflictError(install_sources, source)
         if install_sources:
-            self._fetch.configure_sources()
+            self._fetch.configure_sources(update=True)
             return
         if not source:
             raise AptNoSourceConfigError()
