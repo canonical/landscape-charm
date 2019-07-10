@@ -9,7 +9,7 @@ from charmhelpers.core.services.helpers import render_template
 
 from lib.hook import Hook
 from lib.paths import default_paths
-from lib.relations.postgresql import PostgreSQLRequirer
+from lib.relations.postgresql import PostgreSQLRequirer, PostgreSQLProvider
 from lib.relations.rabbitmq import RabbitMQRequirer, RabbitMQProvider
 from lib.relations.haproxy import HAProxyProvider, HAProxyRequirer
 from lib.relations.leader import LeaderProvider, LeaderRequirer
@@ -57,6 +57,7 @@ class ServicesHook(Hook):
                 HAProxyProvider(
                     config_requirer, hosted_requirer, paths=self._paths),
                 RabbitMQProvider(),
+                PostgreSQLProvider(database="landscape"),
             ],
             # Required data is available to the render_template calls below.
             "required_data": [
