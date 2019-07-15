@@ -244,6 +244,17 @@ class LSCtlTest(HookenvTest):
         The 'lsctl' script is invoked if db connection details have changed.
         """
         old = SAMPLE_DB_UNIT_DATA.copy()
+        # update sample data
+        rel_data = {}
+        for item in old["master"].split(' '):
+            key, value = item.split('=')
+            if key == 'host':
+                assert value != "9.9.9.9"
+                rel_data[key] = "9.9.9.9"
+            else:
+                rel_data[key] = value
+        old["master"] = " ".join("{}={}".format(k, v)
+                                 for k, v in rel_data.items())
         assert old["host"] != "9.9.9.9"
         old["host"] = "9.9.9.9"
         update_persisted_data("db", old, hookenv=self.hookenv)

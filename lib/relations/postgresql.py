@@ -79,4 +79,3 @@ class PostgreSQLRequirer(RelationContext):
                 value = int(value)
             data[key] = value
         return data
-

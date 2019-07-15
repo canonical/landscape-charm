@@ -128,7 +128,7 @@ class FetchStub(object):
     def apt_install(self, packages, options=None, fatal=False):
         self.installed.append((packages, options, fatal))
 
-    def configure_sources(self):
+    def configure_sources(self, update=False):
         install_sources = self._config().get('install_sources')
         install_keys = self._config().get('install_keys')
         self.configured_sources.append((install_sources, install_keys))
