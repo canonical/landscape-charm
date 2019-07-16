@@ -1,6 +1,6 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.sample import SAMPLE_DB_UNIT_DATA
-from lib.relations.postgresql import PostgreSQLRequirer
+from lib.relations.postgresql import PostgreSQLRequirer, PostgreSQLProvider
 
 
 class PostgreSQLRequirerTest(HookenvTest):
@@ -63,3 +63,14 @@ class PostgreSQLRequirerTest(HookenvTest):
         relation = PostgreSQLRequirer(hookenv=self.hookenv)
         self.assertTrue(relation.is_ready())
         self.assertEqual("10.0.3.169", relation["db"][0]["host"])
+
+
+class PostgreSQLProviderTest(HookenvTest):
+
+    with_hookenv_monkey_patch = True
+
+    def test_scafolding(self):
+        relation = PostgreSQLProvider(database="test")
+        self.assertEqual({"database": "test"}, relation.provide_data())
+        self.assertEqual("db", relation.name)
+        self.assertEqual("pgsql", relation.interface)
