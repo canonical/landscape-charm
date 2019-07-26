@@ -113,11 +113,19 @@ class ServicesHookTest(HookenvTest):
             "config": config_expected,
             "is_leader": True,
         }
-
         for render in self.renders:
             rendered_context = render[2]
             for key in context.keys():
-                self.assertEqual(context[key], rendered_context[key])
+                if key == 'db':
+                    # check that all keys are in the rendered_context
+                    expected = sorted(
+                        ['master', 'host', 'port', 'user', 'password',
+                         'database', 'allowed-units'])
+                    self.assertEqual(expected,
+                                     sorted(rendered_context[key][0].keys()))
+                else:
+                    self.assertEqual(context[key], rendered_context[key])
+
         self.assertEqual(
             ("service.conf", self.paths.service_conf()),
             self.renders[0][:2])

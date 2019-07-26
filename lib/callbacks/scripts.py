@@ -12,7 +12,7 @@ NO_RESTART_CONFIG_KEYS = {
     "source", "key", "ssl-cert", "ssl-key", "smtp-relay-host"}
 
 # Database relation keys for which, in case of change, a restart is not needed.
-NO_RESTART_DB_RELATION_KEYS = {"allowed-units", "state"}
+NO_RESTART_DB_RELATION_KEYS = {"allowed-units"}
 
 
 class ScriptCallback(ManagerCallback):
