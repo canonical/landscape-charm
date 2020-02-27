@@ -38,9 +38,9 @@ Landscape is a commercial product and as such it needs configuration of a licens
 license-file
 ------------
 
-You can set this as a juju configuration option after deployment on each deployed landscape-service like:
+You can set this as a juju configuration option after deployment on each deployed landscape-server application like:
 
-    $ juju set <landscape-service> "license-file=$(cat license-file)"
+    $ juju config landscape-server "license-file=$(cat license-file)"
 
 
 SSL
