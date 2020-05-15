@@ -43,10 +43,12 @@ SERVICE_OPTIONS = {
         "acl attachment path_beg -i /attachment",
         "acl api path_beg -i /api",
         "acl prometheus_metrics path_beg -i /metrics",
+        "acl ping path_beg -i /ping",
         "http-request deny if prometheus_metrics",
         "use_backend landscape-message if message",
         "use_backend landscape-message if attachment",
         "use_backend landscape-api if api",
+        "use_backend landscape-ping if ping",
     ],
 }
 SERVER_BASE_PORTS = {
