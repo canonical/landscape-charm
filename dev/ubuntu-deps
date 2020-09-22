@@ -5,7 +5,7 @@
 CODENAME=$(lsb_release -cs)
 
 # Install add-apt-repository (packaging differs across releases).
-sudo apt-get -y install python-software-properties
+sudo apt-get -y install software-properties-common
 
 # Add the juju stable ppa, install charm-tools (juju-test plugin) and other deps
 sudo add-apt-repository -y ppa:juju/stable

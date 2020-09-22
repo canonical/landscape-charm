@@ -1,4 +1,3 @@
-import os
 import subprocess
 
 from charmhelpers.core import hookenv
@@ -14,12 +13,15 @@ NO_RESTART_CONFIG_KEYS = {
 # Database relation keys for which, in case of change, a restart is not needed.
 NO_RESTART_DB_RELATION_KEYS = {"allowed-units"}
 
+CONFIG_ONLY_FLAG = "--configure-lds-only"
+
 
 class ScriptCallback(ManagerCallback):
     """Callback class for invoking Landscape scripts."""
 
-    def __init__(self, subprocess=subprocess):
+    def __init__(self, subprocess=subprocess, hookenv=hookenv):
         self._subprocess = subprocess
+        self._hookenv = hookenv
 
     def _run(self, name, options=()):
         """Run the script with the given name and options."""
@@ -34,11 +36,20 @@ class SchemaBootstrap(ScriptCallback):
     This will invoke the schema script with the --bootstrap flag, if it hasn't
     been called yet.
     """
+
     def __call__(self, manager, service_name, event_name):
+        self._schema_doc = self._subprocess.check_output([SCHEMA_SCRIPT, "-h"])
         if not manager.was_ready(service_name):
             options = ["--bootstrap"]
             options.extend(self._get_proxy_options())
             self._run(SCHEMA_SCRIPT, options)
+
+        if CONFIG_ONLY_FLAG in self._schema_doc:
+            options = [CONFIG_ONLY_FLAG]
+            options.extend(self._get_proxy_options())
+            options.extend(self._get_settings_options())
+            if len(options) > 1:
+                self._run(SCHEMA_SCRIPT, options)
 
     def _get_proxy_options(self):
         """Return the HTTP proxy options to set.
@@ -48,25 +59,45 @@ class SchemaBootstrap(ScriptCallback):
         at the environment variables that Juju sets for us.
         """
         options = []
+        config = self._hookenv.config()
 
-        help_output = self._subprocess.check_output([SCHEMA_SCRIPT, "-h"])
-        if "--with-http-proxy" in help_output:
+        if "--with-http-proxy" in self._schema_doc:
             # Forward any proxy configuration set in the environment
+            model_proxy = self._hookenv.env_proxy_settings() or {}
             for proxy_variable in ("http_proxy", "https_proxy", "no_proxy"):
-                if proxy_variable in os.environ:
-                    options.append("--with-%s=%s" % (
-                        proxy_variable.replace("_", "-"),
-                        os.environ[proxy_variable]))
+                model_proxy_value = model_proxy.get(proxy_variable, "")
+
+                # XXX There is no charm hook for model-config changes,
+                # so updating proxies has to be done using charm config.
+                # See juju issue (LP: #1835050).
+                proxy_variable = proxy_variable.replace("_", "-")
+                proxy_value = config.get(proxy_variable)
+                if proxy_value is None:
+                    proxy_value = model_proxy_value
+                options.append("--with-{}".format(proxy_variable))
+                options.append(proxy_value)
+
+        return options
+
+    def _get_settings_options(self):
+        """Return options for updating charm-managed settings."""
+        config = self._hookenv.config()
+        options = []
+        root_url = config.get("root-url")
+        if root_url:
+            options.append("--with-root-url")
+            options.append(root_url)
+
+        system_email = config.get("system-email")
+        if system_email:
+            options.append("--with-system-email")
+            options.append(system_email)
 
         return options
 
 
 class LSCtl(ScriptCallback):
     """Call the lsctl script to start or stop services."""
-
-    def __init__(self, subprocess=subprocess, hookenv=hookenv):
-        super(LSCtl, self).__init__(subprocess=subprocess)
-        self._hookenv = hookenv
 
     def __call__(self, manager, service_name, event_name):
         current_status, current_status_message = self._hookenv.status_get()

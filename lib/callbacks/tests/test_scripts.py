@@ -3,7 +3,7 @@ from fixtures import EnvironmentVariable
 from charmhelpers.core.services.base import ServiceManager
 
 from lib.paths import LSCTL, SCHEMA_SCRIPT
-from lib.callbacks.scripts import SchemaBootstrap, LSCtl
+from lib.callbacks.scripts import SchemaBootstrap, LSCtl, CONFIG_ONLY_FLAG
 from lib.utils import update_persisted_data
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import SubprocessStub
@@ -19,7 +19,8 @@ class SchemaBootstrapTest(HookenvTest):
         self.subprocess = SubprocessStub()
         self.subprocess.add_fake_executable(SCHEMA_SCRIPT)
         self.manager = ServiceManager(services=[{"service": "landscape"}])
-        self.callback = SchemaBootstrap(subprocess=self.subprocess)
+        self.callback = SchemaBootstrap(
+            subprocess=self.subprocess, hookenv=self.hookenv)
 
     def test_options(self):
         """
@@ -56,18 +57,155 @@ class SchemaBootstrapTest(HookenvTest):
         self.callback(self.manager, "landscape", None)
         self.assertEqual(
             ["/usr/bin/landscape-schema", "--bootstrap",
-             "--with-http-proxy=http://foo:3128",
-             "--with-https-proxy=http://bar:3128",
-             "--with-no-proxy=localhost"],
+             "--with-http-proxy", "http://foo:3128",
+             "--with-https-proxy", "http://bar:3128",
+             "--with-no-proxy", "localhost"],
             self.subprocess.calls[1][0])
 
     def test_was_ready(self):
         """
-        If the services was ready, the schema script is not invoked again.
+        If the services was ready, the schema bootstrap is not invoked again.
         """
         self.manager.save_ready("landscape")
         self.callback(self.manager, "landscape", None)
-        self.assertEqual([], self.subprocess.calls)
+        self.assertEqual([
+            (['/usr/bin/landscape-schema', '-h'], {})], self.subprocess.calls)
+
+    def test_update_config(self):
+        """Updating config are updated in Landscape."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: " + CONFIG_ONLY_FLAG)
+
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["root-url"] = "https://old.sad/"
+        config.save()
+        self.manager.save_ready("landscape")
+
+        config["root-url"] = "https://happy.new/"
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+            (["/usr/bin/landscape-schema", CONFIG_ONLY_FLAG, "--with-root-url",
+              "https://happy.new/"], {}),
+        ], self.subprocess.calls)
+
+    def test_update_config_unsupported_flag(self):
+        """Configuration is NOOP if the configure-lds flag is not supported."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: --spam")
+
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["root-url"] = "https://old.sad/"
+        config.save()
+        self.manager.save_ready("landscape")
+        config["root-url"] = "https://happy.new/"
+
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+        ], self.subprocess.calls)
+
+    def test_bootstrap_and_configure(self):
+        """Configuration is done after bootstrap, if config values exist."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"], stdout="Usage: " + CONFIG_ONLY_FLAG)
+
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["system-email"] = "noreply@spam"
+        config.save()
+        config["system-email"] = "noreply@scape"
+
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+            (["/usr/bin/landscape-schema", "--bootstrap"], {}),
+            (["/usr/bin/landscape-schema", CONFIG_ONLY_FLAG,
+              "--with-system-email", "noreply@scape"], {}),
+        ], self.subprocess.calls)
+
+    def test_inherit_model_proxy(self):
+        """Proxy config is inherited from the model if unset on charm."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"],
+            stdout="Usage: --with-http-proxy " + CONFIG_ONLY_FLAG)
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        config["http-proxy"] = "spam"
+        config["https-proxy"] = "spam"
+        config["no-proxy"] = "spam"
+        config.save()
+        del config["http-proxy"]
+        del config["https-proxy"]
+        del config["no-proxy"]
+        self.useFixture(EnvironmentVariable("http_proxy", "http://foo:3128"))
+        self.useFixture(EnvironmentVariable("https_proxy", "http://bar:3128"))
+        self.useFixture(EnvironmentVariable("no_proxy", "localhost"))
+        self.manager.save_ready("landscape")
+
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+            (["/usr/bin/landscape-schema", CONFIG_ONLY_FLAG,
+              "--with-http-proxy", "http://foo:3128",
+              "--with-https-proxy", "http://bar:3128",
+              "--with-no-proxy", "localhost"], {}),
+        ], self.subprocess.calls)
+
+    def test_change_model_proxy(self):
+        """Proxy config override model proxy if configured on charm."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"],
+            stdout="Usage: --with-http-proxy " + CONFIG_ONLY_FLAG)
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        self.useFixture(EnvironmentVariable("http_proxy", "spam"))
+        self.useFixture(EnvironmentVariable("https_proxy", "spam"))
+        self.useFixture(EnvironmentVariable("no_proxy", "spam"))
+        self.manager.save_ready("landscape")
+        config["http-proxy"] = "http://foo:3128"
+        config["https-proxy"] = "http://bar:3128"
+        config["no-proxy"] = "localhost"
+
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+            (["/usr/bin/landscape-schema", CONFIG_ONLY_FLAG,
+              "--with-http-proxy", "http://foo:3128",
+              "--with-https-proxy", "http://bar:3128",
+              "--with-no-proxy", "localhost"], {}),
+        ], self.subprocess.calls)
+
+    def test_unset_model_proxy(self):
+        """Proxy config can explicitly unset model proxy."""
+        self.subprocess.add_fake_executable(
+            SCHEMA_SCRIPT, args=["-h"],
+            stdout="Usage: --with-http-proxy " + CONFIG_ONLY_FLAG)
+        self.hookenv.hook = "config-changed"
+        config = self.hookenv.config()
+        self.useFixture(EnvironmentVariable("http_proxy", "spam"))
+        self.useFixture(EnvironmentVariable("https_proxy", "spam"))
+        self.useFixture(EnvironmentVariable("no_proxy", "spam"))
+        self.manager.save_ready("landscape")
+        config["http-proxy"] = ""
+        config["https-proxy"] = ""
+        config["no-proxy"] = ""
+
+        self.callback(self.manager, "landscape", None)
+        self.assertEqual([
+            (["/usr/bin/landscape-schema", "-h"], {}),
+            (["/usr/bin/landscape-schema", CONFIG_ONLY_FLAG,
+              "--with-http-proxy", "",
+              "--with-https-proxy", "",
+              "--with-no-proxy", ""], {}),
+        ], self.subprocess.calls)
+
+
+    def test_reconfigure_noop(self):
+        """Nothing happens if there is no proxy and no config change."""
+        # TODO
 
 
 class LSCtlTest(HookenvTest):
