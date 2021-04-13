@@ -8,8 +8,9 @@ from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import HostStub, PsutilStub, SubprocessStub, FetchStub
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_DATA, SAMPLE_AMQP_UNIT_DATA,
-    SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA, SAMPLE_HOSTED_DATA,
-    SAMPLE_WORKER_COUNT_DATA, SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
+    SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA,
+    SAMPLE_CONFIG_OIDC_DATA, SAMPLE_HOSTED_DATA, SAMPLE_WORKER_COUNT_DATA,
+    SAMPLE_WEBSITE_UNIT_DATA, SAMPLE_CONFIG)
 from lib.services import ServicesHook
 from lib.tests.rootdir import RootDir
 from lib.paths import (
@@ -179,6 +180,19 @@ class ServicesHookTest(HookenvTest):
         self.hookenv.config().update(SAMPLE_CONFIG_OPENID_DATA)
         self.hook()
         config_expected = SAMPLE_CONFIG_OPENID_DATA.copy()
+        config_expected["worker-counts"] = SAMPLE_WORKER_COUNT_DATA
+
+        rendered_context = self.renders[0][2]
+        self.assertEqual(config_expected, rendered_context["config"])
+
+    def test_ready_with_oidc_configuration(self):
+        """
+        OpenID-Connect configuration is passed in to service.conf generation if
+        it is set in the hook configuration.
+        """
+        self.hookenv.config().update(SAMPLE_CONFIG_OIDC_DATA)
+        self.hook()
+        config_expected = SAMPLE_CONFIG_OIDC_DATA.copy()
         config_expected["worker-counts"] = SAMPLE_WORKER_COUNT_DATA
 
         rendered_context = self.renders[0][2]
