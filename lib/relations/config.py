@@ -27,7 +27,7 @@ class OpenIDOptionError(CharmError):
     def __init__(self):
         message = (
             "Specify OpenID or OpenID-Connect options, not both!")
-        super(OpenIDConfigurationError, self).__init__(message)
+        super(OpenIDOptionError, self).__init__(message)
 
 
 class OpenIDConfigurationError(CharmError):
@@ -120,7 +120,7 @@ class ConfigRequirer(dict):
         oidc_client_secret = config.get("oidc-client-secret")
         if (not (oidc_issuer and oidc_client_id and oidc_client_secret) and
                 (oidc_issuer or oidc_client_id or oidc_client_secret)):
-            raise OpenIDConfigurationError()
+            raise OpenIDConnectConfigurationError()
 
         worker_count = config.get("worker-counts", 2)
         config["worker-counts"] = self._calculate_worker_counts(worker_count)
