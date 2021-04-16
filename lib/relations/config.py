@@ -1,5 +1,4 @@
 import psutil
-import re
 
 from charmhelpers.core import hookenv
 from lib.error import CharmError
@@ -97,11 +96,11 @@ class ConfigRequirer(dict):
             raise RootUrlNotValidError()
 
         # Make sure that only openid or oidc options are set
-        # not both
-        oid = re.compile(r'openid-.*')
-        oidc = re.compile(r'oidc-.*')
-        oid_opts = [opt for opt in config.keys() if re.match(oid, opt)]
-        oidc_opts = [opt for opt in config.keys() if re.match(oidc, opt)]
+        # not both. Check values to be different than None or empty string.
+        oid_opts = any(
+            [v for k, v in config.items() if k.startswith("openid-")])
+        oidc_opts = any(
+            [v for k, v in config.items() if k.startswith("oidc-")])
         if oid_opts and oidc_opts:
             raise OpenIDOptionError()
 
@@ -118,8 +117,8 @@ class ConfigRequirer(dict):
         oidc_issuer = config.get("oidc-issuer")
         oidc_client_id = config.get("oidc-client-id")
         oidc_client_secret = config.get("oidc-client-secret")
-        if (not (oidc_issuer and oidc_client_id and oidc_client_secret) and
-                (oidc_issuer or oidc_client_id or oidc_client_secret)):
+        oidc_fields = (oidc_issuer, oidc_client_id, oidc_client_secret)
+        if any(oidc_fields) and not all(oidc_fields):
             raise OpenIDConnectConfigurationError()
 
         worker_count = config.get("worker-counts", 2)

@@ -93,6 +93,7 @@ class ConfigRequirerTest(HookenvTest):
     def test_openid_oidc_options_clash(self):
         """
         If both  openid_* and oidc_* options are provided
+        an error is raised.
         """
         self.hookenv.config().update({
             "openid-provider-url": "blah",
@@ -109,6 +110,7 @@ class ConfigRequirerTest(HookenvTest):
     def test_oidc_options_missing(self):
         """
         If not all oidc_* options are set
+        an error is raised.
         """
         self.hookenv.config().update({
             "oidc-issuer": "blah",
