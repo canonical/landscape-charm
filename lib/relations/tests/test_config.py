@@ -1,7 +1,8 @@
 from lib.tests.helpers import HookenvTest
 from lib.tests.stubs import PsutilStub
 from lib.relations.config import (
-    ConfigRequirer, OpenIDConfigurationError, RootUrlNotValidError)
+    ConfigRequirer, OpenIDConfigurationError, OpenIDConnectConfigurationError,
+    OpenIDOptionError, RootUrlNotValidError)
 
 
 class ConfigRequirerTest(HookenvTest):
@@ -87,6 +88,43 @@ class ConfigRequirerTest(HookenvTest):
         expected = (
             "To set up OpenID authentication, both 'openid-provider-url' "
             "and 'openid-logout-url' must be provided.")
+        self.assertEqual(expected, error.exception.message)
+
+    def test_openid_oidc_options_clash(self):
+        """
+        If both  openid_* and oidc_* options are provided
+        an error is raised.
+        """
+        self.hookenv.config().update({
+            "openid-provider-url": "blah",
+            "oidc-issuer": "blah"
+            })
+
+        with self.assertRaises(OpenIDOptionError) as error:
+            ConfigRequirer(hookenv=self.hookenv)
+
+        expected = (
+            "Specify OpenID or OpenID-Connect options, not both!")
+        self.assertEqual(expected, error.exception.message)
+
+    def test_oidc_options_missing(self):
+        """
+        If not all oidc_* options are set
+        an error is raised.
+        """
+        self.hookenv.config().update({
+            "oidc-issuer": "blah",
+            "oidc-client-id": "blah"
+            })
+
+        with self.assertRaises(OpenIDConnectConfigurationError) as error:
+            ConfigRequirer(hookenv=self.hookenv)
+
+        expected = (
+            "To set up OpenID-Connect authentication,"
+            "the following must be provided:"
+            "'oidc-issuer', 'oidc-client-id', 'oidc-client-secret'."
+            "'oidc-logout-url' is optional")
         self.assertEqual(expected, error.exception.message)
 
     def test_worker_counts_defaults(self):

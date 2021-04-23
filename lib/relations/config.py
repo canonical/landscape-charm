@@ -19,6 +19,16 @@ class RootUrlNotValidError(CharmError):
         super(RootUrlNotValidError, self).__init__(message)
 
 
+class OpenIDOptionError(CharmError):
+    """
+    OpenID and OpenID-Connect clash
+    """
+    def __init__(self):
+        message = (
+            "Specify OpenID or OpenID-Connect options, not both!")
+        super(OpenIDOptionError, self).__init__(message)
+
+
 class OpenIDConfigurationError(CharmError):
     """
     OpenID configuration is invalid.
@@ -31,6 +41,20 @@ class OpenIDConfigurationError(CharmError):
             "To set up OpenID authentication, both 'openid-provider-url' "
             "and 'openid-logout-url' must be provided.")
         super(OpenIDConfigurationError, self).__init__(message)
+
+
+class OpenIDConnectConfigurationError(CharmError):
+    """
+    OpenID-Connect configuration is invalid.
+    """
+
+    def __init__(self):
+        message = (
+            "To set up OpenID-Connect authentication,"
+            "the following must be provided:"
+            "'oidc-issuer', 'oidc-client-id', 'oidc-client-secret'."
+            "'oidc-logout-url' is optional")
+        super(OpenIDConnectConfigurationError, self).__init__(message)
 
 
 class ConfigRequirer(dict):
@@ -71,6 +95,15 @@ class ConfigRequirer(dict):
         if root_url and not is_valid_url(root_url):
             raise RootUrlNotValidError()
 
+        # Make sure that only openid or oidc options are set
+        # not both. Check values to be different than None or empty string.
+        oid_opts = any(
+            [v for k, v in config.items() if k.startswith("openid-")])
+        oidc_opts = any(
+            [v for k, v in config.items() if k.startswith("oidc-")])
+        if oid_opts and oidc_opts:
+            raise OpenIDOptionError()
+
         # When OpenID authentication is requested, both 'openid_provider_url'
         # and 'openid_logout_url' must be defined in the configuration.
         openid_provider_url = config.get("openid-provider-url")
@@ -78,6 +111,15 @@ class ConfigRequirer(dict):
         if ((openid_provider_url and not openid_logout_url) or
                 (not openid_provider_url and openid_logout_url)):
             raise OpenIDConfigurationError()
+
+        # When OpenID-Connect authentication is requested,
+        # provide at least these 3 options in the configuration.
+        oidc_issuer = config.get("oidc-issuer")
+        oidc_client_id = config.get("oidc-client-id")
+        oidc_client_secret = config.get("oidc-client-secret")
+        oidc_fields = (oidc_issuer, oidc_client_id, oidc_client_secret)
+        if any(oidc_fields) and not all(oidc_fields):
+            raise OpenIDConnectConfigurationError()
 
         worker_count = config.get("worker-counts", 2)
         config["worker-counts"] = self._calculate_worker_counts(worker_count)

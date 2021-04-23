@@ -46,6 +46,14 @@ SAMPLE_CONFIG_OPENID_DATA.update({
     "openid-logout-url": "http://openid-host/logout",
 })
 
+SAMPLE_CONFIG_OIDC_DATA = SAMPLE_CONFIG.copy()
+SAMPLE_CONFIG_OIDC_DATA.update({
+    "oidc-issuer": "http://oidc-host/",
+    "oidc-client-id": "000000aaaaabbbbbb.someapps.com.someprovider",
+    "oidc-client-secret": "7841cXW0EE0NA",
+    "oidc-logout-url": "http://oidc-host/logout",
+})
+
 SAMPLE_CONFIG_LICENSE_DATA = {
     "license-file": base64.b64encode("license data"),
 }

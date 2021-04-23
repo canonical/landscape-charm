@@ -73,6 +73,26 @@ options:
         type: string
         description: |
             OpenID provider URL to use to log out of Landscape.
+    oidc-issuer:
+        default:
+        type: string
+        description: |
+            OpenID-Connect issuer URL to use for authentication to Landscape.
+    oidc-client-id:
+        default:
+        type: string
+        description: |
+            OpenID-Connect client ID.
+    oidc-client-secret:
+        default:
+        type: string
+        description: |
+            OpenID-Connect client secret.
+    oidc-logout-url:
+        default:
+        type: string
+        description: |
+            OpenID-Connect issuer URL to use to log out of Landscape.
     root-url:
         description: |
             The root URL for this landscape deployment. If left blank the public
