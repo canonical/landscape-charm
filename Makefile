@@ -1,9 +1,9 @@
 PYTHON := /usr/bin/env python
 
 test:
-	trial lib
+	PYTHONPATH=. trial lib
 	# For now only the install hook runs against python3
-	trial3 lib/tests/test_apt.py lib/tests/test_install.py
+	PYTHONPATH=. trial3 lib/tests/test_apt.py lib/tests/test_install.py
 
 ci-test:
 	./dev/ubuntu-deps
@@ -15,8 +15,7 @@ update-charm-revision-numbers: bundles
 		apache2 postgresql juju-gui haproxy rabbitmq-server nfs
 
 test-depends: bundles
-	pip install --user bundletester juju-deployer
-	pip3 install --user amulet
+	PIP_IGNORE_INSTALLED=0 pip3 install --user amulet
 	cd tests && python3 test_helpers.py
 
 bundles-checkout:
@@ -31,9 +30,6 @@ bundles-checkout:
 bundles: bundles-checkout
 	bundles/render-bundles
 
-bundles-local-branch: bundles-checkout
-	bundles/render-bundles --landscape-branch $(CURDIR)
-
 bundles-local-charm: bundles-checkout
 	bundles/render-bundles --landscape-charm $(CURDIR)
 
@@ -45,19 +41,19 @@ secrets:
 	fi
 
 integration-test: test-depends
-	python2 ~/.local/bin/bundletester -v -l DEBUG --skip-implicit -t .
+	./tests/01-basic
 
 # Run integration tests using the LDS package from the lds-trunk PPA
 integration-test-trunk: secrets
 	LS_CHARM_SOURCE=lds-trunk-ppa $(MAKE) $(subst -trunk,,$@)
 
-deploy-dense-maas: bundles-local-branch config
+deploy-dense-maas: bundles-local-charm config
 	./dev/deployer dense-maas
 
-deploy-dense-maas-dev: bundles-local-branch config repo-file-trunk
+deploy-dense-maas-dev: bundles-local-charm config repo-file-trunk
 	./dev/deployer dense-maas --flags juju-debug
 
-deploy: bundles-local-branch
+deploy: bundles-local-charm
 	./dev/deployer scalable
 
 repo-file-trunk: secrets config

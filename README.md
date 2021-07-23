@@ -62,13 +62,11 @@ The Landscape charm is fairly well unit tested and new code changes should be su
 Integration Testing
 ===================
 
-This charm makes use of juju-deployer and the charm-tools package to enable end-to-end integration testing.  This is how you proceed with running them:
+This charm had juju-deployer and charm-tools tests. Those being EOL, some integration-test still exist, and can be executed using a "juju deploy" directly. This is how you proceed with running them:
 
     $ juju bootstrap localhost
     $ make integration-test
 
 Or if you want to use the packages from the lds-trunk PPA:
 
-    $ JUJU_MODEL=<model> make integration-test-trunk
-
-The JUJU_MODEL environment variable can be omitted if you want to use the current model.
+    $ make integration-test-trunk

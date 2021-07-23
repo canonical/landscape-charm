@@ -53,7 +53,7 @@ class InstallHookTest(HookenvTest):
         os.chmod(hook, 0o755)
         self.hookenv.config()["source"] = "ppa:landscape/14.10"
         self.assertEqual(1, self.hook())
-        self.assertEqual(
+        self.assertIn(
             "Command '%s' returned non-zero exit status 127" % hook,
             self.hookenv.messages[-1][0])
 
