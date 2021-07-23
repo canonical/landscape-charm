@@ -240,6 +240,32 @@ class ServiceConfTest(TemplateTest):
             "/etc/landscape/gpg-passphrase.txt",
             config.get("api", "gpg-passphrase-path"))
 
+    def test_broker_ha(self):
+        """
+        Verify that broker gets a list of multiple rabbit servers if
+        multiple such units exist.
+        """
+        self.context["amqp"] = [
+            {
+                "hostname": "roger",
+                "password": "secret",
+            },
+            {
+                "hostname": "bugs",
+                "password": "secret",
+            },
+            {
+                "hostname": "lola",
+                "password": "secret",
+            },
+        ]
+
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("roger,bugs,lola", config.get("broker", "host"))
+        self.assertEqual("secret", config.get("broker", "password"))
+
 
 class LandscapeDefaultsTest(TemplateTest):
 
