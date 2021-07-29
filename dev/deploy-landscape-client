@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 """
 This script looks at the current Juju environment and generates a
-juju-deployer config for landscape-client that is configured to talk to
+juju bundle for landscape-client that is configured to talk to
 the deployed landscape-server service. The URLs and SSL certificate are
 taken from the deployed landscape-server units.
 
 By default, landscape-client will be deployed, but you can choose to
-only generate the juju-deployer config and deploy manually:
+only generate the juju bundle and deploy manually:
 
     deploy-landscape-client --no-deploy > landscape-client.yaml
 
@@ -119,7 +119,7 @@ def main(args, stdout=sys.stdout, stderr=sys.stderr):
 
     if args.deploy:
         print("Deploying landscape-client.", file=stderr)
-        subprocess.check_call(["juju-deployer", "-c", config_path])
+        subprocess.check_call(["juju deploy", config_path])
     print("Cleaning up {}".format(tempdir), file=stderr)
     shutil.rmtree(tempdir)
 
