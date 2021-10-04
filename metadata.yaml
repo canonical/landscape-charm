@@ -9,6 +9,8 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
+  registration:
+    interface: dashboards-registration
 provides:
   data:
     interface: block-storage
