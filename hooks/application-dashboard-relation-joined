@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright Canonical 2012 Canonical Ltd. All Rights Reserved
+# Copyright Canonical 2021 Canonical Ltd. All Rights Reserved
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,14 +26,15 @@ from charmhelpers.core.hookenv import (
     hook_name,
     unit_public_ip,
     UnregisteredHookError,
+    config,
 )
 
 hooks = Hooks()
 
 
-@hooks.hook("registration-relation-joined")
-def registration_relation_joined(relation_id=None, remote_unit=None):
-    """Register landscape url in Homer dashboard"""
+@hooks.hook("application-dashboard-relation-joined")
+def application_dashboard_relation_joined(relation_id=None, remote_unit=None):
+    """Register Landscape URL in dashboard charm such as Homer."""
     if not is_leader():
         return
     log("hook %s triggered" % hook_name(), "INFO")
@@ -46,7 +47,9 @@ def registration_relation_joined(relation_id=None, remote_unit=None):
     if public_ip is None:
         public_ip = unit_public_ip()
     subtitle = "Systems management"
-    url = "http://" + public_ip
+    tls_configured = config("ssl-key")
+    scheme = "https://" if tls_configured else "http://"
+    url = scheme + public_ip
     relation_set(
         relation_id,
         relation_settings={
