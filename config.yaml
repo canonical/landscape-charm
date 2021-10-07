@@ -117,3 +117,7 @@ options:
         description: |
             The SMTP server to use to deliver outgoing mail.
         default: ""
+    site-name:
+        type: string
+        default: ''
+        description: An unique site name for Landscape deployment
