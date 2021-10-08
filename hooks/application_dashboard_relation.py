@@ -48,7 +48,7 @@ def application_dashboard_relation_changed(relation_id=None, remote_unit=None):
             public_ip = relation_get("public-address", unit=hap_unit, rid=rid)
             break
         if public_ip:
-            break;
+            break
     if public_ip is None:
         public_ip = unit_public_ip()
     if config("site-name"):
