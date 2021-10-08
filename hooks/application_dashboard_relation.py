@@ -47,6 +47,8 @@ def application_dashboard_relation_changed(relation_id=None, remote_unit=None):
         for hap_unit in haproxy_units:
             public_ip = relation_get("public-address", unit=hap_unit, rid=rid)
             break
+        if public_ip:
+            break;
     if public_ip is None:
         public_ip = unit_public_ip()
     if config("site-name"):
@@ -59,7 +61,7 @@ def application_dashboard_relation_changed(relation_id=None, remote_unit=None):
     scheme = "https://" if tls_configured else "http://"
     url = scheme + public_ip
     icon_data = None
-    icon_file = os.environ.get("JUJU_CHARM_DIR", None) + "/icon.svg"
+    icon_file = os.environ.get("JUJU_CHARM_DIR", "") + "/icon.svg"
     if os.path.exists(icon_file):
         with open(icon_file) as f:
             icon_data = f.read()
