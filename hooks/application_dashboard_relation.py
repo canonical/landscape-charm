@@ -41,25 +41,34 @@ def application_dashboard_relation_changed(relation_id=None, remote_unit=None):
     relations = relation_ids('application-dashboard')
     if not relations:
         return
-    public_ip = None
-    for rid in relation_ids("website"):
-        haproxy_units = related_units(rid)
-        for hap_unit in haproxy_units:
-            public_ip = relation_get("public-address", unit=hap_unit, rid=rid)
-            break
-        if public_ip:
-            break
-    if public_ip is None:
-        public_ip = unit_public_ip()
+
+    url = None
+    if config("root-url"):
+        url = config("root-url")
+    else:
+        public_ip = None
+        for rid in relation_ids("website"):
+            haproxy_units = related_units(rid)
+            for hap_unit in haproxy_units:
+                public_ip = relation_get("public-address",
+                                         unit=hap_unit,
+                                         rid=rid)
+                break
+            if public_ip:
+                break
+        if public_ip is None:
+            public_ip = unit_public_ip()
+        # Landscape UI always uses https.
+        scheme = "https://"
+        url = scheme + public_ip
+
     if config("site-name"):
         subtitle = "[{}] Systems management".format(config("site-name"))
-        group = "[{}] LAM".format(config("site-name"))
+        group = "[{}] LMA".format(config("site-name"))
     else:
         subtitle = "Systems management"
         group = "LMA"
-    tls_configured = config("ssl-key")
-    scheme = "https://" if tls_configured else "http://"
-    url = scheme + public_ip
+
     icon_data = None
     icon_file = os.environ.get("JUJU_CHARM_DIR", "") + "/icon.svg"
     if os.path.exists(icon_file):
