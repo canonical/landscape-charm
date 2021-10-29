@@ -4,7 +4,6 @@ test:
 	PYTHONPATH=. trial lib
 	# For now only the install hook runs against python3
 	PYTHONPATH=. trial3 lib/tests/test_apt.py lib/tests/test_install.py
-	PYTHONPATH=hooks pytest lib/tests/test_application_dashboard.py
 
 ci-test:
 	./dev/ubuntu-deps

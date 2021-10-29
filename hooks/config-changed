@@ -2,9 +2,7 @@
 import sys
 
 from lib.services import ServicesHook
-from application_dashboard_relation import application_dashboard_relation_changed  # noqa: E501
 
 if __name__ == "__main__":
     hook = ServicesHook()
-    application_dashboard_relation_changed()
     sys.exit(hook())
