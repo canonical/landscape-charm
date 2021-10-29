@@ -9,6 +9,8 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
+  application-dashboard:
+    interface: register-application
 provides:
   data:
     interface: block-storage
