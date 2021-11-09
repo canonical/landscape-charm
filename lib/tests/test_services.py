@@ -5,7 +5,12 @@ import yaml
 from charmhelpers.core import templating
 
 from lib.tests.helpers import HookenvTest
-from lib.tests.stubs import HostStub, PsutilStub, SubprocessStub, FetchStub
+from lib.tests.stubs import (
+    HostStub,
+    PsutilStub,
+    SubprocessStub,
+    FetchStub,
+    NrpeConfigStub)
 from lib.tests.sample import (
     SAMPLE_DB_UNIT_DATA, SAMPLE_LEADER_DATA, SAMPLE_AMQP_UNIT_DATA,
     SAMPLE_CONFIG_LICENSE_DATA, SAMPLE_CONFIG_OPENID_DATA,
@@ -34,9 +39,11 @@ class ServicesHookTest(HookenvTest):
         self.root_dir = self.useFixture(RootDir())
         self.fetch = FetchStub(self.hookenv.config)
         self.psutil = PsutilStub(num_cpus=2, physical_memory=1*1024**3)
+        self.nrpe_config = NrpeConfigStub()
         self.hook = ServicesHook(
             hookenv=self.hookenv, host=self.host, subprocess=self.subprocess,
-            paths=self.paths, fetch=self.fetch, psutil=self.psutil)
+            paths=self.paths, fetch=self.fetch, psutil=self.psutil,
+            nrpe_config=self.nrpe_config)
 
         # XXX Monkey patch the templating API, charmhelpers doesn't sport
         #     any dependency injection here as well.

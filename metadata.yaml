@@ -21,6 +21,9 @@ provides:
   hosted:
     interface: landscape-hosted
     scope: container
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
 series:
   - bionic
   - xenial

@@ -21,6 +21,7 @@ from lib.callbacks.smtp import ConfigureSMTP
 from lib.callbacks.filesystem import (
     EnsureConfigDir, WriteCustomSSLCertificate, WriteLicenseFile)
 from lib.callbacks.apt import SetAPTSources
+from lib.callbacks.nrpe import ConfigureNRPE
 
 
 class ServicesHook(Hook):
@@ -32,7 +33,7 @@ class ServicesHook(Hook):
     """
     def __init__(self, hookenv=hookenv, host=host,
                  subprocess=subprocess, paths=default_paths, fetch=fetch,
-                 psutil=psutil):
+                 psutil=psutil, nrpe_config=None):
         super(ServicesHook, self).__init__(hookenv=hookenv)
         self._hookenv = hookenv
         self._host = host
@@ -40,6 +41,7 @@ class ServicesHook(Hook):
         self._psutil = psutil
         self._subprocess = subprocess
         self._fetch = fetch
+        self._nrpe_config = nrpe_config
 
     def _run(self):
 
@@ -88,6 +90,8 @@ class ServicesHook(Hook):
                 WriteLicenseFile(host=self._host, paths=self._paths),
                 ConfigureSMTP(
                     hookenv=self._hookenv, subprocess=self._subprocess),
+                ConfigureNRPE(hookenv=self._hookenv,
+                              nrpe_config=self._nrpe_config),
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
