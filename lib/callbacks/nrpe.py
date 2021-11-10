@@ -1,5 +1,3 @@
-# import subprocess
-
 from charmhelpers.core import hookenv
 from charmhelpers.core.services.base import ManagerCallback
 from charmhelpers.contrib.charmsupport import nrpe
@@ -26,7 +24,7 @@ class ConfigureNRPE(ManagerCallback):
             self._nrpe_config = nrpe.NRPE()
 
     def __call__(self, manager, service_name, event_name):
-        self._hookenv.log('Configure NRPE checks')
+        self._hookenv.log('Configuring NRPE checks')
         if self._hookenv.relations_of_type('nrpe-external-master'):
             if self._hookenv.is_leader():
                 self._add_checks(DEFAULT_SERVICES + LEADER_SERVICES)
@@ -38,16 +36,16 @@ class ConfigureNRPE(ManagerCallback):
         self._nrpe_config.write()
 
     def _add_checks(self, services):
-        """ add a service check """
+        """ Add a service check """
         for service in services:
-            hookenv.log('add nrpe check: %s' % service, hookenv.DEBUG)
+            hookenv.log('Adding nrpe check: %s' % service, hookenv.DEBUG)
             self._nrpe_config.add_check(
                     shortname='%s' % service,
                     description='process check {%s}' % self._unit,
                     check_cmd='check_systemd.py %s' % service)
 
     def _remove_checks(self, services):
-        """ add a service check """
+        """ Remove a service check """
         for service in services:
-            hookenv.log('remove nrpe check: %s' % service, hookenv.DEBUG)
+            hookenv.log('Removing nrpe check: %s' % service, hookenv.DEBUG)
             self._nrpe_config.remove_check(shortname=service)

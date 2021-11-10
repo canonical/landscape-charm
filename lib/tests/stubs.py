@@ -33,8 +33,8 @@ class HookenvStub(object):
     def config(self):
         return self._config
 
-    def relations_of_type(self, rel_type):
-        return True
+    def relations_of_type(self, reltype):
+        return self.relations.get(reltype, None)
 
     def log(self, message, level=None):
         self.messages.append((message, level))
