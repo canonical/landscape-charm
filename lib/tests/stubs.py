@@ -33,6 +33,9 @@ class HookenvStub(object):
     def config(self):
         return self._config
 
+    def relations_of_type(self, reltype):
+        return self.relations.get(reltype, None)
+
     def log(self, message, level=None):
         self.messages.append((message, level))
 
@@ -264,3 +267,24 @@ class PsutilStub(object):
 
     def virtual_memory(self):
         return PsutilUsageStub(self._physical_memory)
+
+
+class NrpeConfigStub(object):
+    def __init__(self):
+        self._nrpe_checks = {}
+
+    def write(self):
+        pass
+
+    def add_check(self, shortname, description, check_cmd):
+        self._nrpe_checks[shortname] = {
+            "description": description,
+            "command": check_cmd,
+        }
+
+    def remove_check(self, shortname):
+        if self._nrpe_checks.get(shortname):
+            del self._nrpe_checks[shortname]
+
+    def get_nrpe_checks(self):
+        return self._nrpe_checks
