@@ -180,6 +180,12 @@ class CronTest(IntegrationTest):
     def test_update_security_db_cron(self):
         """Verify that the update_security_db cron job runs without errors."""
         script = "/opt/canonical/landscape/scripts/update_security_db.sh"
+        # remove some extra sleep which would make this test timeout
+        check_output([
+            "juju", "ssh", self.layer.cron_unit, "sudo", "sed", "-e",
+            "/^sleep/d", "-i", script
+        ])
+
         output, status = self.environment.run_script_on_cron_unit(
             script, self.layer)
         self.assertCronStatus(status, output, "update_security_db_cron")
@@ -222,6 +228,11 @@ class CronTest(IntegrationTest):
             "sudo cp {config_dir}/hash-id-databases-sample.conf"
             " {config_dir}/hash-id-databases.conf".format(
                 config_dir=config_dir))
+        self.environment.run_command_on_landscape(
+            "sudo sed -i 's,^url.*,url={url},' "
+            "{config_dir}/hash-id-databases.conf".format(
+                config_dir=config_dir,
+                url="http://ppa.launchpad.net/simpoir/dummy-test-only/ubuntu"))
 
         script = "/opt/canonical/landscape/scripts/hash_id_databases.sh"
         output, status = self.environment.run_script_on_cron_unit(

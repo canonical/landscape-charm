@@ -13,10 +13,10 @@ CHARM_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Deployer(object):
-    """Simple wrapper around juju-deployer.
+    """Simple wrapper around juju deploy (used to be juju-deployer).
 
     It creates a temporary directory that will act as local charm repository
-    for juju-deployer so it can deploy the current charm branch as local
+    for juju deploy so it can deploy the current charm branch as local
     charm.
 
     It also overrides the configuration in the stock bundles, accounting for
@@ -53,7 +53,7 @@ class Deployer(object):
         @param source_bundle_file: The bundle file to override.
         """
         # Will create a config file with option values overridden for use in
-        # the juju deployer commandline to add a custom license-file to the
+        # the juju deploy commandline to add a custom license-file to the
         # deployment.
         local_yaml_file = os.path.join(tmpdir, "99-local.yaml")
         with open(source_bundle_file, "r") as bundle_content:
@@ -80,8 +80,8 @@ class Deployer(object):
 
     def deploy(self, timeout=900):
         """
-        Use juju-deployer to deploy the target deployment type on current
-        `juju env`.
+        Use juju deploy to deploy the target deployment type on current
+        juju model.
 
         @param timeout: timeout in seconds (int or string is OK)
         """
@@ -100,22 +100,21 @@ class Deployer(object):
                 self._stage_deployer_dir(deployer_dir, series)
             updated_bundle_file = self._create_local_yaml(
                 deployer_dir, original_bundle)
-            # The -w 30 is there to allow things to settle a bit before
-            # issuing a 'juju run' to wait for all the relations to settle.
-            args = ["juju-deployer", "-vdWL", "-w 30"]
-            args.extend(["-c", updated_bundle_file])
-            if timeout is not None:
-                args.extend(["--timeout", str(timeout)])
+            args = ["juju", "deploy"]
+            args.append(updated_bundle_file)
             logging.info("(cwd=%s) RUN: %s" % (deployer_dir, args))
             subprocess.check_call(args, cwd=deployer_dir)
             logging.info("Waiting for relations to settle")
-            subprocess.check_output(["juju", "run", "--all", "/bin/true"])
+            subprocess.check_output([
+                "juju", "run", "--all", "--timeout={}s".format(timeout),
+                "/bin/true"])
             deploy_time = int(round(time.time() - start))
             logging.info(
                 "Deployment usable after {} seconds".format(deploy_time))
-            haproxy_ip = subprocess.check_output(
-                ["juju-deployer", "-f", "haproxy"])
-            haproxy_ip = haproxy_ip.decode("utf-8").strip()
+            juju_status = yaml.load(subprocess.check_output([
+                "juju", "status", "--format=yaml"]))
+            haproxies = juju_status["applications"]["haproxy"]["units"]
+            haproxy_ip = list(haproxies.values())[0]["public-address"]
             logging.info("Landscape URL: https://{}/".format(haproxy_ip))
         finally:
             if deployer_dir is not None:
@@ -138,7 +137,7 @@ class Deployer(object):
 
 
 def get_parser():
-    parser = ArgumentParser(description="Simple wrapper around juju-deployer")
+    parser = ArgumentParser(description="Simple wrapper around juju deploy")
     parser.add_argument(
         "target", choices=("scalable", "dense", "dense-maas"),
         help="target deployment type")

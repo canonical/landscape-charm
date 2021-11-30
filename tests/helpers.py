@@ -6,6 +6,7 @@ import logging
 import sys
 import yaml
 import os
+import path
 import subprocess
 import tempfile
 import json
@@ -20,6 +21,8 @@ from configparser import ConfigParser
 from fixtures import Fixture, TestWithFixtures
 
 from amulet import Deployment
+from amulet.helpers import INFRA_FAIL, raise_status
+from amulet.sentry import SentryError, Talisman
 
 from zope.testrunner import run
 
@@ -43,8 +46,10 @@ DEFAULT_BUNDLE_CONTEXT = {
         },
     "haproxy": {},
     "landscape": {
-        "branch": ".",
-        "memory": "2G"},
+        "charm": os.getcwd(),
+        # If you get OOM killed by LXD host (e.g. test_update_security_db_cron)
+        # the memory quota isn't high enough.
+        "memory": "4G"},
 }
 
 
@@ -77,6 +82,22 @@ class EnvironmentFixture(Fixture):
         self._dense_maas = os.environ.get("DENSE_MAAS", "0") == "1"
         self._tempfile = tempfile
 
+    def _amulet_setup(self):
+        """Like Deployement.setup(), without using defunct juju-deployer."""
+        timeout = 900
+        with path.tempdir(prefix='amulet-juju-deployer-') as tmpdir:
+            schema_file = tmpdir / 'deployer-schema.yaml'
+            schema_file.write_text(yaml.dump(self._get_bundle()))
+            with self._deployment._deploy_w_timeout(timeout):
+                self._subprocess.check_call(
+                    ["juju", "deploy", str(schema_file)])
+        try:
+            self._deployment.sentry = Talisman(
+                self._deployment.services, timeout=900,
+                juju_env=self._deployment.juju_env)
+        except SentryError as e:
+            raise_status(INFRA_FAIL, msg=e)
+
     def setUp(self):
         super(EnvironmentFixture, self).setUp()
         if not self._deployment.deployed:
@@ -84,7 +105,7 @@ class EnvironmentFixture(Fixture):
                 self._configure_for_dense_maas()
             self._deployment.load(self._get_bundle())
             with self._enable_sample_hashids():
-                self._deployment.setup(timeout=self._timeout)
+                self._amulet_setup()
             self._deployment.sentry.wait(self._timeout)
 
     def get_haproxy_public_address(self, unit=None):
@@ -178,7 +199,7 @@ class EnvironmentFixture(Fixture):
         post_data = ("login.email=%s&login.password=%s&login=Login&"
                      "form-security-token=%s" % (email, password, token))
         return self.check_url(
-            "/redirect", "<h2>Organisation</h2>", post_data=post_data,
+            "/redirect", "<h2>Standalone Account</h2>", post_data=post_data,
             cookie_jar=cookie_file)
 
     def check_service(self, name, state="up", attempts=2, interval=5):

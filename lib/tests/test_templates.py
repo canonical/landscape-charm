@@ -64,6 +64,30 @@ class ServiceConfTest(TemplateTest):
             "http://openid-host/logout",
             config.get("landscape", "openid-logout-url"))
 
+    def test_render_with_oidc(self):
+        """
+        When OpenID-Connect configuration is present in the leader context,
+        oidc-related options are set.
+        """
+        config = self.context["config"]
+        config.update({
+            "oidc-issuer": "http://oidc-host/",
+            "oidc-client-id": "oidc-client-id",
+            "oidc-client-secret": "somesecret",
+        })
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual(
+            "http://oidc-host/",
+            config.get("landscape", "oidc-issuer"))
+        self.assertEqual(
+            "oidc-client-id",
+            config.get("landscape", "oidc-client-id"))
+        self.assertEqual(
+            "somesecret",
+            config.get("landscape", "oidc-client-secret"))
+
     def test_render_with_openid_both_required(self):
         """
         When only one of OpenID configuration keys is present, neither
@@ -215,6 +239,32 @@ class ServiceConfTest(TemplateTest):
         self.assertEqual(
             "/etc/landscape/gpg-passphrase.txt",
             config.get("api", "gpg-passphrase-path"))
+
+    def test_broker_ha(self):
+        """
+        Verify that broker gets a list of multiple rabbit servers if
+        multiple such units exist.
+        """
+        self.context["amqp"] = [
+            {
+                "hostname": "roger",
+                "password": "secret",
+            },
+            {
+                "hostname": "bugs",
+                "password": "secret",
+            },
+            {
+                "hostname": "lola",
+                "password": "secret",
+            },
+        ]
+
+        buffer = StringIO(self.template.render(self.context))
+        config = ConfigParser()
+        config.readfp(buffer)
+        self.assertEqual("roger,bugs,lola", config.get("broker", "host"))
+        self.assertEqual("secret", config.get("broker", "password"))
 
 
 class LandscapeDefaultsTest(TemplateTest):

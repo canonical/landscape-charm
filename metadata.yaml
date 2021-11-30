@@ -9,6 +9,8 @@ requires:
     interface: pgsql
   amqp:
     interface: rabbitmq
+  application-dashboard:
+    interface: register-application
 provides:
   data:
     interface: block-storage
@@ -18,6 +20,9 @@ provides:
     interface: http
   hosted:
     interface: landscape-hosted
+    scope: container
+  nrpe-external-master:
+    interface: nrpe-external-master
     scope: container
 series:
   - bionic

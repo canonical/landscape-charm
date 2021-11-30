@@ -6,3 +6,4 @@ include:
     - fetch
     - osplatform
     - contrib.hahelpers
+    - contrib.charmsupport.nrpe
