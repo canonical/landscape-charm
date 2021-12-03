@@ -202,7 +202,6 @@ class SchemaBootstrapTest(HookenvTest):
               "--with-no-proxy", ""], {}),
         ], self.subprocess.calls)
 
-
     def test_reconfigure_noop(self):
         """Nothing happens if there is no proxy and no config change."""
         # TODO
