@@ -138,8 +138,8 @@ options:
         default:
         type: string
         description: |
-            Comma separated list of hosts hosts which for which no HTTP proxy
-            should be used. If left blank, the model-config value will be used.
+            Comma separated list of hosts for which no proxy should be used.
+            If left blank, the model-config value will be used.
     site-name:
         type: string
         default: ''
