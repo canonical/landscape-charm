@@ -99,6 +99,11 @@ options:
             IP of the first related HAproxy unit will be used instead.
         type: string
         default: ""
+    system-email:
+        type: string
+        description: |
+            The address emails from Landscape will appear to come from.
+        default: ""
     ssl-cert:
         type: string
         description: |
@@ -117,6 +122,24 @@ options:
         description: |
             The SMTP server to use to deliver outgoing mail.
         default: ""
+    http-proxy:
+        default:
+        type: string
+        description: |
+            The http proxy URL Landscape will use. If left blank, the
+            model-config value will be used.
+    https-proxy:
+        default:
+        type: string
+        description: |
+            The https proxy Landscape will use. If left blank, the model-config
+            value will be used.
+    no-proxy:
+        default:
+        type: string
+        description: |
+            Comma separated list of hosts for which no proxy should be used.
+            If left blank, the model-config value will be used.
     site-name:
         type: string
         default: ''

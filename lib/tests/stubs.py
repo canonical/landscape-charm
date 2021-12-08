@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from charmhelpers.core.hookenv import Config
@@ -32,6 +33,13 @@ class HookenvStub(object):
 
     def config(self):
         return self._config
+
+    def env_proxy_settings(self):
+        return {
+            k: os.environ[k]
+            for k in ("http_proxy", "https_proxy", "no_proxy")
+            if k in os.environ
+        } or None
 
     def relations_of_type(self, reltype):
         return self.relations.get(reltype, None)

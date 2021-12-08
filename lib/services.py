@@ -86,7 +86,8 @@ class ServicesHook(Hook):
                     subprocess=self._subprocess),
                 EnsureConfigDir(paths=self._paths),
                 WriteCustomSSLCertificate(paths=self._paths),
-                SchemaBootstrap(subprocess=self._subprocess),
+                SchemaBootstrap(
+                    subprocess=self._subprocess, hookenv=self._hookenv),
                 WriteLicenseFile(host=self._host, paths=self._paths),
                 ConfigureSMTP(
                     hookenv=self._hookenv, subprocess=self._subprocess),
@@ -95,4 +96,8 @@ class ServicesHook(Hook):
             ],
             "start": LSCtl(subprocess=self._subprocess, hookenv=self._hookenv),
         }])
-        manager.manage()
+        try:
+            manager.manage()
+        except Exception as e:
+            self._hookenv.log(str(e), level=hookenv.ERROR)
+            raise
