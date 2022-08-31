@@ -1,29 +1,16 @@
-pause:
-  description: Pause the Landscape service.
-resume:
-  description: Resume the Landscape service.
-upgrade:
-  description: Upgrade software on the Landscape unit. This action will update
-    APT package indexes and upgrade the landscape-server package.
-    Unit must already be paused with the 'pause' action.
-migrate-schema:
-  description: Upgrade the landscape schemas on the related databases.
-    Unit must already be paused with the 'pause' action.
-bootstrap:
-  description: Bootstraps Landscape installation by creating an administrator
-    user account.
+# Copyright 2022 Mitch Burton
+# See LICENSE file for licensing details.
+#
+# TEMPLATE-TODO: change this example to suit your needs.
+# If you don't need actions, you can remove the file entirely.
+# It ties in to the example _on_fortune_action handler in src/charm.py
+#
+# Learn more about actions at: https://juju.is/docs/sdk/actions
+
+fortune:
+  description: Returns a pithy phrase.
   params:
-    admin-name:
+    fail:
+      description: "Fail with this message"
       type: string
-      description: Name for the administrator to add.
-    admin-email:
-      type: string
-      description: Email for the administrator to add.
-    admin-password:
-      type: string
-      description: Password for the administrator to add.
-    registration-key:
-      type: string
-      description: Registration key to set on the account.
-  required: [admin-name, admin-email, admin-password]
-  additionalProperties: false
+      default: ""

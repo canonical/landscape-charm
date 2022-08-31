@@ -1,9 +1,0 @@
-branch: lp:charm-helpers
-destination: charmhelpers
-include:
-    - __init__
-    - core
-    - fetch
-    - osplatform
-    - contrib.hahelpers
-    - contrib.charmsupport.nrpe

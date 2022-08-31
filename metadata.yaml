@@ -1,9 +1,15 @@
+# Copyright 2022 Canonical Ltd
+# See LICENSE file for licensing details.
+
+# For a complete list of supported options, see:
+# https://juju.is/docs/sdk/metadata-reference
 name: landscape-server
-summary: Charm for installing and using Landscape Dedicated Server.
-maintainer: Landscape Team <landscape-team@canonical.com>
-description: A multi server Landscape Dedicated Server charm.
-tags:
-  - app-servers
+display-name: Landscape Server
+description: A multi-server Self-Hosted Landscape Server charm.
+maintainers:
+  - Landscape Developers <landscape-devel@lists.canonical.com>
+summary: Charm for installing and using Self-Hosted Landscape Server.
+
 requires:
   db:
     interface: pgsql
@@ -11,6 +17,7 @@ requires:
     interface: rabbitmq
   application-dashboard:
     interface: register-application
+
 provides:
   data:
     interface: block-storage
@@ -24,7 +31,7 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+
 series:
-  - bionic
-  - xenial
-  - trusty
+  - jammy
+  - focal

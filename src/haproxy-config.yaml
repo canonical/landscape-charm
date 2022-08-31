@@ -1,0 +1,60 @@
+http_service:
+  service_name: landscape-http
+  service_host: 0.0.0.0
+  service_port: 80
+  service_options:
+    - mode http
+    - timeout client 300000
+    - timeout server 300000
+    - balance leastconn
+    - option httpchk HEAD / HTTP/1.0
+    - acl ping path_beg -i /ping
+    - acl repository path_beg -i /repository
+    - redirect scheme https unless ping OR repository
+    - use_backend landscape-ping if ping
+
+https_service:
+  service_name: landscape-https
+  service_host: 0.0.0.0
+  service_port: 443
+  service_options:
+    - mode http
+    - timeout client 300000
+    - timeout server 300000
+    - balance leastconn
+    - option httpchk HEAD / HTTP/1.0
+    - http-request set-header X-Forwarded-Proto https
+    - acl message path_beg -i /message-system
+    - acl attachment path_beg -i /api
+    - acl api path_beg -i /api
+    - acl prometheus_metrics path_beg -i /metrics
+    - acl ping path_beg -i /ping
+    - http-request deny if prometheus_metrics
+    - use_backend landscape-message if message
+    - use_backend landscape-message if attachment
+    - use_backend landscape-api if api
+    - use_backend landscape-ping if ping
+
+error_files:
+  location: /opt/canonical/landscape/canonical/landscape/offline
+  files:
+    "403": unauthorized-haproxy.html
+    "500": exception-haproxy.html
+    "502": unplanned-offline-haproxy.html
+    "503": unplanned-offline-haproxy.html
+    "504": timeout-haproxy.html
+
+ports:
+  appserver: 8080
+  pingserver: 8070
+  message-server: 8090
+  api: 9080
+  package-upload: 9100
+  pppa-proxy: 9298
+
+server_options:
+  - check
+  - inter 5000
+  - rise 2
+  - fall 5
+  - maxconn 50

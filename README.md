@@ -1,72 +1,24 @@
-Overview
-========
-The Landscape systems management tool helps you monitor, manage and update your entire Ubuntu infrastructure from a single interface. Part of Canonical's Ubuntu Advantage support service, Landscape brings you intuitive systems management tools combined with world-class support.
+# landscape-charm-charmcraft
 
-This charm will deploy Landscape On Premises, and needs to be connected to other charms to be fully functional. Example deployments are given below.
+## Description
 
-For more information about Landscape, go to http://www.ubuntu.com/management
+TODO: Describe your charm in a few paragraphs of Markdown
 
-Standard Usage
-==============
+## Usage
 
-The typical deployment of Landscape happens using a Juju bundle. This charm is not useful without a deployed bundle of services.
-
-Please use one of the following bundle types depending on your needs:
-
-*  https://jujucharms.com/landscape-scalable/
-*  https://jujucharms.com/landscape-dense-maas/
-*  https://jujucharms.com/landscape-dense/
-
-For the landscape-scalable case:
-
-    $ juju deploy landscape-scalable
+TODO: Provide high-level usage, such as required config or relations
 
 
-Customised Deployments
-======================
+## Relations
 
-The standard deployment of Landscape will give you the latest released code. If you want a different version, different options, etc, you will need to download one of the bundles, and add/change options in the file before supplying it to juju.
+TODO: Provide any relations which are provided or required by your charm
 
-On the bundle page, download the `bundle.yaml` file.
+## OCI Images
 
+TODO: Include a link to the default image your charm uses
 
-Configuration
-=============
+## Contributing
 
-Landscape is a commercial product and as such it needs configuration of a license and password protected repository before deployment.  Please login to your "hosted account" (on landscape.canonical.com) to gather these details after purchasing seats for Landscape On Premises.  All information is found by following a link on the left side of the page called "access the Landscape On Premises archive"
-
-license-file
-------------
-
-You can set this as a juju configuration option after deployment on each deployed landscape-server application like:
-
-    $ juju config landscape-server "license-file=$(cat license-file)"
-
-
-SSL
-===
-
-The pre-packaged bundles will ask the HAProxy charm to generate a self signed certificate. While useful for testing, this must not be used for production deployments.
-
-For production deployments, you should include a "real" SSL certificate key pair that has been signed by a CA that your clients trust in the haproxy service configuration (or in the landscape-server service configuration if you need to use your haproxy service for other services too with different certificates).
-
-
-Unit Testing
-============
-
-The Landscape charm is fairly well unit tested and new code changes should be submitted with unit tests.  You can run them like this:
-
-    $ make test
-
-
-Integration Testing
-===================
-
-This charm had juju-deployer and charm-tools tests. Those being EOL, some integration-test still exist, and can be executed using a "juju deploy" directly. This is how you proceed with running them:
-
-    $ juju bootstrap localhost
-    $ make integration-test
-
-Or if you want to use the packages from the lds-trunk PPA:
-
-    $ make integration-test-trunk
+Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
+on enhancements to this charm following best practice guidelines, and
+`CONTRIBUTING.md` for developer guidance.

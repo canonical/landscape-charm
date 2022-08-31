@@ -1,162 +1,123 @@
+# Copyright 2022 Mitch Burton
+# See LICENSE file for licensing details.
+#
+# TEMPLATE-TODO: change this example to suit your needs.
+# If you don't need a config, you can remove the file entirely.
+# It ties in to the example _on_config_changed handler in src/charm.py
+#
+# Learn more about config at: https://juju.is/docs/sdk/config
+
 options:
-    install_sources:
-        default: "['ppa:landscape/19.10']"
-        type: string
-        description: >
-          List of extra apt sources, per charm-helpers standard format (a
-          yaml list of strings encoded as a string). Each source may be either a line
-          that can be added directly to sources.list(5), or in the form ppa:<user>/<ppa-name>
-          for adding Personal Package Archives, or a distribution component to enable.
-    install_keys:
-        default: ""
-        type: string
-        description: >
-          List of signing keys for install_sources package sources, per
-          charmhelpers standard format (a yaml list of strings encoded as a string).
-          The keys should be the full ASCII armoured GPG public keys. While GPG key
-          ids are also supported and looked up on a keyserver, operators should be aware
-          that this mechanism is insecure. null can be used if a standard package signing
-          key is used that will already be installed on the machine, and for PPA sources
-          where the package signing key is securely retrieved from Launchpad.\n"
-    source:
-        default: ""
-        type: string
-        description: |
-            *DEPRECATED*. See install_sources
-
-            The source from which to install the landscape packages. Possible
-            values are:
-                - A version number: "16.06"
-                - A PPA URL: "ppa:landscape/16.06"
-                - A full deb line: "deb http://ppa.launchpad.net/landscape/16.06/ubuntu xenial main"
-                - A comma-separated list of the previous values, e.g. "16.06, ppa:juju/devel" (NOTE:
-                  using multiple repositories is meant for testing only, and not supported for
-                  production deployments, that should always just point to a single official
-                  Landscape PPA or a mirror of it).
-    key:
-        default: ""
-        type: string
-        description: |
-            *DEPRECATED*. See install_keys
-
-            Key ID to import to the apt keyring to support use with arbitary source
-            configuration from outside of Launchpad archives or PPA's.
-            In case multiple repositories are specified in the 'source' config key,
-            this should be a comma-separated list of key IDs, one for each
-            repository and in the same order. If a repository needs no key ID,
-            the special keyword 'null' should be passed.
-            Note that if 'source' (or one of its entries) is set to point ot a
-            Launchpad PPA, there's no need to specify a key, since it gets
-            automatically and securely fetched from Launchpad itself.
-    worker-counts:
-        default: 2
-        type: int
-        description: |
-            Number of processes to spawn for message-server and ping-server.
-            If set to 0, the charm will automatically pick a value trying to
-            maximize the use of the compute/memory resources available
-            on the unit.
-    license-file:
-        description: |
-            License file for LDS, either as a base64-encoded string containing
-            the actual license file data, or a file://, http:// or https:// URL
-            pointing to the license file for download.
-        type: string
-        default:
-    openid-provider-url:
-        default:
-        type: string
-        description: |
-            OpenID provider URL to use for authentication to Landscape.
-    openid-logout-url:
-        default:
-        type: string
-        description: |
-            OpenID provider URL to use to log out of Landscape.
-    oidc-issuer:
-        default:
-        type: string
-        description: |
-            OpenID-Connect issuer URL to use for authentication to Landscape.
-    oidc-client-id:
-        default:
-        type: string
-        description: |
-            OpenID-Connect client ID.
-    oidc-client-secret:
-        default:
-        type: string
-        description: |
-            OpenID-Connect client secret.
-    oidc-logout-url:
-        default:
-        type: string
-        description: |
-            OpenID-Connect issuer URL to use to log out of Landscape.
-    root-url:
-        description: |
-            The root URL for this landscape deployment. If left blank the public
-            IP of the first related HAproxy unit will be used instead.
-        type: string
-        default: ""
-    system-email:
-        type: string
-        description: |
-            The address emails from Landscape will appear to come from.
-        default: ""
-    ssl-cert:
-        type: string
-        description: |
-            base64 encoded SSL certificate to use for the Landscape server.
-            It will be passed verbatim to the haproxy charm. If not set, a
-            self-signed certificated will be used instead.
-        default: ""
-    ssl-key:
-        type: string
-        description: |
-            base64 encoded private key for the default SSL certificate. If
-            ssl_cert is not set, this will be ignored.
-        default: ""
-    smtp-relay-host:
-        type: string
-        description: |
-            The SMTP server to use to deliver outgoing mail.
-        default: ""
-    http-proxy:
-        default:
-        type: string
-        description: |
-            The http proxy URL Landscape will use. If left blank, the
-            model-config value will be used.
-    https-proxy:
-        default:
-        type: string
-        description: |
-            The https proxy Landscape will use. If left blank, the model-config
-            value will be used.
-    no-proxy:
-        default:
-        type: string
-        description: |
-            Comma separated list of hosts for which no proxy should be used.
-            If left blank, the model-config value will be used.
-    site-name:
-        type: string
-        default: ''
-        description: An unique site name for Landscape deployment
-    nagios_context:
-        default: "juju"
-        type: string
-        description: |
-            Used by the nrpe subordinate charms.
-            A string that will be prepended to instance name to set the host name
-            in nagios. So for instance the hostname would be something like:
-                juju-myservice-0
-            If you're running multiple environments with the same services in them
-            this allows you to differentiate between them.
-    nagios_servicegroups:
-        default: ""
-        type: string
-        description: |
-            A comma-separated list of nagios servicegroups.
-            If left empty, the nagios_context will be used as the servicegroup
+  landscape_ppa:
+    type: string
+    default: "ppa:landscape/self-hosted-22.04beta"
+    description: The PPA from which Landscape Server will be installed.
+  worker_counts:
+    type: int
+    default: 2
+    description: |
+      Number of processes to spawn for message-server and ping-server.
+      If set to 0, the charm will automatically pick a value, trying
+      to maximize the use of the computer/memory resources available
+      on the unit.
+  license_file:
+    type: string
+    default:
+    description: |
+      License file for Self-Hosted Landscape, either as a
+      base64-encoded string containing the actual license file data, or
+      a file://, http://, or http:// URL pointing to the license file
+      for download.
+  openid_provider_url:
+    type: string
+    default:
+    description: |
+      OpenID provider URL to use for Landscape Server authentication.
+  openid_logout_url:
+    type: string
+    default:
+    description: |
+      OpenID provider URL to use to log out of Landscape Server.
+  oidc_issuer:
+    type: string
+    default:
+    description: |
+      OpenID-Connect issuer URL to use for Landscape Server
+      authentication.
+  oidc_client_id:
+    type: string
+    default:
+    description: OpenID-Connect client ID.
+  oidc_client_secret:
+    type: string
+    default:
+    description: OpenID-Connect client secret.
+  oidc_logout_url:
+    type: string
+    description: |
+      OpenID-Connect issuer URL to use to log out of Landscape Servers is.
+  root_url:
+    type: string
+    default:
+    description: |
+      The root URL for this Landscape deployment. If left blank, the
+      public IP of the first related HAProxy unit will be used instead.
+  system_email:
+    type: string
+    default:
+    description: |
+      The email address that Landscape emails will appear to come from.
+  smtp_relay_host:
+    type: string
+    default:
+    description: The SMTP server used to deliver outgoing mail.
+  ssl_cert:
+    type: string
+    default: "DEFAULT"
+    description: |
+      The base64-encoded SSL certificate to use for Landscape Server.
+      It will be passed verbatim to the HAProxy charm. If not set, a
+      self-signed certificate will be used instead.
+  ssl_key:
+    type: string
+    default: ""
+    description: |
+      The base64-encoded private key for the SSL certificate. If
+      ssl-cert is not set, this will be ignored.
+  http_proxy:
+    type: string
+    default:
+    description: |
+      The HTTP proxy URL Landscape will use. If blank, the model-config
+      value will be used.
+  https_proxy:
+    type: string
+    default:
+    description: |
+      The HTTPS proxy URL Landscape will use. If blank, the
+      model-config value will be used.
+  no_proxy:
+    type: string
+    default:
+    description: |
+      Comma-separated list of hosts for which no proxy should be used.
+      If blank, the model-config value will be used.
+  site_name:
+    type: string
+    default: "juju"
+    description: A unique site name for the Landscape deployment.
+  nagios_context:
+    type: string
+    default: "juju"
+    description: |
+      Used by the NRPE subordinate charms. A string that will be
+      prepended to the instance name to set the hostname in nagios,
+      e.g., juju-myservice-0. If you are running multiple environments
+      with the same services in them, this allows you to differentiate
+      them.
+  nagios_servicegroups:
+    type: string
+    default:
+    description: |
+      Comma-separated list of nagios servicegroups. If empty, the
+      nagios-context will be used as the servicegroup.
