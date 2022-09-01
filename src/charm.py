@@ -14,10 +14,11 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
-import yaml
-from base64 import b64decode, b64encode
+from base64 import b64decode, b64encode, binascii
 from configparser import ConfigParser
 from subprocess import CalledProcessError, check_call
+
+import yaml
 
 from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError, add_package)
@@ -40,7 +41,7 @@ HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__),
 LSCTL = "/usr/bin/lsctl"
 
 
-class LandscapeCharmCharmcraftCharm(CharmBase):
+class LandscapeServerCharm(CharmBase):
     """Charm the service."""
 
     _stored = StoredState()
@@ -48,7 +49,6 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.fortune_action, self._on_fortune_action)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
@@ -66,30 +66,14 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
                                self._website_relation_changed)
 
         self._stored.set_default(ready={
-            "postgresql": False,
-            "rabbitmq": False,
+            "db": False,
+            "amqp": False,
             "haproxy": False,
         })
         self._stored.set_default(running=False)
 
     def _on_config_changed(self, _) -> None:
         pass
-
-    def _on_fortune_action(self, event):
-        """Just an example to show how to receive actions.
-
-        TEMPLATE-TODO: change this example to suit your needs.
-        If you don't need to handle actions, you can remove this method,
-        the hook created in __init__.py for it, the corresponding test,
-        and the actions.py file.
-
-        Learn more about actions at https://juju.is/docs/sdk/actions
-        """
-        fail = event.params["fail"]
-        if fail:
-            event.fail(fail)
-        else:
-            event.set_results({"fortune": "A bug in the code is worth two in the documentation."})
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -154,7 +138,6 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
         self._update_default_settings("RUN_ALL", "yes")
 
         try:
-            # TODO: get the services running properly.
             check_call([LSCTL, "restart"])
             self.unit.status = ActiveStatus("Unit is ready")
             return True
@@ -168,15 +151,17 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
 
         # Using "master" key as a quick indicator of readiness.
         if "master" not in unit_data:
-            logger.info("postgresql:db relation not yet ready")
+            logger.info("db relation not yet ready")
+            self._update_ready_status()
             return
 
         allowed_units = unit_data["allowed-units"].split()
         if self.unit.name not in allowed_units:
             logger.info("%s not in allowed_units")
+            self._update_ready_status()
             return
 
-        self._stored.ready["postgresql"] = False
+        self._stored.ready["db"] = False
         self.unit.status = MaintenanceStatus("Setting up databases")
 
         host = unit_data["host"]
@@ -204,16 +189,19 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
                 e.returncode)
             self.unit.status = BlockedStatus(
                 "Failed to update database schema")
+            return
 
-        self._stored.ready["postgresql"] = True
+        self._stored.ready["db"] = True
         self._update_ready_status()
 
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
-        self._stored.ready["rabbitmq"] = False
-        self.unit.status = MaintenanceStatus("Setting up rabbitmq connection")
+        self._stored.ready["amqp"] = False
+        self.unit.status = MaintenanceStatus("Setting up amqp connection")
 
-        event.relation.data[self.unit].update({"username": "landscape"})
-        event.relation.data[self.unit].update({"vhost": "landscape"})
+        event.relation.data[self.unit].update({
+            "username": "landscape",
+            "vhost": "landscape",
+        })
 
     def _amqp_relation_changed(self, event):
         unit_data = event.relation.data[event.unit]
@@ -232,7 +220,7 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
             }
         })
 
-        self._stored.ready["rabbitmq"] = True
+        self._stored.ready["amqp"] = True
         self._update_ready_status()
 
     def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
@@ -254,8 +242,8 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
             try:
                 ssl_cert = b64decode(ssl_cert)
                 ssl_key = b64decode(ssl_key)
-                ssl_cert = b64encode("{}\n{}".format(ssl_cert, ssl_key))
-            except TypeError:
+                ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
+            except binascii.Error:
                 self.unit.status = BlockedStatus(
                     "Unable to decode `ssl_cert` or `ssl_key` - must be "
                     "b64-encoded")
@@ -362,14 +350,14 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
             new_lines = []
             for i, line in enumerate(settings_file):
                 if line.startswith(key + "="):
-                    new_line = "{}=\"{}\"".format(key, value)
+                    new_line = "{}=\"{}\"\n".format(key, value)
                 else:
                     new_line = line
 
                 new_lines.append(new_line)
 
         with open(DEFAULT_SETTINGS, "w") as settings_file:
-            settings_file.write("\n".join(new_lines))
+            settings_file.write("".join(new_lines))
 
     def _write_ssl_cert(self, ssl_cert: str) -> None:
         """Decodes and writes `ssl_cert` to SSL_CERT_PATH."""
@@ -377,5 +365,5 @@ class LandscapeCharmCharmcraftCharm(CharmBase):
             ssl_cert_file.write(b64decode(ssl_cert))
 
 
-if __name__ == "__main__":
-    main(LandscapeCharmCharmcraftCharm)
+if __name__ == "__main__":  # pragma: no cover
+    main(LandscapeServerCharm)
