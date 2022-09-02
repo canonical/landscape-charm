@@ -26,7 +26,7 @@ options:
     description: |
       License file for Self-Hosted Landscape, either as a
       base64-encoded string containing the actual license file data, or
-      a file://, http://, or http:// URL pointing to the license file
+      a file://, http://, or https:// URL pointing to the license file
       for download.
   openid_provider_url:
     type: string
@@ -69,7 +69,7 @@ options:
       The email address that Landscape emails will appear to come from.
   smtp_relay_host:
     type: string
-    default:
+    default: ""
     description: The SMTP server used to deliver outgoing mail.
   ssl_cert:
     type: string
