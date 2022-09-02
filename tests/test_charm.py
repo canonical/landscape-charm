@@ -7,6 +7,8 @@ import os
 import unittest
 from base64 import b64encode, b64decode
 from configparser import ConfigParser
+from grp import struct_group
+from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 from unittest.mock import DEFAULT, Mock, patch
@@ -32,11 +34,12 @@ class TestCharm(unittest.TestCase):
         self.tempdir = TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
 
-        pwd_mock = patch("charm.pwd").start()
-        pwd_mock.getpwnam.return_value = Mock(pw_pid=1000)
-        grp_mock = patch("charm.grp").start()
-        grp_mock.getgrnam.return_value = Mock(gr_gid=1000)
-        patch("subprocess.run").start()
+        pwd_mock = patch("charm.user_exists").start()
+        pwd_mock.return_value = Mock(
+            spec_set=struct_passwd, pw_uid=1000)
+        grp_mock = patch("charm.group_exists").start()
+        grp_mock.return_value = Mock(
+            spec_set=struct_group, gr_gid=1000)
 
         self.addCleanup(patch.stopall)
 
@@ -590,83 +593,57 @@ password = default
                 "DONOTTOUCH=\"THIS\"\nTOUCHTHIS=\"THANKYOU\"\n",
                 mock_default_settings_file.read())
 
-    def test_configure_smtp(self):
-        """Default config results in `Internet Site` settings."""
-        with patch("subprocess.run") as mock_subprocess_run:
-            self.harness.charm._configure_smtp("")
-
-        self.assertEqual(2, len(mock_subprocess_run.mock_calls))
-        mock_subprocess_run.assert_any_call(
-            [DEBCONF_SET_SELECTIONS],
-            input="postfix postfix/relayhost string \n"
-                  "postfix postfix/main_mailer_type select Internet Site\n",
-            text=True,
-            check=True,
-        )
-        mock_subprocess_run.assert_any_call([DPKG_RECONFIGURE, "postfix"],
-                                            check=True)
-
     def test_on_config_changed_no_smtp_change(self):
-        self.harness.disable_hooks()
-        self.harness.update_config({"smtp_relay_host": "UNCONFIGURED"})
         self.harness.charm._configure_smtp = Mock()
-
-        self.harness.charm._on_config_changed(None)
+        self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
 
+    def test_on_config_changed_smtp_change(self):
+        self.harness.charm._configure_smtp = Mock()
+        self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
+
+        self.harness.charm._configure_smtp.assert_called_once_with(
+            "smtp.example.com")
+
     def test_configure_smtp_relay_host(self):
-        with patch("subprocess.run") as mock_subprocess_run:
-            self.harness.charm._configure_smtp("example.com")
+        mock_postfix_cf = os.path.join(self.tempdir.name, "my_postfix.cf")
+        with open(mock_postfix_cf, "w") as mock_postfix_cf_file:
+            mock_postfix_cf_file.write("relayhost = \nothersetting = nada\n")
 
-        self.assertEqual(2, len(mock_subprocess_run.mock_calls))
-        mock_subprocess_run.assert_any_call(
-            [DEBCONF_SET_SELECTIONS],
-            input="postfix postfix/relayhost string example.com\n"
-                  "postfix postfix/main_mailer_type select Internet with "
-                  "smarthost\n",
-            text=True,
-            check=True,
+        patches = patch.multiple(
+            "charm",
+            service_reload=DEFAULT,
+            POSTFIX_CF=mock_postfix_cf,
         )
-        mock_subprocess_run.assert_any_call([DPKG_RECONFIGURE, "postfix"],
-                                            check=True)
 
-    def test_configure_smtp_relay_host_debconf_error(self):
-        with patch("subprocess.run") as mock_subprocess_run:
-            mock_subprocess_run.side_effect = CalledProcessError(127, "ouch")
-            self.harness.charm._configure_smtp("")
+        with patches as mocks:
+            self.harness.charm._configure_smtp("smtp.example.com")
 
-        mock_subprocess_run.assert_called_once_with(
-            [DEBCONF_SET_SELECTIONS],
-            input="postfix postfix/relayhost string \n"
-                  "postfix postfix/main_mailer_type select Internet Site\n",
-            text=True,
-            check=True,
+        mocks["service_reload"].assert_called_once_with("postfix")
+        with open(mock_postfix_cf) as mock_postfix_cf_file:
+            self.assertEqual("relayhost = smtp.example.com\n"
+                             "othersetting = nada\n",
+                             mock_postfix_cf_file.read())
+
+    def test_configure_smtp_relay_host_reload_error(self):
+        mock_postfix_cf = os.path.join(self.tempdir.name, "my_postfix.cf")
+        with open(mock_postfix_cf, "w") as mock_postfix_cf_file:
+            mock_postfix_cf_file.write("relayhost = \nothersetting = nada\n")
+
+        patches = patch.multiple(
+            "charm",
+            service_reload=DEFAULT,
+            POSTFIX_CF=mock_postfix_cf,
         )
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
 
-    def test_configure_smtp_relay_host_dpkg_reconfigure_error(self):
-        def raise_on_dpkg(*args, **kwargs):
-            if DPKG_RECONFIGURE in args[0]:
-                raise CalledProcessError(127, "ouch")
+        with patches as mocks:
+            mocks["service_reload"].return_value = False
+            self.harness.charm._configure_smtp("smtp.example.com")
 
-            return DEFAULT
-
-        with patch("subprocess.run") as mock_subprocess_run:
-            mock_subprocess_run.side_effect = raise_on_dpkg
-
-            self.harness.charm._configure_smtp("")
-
-        self.assertEqual(2, len(mock_subprocess_run.mock_calls))
-        mock_subprocess_run.assert_any_call(
-            [DEBCONF_SET_SELECTIONS],
-            input="postfix postfix/relayhost string \n"
-                  "postfix postfix/main_mailer_type select Internet Site\n",
-            text=True,
-            check=True,
-        )
-        mock_subprocess_run.assert_any_call([DPKG_RECONFIGURE, "postfix"],
-                                            check=True)
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
+        mocks["service_reload"].assert_called_once_with("postfix")
+        with open(mock_postfix_cf) as mock_postfix_cf_file:
+            self.assertEqual("relayhost = smtp.example.com\n"
+                             "othersetting = nada\n",
+                             mock_postfix_cf_file.read())
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)

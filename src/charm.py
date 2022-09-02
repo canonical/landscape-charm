@@ -12,11 +12,8 @@ develop a new k8s charm using the Operator Framework:
     https://discourse.charmhub.io/t/4208
 """
 
-import grp
 import logging
 import os
-import pwd
-import subprocess
 from base64 import b64decode, b64encode, binascii
 from configparser import ConfigParser
 from subprocess import CalledProcessError, check_call
@@ -27,6 +24,8 @@ import yaml
 
 from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError, add_package)
+from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
+from charms.operator_libs_linux.v0.systemd import service_reload
 
 from ops.charm import (
     CharmBase, InstallEvent, RelationChangedEvent, RelationJoinedEvent,
@@ -41,17 +40,18 @@ logger = logging.getLogger(__name__)
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DEFAULT_SETTINGS = "/etc/default/landscape-server"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
-SERVICE_CONF = "/etc/landscape/service.conf"
-SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__),
                                    "haproxy-config.yaml")
-LSCTL = "/usr/bin/lsctl"
 LICENSE_FILE_PROTOCOLS = (
     "file://",
     "http://",
     "https://",
 )
 LICENSE_FILE = "/etc/landscape/license.txt"
+LSCTL = "/usr/bin/lsctl"
+POSTFIX_CF = "/etc/postfix/main.cf"
+SERVICE_CONF = "/etc/landscape/service.conf"
+SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 
 
 class LandscapeServerCharm(CharmBase):
@@ -84,10 +84,9 @@ class LandscapeServerCharm(CharmBase):
             "haproxy": False,
         })
         self._stored.set_default(running=False)
-        self._stored.set_default(smtp_relay_host="UNCONFIGURED")
 
-        self.landscape_uid = pwd.getpwnam("landscape").pw_pid
-        self.root_gid = grp.getgrnam("root").gr_gid
+        self.landscape_uid = user_exists("landscape").pw_uid
+        self.root_gid = group_exists("root").gr_gid
 
     def _on_config_changed(self, _) -> None:
         # Write the config-provided SSL certificate, if it exists.
@@ -99,16 +98,15 @@ class LandscapeServerCharm(CharmBase):
 
         # Write the license file, if it exists.
         license_file = self.model.config.get("license_file")
-
         if license_file:
             self.unit.status = MaintenanceStatus(
                 "Writing Landscape license file")
             self._write_license_file(license_file)
 
-        new_smtp_relay_host = self.model.config["smtp_relay_host"]
-        if new_smtp_relay_host != self._stored.smtp_relay_host:
-            self._configure_smtp(new_smtp_relay_host)
-            self._stored.smtp_relay_host = new_smtp_relay_host
+        smtp_relay_host = self.model.config.get("smtp_relay_host")
+        if smtp_relay_host:
+            self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
+            self._configure_smtp(smtp_relay_host)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -391,7 +389,7 @@ class LandscapeServerCharm(CharmBase):
         """Updates the Landscape Server default settings file."""
         with open(DEFAULT_SETTINGS, "r") as settings_file:
             new_lines = []
-            for i, line in enumerate(settings_file):
+            for line in settings_file:
                 if line.startswith(key + "="):
                     new_line = "{}=\"{}\"\n".format(key, value)
                 else:
@@ -403,35 +401,24 @@ class LandscapeServerCharm(CharmBase):
             settings_file.write("".join(new_lines))
 
     def _configure_smtp(self, relay_host: str):
-        main_mailer_type = "Internet Site"
 
-        if relay_host:
-            main_mailer_type = "Internet with smarthost"
+        # Rewrite postfix config.
+        with open(POSTFIX_CF, "r") as postfix_config_file:
+            new_lines = []
+            for line in postfix_config_file:
+                if line.startswith("relayhost ="):
+                    new_line = "relayhost = " + relay_host
+                else:
+                    new_line = line
 
-        # Update postfix config via debconf.
-        options = "\n".join((
-            "postfix postfix/relayhost string " + relay_host,
-            "postfix postfix/main_mailer_type select " + main_mailer_type,
-        )) + "\n"
-        try:
-            logger.info("Configuring postfix via debconf with options: %s",
-                        options)
-            subprocess.run([DEBCONF_SET_SELECTIONS], input=options, check=True,
-                           text=True)
-        except CalledProcessError as e:
-            logger.error("postfix config failed with return code %d",
-                         e.returncode)
-            self.unit.status = BlockedStatus("Failed to configure postfix SMTP")
-            return
+                new_lines.append(new_line)
 
-        # Run reconfigure noninteractively.
-        try:
-            logger.info("Reconfiguring postfix via dpkg")
-            subprocess.run([DPKG_RECONFIGURE, "postfix"], check=True)
-        except CalledProcessError as e:
-            logger.error("postfix config failed with return code %d",
-                         e.returncode)
-            self.unit.status = BlockedStatus("Failed to configure postfix SMTP")
+        with open(POSTFIX_CF, "w") as postfix_config_file:
+            postfix_config_file.write("\n".join(new_lines))
+
+        # Restart postfix.
+        if not service_reload("postfix"):
+            self.unit.status = BlockedStatus("postfix configuration failed")
 
     def _write_ssl_cert(self, ssl_cert: str) -> None:
         """Decodes and writes `ssl_cert` to SSL_CERT_PATH."""
