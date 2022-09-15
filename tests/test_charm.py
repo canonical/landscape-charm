@@ -15,16 +15,18 @@ from unittest.mock import DEFAULT, Mock, patch
 
 import yaml
 
-from ops.charm import RelationChangedEvent
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.charm import ActionEvent, RelationChangedEvent
+from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
+                       WaitingStatus)
 from ops.testing import Harness
 
+from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError)
 
 from charm import (
-    DEBCONF_SET_SELECTIONS, DPKG_RECONFIGURE, HAPROXY_CONFIG_FILE,
-    LandscapeServerCharm)
+    DEBCONF_SET_SELECTIONS, DPKG_RECONFIGURE, HAPROXY_CONFIG_FILE, LSCTL,
+    SCHEMA_SCRIPT, LandscapeServerCharm)
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
@@ -57,7 +59,7 @@ class TestCharm(unittest.TestCase):
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            add_package=DEFAULT,
+            apt=DEFAULT,
         )
         ppa = harness.model.config.get("landscape_ppa")
 
@@ -66,7 +68,7 @@ class TestCharm(unittest.TestCase):
 
         mocks["check_call"].assert_called_once_with(
             ["add-apt-repository", "-y", ppa])
-        mocks["add_package"].assert_called_once_with("landscape-server")
+        mocks["apt"].add_package.assert_called_once_with("landscape-server")
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
@@ -77,12 +79,12 @@ class TestCharm(unittest.TestCase):
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            add_package=DEFAULT,
+            apt=DEFAULT,
         )
         ppa = harness.model.config.get("landscape_ppa")
 
         with patches as mocks:
-            mocks["add_package"].side_effect = PackageNotFoundError
+            mocks["apt"].add_package.side_effect = PackageNotFoundError
             harness.begin_with_initial_hooks()
 
         status = harness.charm.unit.status
@@ -95,12 +97,12 @@ class TestCharm(unittest.TestCase):
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            add_package=DEFAULT,
+            apt=DEFAULT,
         )
         ppa = harness.model.config.get("landscape_ppa")
 
         with patches as mocks:
-            mocks["add_package"].side_effect = PackageError("ouch")
+            mocks["apt"].add_package.side_effect = PackageError("ouch")
             harness.begin_with_initial_hooks()
 
         status = harness.charm.unit.status
@@ -127,7 +129,7 @@ class TestCharm(unittest.TestCase):
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            add_package=DEFAULT,
+            apt=DEFAULT,
             SSL_CERT_PATH=mock_cert_path,
         )
         ppa = harness.model.config.get("landscape_ppa")
@@ -144,17 +146,25 @@ class TestCharm(unittest.TestCase):
         mock_input = os.path.join(self.tempdir.name, "new_license.txt")
 
         with open(mock_input, "w") as mock_input_file:
-            mock_input_file.write("THIS IS A LICENSE")
+            mock_input_file.write("TEST INSTALL LICENSE FILE")
 
         harness.update_config({"license_file": "file://" + mock_input})
 
-        with patch("charm.LICENSE_FILE", new=mock_license):
+        patches = patch.multiple(
+            "charm",
+            check_call=DEFAULT,
+            apt=DEFAULT,
+            LICENSE_FILE=mock_license,
+        )
+
+        with patches:
             harness.begin_with_initial_hooks()
 
         with open(mock_license) as mock_license_file:
             mode = 0o777 & os.stat(mock_license_file.fileno()).st_mode
             self.assertEqual(0o640, mode)
-            self.assertEqual("THIS IS A LICENSE", mock_license_file.read())
+            self.assertEqual("TEST INSTALL LICENSE FILE",
+                             mock_license_file.read())
 
     def test_install_license_file_b64(self):
         harness = Harness(LandscapeServerCharm)
@@ -191,6 +201,8 @@ class TestCharm(unittest.TestCase):
         self.assertFalse(os.path.exists(mock_license))
 
     def test_update_ready_status_not_running(self):
+        self.harness.charm.unit.status = WaitingStatus()
+
         self.harness.charm._stored.ready.update({
             k: True for k in self.harness.charm._stored.ready.keys()
         })
@@ -218,6 +230,8 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(mock_settings_file.read(), "RUN_ALL=\"yes\"\n")
 
     def test_update_ready_status_running(self):
+        self.harness.charm.unit.status = WaitingStatus()
+
         self.harness.charm._stored.ready.update({
             k: True for k in self.harness.charm._stored.ready.keys()
         })
@@ -230,6 +244,8 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(status.message, "Unit is ready")
 
     def test_update_ready_status_called_process_error(self):
+        self.harness.charm.unit.status = WaitingStatus()
+
         self.harness.charm._stored.ready.update({
             k: True for k in self.harness.charm._stored.ready.keys()
         })
@@ -492,7 +508,7 @@ password = default
         relation_data = mock_event.relation.data[self.harness.charm.unit]
         status = self.harness.charm.unit.status
         self.assertIn("services", relation_data)
-        self.assertIsInstance(status, WaitingStatus)
+        self.assertIsInstance(status, MaintenanceStatus)
         self.assertTrue(self.harness.charm._stored.ready["haproxy"])
 
     def test_website_relation_joined(self):
@@ -523,7 +539,7 @@ password = default
         relation_data = mock_event.relation.data[self.harness.charm.unit]
         status = self.harness.charm.unit.status
         self.assertIn("services", relation_data)
-        self.assertIsInstance(status, WaitingStatus)
+        self.assertIsInstance(status, MaintenanceStatus)
         self.assertTrue(self.harness.charm._stored.ready["haproxy"])
 
     def test_website_relation_changed_cert_not_DEFAULT(self):
@@ -646,4 +662,140 @@ password = default
             self.assertEqual("relayhost = smtp.example.com\n"
                              "othersetting = nada\n",
                              mock_postfix_cf_file.read())
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+
+    def test_action_pause(self):
+        with patch("charm.check_call") as check_call_mock:
+            self.harness.charm._pause(Mock())
+
+        check_call_mock.assert_called_once_with([LSCTL, "stop"])
+        self.assertFalse(self.harness.charm._stored.running)
+
+    def test_action_pause_CalledProcessError(self):
+        self.harness.charm._stored.running = True
+        event = Mock(spec_set=ActionEvent)
+
+        with patch("charm.check_call") as check_call_mock:
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.charm._pause(event)
+
+        check_call_mock.assert_called_once_with([LSCTL, "stop"])
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+        self.assertTrue(self.harness.charm._stored.running)
+        event.fail.assert_called_once()
+
+    def test_action_resume(self):
+        self.harness.charm._update_ready_status = Mock()
+        event = Mock(spec_set=ActionEvent)
+
+        with patch("subprocess.run") as run_mock:
+            with patch("charm.check_call") as check_call_mock:
+                self.harness.charm._resume(event)
+
+        run_mock.assert_called_once_with([LSCTL, "start"], capture_output=True,
+                                         text=True)
+        check_call_mock.assert_called_once_with([LSCTL, "status"])
+        self.harness.charm._update_ready_status.assert_called_once()
+        self.assertTrue(self.harness.charm._stored.running)
+        event.log.assert_called_once()
+
+    def test_action_resume_CalledProcessError(self):
+        self.harness.charm._update_ready_status = Mock()
+        event = Mock(spec_set=ActionEvent)
+
+        with patch("subprocess.run") as run_mock:
+            with patch("charm.check_call") as check_call_mock:
+                run_mock.return_value = Mock(
+                    stdout="Everything is on fire")
+                check_call_mock.side_effect = CalledProcessError(127, "uhoh")
+
+                self.harness.charm._resume(event)
+
+        self.assertEqual(2, len(run_mock.mock_calls))
+        run_mock.assert_any_call([LSCTL, "start"], capture_output=True,
+                                 text=True)
+        run_mock.assert_any_call([LSCTL, "stop"])
+        check_call_mock.assert_called_once_with([LSCTL, "status"])
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+        event.log.assert_called_once()
+        event.fail.assert_called_once()
+
+    def test_action_upgrade(self):
+        event = Mock(spec_set=ActionEvent)
+        self.harness.charm._stored.running = False
+        prev_status = self.harness.charm.unit.status
+
+        with patch("charm.apt", spec_set=apt) as apt_mock:
+            self.harness.charm._upgrade(event)
+
+        event.log.assert_called_once()
+        apt_mock.add_package.assert_called_once_with(
+            "landscape-server", update_cache=True)
+        self.assertEqual(self.harness.charm.unit.status, prev_status)
+
+    def test_action_upgrade_running(self):
+        """
+        Tests that we do not perform an upgrade while Landscape is running.
+        """
+        event = Mock(spec_set=ActionEvent)
+        self.harness.charm._stored.running = True
+
+        with patch("charm.apt", spec_set=apt) as apt_mock:
+            self.harness.charm._upgrade(event)
+
+        event.log.assert_not_called()
+        event.fail.assert_called_once()
+        apt_mock.add_package.assert_not_called()
+
+    def test_action_upgrade_PackageError(self):
+        event = Mock(spec_set=ActionEvent)
+        self.harness.charm._stored.running = False
+
+        with patch("charm.apt", spec_set=apt) as apt_mock:
+            apt_mock.add_package.side_effect = PackageError("ouch")
+            self.harness.charm._upgrade(event)
+
+        event.log.assert_called_once()
+        event.fail.assert_called_once()
+        apt_mock.add_package.assert_called_once_with(
+            "landscape-server", update_cache=True)
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+
+    def test_action_migrate_schema(self):
+        event = Mock(spec_set=ActionEvent)
+
+        with patch("subprocess.run") as run_mock:
+            self.harness.charm._migrate_schema(event)
+
+        event.log.assert_called_once()
+        event.fail.assert_not_called()
+        run_mock.assert_called_once_with(
+            [SCHEMA_SCRIPT], check=True, text=True)
+
+    def test_action_migrate_schema_running(self):
+        """
+        Test that we do not perform a schema migration while Landscape is
+        running.
+        """
+        event = Mock(spec_set=ActionEvent)
+        self.harness.charm._stored.running = True
+
+        with patch("subprocess.run") as run_mock:
+            self.harness.charm._migrate_schema(event)
+
+        event.log.assert_not_called()
+        event.fail.assert_called_once()
+        run_mock.assert_not_called()
+
+    def test_action_migrate_schema_CalledProcessError(self):
+        event = Mock(spec_set=ActionEvent)
+
+        with patch("subprocess.run") as run_mock:
+            run_mock.side_effect = CalledProcessError(127, "uhoh")
+            self.harness.charm._migrate_schema(event)
+
+        event.log.assert_called_once()
+        event.fail.assert_called_once()
+        run_mock.assert_called_once_with(
+            [SCHEMA_SCRIPT], check=True, text=True)
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)

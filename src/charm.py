@@ -14,6 +14,7 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
+import subprocess
 from base64 import b64decode, b64encode, binascii
 from configparser import ConfigParser
 from subprocess import CalledProcessError, check_call
@@ -22,14 +23,15 @@ from urllib.error import URLError
 
 import yaml
 
+from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import (
-    PackageError, PackageNotFoundError, add_package)
+    PackageError, PackageNotFoundError)
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
 from charms.operator_libs_linux.v0.systemd import service_reload
 
 from ops.charm import (
-    CharmBase, InstallEvent, RelationChangedEvent, RelationJoinedEvent,
-    UpdateStatusEvent)
+    ActionEvent, CharmBase, InstallEvent, RelationChangedEvent,
+    RelationJoinedEvent, UpdateStatusEvent)
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
@@ -50,6 +52,7 @@ LICENSE_FILE_PROTOCOLS = (
 LICENSE_FILE = "/etc/landscape/license.txt"
 LSCTL = "/usr/bin/lsctl"
 POSTFIX_CF = "/etc/postfix/main.cf"
+SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 SERVICE_CONF = "/etc/landscape/service.conf"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 
@@ -61,10 +64,13 @@ class LandscapeServerCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        # Lifecycle
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
+
+        # Relations
         self.framework.observe(self.on.db_relation_joined,
                                self._db_relation_changed)
         self.framework.observe(self.on.db_relation_changed,
@@ -78,6 +84,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.website_relation_changed,
                                self._website_relation_changed)
 
+        # Actions
+        self.framework.observe(self.on.pause_action, self._pause)
+        self.framework.observe(self.on.resume_action, self._resume)
+        self.framework.observe(self.on.upgrade_action, self._upgrade)
+        self.framework.observe(self.on.migrate_schema_action,
+                               self._migrate_schema)
+
+        # State
         self._stored.set_default(ready={
             "db": False,
             "amqp": False,
@@ -117,20 +131,23 @@ class LandscapeServerCharm(CharmBase):
         try:
             # Add the Landscape Server beta PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
-            add_package("landscape-server")
+            apt.add_package("landscape-server")
         except PackageNotFoundError:
             logger.error("landscape-server package not found in package cache "
                          "or on system")
             self.unit.status = BlockedStatus("Failed to install packages")
+            return
         except PackageError as e:
             logger.error(
                 "Could not install landscape-server package. Reason: %s",
                 e.message)
             self.unit.status = BlockedStatus("Failed to install packages")
+            return
         except CalledProcessError as e:
             logger.error("Package install failed with return code %d",
                          e.returncode)
             self.unit.status = BlockedStatus("Failed to install packages")
+            return
 
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
@@ -147,13 +164,17 @@ class LandscapeServerCharm(CharmBase):
                 "Writing Landscape license file")
             self._write_license_file(license_file)
 
+        self.unit.status = ActiveStatus("Unit is ready")
+
+        self._update_ready_status()
+
     def _update_status(self, event: UpdateStatusEvent) -> None:
         """Called at regular intervals by juju."""
         self._update_ready_status()
 
     def _update_ready_status(self) -> None:
         """If all relations are prepared, updates unit status to Active."""
-        if isinstance(self.unit.status, BlockedStatus):
+        if isinstance(self.unit.status, (BlockedStatus, MaintenanceStatus)):
             return
 
         if not all(self._stored.ready.values()):
@@ -193,12 +214,14 @@ class LandscapeServerCharm(CharmBase):
         # Using "master" key as a quick indicator of readiness.
         if "master" not in unit_data:
             logger.info("db relation not yet ready")
+            self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
 
         allowed_units = unit_data["allowed-units"].split()
         if self.unit.name not in allowed_units:
             logger.info("%s not in allowed_units")
+            self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
 
@@ -233,6 +256,7 @@ class LandscapeServerCharm(CharmBase):
             return
 
         self._stored.ready["db"] = True
+        self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
@@ -262,6 +286,7 @@ class LandscapeServerCharm(CharmBase):
         })
 
         self._stored.ready["amqp"] = True
+        self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
     def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
@@ -366,6 +391,7 @@ class LandscapeServerCharm(CharmBase):
         haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
 
         self._write_ssl_cert(haproxy_ssl_cert)
+        self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
     def _update_service_conf(self, updates: dict) -> None:
@@ -400,7 +426,7 @@ class LandscapeServerCharm(CharmBase):
         with open(DEFAULT_SETTINGS, "w") as settings_file:
             settings_file.write("".join(new_lines))
 
-    def _configure_smtp(self, relay_host: str):
+    def _configure_smtp(self, relay_host: str) -> None:
 
         # Rewrite postfix config.
         with open(POSTFIX_CF, "r") as postfix_config_file:
@@ -425,7 +451,7 @@ class LandscapeServerCharm(CharmBase):
         with open(SSL_CERT_PATH, "wb") as ssl_cert_file:
             ssl_cert_file.write(b64decode(ssl_cert))
 
-    def _write_license_file(self, license_file: str):
+    def _write_license_file(self, license_file: str) -> None:
         """Reads or decodes `license_file` to LICENSE_FILE."""
 
         if any((license_file.startswith(proto)
@@ -450,6 +476,83 @@ class LandscapeServerCharm(CharmBase):
 
         os.chmod(LICENSE_FILE, 0o640)
         os.chown(LICENSE_FILE, self.landscape_uid, self.root_gid)
+
+    def _pause(self, event: ActionEvent) -> None:
+        self.unit.status = MaintenanceStatus("Stopping services")
+        event.log("Stopping services")
+
+        try:
+            check_call([LSCTL, "stop"])
+        except CalledProcessError as e:
+            logger.error("Stopping services failed with return code %d",
+                         e.returncode)
+            self.unit.status = BlockedStatus("Failed to stop services")
+            event.fail("Failed to stop services")
+        else:
+            self.unit.status = MaintenanceStatus("Services stopped")
+            self._stored.running = False
+
+    def _resume(self, event: ActionEvent):
+        self.unit.status = MaintenanceStatus("Starting services")
+        event.log("Starting services")
+
+        start_result = subprocess.run([LSCTL, "start"], capture_output=True,
+                                      text=True)
+
+        try:
+            check_call([LSCTL, "status"])
+        except CalledProcessError as e:
+            logger.error("Starting services failed with return code %d",
+                         e.returncode)
+            logger.error("Failed to start services: %s", start_result.stdout)
+            self.unit.status = MaintenanceStatus("Stopping services")
+            subprocess.run([LSCTL, "stop"])
+            self.unit.status = BlockedStatus("Failed to start services")
+            event.fail("Failed to start services: %s", start_result.stdout)
+        else:
+            self._stored.running = True
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status()
+
+    def _upgrade(self, event: ActionEvent) -> None:
+        if self._stored.running:
+            event.fail("Cannot upgrade while running. Please run action "
+                       "'pause' prior to upgrade")
+            return
+
+        prev_status = self.unit.status
+        self.unit.status = MaintenanceStatus("Upgrading packages")
+        event.log("Upgrading Landscape packages...")
+
+        try:
+            apt.add_package("landscape-server", update_cache=True)
+        except PackageError as e:
+            logger.error("Could not upgrade package. Reason: %s", e.message)
+            event.fail("Could not upgrade package. Reason: %s", e.message)
+            self.unit.status = BlockedStatus("Failed to upgrade packages")
+        else:
+            self.unit.status = prev_status
+
+    def _migrate_schema(self, event: ActionEvent) -> None:
+        if self._stored.running:
+            event.fail("Cannot migrate schema while running. Please run action"
+                       " 'pause' prior to migration")
+            return
+
+        prev_status = self.unit.status
+        self.unit.status = MaintenanceStatus("Migrating schemas...")
+        event.log("Running schema migration...")
+
+        try:
+            subprocess.run([SCHEMA_SCRIPT], check=True, text=True)
+        except CalledProcessError as e:
+            logger.error("Schema migration failed with error code %s",
+                         e.returncode)
+            event.fail("Schema migration failed with error code %s",
+                       e.returncode)
+            self.unit.status = BlockedStatus("Failed schema migration")
+        else:
+            self.unit.status = prev_status
 
 
 if __name__ == "__main__":  # pragma: no cover
