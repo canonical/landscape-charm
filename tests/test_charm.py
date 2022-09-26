@@ -434,6 +434,37 @@ password = default
         self.assertEqual(config["broker"]["host"], "test1,test2")
         self.assertEqual(config["broker"]["password"], "testpass")
 
+    def test_amqp_relation_changed_str_hostname(self):
+        """
+        Tests proper handling when the event's hostname is a single string.
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "hostname": "test1",
+                "password": "testpass",
+            },
+        }
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
+        with open(mock_service_conf, "w") as mock_service_conf_file:
+            mock_service_conf_file.write("""
+[broker]
+host = default
+password = default
+""")
+
+        with patch("charm.SERVICE_CONF", new=mock_service_conf):
+            self.harness.charm._amqp_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, WaitingStatus)
+        self.assertTrue(self.harness.charm._stored.ready["amqp"])
+
+        config = ConfigParser()
+        config.read(mock_service_conf)
+        self.assertEqual(config["broker"]["host"], "test1")
+        self.assertEqual(config["broker"]["password"], "testpass")
+
     def test_website_relation_joined_cert_no_key(self):
         mock_event = Mock()
         self.harness.disable_hooks()

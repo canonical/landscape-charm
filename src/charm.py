@@ -278,9 +278,12 @@ class LandscapeServerCharm(CharmBase):
         hostname = unit_data["hostname"]
         password = unit_data["password"]
 
+        if isinstance(hostname, list):
+            hostname = ",".join(hostname)
+
         self._update_service_conf({
             "broker": {
-                "host": ",".join(hostname),
+                "host": hostname,
                 "password": password,
             }
         })
