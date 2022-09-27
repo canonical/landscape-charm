@@ -633,7 +633,7 @@ password = default
 
         with patch("charm.DEFAULT_SETTINGS", new=mock_default_settings):
             self.harness.charm._update_default_settings(
-                "TOUCHTHIS", "THANKYOU")
+                {"TOUCHTHIS": "THANKYOU"})
 
         with open(mock_default_settings) as mock_default_settings_file:
             self.assertEqual(

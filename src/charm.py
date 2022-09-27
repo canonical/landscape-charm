@@ -197,7 +197,12 @@ class LandscapeServerCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Starting services")
 
-        self._update_default_settings("RUN_ALL", "yes")
+        self._update_default_settings({
+            "RUN_ALL": "yes",
+            "RUN_APPSERVER": str(self.model.config["worker_counts"]),
+            "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
+            "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
+        })
 
         try:
             check_call([LSCTL, "restart"])
@@ -414,13 +419,15 @@ class LandscapeServerCharm(CharmBase):
         with open(SERVICE_CONF, "w") as config_file:
             config.write(config_file)
 
-    def _update_default_settings(self, key: str, value: str) -> None:
+    def _update_default_settings(self, updates: dict) -> None:
         """Updates the Landscape Server default settings file."""
         with open(DEFAULT_SETTINGS, "r") as settings_file:
             new_lines = []
             for line in settings_file:
-                if line.startswith(key + "="):
-                    new_line = "{}=\"{}\"\n".format(key, value)
+                if "=" in line and line.split("=")[0] in updates:
+                    key = line.split("=")[0]
+
+                    new_line = "{}=\"{}\"\n".format(key, updates[key])
                 else:
                     new_line = line
 

@@ -25,7 +25,7 @@ https_service:
     - option httpchk HEAD / HTTP/1.0
     - http-request set-header X-Forwarded-Proto https
     - acl message path_beg -i /message-system
-    - acl attachment path_beg -i /api
+    - acl attachment path_beg -i /attachment
     - acl api path_beg -i /api
     - acl prometheus_metrics path_beg -i /metrics
     - acl ping path_beg -i /ping
