@@ -4,7 +4,7 @@
 options:
   landscape_ppa:
     type: string
-    default: "ppa:landscape/self-hosted-22.04beta"
+    default: "ppa:landscape/self-hosted-beta"
     description: The PPA from which Landscape Server will be installed.
   worker_counts:
     type: int
