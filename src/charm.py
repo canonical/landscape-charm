@@ -122,6 +122,8 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(smtp_relay_host)
 
+        self._start_services()
+
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
@@ -199,6 +201,7 @@ class LandscapeServerCharm(CharmBase):
 
         self._update_default_settings({
             "RUN_ALL": "yes",
+            "RUN_APISERVER": str(self.model.config["worker_counts"]),
             "RUN_APPSERVER": str(self.model.config["worker_counts"]),
             "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
             "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
