@@ -15,7 +15,7 @@ from unittest.mock import DEFAULT, Mock, patch
 
 import yaml
 
-from ops.charm import ActionEvent, RelationChangedEvent
+from ops.charm import ActionEvent
 from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
                        WaitingStatus)
 from ops.testing import Harness
@@ -25,8 +25,8 @@ from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError)
 
 from charm import (
-    DEBCONF_SET_SELECTIONS, DPKG_RECONFIGURE, HAPROXY_CONFIG_FILE, LSCTL,
-    SCHEMA_SCRIPT, LandscapeServerCharm)
+    HAPROXY_CONFIG_FILE, LSCTL, SCHEMA_SCRIPT, LandscapeServerCharm)
+
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
@@ -76,12 +76,16 @@ class TestCharm(unittest.TestCase):
 
     def test_install_package_not_found_error(self):
         harness = Harness(LandscapeServerCharm)
+        mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
+            DEFAULT_SETTINGS=mock_settings_path,
         )
-        ppa = harness.model.config.get("landscape_ppa")
+
+        with open(mock_settings_path, "w") as fp:
+            fp.write("")
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageNotFoundError
@@ -99,7 +103,6 @@ class TestCharm(unittest.TestCase):
             check_call=DEFAULT,
             apt=DEFAULT,
         )
-        ppa = harness.model.config.get("landscape_ppa")
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageError("ouch")
@@ -125,16 +128,20 @@ class TestCharm(unittest.TestCase):
         harness.disable_hooks()
         harness.update_config({"ssl_cert": "MYFANCYCERT="})
         mock_cert_path = os.path.join(self.tempdir.name, "my_cert.crt")
+        mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
+
+        with open(mock_settings_path, "w") as mock_settings_file:
+            mock_settings_file.write("RUN_ALL=\"no\"\n")
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
             SSL_CERT_PATH=mock_cert_path,
+            DEFAULT_SETTINGS=mock_settings_path,
         )
-        ppa = harness.model.config.get("landscape_ppa")
 
-        with patches as mocks:
+        with patches:
             harness.begin_with_initial_hooks()
 
         with open(mock_cert_path, "rb") as mock_cert:
@@ -641,17 +648,21 @@ password = default
                 mock_default_settings_file.read())
 
     def test_on_config_changed_no_smtp_change(self):
+        self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
+        self.harness.charm._update_ready_status.assert_called_once()
 
     def test_on_config_changed_smtp_change(self):
+        self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
 
         self.harness.charm._configure_smtp.assert_called_once_with(
             "smtp.example.com")
+        self.harness.charm._update_ready_status.assert_called_once()
 
     def test_configure_smtp_relay_host(self):
         mock_postfix_cf = os.path.join(self.tempdir.name, "my_postfix.cf")

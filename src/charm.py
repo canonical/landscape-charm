@@ -122,7 +122,7 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(smtp_relay_host)
 
-        self._start_services()
+        self._update_ready_status(restart_services=True)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -174,7 +174,7 @@ class LandscapeServerCharm(CharmBase):
         """Called at regular intervals by juju."""
         self._update_ready_status()
 
-    def _update_ready_status(self) -> None:
+    def _update_ready_status(self, restart_services=False) -> None:
         """If all relations are prepared, updates unit status to Active."""
         if isinstance(self.unit.status, (BlockedStatus, MaintenanceStatus)):
             return
@@ -186,7 +186,7 @@ class LandscapeServerCharm(CharmBase):
                 "Waiting on relations: {}".format(", ".join(waiting_on)))
             return
 
-        if self._stored.running:
+        if self._stored.running and not restart_services:
             self.unit.status = ActiveStatus("Unit is ready")
             return
 
@@ -206,6 +206,8 @@ class LandscapeServerCharm(CharmBase):
             "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
             "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
         })
+
+        logger.info("Starting services")
 
         try:
             check_call([LSCTL, "restart"])
