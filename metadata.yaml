@@ -29,7 +29,3 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
-
-series:
-  - jammy
-  - focal
