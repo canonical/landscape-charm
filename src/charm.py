@@ -30,12 +30,13 @@ from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
 from charms.operator_libs_linux.v0.systemd import service_reload
 
 from ops.charm import (
-    ActionEvent, CharmBase, InstallEvent, RelationChangedEvent,
-    RelationJoinedEvent, UpdateStatusEvent)
+    ActionEvent, CharmBase, InstallEvent, LeaderElectedEvent,
+    LeaderSettingsChangedEvent, RelationChangedEvent, RelationJoinedEvent,
+    UpdateStatusEvent)
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
-    ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus)
+    ActiveStatus, BlockedStatus, Relation, MaintenanceStatus, WaitingStatus)
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,24 @@ LICENSE_FILE_PROTOCOLS = (
 )
 LICENSE_FILE = "/etc/landscape/license.txt"
 LSCTL = "/usr/bin/lsctl"
+NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 SERVICE_CONF = "/etc/landscape/service.conf"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
+
+DEFAULT_SERVICES = (
+    "landscape-api",
+    "landscape-appserver",
+    "landscape-async-frontend",
+    "landscape-job-handler",
+    "landscape-msgserver",
+    "landscape-pingserver",
+)
+LEADER_SERVICES = (
+    "landscape-package-search",
+    "landscape-package-upload",
+)
 
 
 class LandscapeServerCharm(CharmBase):
@@ -83,6 +98,13 @@ class LandscapeServerCharm(CharmBase):
                                self._website_relation_joined)
         self.framework.observe(self.on.website_relation_changed,
                                self._website_relation_changed)
+        self.framework.observe(self.on.nrpe_external_master_relation_joined,
+                               self._nrpe_external_master_relation_joined)
+
+        # Leadership
+        self.framework.observe(self.on.leader_elected, self._leader_elected)
+        self.framework.observe(self.on.leader_settings_changed,
+                               self._leader_settings_changed)
 
         # Actions
         self.framework.observe(self.on.pause_action, self._pause)
@@ -406,6 +428,81 @@ class LandscapeServerCharm(CharmBase):
         self._write_ssl_cert(haproxy_ssl_cert)
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
+
+    def _nrpe_external_master_relation_joined(
+            self, event: RelationJoinedEvent) -> None:
+        self._update_nrpe_checks(event.relation)
+
+    def _update_nrpe_checks(self, relation: Relation):
+        logger.debug("Configuring NRPE checks")
+
+        if self.unit.is_leader():
+            services_to_add = DEFAULT_SERVICES + LEADER_SERVICES
+            services_to_remove = ()
+        else:
+            services_to_add = DEFAULT_SERVICES
+            services_to_remove = LEADER_SERVICES
+
+        monitors = {
+            "monitors": {
+                "remote": {
+                    "nrpe": {
+                        s: {"command": f"check_{s}"} for s in services_to_add
+                    },
+                },
+            },
+        }
+
+        relation.data[self.unit].update({
+            "monitors": yaml.safe_dump(monitors),
+        })
+
+        if not os.path.exists(NRPE_D_DIR):
+            logger.debug("NRPE directories not ready")
+            return
+
+        for service in services_to_add:
+            service_cfg = service.replace("-", "_")
+            cfg_filename = os.path.join(NRPE_D_DIR, f"check_{service_cfg}.cfg")
+
+            if os.path.exists(cfg_filename):
+                continue
+
+            with open(cfg_filename, "w") as cfg_fp:
+                cfg_fp.write(f"""# check {service}
+# The following header was added by the landscape-server charm
+# Modifying it will affect nagios monitoring and alerting
+# servicegroups: juju
+command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service}
+""")
+
+        for service in services_to_remove:
+            service_cfg = service.replace("-", "_")
+            cfg_filename = os.path.join(NRPE_D_DIR, f"check_{service_cfg}.cfg")
+
+            if not os.path.exists(cfg_filename):
+                continue
+
+            os.remove(cfg_filename)
+
+    def _leader_elected(self, event: LeaderElectedEvent) -> None:
+        # Update any nrpe checks.
+        self._leader_changed()
+
+    def _leader_settings_changed(
+            self, event: LeaderSettingsChangedEvent) -> None:
+        self._leader_changed()
+
+    def _leader_changed(self) -> None:
+        """
+        Generic updates that need to happen whenever leadership changes,
+        in both leaders and non-leaders.
+        """
+        # Update any nrpe checks.
+        nrpe_relations = self.model.relations.get("nrpe-external-master", [])
+
+        for relation in nrpe_relations:
+            self._update_nrpe_checks(relation)
 
     def _update_service_conf(self, updates: dict) -> None:
         """

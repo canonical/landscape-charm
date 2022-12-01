@@ -25,7 +25,8 @@ from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError)
 
 from charm import (
-    HAPROXY_CONFIG_FILE, LSCTL, SCHEMA_SCRIPT, LandscapeServerCharm)
+    DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LEADER_SERVICES, LSCTL, NRPE_D_DIR,
+    SCHEMA_SCRIPT, LandscapeServerCharm)
 
 
 class TestCharm(unittest.TestCase):
@@ -841,3 +842,94 @@ password = default
         run_mock.assert_called_once_with(
             [SCHEMA_SCRIPT], check=True, text=True)
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+
+    def test_nrpe_external_master_relation_joined(self):
+        mock_event = Mock()
+        mock_event.relation.data = {self.harness.charm.unit: {}}
+        mock_nrpe_d_dir = os.path.join(self.tempdir.name, "nrpe.d")
+        os.mkdir(mock_nrpe_d_dir)
+
+        self.harness.set_leader()
+
+        with patch("charm.NRPE_D_DIR", new=mock_nrpe_d_dir):
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+
+        for service in DEFAULT_SERVICES + LEADER_SERVICES:
+            self.assertIn(
+                service,
+                mock_event.relation.data[self.harness.charm.unit]["monitors"])
+
+        cfg_files = os.listdir(mock_nrpe_d_dir)
+        self.assertEqual(len(DEFAULT_SERVICES + LEADER_SERVICES), len(cfg_files))
+
+    def test_nrpe_external_master_relation_joined_not_leader(self):
+        mock_event = Mock()
+        unit = self.harness.charm.unit
+        mock_event.relation.data = {unit: {}}
+
+        self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+
+        event_data = mock_event.relation.data[unit]
+
+        for service in DEFAULT_SERVICES:
+            self.assertIn(service, event_data["monitors"])
+
+        for service in LEADER_SERVICES:
+            self.assertNotIn(service, event_data["monitors"])
+
+    def test_nrpe_external_master_relation_joined_cfgs_exist(self):
+        mock_event = Mock()
+        unit = self.harness.charm.unit
+        mock_event.relation.data = {unit: {}}
+
+        self.harness.set_leader()
+
+        with patch("os.path.exists") as os_path_exists_mock:
+            os_path_exists_mock.return_value = True
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+
+        self.assertEqual(len(os_path_exists_mock.mock_calls),
+                         len(DEFAULT_SERVICES + LEADER_SERVICES) + 1)
+
+    def test_nrpe_external_master_relation_joined_cfgs_exist_not_leader(self):
+        mock_event = Mock()
+        unit = self.harness.charm.unit
+        mock_event.relation.data = {unit: {}}
+
+        with patch("os.path.exists") as os_path_exists_mock:
+            with patch("os.remove") as os_remove_mock:
+                os_path_exists_mock.return_value = True
+                self.harness.charm._nrpe_external_master_relation_joined(
+                    mock_event)
+
+        self.assertEqual(len(os_path_exists_mock.mock_calls),
+                         len(DEFAULT_SERVICES + LEADER_SERVICES) + 1)
+        self.assertEqual(len(os_remove_mock.mock_calls), len(LEADER_SERVICES))
+
+    def test_nrpe_external_master_relation_joined_cfgs_not_exist_not_leader(
+            self):
+        mock_event = Mock()
+        unit = self.harness.charm.unit
+        mock_event.relation.data = {unit: {}}
+        n = 1
+
+        def path_exists(path):
+            nonlocal n
+
+            if path == NRPE_D_DIR:
+                return True
+            elif n <= len(DEFAULT_SERVICES):
+                n += 1
+                return True
+
+            return False
+
+        with patch("os.path.exists") as os_path_exists_mock:
+            with patch("os.remove") as os_remove_mock:
+                os_path_exists_mock.side_effect = path_exists
+                self.harness.charm._nrpe_external_master_relation_joined(
+                    mock_event)
+
+        self.assertEqual(len(os_path_exists_mock.mock_calls),
+                         len(DEFAULT_SERVICES + LEADER_SERVICES) + 1)
+        self.assertEqual(len(os_remove_mock.mock_calls), 0)
