@@ -57,10 +57,25 @@ class TestCharm(unittest.TestCase):
 
     def test_install(self):
         harness = Harness(LandscapeServerCharm)
+
+        mock_default_settings = os.path.join(self.tempdir.name, "my_settings")
+        with open(mock_default_settings, "w") as fp:
+            fp.write("")
+
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost: test\n")
+
+        relation_id = harness.add_relation("replicas", "landscape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
+
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
+            DEFAULT_SETTINGS=mock_default_settings,
+            SERVICE_CONF=mock_service_conf,
         )
         ppa = harness.model.config.get("landscape_ppa")
 
@@ -78,15 +93,24 @@ class TestCharm(unittest.TestCase):
     def test_install_package_not_found_error(self):
         harness = Harness(LandscapeServerCharm)
         mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
             DEFAULT_SETTINGS=mock_settings_path,
+            SERVICE_CONF=mock_service_conf,
         )
 
         with open(mock_settings_path, "w") as fp:
             fp.write("")
+
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost: test\n")
+
+        relation_id = harness.add_relation("replicas", "landscape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageNotFoundError
@@ -98,12 +122,21 @@ class TestCharm(unittest.TestCase):
 
     def test_install_package_error(self):
         harness = Harness(LandscapeServerCharm)
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
+            SERVICE_CONF=mock_service_conf,
         )
+
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost: test\n")
+
+        relation_id = harness.add_relation("replicas", "landscape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageError("ouch")
@@ -116,9 +149,18 @@ class TestCharm(unittest.TestCase):
     def test_install_called_process_error(self):
         harness = Harness(LandscapeServerCharm)
 
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost = test")
+
+        relation_id = harness.add_relation("replicas", "landcape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
+
         with patch("charm.check_call") as mock:
-            mock.side_effect = CalledProcessError(127, Mock())
-            harness.begin_with_initial_hooks()
+            with patch("charm.SERVICE_CONF", new=mock_service_conf):
+                mock.side_effect = CalledProcessError(127, Mock())
+                harness.begin_with_initial_hooks()
 
         status = harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -130,9 +172,13 @@ class TestCharm(unittest.TestCase):
         harness.update_config({"ssl_cert": "MYFANCYCERT="})
         mock_cert_path = os.path.join(self.tempdir.name, "my_cert.crt")
         mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
 
         with open(mock_settings_path, "w") as mock_settings_file:
             mock_settings_file.write("RUN_ALL=\"no\"\n")
+
+        with open(mock_service_conf, "w") as mock_service_conf_file:
+            mock_service_conf_file.write("[package-search]\nhost = localhost\n")
 
         patches = patch.multiple(
             "charm",
@@ -140,7 +186,12 @@ class TestCharm(unittest.TestCase):
             apt=DEFAULT,
             SSL_CERT_PATH=mock_cert_path,
             DEFAULT_SETTINGS=mock_settings_path,
+            SERVICE_CONF=mock_service_conf,
         )
+
+        peer_relation_id = harness.add_relation("replicas", "landscape-server")
+        harness.update_relation_data(
+            peer_relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patches:
             harness.begin_with_initial_hooks()
@@ -156,13 +207,26 @@ class TestCharm(unittest.TestCase):
         with open(mock_input, "w") as mock_input_file:
             mock_input_file.write("TEST INSTALL LICENSE FILE")
 
+        mock_settings = os.path.join(self.tempdir.name, "my_settings")
+        with open(mock_settings, "w") as fp:
+            fp.write("")
+
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost = test")
+
         harness.update_config({"license_file": "file://" + mock_input})
+        relation_id = harness.add_relation("replicas", "landcape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
             LICENSE_FILE=mock_license,
+            DEFAULT_SETTINGS=mock_settings,
+            SERVICE_CONF=mock_service_conf,
         )
 
         with patches:
@@ -178,9 +242,18 @@ class TestCharm(unittest.TestCase):
         harness = Harness(LandscapeServerCharm)
         harness.update_config({"license_file": "VEhJUyBJUyBBIExJQ0VOU0U="})
         mock_license = os.path.join(self.tempdir.name, "my_license.txt")
+        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
+
+        with open(mock_service_conf, "w") as fp:
+            fp.write("[package-search]\nhost = test\n")
+
+        relation_id = harness.add_relation("replicas", "landscape-server")
+        harness.update_relation_data(
+            relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patch("charm.LICENSE_FILE", new=mock_license):
-            harness.begin_with_initial_hooks()
+            with patch("charm.SERVICE_CONF", new=mock_service_conf):
+                harness.begin_with_initial_hooks()
 
         with open(mock_license) as mock_license_file:
             mode = 0o777 & os.stat(mock_license_file.fileno()).st_mode
@@ -218,7 +291,7 @@ class TestCharm(unittest.TestCase):
                                           "my_settings.conf")
 
         with open(mock_settings_path, "w") as mock_settings_file:
-            mock_settings_file.write("RUN_ALL=\"no\"\n")
+            mock_settings_file.write("RUN_APPSERVER=\"no\"\n")
 
         patches = patch.multiple(
             "charm",
@@ -235,7 +308,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(self.harness.charm._stored.running)
 
         with open(mock_settings_path) as mock_settings_file:
-            self.assertEqual(mock_settings_file.read(), "RUN_ALL=\"yes\"\n")
+            self.assertEqual(mock_settings_file.read(), "RUN_APPSERVER=\"2\"\n")
 
     def test_update_ready_status_running(self):
         self.harness.charm.unit.status = WaitingStatus()
@@ -260,7 +333,7 @@ class TestCharm(unittest.TestCase):
         mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
 
         with open(mock_settings_path, "w") as mock_settings_file:
-            mock_settings_file.write("RUN_ALL=\"no\"\n")
+            mock_settings_file.write("RUN_APPSERVER=\"no\"\n")
 
         patches = patch.multiple(
             "charm",
@@ -278,7 +351,7 @@ class TestCharm(unittest.TestCase):
         self.assertFalse(self.harness.charm._stored.running)
 
         with open(mock_settings_path) as mock_settings_file:
-            self.assertEqual(mock_settings_file.read(), "RUN_ALL=\"yes\"\n")
+            self.assertEqual(mock_settings_file.read(), "RUN_APPSERVER=\"2\"\n")
 
     def test_db_relation_changed_no_master(self):
         mock_event = Mock()
@@ -849,6 +922,10 @@ password = default
         mock_nrpe_d_dir = os.path.join(self.tempdir.name, "nrpe.d")
         os.mkdir(mock_nrpe_d_dir)
 
+        self.harness.add_relation("replicas", "landscape-server")
+        self.harness.model.get_binding = Mock(
+            return_value=Mock(bind_address="123.123.123.123"))
+        self.harness.charm._update_service_conf = Mock()
         self.harness.set_leader()
 
         with patch("charm.NRPE_D_DIR", new=mock_nrpe_d_dir):
@@ -882,6 +959,10 @@ password = default
         unit = self.harness.charm.unit
         mock_event.relation.data = {unit: {}}
 
+        self.harness.add_relation("replicas", "landscape-server")
+        self.harness.model.get_binding = Mock(
+            return_value=Mock(bind_address="123.123.123.123"))
+        self.harness.charm._update_service_conf = Mock()
         self.harness.set_leader()
 
         with patch("os.path.exists") as os_path_exists_mock:
@@ -942,7 +1023,14 @@ password = default
         self.harness.charm._update_nrpe_checks = Mock()
         self.harness.hooks_disabled()
         self.harness.add_relation("nrpe-external-master", "nrpe")
+        self.harness.add_relation("replicas", "landscape-server")
 
+        self.harness.charm._update_service_conf = Mock()
         self.harness.charm._leader_settings_changed(Mock())
 
         self.harness.charm._update_nrpe_checks.assert_called_once()
+        self.harness.charm._update_service_conf.assert_called_once_with({
+            "package-search": {
+                "host": None,
+            },
+        })

@@ -35,6 +35,11 @@ https_service:
     - use_backend landscape-api if api
     - use_backend landscape-ping if ping
 
+leader_service_options:
+  - acl package-upload path_beg -i /upload
+  - use_backend landscape-package-upload if package-upload
+  - reqrep ^([^\ ]*)\ /upload/(.*) \1\ /\2
+
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
   files:

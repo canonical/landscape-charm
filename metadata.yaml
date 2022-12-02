@@ -29,3 +29,7 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+
+peers:
+  replicas:
+    interface: landscape-replica

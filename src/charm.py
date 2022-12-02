@@ -79,6 +79,7 @@ class LandscapeServerCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
         # Lifecycle
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.install, self._on_install)
@@ -101,10 +102,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.nrpe_external_master_relation_joined,
                                self._nrpe_external_master_relation_joined)
 
-        # Leadership
+        # Leadership/peering
         self.framework.observe(self.on.leader_elected, self._leader_elected)
         self.framework.observe(self.on.leader_settings_changed,
                                self._leader_settings_changed)
+        self.framework.observe(self.on.replicas_relation_joined,
+                               self._on_replicas_relation_joined)
+        self.framework.observe(self.on.replicas_relation_changed,
+                               self._on_replicas_relation_changed)
 
         # Actions
         self.framework.observe(self.on.pause_action, self._pause)
@@ -119,6 +124,7 @@ class LandscapeServerCharm(CharmBase):
             "amqp": False,
             "haproxy": False,
         })
+        self._stored.set_default(leader_ip="")
         self._stored.set_default(running=False)
 
         self.landscape_uid = user_exists("landscape").pw_uid
@@ -190,6 +196,14 @@ class LandscapeServerCharm(CharmBase):
 
         self.unit.status = ActiveStatus("Unit is ready")
 
+        # Indicate that this install is a charm install.
+        with open(DEFAULT_SETTINGS, "r") as settings_file:
+            settings = settings_file.read()
+
+        with open(DEFAULT_SETTINGS, "w") as settings_file:
+            settings_file.write('DEPLOYED_FROM="charm"\n')
+            settings_file.write(settings)
+
         self._update_ready_status()
 
     def _update_status(self, event: UpdateStatusEvent) -> None:
@@ -220,13 +234,19 @@ class LandscapeServerCharm(CharmBase):
         successful, False otherwise.
         """
         self.unit.status = MaintenanceStatus("Starting services")
+        is_leader = self.unit.is_leader()
 
         self._update_default_settings({
-            "RUN_ALL": "yes",
+            "RUN_ALL": "no",
             "RUN_APISERVER": str(self.model.config["worker_counts"]),
+            "RUN_ASYNC_FRONTEND": "yes",
+            "RUN_JOBHANDLER": "yes",
             "RUN_APPSERVER": str(self.model.config["worker_counts"]),
             "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
             "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
+            "RUN_CRON": "yes" if is_leader else "no",
+            "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
+            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader else "no",
         })
 
         logger.info("Starting services")
@@ -325,6 +345,10 @@ class LandscapeServerCharm(CharmBase):
         self._update_ready_status()
 
     def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
+        self._update_haproxy_connection(event.relation)
+        self._update_ready_status()
+
+    def _update_haproxy_connection(self, relation: Relation) -> None:
         self._stored.ready["haproxy"] = False
         self.unit.status = MaintenanceStatus("Setting up haproxy connection")
 
@@ -357,18 +381,24 @@ class LandscapeServerCharm(CharmBase):
         https_service = haproxy_config["https_service"]
         https_service["crts"] = [ssl_cert]
 
-        server_ip = event.relation.data[self.unit]["private-address"]
+        if self.unit.is_leader():
+            https_service["service_options"].extend(
+                haproxy_config["leader_service_options"])
+
+        server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
         worker_counts = self.model.config["worker_counts"]
 
-        appservers, pingservers, message_servers, api_servers = [
+        (appservers, pingservers, message_servers, api_servers,
+         package_upload_servers) = [
             [(
                 "landscape-{}-{}-{}".format(name, unit_name, i),
                 server_ip,
                 haproxy_config["ports"][name] + i,
                 haproxy_config["server_options"],
             ) for i in range(worker_counts)]
-            for name in ("appserver", "pingserver", "message-server", "api")
+            for name in ("appserver", "pingserver", "message-server", "api",
+                         "package-upload")
         ]
 
         http_service["servers"] = appservers
@@ -385,7 +415,11 @@ class LandscapeServerCharm(CharmBase):
             "servers": api_servers,
         }]
 
-        # TODO: sort out pppa-proxy servers/backends
+        if self.unit.is_leader():
+            https_service["backends"].append({
+                "backend_name": "landscape-package-upload",
+                "servers": package_upload_servers,
+            })
 
         error_files_location = haproxy_config["error_files"]["location"]
         error_files = []
@@ -400,12 +434,11 @@ class LandscapeServerCharm(CharmBase):
         http_service["error_files"] = error_files
         https_service["error_files"] = error_files
 
-        event.relation.data[self.unit].update({
+        relation.data[self.unit].update({
             "services": yaml.safe_dump([http_service, https_service])
         })
 
         self._stored.ready["haproxy"] = True
-        self._update_ready_status()
 
     def _website_relation_changed(self, event: RelationChangedEvent) -> None:
         """
@@ -487,10 +520,29 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
         # Update any nrpe checks.
+        peer_relation = self.model.get_relation("replicas")
+        ip = str(self.model.get_binding(peer_relation).network.bind_address)
+        peer_relation.data[self.app].update({"leader-ip": ip})
+
+        self._update_service_conf({
+            "package-search": {
+                "host": "localhost",
+            },
+        })
+
         self._leader_changed()
 
     def _leader_settings_changed(
             self, event: LeaderSettingsChangedEvent) -> None:
+        peer_relation = self.model.get_relation("replicas")
+        leader_ip = peer_relation.data[self.app].get("leader-ip")
+
+        self._update_service_conf({
+            "package-search": {
+                "host": leader_ip,
+            },
+        })
+
         self._leader_changed()
 
     def _leader_changed(self) -> None:
@@ -503,6 +555,27 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         for relation in nrpe_relations:
             self._update_nrpe_checks(relation)
+
+        haproxy_relations = self.model.relations.get("website", [])
+
+        for relation in haproxy_relations:
+            self._update_haproxy_connection(relation)
+
+        self._update_ready_status(restart_services=True)
+
+    def _on_replicas_relation_joined(self, event: RelationJoinedEvent) -> None:
+        if self.unit.is_leader():
+            ip = str(self.model.get_binding(event.relation).network.bind_address)
+            event.relation.data[self.app].update({"leader-ip": ip})
+
+        event.relation.data[self.unit].update({"unit-data": self.unit.name})
+
+    def _on_replicas_relation_changed(
+            self, event: RelationChangedEvent) -> None:
+        leader_ip_value = event.relation.data[self.app].get("leader-ip")
+
+        if leader_ip_value and leader_ip_value != self._stored.leader_ip:
+            self._stored.leader_ip = leader_ip_value
 
     def _update_service_conf(self, updates: dict) -> None:
         """
