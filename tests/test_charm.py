@@ -933,3 +933,16 @@ password = default
         self.assertEqual(len(os_path_exists_mock.mock_calls),
                          len(DEFAULT_SERVICES + LEADER_SERVICES) + 1)
         self.assertEqual(len(os_remove_mock.mock_calls), 0)
+
+    def test_leader_settings_changed(self):
+        """
+        Tests that _update_nrpe_checks is called when leader settings
+        have changed and an nrpe-external-master relation exists.
+        """
+        self.harness.charm._update_nrpe_checks = Mock()
+        self.harness.hooks_disabled()
+        self.harness.add_relation("nrpe-external-master", "nrpe")
+
+        self.harness.charm._leader_settings_changed(Mock())
+
+        self.harness.charm._update_nrpe_checks.assert_called_once()

@@ -1,21 +1,63 @@
-# landscape-charm-charmcraft
+# Landscape Server
 
 ## Description
 
-TODO: Describe your charm in a few paragraphs of Markdown
+The Landscape systems management tool helps you monitor, manage, and
+update your entire Ubuntu infrastructure from a single interface. Part
+of Canonical's [Ubuntu Pro](https://ubuntu.com/pro) support service,
+Landscape brings you intuitive systems management tools combined with
+world-class support.
+
+This charm will deploy Self-Hosted Landscape and needs to be connected
+to other charms to be fully functional. Example deployments are given
+below.
+
+For more information about Landscape, please visit
+[https://ubuntu.com/landscape](https://ubuntu.com/landscape)
 
 ## Usage
 
-TODO: Provide high-level usage, such as required config or relations
+Typically, Landscape deployment is done using a Juju bundle. This charm
+is not useful without a deployed bundle of services.
+
+Please use one of the following bundle types, depending o your needs:
+  - [landscape-scalable](https://charmhub.io/landscape-scalable)
+  - [landscape-dense-maas](https://charmhub.io/landscape-dense-maas)
+  - [landscape-dense](https://charmhub.io/landscape-dense)
 
 
 ## Relations
 
 TODO: Provide any relations which are provided or required by your charm
 
-## OCI Images
+## Configuration
 
-TODO: Include a link to the default image your charm uses
+Landscape requires configuration of a license file before deployment.
+Please sign in to your "hosted account" at
+[https://landscape.canonical.com](https://landscape.canonical.com) to
+download your license file. It can be found by following the link on
+the left side of the page: "access the Landscape On Premises archive."
+
+### license-file
+
+You can set this as a juju configuration option after deployment on each
+deployed landscape-server application:
+
+```bash
+juju config landscape-server "license-file=$(cat license-file"
+```
+
+### SSL
+
+The pre-packaged bundles will ask the HAProxy charm to generate a
+self-signed certificate. While useful for testing, this must not be used
+for production deployments.
+
+For production deployments, you should include a "real" SSL certificate
+key pair (that has been signed by a Certificate Authority that your
+clients trust) in the HAproxy service configuration (or in the
+landscape-server service configuration if you need to use your HAProxy
+service for other services that have different certificates).
 
 ## Contributing
 
