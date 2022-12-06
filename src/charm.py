@@ -16,10 +16,7 @@ import logging
 import os
 import subprocess
 from base64 import b64decode, b64encode, binascii
-from configparser import ConfigParser
 from subprocess import CalledProcessError, check_call
-from urllib.request import urlopen
-from urllib.error import URLError
 
 import yaml
 
@@ -38,25 +35,20 @@ from ops.main import main
 from ops.model import (
     ActiveStatus, BlockedStatus, Relation, MaintenanceStatus, WaitingStatus)
 
+from settings_files import (
+    prepend_default_settings, update_default_settings, update_service_conf,
+    write_license_file, write_ssl_cert)
+
 logger = logging.getLogger(__name__)
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
-DEFAULT_SETTINGS = "/etc/default/landscape-server"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
 HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__),
                                    "haproxy-config.yaml")
-LICENSE_FILE_PROTOCOLS = (
-    "file://",
-    "http://",
-    "https://",
-)
-LICENSE_FILE = "/etc/landscape/license.txt"
 LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
-SERVICE_CONF = "/etc/landscape/service.conf"
-SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 
 DEFAULT_SERVICES = (
     "landscape-api",
@@ -136,14 +128,15 @@ class LandscapeServerCharm(CharmBase):
 
         if config_ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            self._write_ssl_cert(config_ssl_cert)
+            write_ssl_cert(config_ssl_cert)
 
         # Write the license file, if it exists.
         license_file = self.model.config.get("license_file")
         if license_file:
             self.unit.status = MaintenanceStatus(
                 "Writing Landscape license file")
-            self._write_license_file(license_file)
+            write_license_file(
+                license_file, self.landscape_uid, self.root_gid)
 
         smtp_relay_host = self.model.config.get("smtp_relay_host")
         if smtp_relay_host:
@@ -184,7 +177,7 @@ class LandscapeServerCharm(CharmBase):
 
         if config_ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            self._write_ssl_cert(config_ssl_cert)
+            write_ssl_cert(config_ssl_cert)
 
         # Write the license file, if it exists.
         license_file = self.model.config.get("license_file")
@@ -192,17 +185,12 @@ class LandscapeServerCharm(CharmBase):
         if license_file:
             self.unit.status = MaintenanceStatus(
                 "Writing Landscape license file")
-            self._write_license_file(license_file)
+            write_license_file(license_file, self.landscape_uid, self.root_gid)
 
         self.unit.status = ActiveStatus("Unit is ready")
 
         # Indicate that this install is a charm install.
-        with open(DEFAULT_SETTINGS, "r") as settings_file:
-            settings = settings_file.read()
-
-        with open(DEFAULT_SETTINGS, "w") as settings_file:
-            settings_file.write('DEPLOYED_FROM="charm"\n')
-            settings_file.write(settings)
+        prepend_default_settings({"DEPLOYED_FROM": "charm"})
 
         self._update_ready_status()
 
@@ -236,7 +224,7 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
 
-        self._update_default_settings({
+        update_default_settings({
             "RUN_ALL": "no",
             "RUN_APISERVER": str(self.model.config["worker_counts"]),
             "RUN_ASYNC_FRONTEND": "yes",
@@ -285,7 +273,7 @@ class LandscapeServerCharm(CharmBase):
         user = unit_data["user"]
         password = unit_data["password"]
 
-        self._update_service_conf({
+        update_service_conf({
             "stores": {
                 "host": "{}:{}".format(host, port),
                 "password": password,
@@ -333,7 +321,7 @@ class LandscapeServerCharm(CharmBase):
         if isinstance(hostname, list):
             hostname = ",".join(hostname)
 
-        self._update_service_conf({
+        update_service_conf({
             "broker": {
                 "host": hostname,
                 "password": password,
@@ -458,7 +446,7 @@ class LandscapeServerCharm(CharmBase):
             "Installing HAProxy SSL certificate")
         haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
 
-        self._write_ssl_cert(haproxy_ssl_cert)
+        write_ssl_cert(haproxy_ssl_cert)
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
@@ -524,7 +512,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         ip = str(self.model.get_binding(peer_relation).network.bind_address)
         peer_relation.data[self.app].update({"leader-ip": ip})
 
-        self._update_service_conf({
+        update_service_conf({
             "package-search": {
                 "host": "localhost",
             },
@@ -537,7 +525,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         peer_relation = self.model.get_relation("replicas")
         leader_ip = peer_relation.data[self.app].get("leader-ip")
 
-        self._update_service_conf({
+        update_service_conf({
             "package-search": {
                 "host": leader_ip,
             },
@@ -577,40 +565,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if leader_ip_value and leader_ip_value != self._stored.leader_ip:
             self._stored.leader_ip = leader_ip_value
 
-    def _update_service_conf(self, updates: dict) -> None:
-        """
-        Updates the Landscape Server configuration file.
-
-        `updates`: a mapping of {section => {key => value}}, to be
-            applied to the config file.
-        """
-        config = ConfigParser()
-        config.read(SERVICE_CONF)
-
-        for section, data in updates.items():
-            for key, value in data.items():
-                config[section][key] = value
-
-        with open(SERVICE_CONF, "w") as config_file:
-            config.write(config_file)
-
-    def _update_default_settings(self, updates: dict) -> None:
-        """Updates the Landscape Server default settings file."""
-        with open(DEFAULT_SETTINGS, "r") as settings_file:
-            new_lines = []
-            for line in settings_file:
-                if "=" in line and line.split("=")[0] in updates:
-                    key = line.split("=")[0]
-
-                    new_line = "{}=\"{}\"\n".format(key, updates[key])
-                else:
-                    new_line = line
-
-                new_lines.append(new_line)
-
-        with open(DEFAULT_SETTINGS, "w") as settings_file:
-            settings_file.write("".join(new_lines))
-
     def _configure_smtp(self, relay_host: str) -> None:
 
         # Rewrite postfix config.
@@ -630,37 +584,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         # Restart postfix.
         if not service_reload("postfix"):
             self.unit.status = BlockedStatus("postfix configuration failed")
-
-    def _write_ssl_cert(self, ssl_cert: str) -> None:
-        """Decodes and writes `ssl_cert` to SSL_CERT_PATH."""
-        with open(SSL_CERT_PATH, "wb") as ssl_cert_file:
-            ssl_cert_file.write(b64decode(ssl_cert))
-
-    def _write_license_file(self, license_file: str) -> None:
-        """Reads or decodes `license_file` to LICENSE_FILE."""
-
-        if any((license_file.startswith(proto)
-                for proto in LICENSE_FILE_PROTOCOLS)):
-            try:
-                license_file_data = urlopen(license_file).read()
-            except URLError:
-                self.unit.status = BlockedStatus(
-                    "Unable to read license file at {}".format(license_file))
-                return
-        else:
-            # Assume b64-encoded.
-            try:
-                license_file_data = b64decode(license_file)
-            except binascii.Error:
-                self.unit.status = BlockedStatus(
-                    "Unable to read b64-encoded license file")
-                return
-
-        with open(LICENSE_FILE, "wb") as license_file_path:
-            license_file_path.write(license_file_data)
-
-        os.chmod(LICENSE_FILE, 0o640)
-        os.chown(LICENSE_FILE, self.landscape_uid, self.root_gid)
 
     def _pause(self, event: ActionEvent) -> None:
         self.unit.status = MaintenanceStatus("Stopping services")

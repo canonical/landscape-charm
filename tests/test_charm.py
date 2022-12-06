@@ -57,15 +57,6 @@ class TestCharm(unittest.TestCase):
 
     def test_install(self):
         harness = Harness(LandscapeServerCharm)
-
-        mock_default_settings = os.path.join(self.tempdir.name, "my_settings")
-        with open(mock_default_settings, "w") as fp:
-            fp.write("")
-
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost: test\n")
-
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
             relation_id, "landscape-server", {"leader-ip": "test"})
@@ -74,8 +65,8 @@ class TestCharm(unittest.TestCase):
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
-            DEFAULT_SETTINGS=mock_default_settings,
-            SERVICE_CONF=mock_service_conf,
+            prepend_default_settings=DEFAULT,
+            update_service_conf=DEFAULT,
         )
         ppa = harness.model.config.get("landscape_ppa")
 
@@ -92,21 +83,12 @@ class TestCharm(unittest.TestCase):
 
     def test_install_package_not_found_error(self):
         harness = Harness(LandscapeServerCharm)
-        mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
-            DEFAULT_SETTINGS=mock_settings_path,
-            SERVICE_CONF=mock_service_conf,
+            update_service_conf=DEFAULT,
         )
-
-        with open(mock_settings_path, "w") as fp:
-            fp.write("")
-
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost: test\n")
 
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
@@ -122,17 +104,12 @@ class TestCharm(unittest.TestCase):
 
     def test_install_package_error(self):
         harness = Harness(LandscapeServerCharm)
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
-            SERVICE_CONF=mock_service_conf,
+            update_service_conf=DEFAULT,
         )
-
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost: test\n")
 
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
@@ -148,17 +125,12 @@ class TestCharm(unittest.TestCase):
 
     def test_install_called_process_error(self):
         harness = Harness(LandscapeServerCharm)
-
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost = test")
-
         relation_id = harness.add_relation("replicas", "landcape-server")
         harness.update_relation_data(
             relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patch("charm.check_call") as mock:
-            with patch("charm.SERVICE_CONF", new=mock_service_conf):
+            with patch("charm.update_service_conf"):
                 mock.side_effect = CalledProcessError(127, Mock())
                 harness.begin_with_initial_hooks()
 
@@ -170,50 +142,30 @@ class TestCharm(unittest.TestCase):
         harness = Harness(LandscapeServerCharm)
         harness.disable_hooks()
         harness.update_config({"ssl_cert": "MYFANCYCERT="})
-        mock_cert_path = os.path.join(self.tempdir.name, "my_cert.crt")
-        mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-
-        with open(mock_settings_path, "w") as mock_settings_file:
-            mock_settings_file.write("RUN_ALL=\"no\"\n")
-
-        with open(mock_service_conf, "w") as mock_service_conf_file:
-            mock_service_conf_file.write("[package-search]\nhost = localhost\n")
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
-            SSL_CERT_PATH=mock_cert_path,
-            DEFAULT_SETTINGS=mock_settings_path,
-            SERVICE_CONF=mock_service_conf,
+            write_ssl_cert=DEFAULT,
+            update_service_conf=DEFAULT,
+            prepend_default_settings=DEFAULT,
         )
 
         peer_relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
             peer_relation_id, "landscape-server", {"leader-ip": "test"})
 
-        with patches:
+        with patches as mocks:
             harness.begin_with_initial_hooks()
 
-        with open(mock_cert_path, "rb") as mock_cert:
-            self.assertEqual(mock_cert.read(), b64decode("MYFANCYCERT="))
+        mocks["write_ssl_cert"].assert_any_call("MYFANCYCERT=")
+        mocks["prepend_default_settings"].assert_called_once_with(
+            {"DEPLOYED_FROM": "charm"})
 
     def test_install_license_file(self):
         harness = Harness(LandscapeServerCharm)
-        mock_license = os.path.join(self.tempdir.name, "my_license.txt")
         mock_input = os.path.join(self.tempdir.name, "new_license.txt")
-
-        with open(mock_input, "w") as mock_input_file:
-            mock_input_file.write("TEST INSTALL LICENSE FILE")
-
-        mock_settings = os.path.join(self.tempdir.name, "my_settings")
-        with open(mock_settings, "w") as fp:
-            fp.write("")
-
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost = test")
 
         harness.update_config({"license_file": "file://" + mock_input})
         relation_id = harness.add_relation("replicas", "landcape-server")
@@ -224,62 +176,33 @@ class TestCharm(unittest.TestCase):
             "charm",
             check_call=DEFAULT,
             apt=DEFAULT,
-            LICENSE_FILE=mock_license,
-            DEFAULT_SETTINGS=mock_settings,
-            SERVICE_CONF=mock_service_conf,
+            write_license_file=DEFAULT,
+            prepend_default_settings=DEFAULT,
+            update_service_conf=DEFAULT,
         )
 
-        with patches:
+        with patches as mocks:
             harness.begin_with_initial_hooks()
 
-        with open(mock_license) as mock_license_file:
-            mode = 0o777 & os.stat(mock_license_file.fileno()).st_mode
-            self.assertEqual(0o640, mode)
-            self.assertEqual("TEST INSTALL LICENSE FILE",
-                             mock_license_file.read())
+        mocks["write_license_file"].assert_any_call(
+            f"file://{mock_input}", 1000, 1000)
 
     def test_install_license_file_b64(self):
         harness = Harness(LandscapeServerCharm)
         harness.update_config({"license_file": "VEhJUyBJUyBBIExJQ0VOU0U="})
-        mock_license = os.path.join(self.tempdir.name, "my_license.txt")
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-
-        with open(mock_service_conf, "w") as fp:
-            fp.write("[package-search]\nhost = test\n")
-
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
             relation_id, "landscape-server", {"leader-ip": "test"})
 
-        with patch("charm.LICENSE_FILE", new=mock_license):
-            with patch("charm.SERVICE_CONF", new=mock_service_conf):
-                harness.begin_with_initial_hooks()
+        with patch.multiple(
+                "charm",
+                update_service_conf=DEFAULT,
+                write_license_file=DEFAULT,
+        ) as mocks:
+            harness.begin_with_initial_hooks()
 
-        with open(mock_license) as mock_license_file:
-            mode = 0o777 & os.stat(mock_license_file.fileno()).st_mode
-            self.assertEqual(0o640, mode)
-            self.assertEqual("THIS IS A LICENSE", mock_license_file.read())
-
-    def test_write_license_file_URLError(self):
-        mock_license = os.path.join(self.tempdir.name, "my_license.txt")
-        mock_input = os.path.join(self.tempdir.name, "new_license.txt")
-
-        with patch("charm.LICENSE_FILE", new=mock_license):
-            self.harness.charm._write_license_file("file://" + mock_input)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertFalse(os.path.exists(mock_license))
-
-    def test_write_license_file_binascii_Error(self):
-        mock_license = os.path.join(self.tempdir.name, "my_license.txt")
-
-        with patch("charm.LICENSE_FILE", new=mock_license):
-            self.harness.charm._write_license_file("DECIDEDLYNOTB64")
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertFalse(os.path.exists(mock_license))
+        mocks["write_license_file"].assert_called_once_with(
+            "VEhJUyBJUyBBIExJQ0VOU0U=", 1000, 1000)
 
     def test_update_ready_status_not_running(self):
         self.harness.charm.unit.status = WaitingStatus()
@@ -287,19 +210,14 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.ready.update({
             k: True for k in self.harness.charm._stored.ready.keys()
         })
-        mock_settings_path = os.path.join(self.tempdir.name,
-                                          "my_settings.conf")
-
-        with open(mock_settings_path, "w") as mock_settings_file:
-            mock_settings_file.write("RUN_APPSERVER=\"no\"\n")
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            DEFAULT_SETTINGS=mock_settings_path,
+            update_default_settings=DEFAULT,
         )
 
-        with patches:
+        with patches as mocks:
             self.harness.charm._update_ready_status()
 
         status = self.harness.charm.unit.status
@@ -307,8 +225,8 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(status.message, "Unit is ready")
         self.assertTrue(self.harness.charm._stored.running)
 
-        with open(mock_settings_path) as mock_settings_file:
-            self.assertEqual(mock_settings_file.read(), "RUN_APPSERVER=\"2\"\n")
+        mock_args = mocks["update_default_settings"].mock_calls[0].args[0]
+        self.assertEqual(mock_args["RUN_APPSERVER"], "2")
 
     def test_update_ready_status_running(self):
         self.harness.charm.unit.status = WaitingStatus()
@@ -330,15 +248,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.ready.update({
             k: True for k in self.harness.charm._stored.ready.keys()
         })
-        mock_settings_path = os.path.join(self.tempdir.name, "my_settings")
-
-        with open(mock_settings_path, "w") as mock_settings_file:
-            mock_settings_file.write("RUN_APPSERVER=\"no\"\n")
 
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            DEFAULT_SETTINGS=mock_settings_path,
+            update_default_settings=DEFAULT,
         )
 
         with patches as mocks:
@@ -350,8 +264,8 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(status.message, "Failed to start services")
         self.assertFalse(self.harness.charm._stored.running)
 
-        with open(mock_settings_path) as mock_settings_file:
-            self.assertEqual(mock_settings_file.read(), "RUN_APPSERVER=\"2\"\n")
+        mock_args = mocks["update_default_settings"].mock_calls[0].args[0]
+        self.assertEqual(mock_args["RUN_APPSERVER"], "2")
 
     def test_db_relation_changed_no_master(self):
         mock_event = Mock()
@@ -390,36 +304,29 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as mock_service_conf_file:
-            mock_service_conf_file.write("""
-[stores]
-host = default
-password = default
-[schema]
-store_user = default
-store_password = default
-            """)
-
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            SERVICE_CONF=mock_service_conf,
+            update_service_conf=DEFAULT,
         )
 
-        with patches:
+        with patches as mocks:
             self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["db"])
 
-        config = ConfigParser()
-        config.read(mock_service_conf)
-        self.assertEqual(config["stores"]["host"], "1.2.3.4:5678")
-        self.assertEqual(config["stores"]["password"], "testpass")
-        self.assertEqual(config["schema"]["store_user"], "testuser")
-        self.assertEqual(config["schema"]["store_password"], "testpass")
+        mocks["update_service_conf"].assert_called_once_with({
+            "stores": {
+                "host": "1.2.3.4:5678",
+                "password": "testpass",
+            },
+            "schema": {
+                "store_user": "testuser",
+                "store_password": "testpass",
+            },
+        })
 
     def test_db_relation_changed_called_process_error(self):
         mock_event = Mock()
@@ -433,21 +340,10 @@ store_password = default
                 "password": "testpass",
             },
         }
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as mock_service_conf_file:
-            mock_service_conf_file.write("""
-[stores]
-host = default
-password = default
-[schema]
-store_user = default
-store_password = default
-""")
-
         patches = patch.multiple(
             "charm",
             check_call=DEFAULT,
-            SERVICE_CONF=mock_service_conf,
+            update_service_conf=DEFAULT,
         )
 
         with patches as mocks:
@@ -458,12 +354,16 @@ store_password = default
         self.assertIsInstance(status, BlockedStatus)
         self.assertFalse(self.harness.charm._stored.ready["db"])
 
-        config = ConfigParser()
-        config.read(mock_service_conf)
-        self.assertEqual(config["stores"]["host"], "1.2.3.4:5678")
-        self.assertEqual(config["stores"]["password"], "testpass")
-        self.assertEqual(config["schema"]["store_user"], "testuser")
-        self.assertEqual(config["schema"]["store_password"], "testpass")
+        mocks["update_service_conf"].assert_called_once_with({
+            "stores": {
+                "host": "1.2.3.4:5678",
+                "password": "testpass",
+            },
+            "schema": {
+                "store_user": "testuser",
+                "store_password": "testpass",
+            }
+        })
 
     def test_amqp_relation_joined(self):
         unit = self.harness.charm.unit
@@ -495,25 +395,20 @@ store_password = default
                 "password": "testpass",
             },
         }
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as mock_service_conf_file:
-            mock_service_conf_file.write("""
-[broker]
-host = default
-password = default
-""")
 
-        with patch("charm.SERVICE_CONF", new=mock_service_conf):
+        with patch("charm.update_service_conf") as mock_update_conf:
             self.harness.charm._amqp_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["amqp"])
 
-        config = ConfigParser()
-        config.read(mock_service_conf)
-        self.assertEqual(config["broker"]["host"], "test1,test2")
-        self.assertEqual(config["broker"]["password"], "testpass")
+        mock_update_conf.assert_called_once_with({
+            "broker": {
+                "host": "test1,test2",
+                "password": "testpass",
+            },
+        })
 
     def test_amqp_relation_changed_str_hostname(self):
         """
@@ -526,25 +421,20 @@ password = default
                 "password": "testpass",
             },
         }
-        mock_service_conf = os.path.join(self.tempdir.name, "my_service.conf")
-        with open(mock_service_conf, "w") as mock_service_conf_file:
-            mock_service_conf_file.write("""
-[broker]
-host = default
-password = default
-""")
 
-        with patch("charm.SERVICE_CONF", new=mock_service_conf):
+        with patch("charm.update_service_conf") as mock_update_conf:
             self.harness.charm._amqp_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["amqp"])
 
-        config = ConfigParser()
-        config.read(mock_service_conf)
-        self.assertEqual(config["broker"]["host"], "test1")
-        self.assertEqual(config["broker"]["password"], "testpass")
+        mock_update_conf.assert_called_once_with({
+            "broker": {
+                "host": "test1",
+                "password": "testpass",
+            },
+        })
 
     def test_website_relation_joined_cert_no_key(self):
         mock_event = Mock()
@@ -659,67 +549,36 @@ password = default
         self.harness.disable_hooks()
         self.harness.update_config({"ssl_cert": "NOTDEFAULT"})
         initial_status = self.harness.charm.unit.status
-        mock_ssl_cert = os.path.join(self.tempdir.name, "my_ssl_cert.crt")
-        with open(mock_ssl_cert, "w") as mock_ssl_cert_file:
-            mock_ssl_cert_file.write("DO NOT PANIC! THIS IS A TEST\n")
 
-        with patch("charm.SSL_CERT_PATH", new=mock_ssl_cert):
+        with patch("charm.write_ssl_cert") as write_cert_mock:
             self.harness.charm._website_relation_changed(mock_event)
 
         self.assertEqual(initial_status, self.harness.charm.unit.status)
-        with open(mock_ssl_cert) as mock_ssl_cert_file:
-            self.assertEqual("DO NOT PANIC! THIS IS A TEST\n",
-                             mock_ssl_cert_file.read())
+        write_cert_mock.assert_not_called()
 
     def test_website_relation_changed_no_new_cert(self):
         mock_event = Mock()
         mock_event.relation.data = {mock_event.unit: {}}
         initial_status = self.harness.charm.unit.status
-        mock_ssl_cert = os.path.join(self.tempdir.name, "my_ssl_cert.crt")
-        with open(mock_ssl_cert, "w") as mock_ssl_cert_file:
-            mock_ssl_cert_file.write("DO NOT PANIC! THIS IS A TEST\n")
 
-        with patch("charm.SSL_CERT_PATH", new=mock_ssl_cert):
+        with patch("charm.write_ssl_cert") as write_cert_mock:
             self.harness.charm._website_relation_changed(mock_event)
 
         self.assertEqual(initial_status, self.harness.charm.unit.status)
-        with open(mock_ssl_cert) as mock_ssl_cert_file:
-            self.assertEqual("DO NOT PANIC! THIS IS A TEST\n",
-                             mock_ssl_cert_file.read())
+        write_cert_mock.assert_not_called()
 
     def test_website_relation_changed(self):
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {"ssl_cert": "FANCYNEWCERT"},
         }
-        mock_ssl_cert = os.path.join(self.tempdir.name, "my_ssl_cert.crt")
-        with open(mock_ssl_cert, "w") as mock_ssl_cert_file:
-            mock_ssl_cert_file.write("DO NOT PANIC! THIS IS A TEST\n")
 
-        with patch("charm.SSL_CERT_PATH", new=mock_ssl_cert):
+        with patch("charm.write_ssl_cert") as write_cert_mock:
             self.harness.charm._website_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
-        with open(mock_ssl_cert, "rb") as mock_ssl_cert_file:
-            self.assertEqual(b"FANCYNEWCERT",
-                             b64encode(mock_ssl_cert_file.read()))
-
-    def test_default_settings_passthrough_lines(self):
-        mock_default_settings = os.path.join(self.tempdir.name, "my_settings")
-
-        with open(mock_default_settings, "w") as mock_default_settings_file:
-            mock_default_settings_file.write(
-                "DONOTTOUCH=\"THIS\"\nTOUCHTHIS=\"PLEASE\"\n")
-
-        with patch("charm.DEFAULT_SETTINGS", new=mock_default_settings):
-            self.harness.charm._update_default_settings(
-                {"TOUCHTHIS": "THANKYOU"})
-
-        with open(mock_default_settings) as mock_default_settings_file:
-            self.assertEqual(
-                "DONOTTOUCH=\"THIS\"\nTOUCHTHIS=\"THANKYOU\"\n",
-                mock_default_settings_file.read())
+        write_cert_mock.assert_called_once_with("FANCYNEWCERT")
 
     def test_on_config_changed_no_smtp_change(self):
         self.harness.charm._update_ready_status = Mock()
@@ -926,7 +785,9 @@ password = default
         self.harness.model.get_binding = Mock(
             return_value=Mock(bind_address="123.123.123.123"))
         self.harness.charm._update_service_conf = Mock()
-        self.harness.set_leader()
+
+        with patch("charm.update_service_conf"):
+            self.harness.set_leader()
 
         with patch("charm.NRPE_D_DIR", new=mock_nrpe_d_dir):
             self.harness.charm._nrpe_external_master_relation_joined(mock_event)
@@ -963,7 +824,9 @@ password = default
         self.harness.model.get_binding = Mock(
             return_value=Mock(bind_address="123.123.123.123"))
         self.harness.charm._update_service_conf = Mock()
-        self.harness.set_leader()
+
+        with patch("charm.update_service_conf"):
+            self.harness.set_leader()
 
         with patch("os.path.exists") as os_path_exists_mock:
             os_path_exists_mock.return_value = True
@@ -1026,10 +889,12 @@ password = default
         self.harness.add_relation("replicas", "landscape-server")
 
         self.harness.charm._update_service_conf = Mock()
-        self.harness.charm._leader_settings_changed(Mock())
+
+        with patch("charm.update_service_conf") as mock_update_conf:
+            self.harness.charm._leader_settings_changed(Mock())
 
         self.harness.charm._update_nrpe_checks.assert_called_once()
-        self.harness.charm._update_service_conf.assert_called_once_with({
+        mock_update_conf.assert_called_once_with({
             "package-search": {
                 "host": None,
             },
