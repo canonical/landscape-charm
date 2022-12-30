@@ -268,10 +268,12 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready["db"] = False
         self.unit.status = MaintenanceStatus("Setting up databases")
 
-        host = unit_data["host"]
+        # We can't use unit_data["host"] because it can return the IP of the secondary
+        master = dict(s.split('=', 1) for s in unit_data["master"])
+        host = master["host"]
+        password = master["password"]
         port = unit_data["port"]
         user = unit_data["user"]
-        password = unit_data["password"]
 
         update_service_conf({
             "stores": {
