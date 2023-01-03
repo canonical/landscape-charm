@@ -137,11 +137,17 @@ class LandscapeServerCharm(CharmBase):
                 "Writing Landscape license file")
             write_license_file(
                 license_file, self.landscape_uid, self.root_gid)
+            self.unit.status = WaitingStatus("Waiting on relations")
 
         smtp_relay_host = self.model.config.get("smtp_relay_host")
         if smtp_relay_host:
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(smtp_relay_host)
+
+        # Update HAProxy relations, if they exist.
+        haproxy_relations = self.model.relations.get("website", [])
+        for relation in haproxy_relations:
+            self._update_haproxy_connection(relation)
 
         self._update_ready_status(restart_services=True)
 
@@ -377,17 +383,23 @@ class LandscapeServerCharm(CharmBase):
         unit_name = self.unit.name.replace("/", "-")
         worker_counts = self.model.config["worker_counts"]
 
-        (appservers, pingservers, message_servers, api_servers,
-         package_upload_servers) = [
+        (appservers, pingservers, message_servers, api_servers) = [
             [(
-                "landscape-{}-{}-{}".format(name, unit_name, i),
+                f"landscape-{name}-{unit_name}-{i}",
                 server_ip,
                 haproxy_config["ports"][name] + i,
                 haproxy_config["server_options"],
             ) for i in range(worker_counts)]
-            for name in ("appserver", "pingserver", "message-server", "api",
-                         "package-upload")
+            for name in ("appserver", "pingserver", "message-server", "api")
         ]
+
+        # There should only ever be one package-upload-server service.
+        package_upload_servers = [(
+            f"landscape-package-upload-{unit_name}-0",
+            server_ip,
+            haproxy_config["ports"]["package-upload"],
+            haproxy_config["server_options"],
+        )]
 
         http_service["servers"] = appservers
         http_service["backends"] = [{
@@ -428,6 +440,8 @@ class LandscapeServerCharm(CharmBase):
 
         self._stored.ready["haproxy"] = True
 
+        self.unit.status = WaitingStatus("")
+
     def _website_relation_changed(self, event: RelationChangedEvent) -> None:
         """
         Writes the HAProxy-provided SSL certificate for
@@ -448,6 +462,9 @@ class LandscapeServerCharm(CharmBase):
 
         write_ssl_cert(haproxy_ssl_cert)
         self.unit.status = ActiveStatus("Unit is ready")
+
+        self._update_haproxy_connection(event.relation)
+
         self._update_ready_status()
 
     def _nrpe_external_master_relation_joined(
@@ -525,11 +542,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         peer_relation = self.model.get_relation("replicas")
         leader_ip = peer_relation.data[self.app].get("leader-ip")
 
-        update_service_conf({
-            "package-search": {
-                "host": leader_ip,
-            },
-        })
+        if leader_ip:
+            update_service_conf({
+                "package-search": {
+                    "host": leader_ip,
+                },
+            })
 
         self._leader_changed()
 
@@ -545,7 +563,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self._update_nrpe_checks(relation)
 
         haproxy_relations = self.model.relations.get("website", [])
-
         for relation in haproxy_relations:
             self._update_haproxy_connection(relation)
 
@@ -584,6 +601,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         # Restart postfix.
         if not service_reload("postfix"):
             self.unit.status = BlockedStatus("postfix configuration failed")
+        else:
+            self.unit.status = WaitingStatus("Waiting on relations")
 
     def _pause(self, event: ActionEvent) -> None:
         self.unit.status = MaintenanceStatus("Stopping services")

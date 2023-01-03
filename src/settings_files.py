@@ -1,0 +1,132 @@
+# Copyright 2022 Canonical Ltd
+
+"""
+Functions for manipulating Landscape Server service settings in the
+filesystem.
+"""
+
+import os
+from base64 import b64decode, binascii
+from configparser import ConfigParser
+from urllib.request import urlopen
+from urllib.error import URLError
+
+DEFAULT_SETTINGS = "/etc/default/landscape-server"
+
+LICENSE_FILE = "/etc/landscape/license.txt"
+LICENSE_FILE_PROTOCOLS = (
+    "file://",
+    "http://",
+    "https://",
+)
+
+SERVICE_CONF = "/etc/landscape/service.conf"
+SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
+
+
+class LicenseFileReadException(Exception):
+    pass
+
+
+class SSLCertReadException(Exception):
+    pass
+
+
+def prepend_default_settings(updates: dict) -> None:
+    """
+    Adds `updates` to the start of the Landscape Server default
+    settings file.
+    """
+    with open(DEFAULT_SETTINGS, "r") as settings_fp:
+        settings = settings_fp.read()
+
+    with open(DEFAULT_SETTINGS, "w") as settings_fp:
+        for k, v in updates.items():
+            settings_fp.write(f'{k}="{v}"\n')
+
+        settings_fp.write(settings)
+
+
+def update_default_settings(updates: dict) -> None:
+    """
+    Updates the Landscape Server default settings file.
+
+    This file is mainly used to determine which services should be
+    running for this installation.
+    """
+    with open(DEFAULT_SETTINGS, "r") as settings_fp:
+        new_lines = []
+
+        for line in settings_fp:
+            if "=" in line and line.split("=")[0] in updates:
+                key = line.split("=")[0]
+                new_line = f'{key}="{updates[key]}"\n'
+            else:
+                new_line = line
+
+            new_lines.append(new_line)
+
+    with open(DEFAULT_SETTINGS, "w") as settings_file:
+        settings_file.write("".join(new_lines))
+
+
+def update_service_conf(updates: dict) -> None:
+    """
+    Updates the Landscape Server configuration file.
+
+    `updates` is a mapping of {section => {key => value}}, to be applied
+        to the config file.
+    """
+    config = ConfigParser()
+    config.read(SERVICE_CONF)
+
+    for section, data in updates.items():
+        for key, value in data.items():
+            if not config.has_section(section):
+                config.add_section(section)
+
+            config[section][key] = value
+
+    with open(SERVICE_CONF, "w") as config_fp:
+        config.write(config_fp)
+
+
+def write_license_file(license_file: str, uid: int, gid: int) -> None:
+    """
+    Reads or decodes `license_file` to LICENSE_FILE and sets it up
+    ownership for `uid` and `gid`.
+
+    raises LicenseFileReadException if the location `license_file`
+    cannot be read
+    """
+
+    if any((license_file.startswith(proto)
+            for proto in LICENSE_FILE_PROTOCOLS)):
+        try:
+            license_file_data = urlopen(license_file).read()
+        except URLError:
+            raise LicenseFileReadException(
+                f"Unable to read license file at {license_file}")
+    else:
+        # Assume b64-encoded
+        try:
+            license_file_data = b64decode(license_file.encode())
+        except binascii.Error:
+            raise LicenseFileReadException(
+                "Unable to read b64-encoded license file")
+
+    with open(LICENSE_FILE, "wb") as license_fp:
+        license_fp.write(license_file_data)
+
+    os.chmod(LICENSE_FILE, 0o640)
+    os.chown(LICENSE_FILE, uid, gid)
+
+
+def write_ssl_cert(ssl_cert: str) -> None:
+    """Decodes and writes `ssl_cert` to `SSL_CERT_PATH`."""
+    try:
+        with open(SSL_CERT_PATH, "wb") as ssl_cert_fp:
+            ssl_cert_fp.write(b64decode(ssl_cert.encode()))
+    except binascii.Error:
+        raise SSLCertReadException(
+            "Unable to decode b64-encoded SSL certificate")

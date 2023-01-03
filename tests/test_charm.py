@@ -5,9 +5,8 @@
 
 import os
 import unittest
-from base64 import b64encode, b64decode
-from configparser import ConfigParser
 from grp import struct_group
+from io import BytesIO
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
@@ -510,7 +509,7 @@ class TestCharm(unittest.TestCase):
         relation_data = mock_event.relation.data[self.harness.charm.unit]
         status = self.harness.charm.unit.status
         self.assertIn("services", relation_data)
-        self.assertIsInstance(status, MaintenanceStatus)
+        self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["haproxy"])
 
     def test_website_relation_joined(self):
@@ -541,7 +540,7 @@ class TestCharm(unittest.TestCase):
         relation_data = mock_event.relation.data[self.harness.charm.unit]
         status = self.harness.charm.unit.status
         self.assertIn("services", relation_data)
-        self.assertIsInstance(status, MaintenanceStatus)
+        self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["haproxy"])
 
     def test_website_relation_changed_cert_not_DEFAULT(self):
@@ -571,10 +570,21 @@ class TestCharm(unittest.TestCase):
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {"ssl_cert": "FANCYNEWCERT"},
+            self.harness.charm.unit: {"private-address": "test"},
         }
 
+        old_open = open
+
+        def open_error_file(path, *args, **kwargs):
+            if "offline" in path:
+                return BytesIO(b"")
+
+            return old_open(path, *args, **kwargs)
+
         with patch("charm.write_ssl_cert") as write_cert_mock:
-            self.harness.charm._website_relation_changed(mock_event)
+            with patch("builtins.open") as open_mock:
+                open_mock.side_effect = open_error_file
+                self.harness.charm._website_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
@@ -886,9 +896,9 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_nrpe_checks = Mock()
         self.harness.hooks_disabled()
         self.harness.add_relation("nrpe-external-master", "nrpe")
-        self.harness.add_relation("replicas", "landscape-server")
-
-        self.harness.charm._update_service_conf = Mock()
+        relation_id = self.harness.add_relation("replicas", "landscape-server")
+        self.harness.update_relation_data(relation_id, "landscape-server",
+                                          {"leader-ip": "test"})
 
         with patch("charm.update_service_conf") as mock_update_conf:
             self.harness.charm._leader_settings_changed(Mock())
@@ -896,6 +906,6 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_nrpe_checks.assert_called_once()
         mock_update_conf.assert_called_once_with({
             "package-search": {
-                "host": None,
+                "host": "test",
             },
         })
