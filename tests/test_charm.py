@@ -15,8 +15,7 @@ from unittest.mock import DEFAULT, Mock, patch
 import yaml
 
 from ops.charm import ActionEvent
-from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
-                       WaitingStatus)
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
 from charms.operator_libs_linux.v0 import apt
@@ -296,7 +295,7 @@ class TestCharm(unittest.TestCase):
         mock_event.relation.data = {
             mock_event.unit: {
                 "allowed-units": self.harness.charm.unit.name,
-                "master": True,
+                "master": "host=1.2.3.4 password=testpass",
                 "host": "1.2.3.4",
                 "port": "5678",
                 "user": "testuser",
@@ -332,7 +331,7 @@ class TestCharm(unittest.TestCase):
         mock_event.relation.data = {
             mock_event.unit: {
                 "allowed-units": self.harness.charm.unit.name,
-                "master": True,
+                "master": "host=1.2.3.4 password=testpass",
                 "host": "1.2.3.4",
                 "port": "5678",
                 "user": "testuser",
