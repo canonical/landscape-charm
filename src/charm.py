@@ -257,9 +257,10 @@ class LandscapeServerCharm(CharmBase):
     def _db_relation_changed(self, event: RelationChangedEvent) -> None:
         unit_data = event.relation.data[event.unit]
 
-        # Using "master" key as a quick indicator of readiness.
-        if "master" not in unit_data:
-            logger.info("db relation not yet ready")
+        required_relation_data = ["master", "allowed-units", "port", "user"]
+        missing_relation_data = [i for i required_relation_data if i not in unit_data]
+        if missing_relation_data:
+            logger.info("db relation not yet ready. Missing keys: {}".format(missing_relation_data))
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
