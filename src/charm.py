@@ -258,7 +258,7 @@ class LandscapeServerCharm(CharmBase):
         unit_data = event.relation.data[event.unit]
 
         required_relation_data = ["master", "allowed-units", "port", "user"]
-        missing_relation_data = [i for i required_relation_data if i not in unit_data]
+        missing_relation_data = [i for i in required_relation_data if i not in unit_data]
         if missing_relation_data:
             logger.info("db relation not yet ready. Missing keys: {}".format(missing_relation_data))
             self.unit.status = ActiveStatus("Unit is ready")
