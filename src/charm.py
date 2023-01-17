@@ -460,11 +460,14 @@ class LandscapeServerCharm(CharmBase):
         if "ssl_cert" not in event.relation.data[event.unit]:
             return
 
-        self.unit.status = MaintenanceStatus(
-            "Installing HAProxy SSL certificate")
+        self.unit.status = MaintenanceStatus("Configuring HAProxy")
         haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
 
-        write_ssl_cert(haproxy_ssl_cert)
+        if haproxy_ssl_cert != "DEFAULT":
+            # If DEFAULT, cert is being managed by a third party,
+            # possibly a subordinate charm.
+            write_ssl_cert(haproxy_ssl_cert)
+
         self.unit.status = ActiveStatus("Unit is ready")
 
         self._update_haproxy_connection(event.relation)
