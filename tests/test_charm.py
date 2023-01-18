@@ -479,6 +479,7 @@ class TestCharm(unittest.TestCase):
         mock_event = Mock()
         mock_event.relation.data = {self.harness.charm.unit: {
             "private-address": "192.168.0.1",
+            "public-address": "8.8.8.8",
         }}
         self.harness.disable_hooks()
         self.harness.update_config({
@@ -502,7 +503,11 @@ class TestCharm(unittest.TestCase):
         with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
             yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
 
-        with patch("charm.HAPROXY_CONFIG_FILE", mock_haproxy_config):
+        with patch.multiple(
+                "charm",
+                HAPROXY_CONFIG_FILE=mock_haproxy_config,
+                update_service_conf=DEFAULT,
+        ):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]
@@ -515,6 +520,7 @@ class TestCharm(unittest.TestCase):
         mock_event = Mock()
         mock_event.relation.data = {self.harness.charm.unit: {
             "private-address": "192.168.0.1",
+            "public-address": "8.8.8.8",
         }}
 
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
@@ -533,7 +539,10 @@ class TestCharm(unittest.TestCase):
         with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
             yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
 
-        with patch("charm.HAPROXY_CONFIG_FILE", mock_haproxy_config):
+        with patch.multiple(
+                "charm", HAPROXY_CONFIG_FILE=mock_haproxy_config,
+                update_service_conf=DEFAULT,
+        ):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]
@@ -569,7 +578,10 @@ class TestCharm(unittest.TestCase):
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {"ssl_cert": "FANCYNEWCERT"},
-            self.harness.charm.unit: {"private-address": "test"},
+            self.harness.charm.unit: {
+                "private-address": "test",
+                "public-address": "test2",
+            },
         }
 
         old_open = open
@@ -580,7 +592,13 @@ class TestCharm(unittest.TestCase):
 
             return old_open(path, *args, **kwargs)
 
-        with patch("charm.write_ssl_cert") as write_cert_mock:
+        with patch.multiple(
+                "charm",
+                write_ssl_cert=DEFAULT,
+                update_service_conf=DEFAULT,
+        ) as mocks:
+            write_cert_mock = mocks["write_ssl_cert"]
+
             with patch("builtins.open") as open_mock:
                 open_mock.side_effect = open_error_file
                 self.harness.charm._website_relation_changed(mock_event)

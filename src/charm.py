@@ -63,6 +63,17 @@ LEADER_SERVICES = (
     "landscape-package-upload",
 )
 
+OPENID_CONFIG_VALS = (
+    "openid_provider_url",
+    "openid_logout_url",
+)
+OIDC_CONFIG_VALS = (
+    "oidc_issuer",
+    "oidc_client_id",
+    "oidc_client_secret",
+    "oidc_logout_url",
+)
+
 
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
@@ -123,6 +134,8 @@ class LandscapeServerCharm(CharmBase):
         self.root_gid = group_exists("root").gr_gid
 
     def _on_config_changed(self, _) -> None:
+        prev_status = self.unit.status
+
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
 
@@ -148,6 +161,26 @@ class LandscapeServerCharm(CharmBase):
         haproxy_relations = self.model.relations.get("website", [])
         for relation in haproxy_relations:
             self._update_haproxy_connection(relation)
+
+        if any(self.model.config.get(v) for v in OPENID_CONFIG_VALS) \
+                and any(self.model.config.get(v) for v in OIDC_CONFIG_VALS):
+            self.unit.status = BlockedStatus(
+                "OpenID and OIDC configurations are mutually exclusive")
+        else:
+            self._configure_openid()
+            self._configure_oidc()
+
+        # Update root_url, if provided
+        root_url = self.model.config.get("root_url")
+        if root_url:
+            update_service_conf({
+                "global": {"root-url": root_url},
+                "api": {"root-url": root_url},
+                "package-upload": {"root-url": root_url},
+            })
+
+        if isinstance(prev_status, BlockedStatus):
+            self.unit.status = prev_status
 
         self._update_ready_status(restart_services=True)
 
@@ -442,6 +475,15 @@ class LandscapeServerCharm(CharmBase):
             "services": yaml.safe_dump([http_service, https_service])
         })
 
+        # Update root_url, if not provided.
+        if not self.model.config.get("root_url"):
+            url = f'https://{relation.data[self.unit]["public-address"]}/'
+            update_service_conf({
+                "global": {"root-url": url},
+                "api": {"root-url": url},
+                "package-upload": {"root-url": url},
+            })
+
         self._stored.ready["haproxy"] = True
 
         self.unit.status = WaitingStatus("")
@@ -610,6 +652,61 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self.unit.status = BlockedStatus("postfix configuration failed")
         else:
             self.unit.status = WaitingStatus("Waiting on relations")
+
+    def _configure_oidc(self) -> None:
+        self.unit.status = MaintenanceStatus("Configuring OIDC")
+
+        oidc_issuer = self.model.config.get("oidc_issuer")
+        oidc_client_id = self.model.config.get("oidc_client_id")
+        oidc_client_secret = self.model.config.get("oidc_client_secret")
+        oidc_logout_url = self.model.config.get("oidc_logout_url")
+        oidc_vals = (oidc_issuer, oidc_client_id, oidc_client_secret, oidc_logout_url)
+        none_count = oidc_vals.count(None)
+
+        if none_count == 0:
+            update_service_conf({
+                "landscape": {
+                    "oidc-issuer": oidc_issuer,
+                    "oidc-client-id": oidc_client_id,
+                    "oidc-client-secret": oidc_client_secret,
+                    "oidc-logout-url": oidc_logout_url,
+                },
+            })
+        elif none_count == 1 and oidc_logout_url is None:
+            # Only the logout url is optional.
+            update_service_conf({
+                "landscape": {
+                    "oidc-issuer": oidc_issuer,
+                    "oidc-client-id": oidc_client_id,
+                    "oidc-client-secret": oidc_client_secret,
+                },
+            })
+        elif none_count < 4:
+            self.unit.status = BlockedStatus(
+                "OIDC connect config requires at least 'oidc_issuer', "
+                "'oidc_client_id', and 'oidc_client_secret' values")
+            return
+
+        self.unit.status = WaitingStatus("Waiting on relations")
+
+    def _configure_openid(self) -> None:
+        self.unit.status = MaintenanceStatus("Configuring OpenID")
+
+        openid_provider_url = self.model.config.get("openid_provider_url")
+        openid_logout_url = self.model.config.get("openid_logout_url")
+
+        if openid_provider_url and openid_logout_url:
+            update_service_conf({
+                "landscape": {
+                    "openid-provider-url": openid_provider_url,
+                    "openid-logout-url": openid_logout_url,
+                },
+            })
+            self.unit.status = WaitingStatus("Waiting on relations")
+        elif openid_provider_url or openid_logout_url:
+            self.unit.status = BlockedStatus(
+                "OpenID configuration requires both 'openid_provider_url' and "
+                "'openid_logout_url'")
 
     def _pause(self, event: ActionEvent) -> None:
         self.unit.status = MaintenanceStatus("Stopping services")
