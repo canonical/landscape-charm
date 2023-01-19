@@ -377,6 +377,16 @@ class LandscapeServerCharm(CharmBase):
 
     def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_haproxy_connection(event.relation)
+
+        # Update root_url, if not provided.
+        if not self.model.config.get("root_url"):
+            url = f'https://{event.relation.data[event.unit]["public-address"]}/'
+            update_service_conf({
+                "global": {"root-url": url},
+                "api": {"root-url": url},
+                "package-upload": {"root-url": url},
+            })
+
         self._update_ready_status()
 
     def _update_haproxy_connection(self, relation: Relation) -> None:
@@ -474,15 +484,6 @@ class LandscapeServerCharm(CharmBase):
         relation.data[self.unit].update({
             "services": yaml.safe_dump([http_service, https_service])
         })
-
-        # Update root_url, if not provided.
-        if not self.model.config.get("root_url"):
-            url = f'https://{relation.data[self.unit]["public-address"]}/'
-            update_service_conf({
-                "global": {"root-url": url},
-                "api": {"root-url": url},
-                "package-upload": {"root-url": url},
-            })
 
         self._stored.ready["haproxy"] = True
 

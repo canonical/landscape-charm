@@ -436,10 +436,12 @@ class TestCharm(unittest.TestCase):
 
     def test_website_relation_joined_cert_no_key(self):
         mock_event = Mock()
+        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
         self.harness.disable_hooks()
         self.harness.update_config({"ssl_cert": "NOTDEFAULT", "ssl_key": ""})
 
-        self.harness.charm._website_relation_joined(mock_event)
+        with patch("charm.update_service_conf"):
+            self.harness.charm._website_relation_joined(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -448,10 +450,12 @@ class TestCharm(unittest.TestCase):
 
     def test_website_relation_joined_cert_not_DEFAULT_not_b64(self):
         mock_event = Mock()
+        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
         self.harness.disable_hooks()
         self.harness.update_config({"ssl_cert": "NOTDEFAULT", "ssl_key": "a"})
 
-        self.harness.charm._website_relation_joined(mock_event)
+        with patch("charm.update_service_conf"):
+            self.harness.charm._website_relation_joined(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -461,13 +465,15 @@ class TestCharm(unittest.TestCase):
 
     def test_website_relation_joined_cert_not_DEFAULT_key_not_b64(self):
         mock_event = Mock()
+        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
         self.harness.disable_hooks()
         self.harness.update_config({
             "ssl_cert": "Tk9UREVGQVVMVA==",
             "ssl_key": "NOTBASE64OHNO",
         })
 
-        self.harness.charm._website_relation_joined(mock_event)
+        with patch("charm.update_service_conf"):
+            self.harness.charm._website_relation_joined(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -477,10 +483,12 @@ class TestCharm(unittest.TestCase):
 
     def test_website_relation_joined_cert_not_DEFAULT(self):
         mock_event = Mock()
-        mock_event.relation.data = {self.harness.charm.unit: {
-            "private-address": "192.168.0.1",
-            "public-address": "8.8.8.8",
-        }}
+        mock_event.relation.data = {
+            self.harness.charm.unit: {
+                "private-address": "192.168.0.1",
+            },
+            mock_event.unit: {"public-address": "8.8.8.8"},
+        }
         self.harness.disable_hooks()
         self.harness.update_config({
             "ssl_cert": "VEhJUyBJUyBBIENFUlQ=",
@@ -518,10 +526,10 @@ class TestCharm(unittest.TestCase):
 
     def test_website_relation_joined(self):
         mock_event = Mock()
-        mock_event.relation.data = {self.harness.charm.unit: {
-            "private-address": "192.168.0.1",
-            "public-address": "8.8.8.8",
-        }}
+        mock_event.relation.data = {
+            self.harness.charm.unit: {"private-address": "192.168.0.1"},
+            mock_event.unit: {"public-address": "8.8.8.8"},
+        }
 
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
             haproxy_config = yaml.safe_load(haproxy_config_file)
