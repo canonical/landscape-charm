@@ -23,8 +23,8 @@ from charms.operator_libs_linux.v0.apt import (
     PackageError, PackageNotFoundError)
 
 from charm import (
-    DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LEADER_SERVICES, LSCTL, NRPE_D_DIR,
-    SCHEMA_SCRIPT, LandscapeServerCharm)
+    DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
+    NRPE_D_DIR, SCHEMA_SCRIPT, LandscapeServerCharm)
 
 
 class TestCharm(unittest.TestCase):
@@ -736,11 +736,16 @@ class TestCharm(unittest.TestCase):
         prev_status = self.harness.charm.unit.status
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
+            pkg_mock = Mock()
+            apt_mock.DebianPackage.from_system.return_value = pkg_mock
             self.harness.charm._upgrade(event)
 
         event.log.assert_called_once()
-        apt_mock.add_package.assert_called_once_with(
-            "landscape-server", update_cache=True)
+        self.assertEqual(
+            apt_mock.DebianPackage.from_system.call_count,
+            len(LANDSCAPE_PACKAGES)
+        )
+        self.assertEqual(pkg_mock.ensure.call_count, len(LANDSCAPE_PACKAGES))
         self.assertEqual(self.harness.charm.unit.status, prev_status)
 
     def test_action_upgrade_running(self):
@@ -762,13 +767,14 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.running = False
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
-            apt_mock.add_package.side_effect = PackageError("ouch")
+            pkg_mock = Mock()
+            apt_mock.DebianPackage.from_system.return_value = pkg_mock
+            pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
             self.harness.charm._upgrade(event)
 
         event.log.assert_called_once()
         event.fail.assert_called_once()
-        apt_mock.add_package.assert_called_once_with(
-            "landscape-server", update_cache=True)
+        apt_mock.DebianPackage.from_system.assert_called_once_with("landscape-server")
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
 
     def test_action_migrate_schema(self):

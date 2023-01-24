@@ -50,6 +50,12 @@ NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 
+LANDSCAPE_PACKAGES = (
+    "landscape-server",
+    "landscape-client",
+    "landscape-common",
+)
+
 DEFAULT_SERVICES = (
     "landscape-api",
     "landscape-appserver",
@@ -574,30 +580,40 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             os.remove(cfg_filename)
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
-        # Update any nrpe checks.
-        peer_relation = self.model.get_relation("replicas")
-        ip = str(self.model.get_binding(peer_relation).network.bind_address)
-        peer_relation.data[self.app].update({"leader-ip": ip})
+        # Just because we received this event does not mean we are
+        # guaranteed to be the leader by the time we process it. See
+        # https://juju.is/docs/sdk/leader-elected-event
 
-        update_service_conf({
-            "package-search": {
-                "host": "localhost",
-            },
-        })
+        if self.unit.is_leader():
+            # Update any nrpe checks.
+            peer_relation = self.model.get_relation("replicas")
+            ip = str(self.model.get_binding(peer_relation).network.bind_address)
+            peer_relation.data[self.app].update({"leader-ip": ip})
+
+            update_service_conf({
+                "package-search": {
+                    "host": "localhost",
+                },
+            })
 
         self._leader_changed()
 
     def _leader_settings_changed(
             self, event: LeaderSettingsChangedEvent) -> None:
-        peer_relation = self.model.get_relation("replicas")
-        leader_ip = peer_relation.data[self.app].get("leader-ip")
+        # Just because we received this event does not mean we are
+        # guaranteed to be a follower by the time we process it. See
+        # https://juju.is/docs/sdk/leader-elected-event
 
-        if leader_ip:
-            update_service_conf({
-                "package-search": {
-                    "host": leader_ip,
-                },
-            })
+        if not self.unit.is_leader():
+            peer_relation = self.model.get_relation("replicas")
+            leader_ip = peer_relation.data[self.app].get("leader-ip")
+
+            if leader_ip:
+                update_service_conf({
+                    "package-search": {
+                        "host": leader_ip,
+                    },
+                })
 
         self._leader_changed()
 
@@ -756,14 +772,19 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Upgrading packages")
         event.log("Upgrading Landscape packages...")
 
-        try:
-            apt.add_package("landscape-server", update_cache=True)
-        except PackageError as e:
-            logger.error("Could not upgrade package. Reason: %s", e.message)
-            event.fail("Could not upgrade package. Reason: %s", e.message)
-            self.unit.status = BlockedStatus("Failed to upgrade packages")
-        else:
-            self.unit.status = prev_status
+        apt.update()
+
+        for package in LANDSCAPE_PACKAGES:
+            try:
+                pkg = apt.DebianPackage.from_system(package)
+                pkg.ensure(state=apt.PackageState.Latest)
+            except PackageNotFoundError as e:
+                logger.error(f"Could not upgrade package {package}. Reason: {e.message}")
+                event.fail(f"Could not upgrade package {package}. Reason: {e.message}")
+                self.unit.status = BlockedStatus("Failed to upgrade packages")
+                return
+
+        self.unit.status = prev_status
 
     def _migrate_schema(self, event: ActionEvent) -> None:
         if self._stored.running:
