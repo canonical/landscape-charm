@@ -776,7 +776,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         for package in LANDSCAPE_PACKAGES:
             try:
-                pkg = apt.DebianPackage.from_system(package)
+                event.log(f"Upgrading {package}...")
+                pkg = apt.DebianPackage.from_apt_cache(package)
                 pkg.ensure(state=apt.PackageState.Latest)
             except PackageNotFoundError as e:
                 logger.error(f"Could not upgrade package {package}. Reason: {e.message}")

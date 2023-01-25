@@ -737,12 +737,12 @@ class TestCharm(unittest.TestCase):
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
             pkg_mock = Mock()
-            apt_mock.DebianPackage.from_system.return_value = pkg_mock
+            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
             self.harness.charm._upgrade(event)
 
         event.log.assert_called_once()
         self.assertEqual(
-            apt_mock.DebianPackage.from_system.call_count,
+            apt_mock.DebianPackage.from_apt_cache.call_count,
             len(LANDSCAPE_PACKAGES)
         )
         self.assertEqual(pkg_mock.ensure.call_count, len(LANDSCAPE_PACKAGES))
@@ -768,13 +768,14 @@ class TestCharm(unittest.TestCase):
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
             pkg_mock = Mock()
-            apt_mock.DebianPackage.from_system.return_value = pkg_mock
+            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
             pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
             self.harness.charm._upgrade(event)
 
         event.log.assert_called_once()
         event.fail.assert_called_once()
-        apt_mock.DebianPackage.from_system.assert_called_once_with("landscape-server")
+        apt_mock.DebianPackage.from_apt_cache.assert_called_once_with(
+            "landscape-server")
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
 
     def test_action_migrate_schema(self):
