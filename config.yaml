@@ -60,7 +60,32 @@ options:
     type: string
     default:
     description: |
-      The email address that Landscape emails will appear to come from.
+      The initial email address that Landscape emails will appear to come from.
+      Note this value cannot be set more than once.
+  admin_email:
+    type: string
+    default:
+    description: |
+      The email address of the initial account administrator. Note this value
+      cannot be set more than once.
+  admin_name:
+    type: string
+    default:
+    description: |
+      The full name of the initial account administrator. Note this value
+      cannot be set more than once.
+  admin_password:
+    type: string
+    default:
+    description: |
+      The initial password of the account administrator. Note this value cannot
+      be set more than once.
+  registration_key:
+    type: string
+    default:
+    description: |
+      The initial account registration key. Note this value cannot be set more
+      than once.
   smtp_relay_host:
     type: string
     default: ""

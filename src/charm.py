@@ -49,6 +49,7 @@ LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
+BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 
 LANDSCAPE_PACKAGES = (
     "landscape-server",
@@ -135,6 +136,8 @@ class LandscapeServerCharm(CharmBase):
         })
         self._stored.set_default(leader_ip="")
         self._stored.set_default(running=False)
+        self._stored.set_default(default_root_url="")
+        self._stored.set_default(account_bootstrapped=False)
 
         self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
@@ -184,6 +187,8 @@ class LandscapeServerCharm(CharmBase):
                 "api": {"root-url": root_url},
                 "package-upload": {"root-url": root_url},
             })
+
+        self._bootstrap_account()
 
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
@@ -387,6 +392,7 @@ class LandscapeServerCharm(CharmBase):
         # Update root_url, if not provided.
         if not self.model.config.get("root_url"):
             url = f'https://{event.relation.data[event.unit]["public-address"]}/'
+            self._stored.default_root_url = url
             update_service_conf({
                 "global": {"root-url": url},
                 "api": {"root-url": url},
@@ -724,6 +730,61 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self.unit.status = BlockedStatus(
                 "OpenID configuration requires both 'openid_provider_url' and "
                 "'openid_logout_url'")
+
+    def _bootstrap_account(self):
+        """If admin account details are provided, create admin"""
+        if not self.unit.is_leader():
+            return
+        if self._stored.account_bootstrapped:  # Admin already created
+            return
+        karg = {}  # Keyword args for command line
+        karg["admin_email"] = self.model.config.get("admin_email")
+        karg["admin_name"] = self.model.config.get("admin_name")
+        karg["admin_password"] = self.model.config.get("admin_password")
+        required_args = karg.values()
+        if not any(required_args):  # Return since no args are specified
+            return
+        if not all(required_args):  # Some required args are missing
+            logger.error(
+                "Admin email, name, and password required for bootstrap account"
+            )
+            return
+        karg["root_url"] = self.model.config.get("root_url")
+        if not karg["root_url"]:
+            default_root_url = self._stored.default_root_url
+            if default_root_url:
+                karg["root_url"] = default_root_url
+            else:
+                logger.error("Bootstrap account waiting on default root url..")
+                return
+        karg["registration_key"] = self.model.config.get("registration_key")
+        karg["system_email"] = self.model.config.get("system_email")
+
+        # Collect command line arguments
+        args = [BOOTSTRAP_ACCOUNT_SCRIPT]
+        for key, value in karg.items():
+            if not value:
+                continue
+            args.append("--" + key)
+            args.append(value)
+
+        try:
+            logger.info(args)
+            result = subprocess.run(args, capture_output=True, text=True)
+        except FileNotFoundError:
+            logger.error("Bootstrap script not found!")
+            logger.error(BOOTSTRAP_ACCOUNT_SCRIPT)
+            return
+        logger.info(result.stdout)
+        if result.returncode:
+            if "DuplicateAccountError" in result.stderr:
+                logger.error("Cannot bootstrap b/c account is already there!")
+                self._stored.account_bootstrapped = True
+            else:
+                logger.error(result.stderr)
+        else:
+            logger.info("Admin account successfully bootstrapped!")
+            self._stored.account_bootstrapped = True
 
     def _pause(self, event: ActionEvent) -> None:
         self.unit.status = MaintenanceStatus("Stopping services")
