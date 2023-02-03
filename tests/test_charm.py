@@ -304,27 +304,38 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["db"])
 
-        update_service_conf_mock.assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
-                "password": "testpass",
-            },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
-            },
-        })
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
 
     def test_db_manual_configs_used(self):
         self.harness.disable_hooks()
-        self.harness.update_config({"db_host":"hello", "db_port":"world", "db_user":"test", "db_password":"test_pass"})
+        self.harness.update_config(
+            {
+                "db_host": "hello",
+                "db_port": "world",
+                "db_user": "test",
+                "db_password": "test_pass",
+            }
+        )
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {
@@ -338,19 +349,23 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
 
-        update_service_conf_mock.assert_called_once_with({
-            "stores": {
-                "host": "hello:world",
-                "password": "test_pass",
-            },
-            "schema": {
-                "store_user": "test",
-                "store_password": "test_pass",
-            },
-        })
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "test_pass",
+                },
+                "schema": {
+                    "store_user": "test",
+                    "store_password": "test_pass",
+                },
+            }
+        )
 
     def test_db_manual_configs_used_partial(self):
         """
@@ -358,7 +373,7 @@ class TestCharm(unittest.TestCase):
         gotten from the postgres unit
         """
         self.harness.disable_hooks()
-        self.harness.update_config({"db_host":"hello", "db_port":"world"})
+        self.harness.update_config({"db_host": "hello", "db_port": "world"})
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {
@@ -372,19 +387,23 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
 
-        update_service_conf_mock.assert_called_once_with({
-            "stores": {
-                "host": "hello:world",
-                "password": "testpass",
-            },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
-            },
-        })
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
 
     def test_db_relation_changed_called_process_error(self):
         mock_event = Mock()
@@ -400,7 +419,9 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 check_call_mock.side_effect = CalledProcessError(127, "ouch")
                 self.harness.charm._db_relation_changed(mock_event)
 
@@ -408,22 +429,24 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, BlockedStatus)
         self.assertFalse(self.harness.charm._stored.ready["db"])
 
-        update_service_conf_mock.assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
-                "password": "testpass",
-            },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
             }
-        })
+        )
 
     def test_on_manual_db_config_change(self):
         """
         Test that the manual db settings are reflected if a config change happens later
         """
-        
+
         mock_event = Mock()
         mock_event.relation.data = {
             mock_event.unit: {
@@ -437,17 +460,23 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
-                self.harness.update_config({"db_host":"hello", "db_port":"world"})
+                self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         self.assertEqual(update_service_conf_mock.call_count, 2)
-        self.assertEqual(update_service_conf_mock.call_args_list[1], call({
-            "stores": {
-                "host": "hello:world",
-            },
-        }))
-
+        self.assertEqual(
+            update_service_conf_mock.call_args_list[1],
+            call(
+                {
+                    "stores": {
+                        "host": "hello:world",
+                    },
+                }
+            ),
+        )
 
     def test_on_manual_db_config_change_block_if_error(self):
         """
@@ -467,12 +496,14 @@ class TestCharm(unittest.TestCase):
         }
 
         with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf") as update_service_conf_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
 
         with patch("charm.check_call") as check_call_mock:
             check_call_mock.side_effect = CalledProcessError(127, "ouch")
-            self.harness.update_config({"db_host":"hello", "db_port":"world"})
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)

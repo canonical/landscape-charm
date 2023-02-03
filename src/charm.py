@@ -315,10 +315,15 @@ class LandscapeServerCharm(CharmBase):
         unit_data = event.relation.data[event.unit]
 
         required_relation_data = ["master", "allowed-units", "port", "user"]
-        missing_relation_data = [i for i in required_relation_data if i not in unit_data]
+        missing_relation_data = [
+            i for i in required_relation_data if i not in unit_data
+        ]
         if missing_relation_data:
-            logger.info("db relation not yet ready. Missing keys: {}".format(
-                missing_relation_data))
+            logger.info(
+                "db relation not yet ready. Missing keys: {}".format(
+                    missing_relation_data
+                )
+            )
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
@@ -355,7 +360,7 @@ class LandscapeServerCharm(CharmBase):
         else:
             port = unit_data["port"]
         if not port:
-            port = "5432"  # Fall back to postgres default port if still not set
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
 
         config_user = self.model.config.get("db_user")
         if config_user:
@@ -383,9 +388,9 @@ class LandscapeServerCharm(CharmBase):
         except CalledProcessError as e:
             logger.error(
                 "Landscape Server schema update failed with return code %d",
-                e.returncode)
-            self.unit.status = BlockedStatus(
-                "Failed to update database schema")
+                e.returncode,
+            )
+            self.unit.status = BlockedStatus("Failed to update database schema")
 
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._stored.ready["amqp"] = False
