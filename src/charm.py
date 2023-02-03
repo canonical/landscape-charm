@@ -37,7 +37,7 @@ from ops.model import (
 
 from settings_files import (
     prepend_default_settings, update_default_settings, update_service_conf,
-    write_license_file, write_ssl_cert)
+    write_license_file, write_ssl_cert, update_db_conf, DEFAULT_POSTGRES_PORT)
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +185,24 @@ class LandscapeServerCharm(CharmBase):
                 "package-upload": {"root-url": root_url},
             })
 
+        config_host = self.model.config.get("db_host")
+        config_password = self.model.config.get("db_password")
+        config_port = self.model.config.get("db_port")
+        config_user = self.model.config.get("db_user")
+        db_kargs = {}
+        if config_host:
+            db_kargs["host"] = config_host
+        if config_password:
+            db_kargs["password"] = config_password
+        if config_port:
+            db_kargs["port"] = config_port
+        if config_user:
+            db_kargs["user"] = config_user
+        if db_kargs:
+            update_db_conf(**db_kargs)
+            if not self._migrate_schema_bootstrap():
+                return
+
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
 
@@ -317,36 +335,57 @@ class LandscapeServerCharm(CharmBase):
 
         # We can't use unit_data["host"] because it can return the IP of the secondary
         master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
-        host = master["host"]
-        password = master["password"]
-        port = unit_data["port"]
-        user = unit_data["user"]
 
-        update_service_conf({
-            "stores": {
-                "host": "{}:{}".format(host, port),
-                "password": password,
-            },
-            "schema": {
-                "store_user": user,
-                "store_password": password,
-            },
-        })
+        # Override db config if manually set in juju
+        config_host = self.model.config.get("db_host")
+        if config_host:
+            host = config_host
+        else:
+            host = master["host"]
 
-        # Ensure the database users and schemas are set up.
+        config_password = self.model.config.get("db_password")
+        if config_password:
+            password = config_password
+        else:
+            password = master["password"]
+
+        config_port = self.model.config.get("db_port")
+        if config_port:
+            port = config_port
+        else:
+            port = unit_data["port"]
+        if not port:
+            port = "5432"  # Fall back to postgres default port if still not set
+
+        config_user = self.model.config.get("db_user")
+        if config_user:
+            user = config_user
+        else:
+            user = unit_data["user"]
+
+        update_db_conf(host=host, port=port, user=user, password=password)
+
+        if not self._migrate_schema_bootstrap():
+            return
+
+        self._stored.ready["db"] = True
+        self.unit.status = ActiveStatus("Unit is ready")
+        self._update_ready_status()
+
+    def _migrate_schema_bootstrap(self):
+        """
+        Migrates schema along with the bootstrap command which ensures that the
+        databases along with the landscape user exists. Returns True on success
+        """
         try:
-            check_call(["/usr/bin/landscape-schema", "--bootstrap"])
+            check_call([SCHEMA_SCRIPT, "--bootstrap"])
+            return True
         except CalledProcessError as e:
             logger.error(
                 "Landscape Server schema update failed with return code %d",
                 e.returncode)
             self.unit.status = BlockedStatus(
                 "Failed to update database schema")
-            return
-
-        self._stored.ready["db"] = True
-        self.unit.status = ActiveStatus("Unit is ready")
-        self._update_ready_status()
 
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._stored.ready["amqp"] = False
