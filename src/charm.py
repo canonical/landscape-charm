@@ -200,7 +200,10 @@ class LandscapeServerCharm(CharmBase):
             db_kargs["user"] = config_user
         if db_kargs:
             update_db_conf(**db_kargs)
-            if not self._migrate_schema_bootstrap():
+            if self._migrate_schema_bootstrap():
+                self.unit.status = WaitingStatus("Waiting on relations")
+                self._stored.ready["db"] = True
+            else:
                 return
 
         if isinstance(prev_status, BlockedStatus):
