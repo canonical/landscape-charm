@@ -941,3 +941,146 @@ class TestCharm(unittest.TestCase):
                 "host": "test",
             },
         })
+
+
+class TestBootstrapAccount(unittest.TestCase):
+    def setUp(self):
+        self.harness = Harness(LandscapeServerCharm)
+        self.addCleanup(self.harness.cleanup)
+
+        self.harness.model.get_binding = Mock(
+            return_value=Mock(bind_address="123.123.123.123")
+        )
+        self.harness.add_relation("replicas", "landscape-server")
+        self.harness.set_leader()
+
+        self.process_mock = patch("subprocess.run").start()
+        self.log_mock = patch("charm.logger.error").start()
+
+        self.addCleanup(patch.stopall)
+
+        self.harness.begin()
+
+    def test_bootstrap_account_doesnt_run_with_missing_configs(self):
+        self.harness.update_config(
+            {"admin_email": "hello@ubuntu.com", "admin_name": "Hello Ubuntu"}
+        )
+        self.assertIn("password required", self.log_mock.call_args.args[0])
+        self.process_mock.assert_not_called()
+
+    def test_bootstrap_account_doesnt_run_with_missing_rooturl(self):
+        self.harness.update_config(
+            {
+                "admin_email": "hello@ubuntu.com",
+                "admin_name": "Hello Ubuntu",
+                "admin_password": "password",
+            }
+        )
+        self.assertIn("root url", self.log_mock.call_args.args[0])
+        self.process_mock.assert_not_called()
+
+    def test_bootstrap_account_default_root_url_is_used(self):
+        self.harness.charm._stored.default_root_url = "https://hello.lxd"
+        self.harness.update_config(
+            {
+                "admin_email": "hello@ubuntu.com",
+                "admin_name": "Hello Ubuntu",
+                "admin_password": "password",
+            }
+        )
+        self.assertIn(
+            self.harness.charm._stored.default_root_url,
+            self.process_mock.call_args.args[0],
+        )
+
+    def test_bootstrap_account_config_url_over_default(self):
+        """If config root url and default root url exists, use config url"""
+        self.harness.charm._stored.default_root_url = "https://hello.lxd"
+        config_root_url = "https://www.landscape.com"
+        self.harness.update_config(
+            {
+                "admin_email": "hello@ubuntu.com",
+                "admin_name": "Hello Ubuntu",
+                "admin_password": "password",
+                "root_url": config_root_url,
+            }
+        )
+        self.assertIn(config_root_url, self.process_mock.call_args.args[0])
+
+    def test_bootstrap_account_runs_once_with_correct_args(self):
+        """
+        Test that bootstrap account runs with correct args and that it can't
+        run again after a successful run
+        """
+        self.process_mock.return_value.returncode = 0  # Success
+        admin_email = "hello@ubuntu.com"
+        admin_name = "Hello Ubuntu"
+        admin_password = "password"
+        root_url = "https://www.landscape.com"
+        config = {
+            "admin_email": admin_email,
+            "admin_name": admin_name,
+            "admin_password": admin_password,
+            "root_url": root_url,
+        }
+        self.harness.update_config(config)
+        self.assertEqual(
+            [
+                "/opt/canonical/landscape/bootstrap-account",
+                "--admin_email",
+                admin_email,
+                "--admin_name",
+                admin_name,
+                "--admin_password",
+                admin_password,
+                "--root_url",
+                root_url,
+            ],
+            self.process_mock.call_args.args[0],
+        )
+        self.harness.update_config(config)
+        self.process_mock.assert_called_once()
+
+    def test_bootstrap_account_runs_twice_if_error(self):
+        """
+        If there's an error ensure that bootstrap account runs again and not
+        a third time if successful
+        """
+        self.process_mock.return_value.returncode = 1  # Error here
+        admin_email = "hello@ubuntu.com"
+        admin_name = "Hello Ubuntu"
+        admin_password = "password"
+        root_url = "https://www.landscape.com"
+        config = {
+            "admin_email": admin_email,
+            "admin_name": admin_name,
+            "admin_password": admin_password,
+            "root_url": root_url,
+        }
+        self.harness.update_config(config)
+        self.process_mock.return_value.returncode = 0
+        self.harness.update_config(config)
+        self.harness.update_config(config)  # Third time
+        self.assertEqual(self.process_mock.call_count, 2)
+
+    def test_bootstrap_account_cannot_run_if_already_bootstrapped(self):
+        """
+        If user already has created an account outside of the charm,
+        then the bootstrap account cannot run again
+        """
+        self.process_mock.return_value.returncode = 1  # Error here
+        self.process_mock.return_value.stderr = "DuplicateAccountError"
+        admin_email = "hello@ubuntu.com"
+        admin_name = "Hello Ubuntu"
+        admin_password = "password"
+        root_url = "https://www.landscape.com"
+        config = {
+            "admin_email": admin_email,
+            "admin_name": admin_name,
+            "admin_password": admin_password,
+            "root_url": root_url,
+        }
+        self.harness.update_config(config)
+        self.harness.update_config(config)
+        self.harness.update_config(config)  # Third time
+        self.process_mock.assert_called_once()
