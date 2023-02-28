@@ -55,6 +55,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-server",
     "landscape-client",
     "landscape-common",
+    "landscape-hashids"
 )
 
 DEFAULT_SERVICES = (
