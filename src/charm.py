@@ -55,6 +55,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-server",
     "landscape-client",
     "landscape-common",
+    "landscape-hashids"
 )
 
 DEFAULT_SERVICES = (
@@ -188,6 +189,8 @@ class LandscapeServerCharm(CharmBase):
                 "package-upload": {"root-url": root_url},
             })
 
+        self._bootstrap_account()
+
         config_host = self.model.config.get("db_host")
         config_password = self.model.config.get("db_password")
         config_port = self.model.config.get("db_port")
@@ -221,11 +224,11 @@ class LandscapeServerCharm(CharmBase):
         landscape_ppa = self.model.config["landscape_ppa"]
 
         try:
-            # Add the Landscape Server beta PPA and install via apt.
+            # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
-            apt.add_package("landscape-server")
+            apt.add_package(["landscape-server", "landscape-hashids"])
         except PackageNotFoundError:
-            logger.error("landscape-server package not found in package cache "
+            logger.error("Landscape package not found in package cache "
                          "or on system")
             self.unit.status = BlockedStatus("Failed to install packages")
             return
