@@ -73,7 +73,8 @@ class TestCharm(unittest.TestCase):
 
         mocks["check_call"].assert_called_once_with(
             ["add-apt-repository", "-y", ppa])
-        mocks["apt"].add_package.assert_called_once_with("landscape-server")
+        mocks["apt"].add_package.assert_called_once_with(["landscape-server", 
+            "landscape-hashids"])
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
