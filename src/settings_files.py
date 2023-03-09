@@ -11,6 +11,8 @@ from configparser import ConfigParser
 from urllib.request import urlopen
 from urllib.error import URLError
 
+CONFIGS_DIR = "/opt/canonical/landscape/configs"
+
 DEFAULT_SETTINGS = "/etc/default/landscape-server"
 
 LICENSE_FILE = "/etc/landscape/license.txt"
@@ -30,6 +32,30 @@ class LicenseFileReadException(Exception):
 
 class SSLCertReadException(Exception):
     pass
+
+
+def configure_for_deployment_mode(mode: str) -> None:
+    """
+    Places files where Landscape expects to find them for different deployment
+    modes.
+    """
+    if mode == "standalone":
+        return
+
+    os.symlink(os.path.join(CONFIGS_DIR, "standalone"), os.path.join(CONFIGS_DIR, mode))
+
+
+def merge_service_conf(other: str) -> None:
+    """
+    Merges `other` into the Landscape Server configuration file,
+    overwriting existing config.
+    """
+    config = ConfigParser()
+    config.read(SERVICE_CONF)
+    config.read_string(other)
+
+    with open(SERVICE_CONF, "w") as config_fp:
+        config.write(config_fp)
 
 
 def prepend_default_settings(updates: dict) -> None:
