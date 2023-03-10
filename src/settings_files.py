@@ -7,6 +7,7 @@ filesystem.
 
 import os
 from base64 import b64decode, binascii
+from collections import defaultdict
 from configparser import ConfigParser
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -22,6 +23,8 @@ LICENSE_FILE_PROTOCOLS = (
 
 SERVICE_CONF = "/etc/landscape/service.conf"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
+
+DEFAULT_POSTGRES_PORT = "5432"
 
 
 class LicenseFileReadException(Exception):
@@ -130,3 +133,17 @@ def write_ssl_cert(ssl_cert: str) -> None:
     except binascii.Error:
         raise SSLCertReadException(
             "Unable to decode b64-encoded SSL certificate")
+
+
+def update_db_conf(host=None, password=None, port=DEFAULT_POSTGRES_PORT, user=None):
+    """Postgres specific settings override"""
+    to_update = defaultdict(dict)
+    if host:  # Note that host is required if port is changed
+        to_update["stores"]["host"] = "{}:{}".format(host, port)
+    if password:
+        to_update["stores"]["password"] = password
+        to_update["schema"]["store_password"] = password
+    if user:
+        to_update["schema"]["store_user"] = user
+    if to_update:
+        update_service_conf(to_update)

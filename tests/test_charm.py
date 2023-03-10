@@ -10,7 +10,7 @@ from io import BytesIO
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
-from unittest.mock import DEFAULT, Mock, patch
+from unittest.mock import DEFAULT, Mock, patch, call
 
 import yaml
 
@@ -73,7 +73,8 @@ class TestCharm(unittest.TestCase):
 
         mocks["check_call"].assert_called_once_with(
             ["add-apt-repository", "-y", ppa])
-        mocks["apt"].add_package.assert_called_once_with("landscape-server")
+        mocks["apt"].add_package.assert_called_once_with(["landscape-server", 
+            "landscape-hashids"])
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
@@ -302,29 +303,108 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
-        patches = patch.multiple(
-            "charm",
-            check_call=DEFAULT,
-            update_service_conf=DEFAULT,
-        )
 
-        with patches as mocks:
-            self.harness.charm._db_relation_changed(mock_event)
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["db"])
 
-        mocks["update_service_conf"].assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_used(self):
+        self.harness.disable_hooks()
+        self.harness.update_config(
+            {
+                "db_host": "hello",
+                "db_port": "world",
+                "db_user": "test",
+                "db_password": "test_pass",
+            }
+        )
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
                 "password": "testpass",
             },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "test_pass",
+                },
+                "schema": {
+                    "store_user": "test",
+                    "store_password": "test_pass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_used_partial(self):
+        """
+        Test that if some of the manual configs are provided, the rest are
+        gotten from the postgres unit
+        """
+        self.harness.disable_hooks()
+        self.harness.update_config({"db_host": "hello", "db_port": "world"})
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
             },
-        })
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
 
     def test_db_relation_changed_called_process_error(self):
         mock_event = Mock()
@@ -338,30 +418,97 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
-        patches = patch.multiple(
-            "charm",
-            check_call=DEFAULT,
-            update_service_conf=DEFAULT,
-        )
 
-        with patches as mocks:
-            mocks["check_call"].side_effect = CalledProcessError(127, "ouch")
-            self.harness.charm._db_relation_changed(mock_event)
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                check_call_mock.side_effect = CalledProcessError(127, "ouch")
+                self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
         self.assertFalse(self.harness.charm._stored.ready["db"])
 
-        mocks["update_service_conf"].assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
+
+    def test_on_manual_db_config_change(self):
+        """
+        Test that the manual db settings are reflected if a config change happens later
+        """
+
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
                 "password": "testpass",
             },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
-            }
-        })
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        self.assertEqual(update_service_conf_mock.call_count, 2)
+        self.assertEqual(
+            update_service_conf_mock.call_args_list[1],
+            call(
+                {
+                    "stores": {
+                        "host": "hello:world",
+                    },
+                }
+            ),
+        )
+
+    def test_on_manual_db_config_change_block_if_error(self):
+        """
+        If the schema migration doesn't go through on a manual config change,
+        then block unit status
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        with patch("charm.check_call") as check_call_mock:
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, BlockedStatus)
+
 
     def test_amqp_relation_joined(self):
         unit = self.harness.charm.unit

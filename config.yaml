@@ -4,7 +4,7 @@
 options:
   landscape_ppa:
     type: string
-    default: "ppa:landscape/self-hosted-beta"
+    default: "ppa:landscape/self-hosted-23.03"
     description: The PPA from which Landscape Server will be installed.
   worker_counts:
     type: int
@@ -140,3 +140,23 @@ options:
     description: |
       Comma-separated list of nagios servicegroups. If empty, the
       nagios-context will be used as the servicegroup.
+  db_host:
+    type: string
+    default:
+    description: |
+      Optionally specify the host instead of getting it from the postgres charm
+  db_password:
+    type: string
+    default:
+    description: Optionally specify db password
+  db_port:
+    type: string
+    default:
+    description: |
+      Optionally specify the db port instead of getting it from the postgres
+      charm. Falls back to the default postgres port
+  db_user:
+    type: string
+    default:
+    description: |
+      Optionally specify the postgres user instead of getting it from the charm
