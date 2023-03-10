@@ -36,8 +36,9 @@ from ops.model import (
     ActiveStatus, BlockedStatus, Relation, MaintenanceStatus, WaitingStatus)
 
 from settings_files import (
-    prepend_default_settings, update_default_settings, update_service_conf,
-    write_license_file, write_ssl_cert, update_db_conf, DEFAULT_POSTGRES_PORT)
+    DEFAULT_POSTGRES_PORT, configure_for_deployment_mode, merge_service_conf,
+    prepend_default_settings, update_db_conf, update_default_settings, update_service_conf,
+    write_license_file, write_ssl_cert)
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,7 @@ class LandscapeServerCharm(CharmBase):
         })
         self._stored.set_default(leader_ip="")
         self._stored.set_default(running=False)
+        self._stored.set_default(paused=False)
         self._stored.set_default(default_root_url="")
         self._stored.set_default(account_bootstrapped=False)
 
@@ -215,6 +217,16 @@ class LandscapeServerCharm(CharmBase):
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
 
+        # Update additional configuration
+        deployment_mode = self.model.config.get("deployment_mode")
+        update_service_conf({"global": {"deployment-mode": deployment_mode}})
+
+        configure_for_deployment_mode(deployment_mode)
+
+        additional_config = self.model.config.get("additional_service_config")
+        if additional_config:
+            merge_service_conf(additional_config)
+
         self._update_ready_status(restart_services=True)
 
     def _on_install(self, event: InstallEvent) -> None:
@@ -286,6 +298,10 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = ActiveStatus("Unit is ready")
             return
 
+        if self._stored.paused:
+            self.unit.status = MaintenanceStatus("Services stopped")
+            return
+
         self._stored.running = self._start_services()
 
     def _start_services(self) -> bool:
@@ -295,6 +311,7 @@ class LandscapeServerCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
+        deployment_mode = self.model.config.get("deployment_mode")
 
         update_default_settings({
             "RUN_ALL": "no",
@@ -307,6 +324,7 @@ class LandscapeServerCharm(CharmBase):
             "RUN_CRON": "yes" if is_leader else "no",
             "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
             "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader else "no",
+            "RUN_PPPA_PROXY": "yes" if deployment_mode != "standalone" else "no",
         })
 
         logger.info("Starting services")
@@ -848,6 +866,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             self.unit.status = MaintenanceStatus("Services stopped")
             self._stored.running = False
+            self._stored.paused = True
 
     def _resume(self, event: ActionEvent):
         self.unit.status = MaintenanceStatus("Starting services")
@@ -868,6 +887,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             event.fail("Failed to start services: %s", start_result.stdout)
         else:
             self._stored.running = True
+            self._stored.paused = False
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
 

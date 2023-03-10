@@ -1,0 +1,32 @@
+description: Landscape Scalable
+applications:
+  postgresql:
+    series: focal
+    charm: ch:postgresql
+    num_units: 1
+    options:
+      extra_packages: python3-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython3-*
+      max_connections: 500
+      max_prepared_transactions: 500
+  rabbitmq-server:
+    series: focal
+    charm: ch:rabbitmq-server
+    num_units: 1
+  haproxy:
+    series: focal
+    charm: ch:haproxy
+    num_units: 1
+    expose: true
+    options:
+      default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
+      services: ""
+      ssl_cert: SELFSIGNED
+      global_default_bind_options: "no-tlsv10"
+  landscape-server:
+    series: jammy
+    charm: ./landscape-server_ubuntu-22.04-amd64-arm64_ubuntu-20.04-amd64-arm64.charm
+    num_units: 1
+relations:
+  - [landscape-server, rabbitmq-server]
+  - [landscape-server, haproxy]
+  - ["landscape-server:db", "postgresql:db-admin"]

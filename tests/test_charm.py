@@ -443,7 +443,8 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-    def test_on_manual_db_config_change(self):
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change(self, _):
         """
         Test that the manual db settings are reflected if a config change happens later
         """
@@ -460,9 +461,9 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
+        with patch("charm.check_call"):
             with patch(
-                "settings_files.update_service_conf"
+                "settings_files.update_service_conf",
             ) as update_service_conf_mock:
                 self.harness.charm._db_relation_changed(mock_event)
                 self.harness.update_config({"db_host": "hello", "db_port": "world"})
@@ -499,16 +500,16 @@ class TestCharm(unittest.TestCase):
         with patch("charm.check_call") as check_call_mock:
             with patch(
                 "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
+            ):
                 self.harness.charm._db_relation_changed(mock_event)
 
         with patch("charm.check_call") as check_call_mock:
-            check_call_mock.side_effect = CalledProcessError(127, "ouch")
-            self.harness.update_config({"db_host": "hello", "db_port": "world"})
+            with patch("settings_files.update_service_conf"):
+                check_call_mock.side_effect = CalledProcessError(127, "ouch")
+                self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
-
 
     def test_amqp_relation_joined(self):
         unit = self.harness.charm.unit
@@ -762,7 +763,8 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, WaitingStatus)
         write_cert_mock.assert_called_once_with("FANCYNEWCERT")
 
-    def test_on_config_changed_no_smtp_change(self):
+    @patch("charm.update_service_conf")
+    def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": ""})
@@ -770,7 +772,8 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._configure_smtp.assert_not_called()
         self.harness.charm._update_ready_status.assert_called_once()
 
-    def test_on_config_changed_smtp_change(self):
+    @patch("charm.update_service_conf")
+    def test_on_config_changed_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
@@ -887,7 +890,7 @@ class TestCharm(unittest.TestCase):
             apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
             self.harness.charm._upgrade(event)
 
-        event.log.assert_called_once()
+        self.assertEqual(event.log.call_count, 5)
         self.assertEqual(
             apt_mock.DebianPackage.from_apt_cache.call_count,
             len(LANDSCAPE_PACKAGES)
@@ -919,7 +922,7 @@ class TestCharm(unittest.TestCase):
             pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
             self.harness.charm._upgrade(event)
 
-        event.log.assert_called_once()
+        self.assertEqual(event.log.call_count, 2)
         event.fail.assert_called_once()
         apt_mock.DebianPackage.from_apt_cache.assert_called_once_with(
             "landscape-server")
@@ -1108,14 +1111,16 @@ class TestBootstrapAccount(unittest.TestCase):
 
         self.harness.begin()
 
-    def test_bootstrap_account_doesnt_run_with_missing_configs(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_doesnt_run_with_missing_configs(self, _):
         self.harness.update_config(
             {"admin_email": "hello@ubuntu.com", "admin_name": "Hello Ubuntu"}
         )
         self.assertIn("password required", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
 
-    def test_bootstrap_account_doesnt_run_with_missing_rooturl(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_doesnt_run_with_missing_rooturl(self, _):
         self.harness.update_config(
             {
                 "admin_email": "hello@ubuntu.com",
@@ -1126,7 +1131,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.assertIn("root url", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
 
-    def test_bootstrap_account_default_root_url_is_used(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_default_root_url_is_used(self, _):
         self.harness.charm._stored.default_root_url = "https://hello.lxd"
         self.harness.update_config(
             {
@@ -1140,7 +1146,8 @@ class TestBootstrapAccount(unittest.TestCase):
             self.process_mock.call_args.args[0],
         )
 
-    def test_bootstrap_account_config_url_over_default(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_config_url_over_default(self, _):
         """If config root url and default root url exists, use config url"""
         self.harness.charm._stored.default_root_url = "https://hello.lxd"
         config_root_url = "https://www.landscape.com"
@@ -1154,7 +1161,8 @@ class TestBootstrapAccount(unittest.TestCase):
         )
         self.assertIn(config_root_url, self.process_mock.call_args.args[0])
 
-    def test_bootstrap_account_runs_once_with_correct_args(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_runs_once_with_correct_args(self, _):
         """
         Test that bootstrap account runs with correct args and that it can't
         run again after a successful run
@@ -1188,7 +1196,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)
         self.process_mock.assert_called_once()
 
-    def test_bootstrap_account_runs_twice_if_error(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_runs_twice_if_error(self, _):
         """
         If there's an error ensure that bootstrap account runs again and not
         a third time if successful
@@ -1210,7 +1219,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)  # Third time
         self.assertEqual(self.process_mock.call_count, 2)
 
-    def test_bootstrap_account_cannot_run_if_already_bootstrapped(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_cannot_run_if_already_bootstrapped(self, update_service_conf_mock):
         """
         If user already has created an account outside of the charm,
         then the bootstrap account cannot run again

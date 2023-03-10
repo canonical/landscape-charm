@@ -160,3 +160,16 @@ options:
     default:
     description: |
       Optionally specify the postgres user instead of getting it from the charm
+  deployment_mode:
+    type: string
+    default: standalone
+    description: |
+      Landscape Server tenancy mode - do not modify unless you are able
+      to provide the additional configuration required to run
+      Landscape in SaaS mode.
+  additional_service_config:
+    type: string
+    default:
+    description: |
+      Additional service.conf settings to be merged with the default
+      configuration.
