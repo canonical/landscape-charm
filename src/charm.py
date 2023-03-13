@@ -148,6 +148,16 @@ class LandscapeServerCharm(CharmBase):
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
 
+        # Update additional configuration
+        deployment_mode = self.model.config.get("deployment_mode")
+        update_service_conf({"global": {"deployment-mode": deployment_mode}})
+
+        configure_for_deployment_mode(deployment_mode)
+
+        additional_config = self.model.config.get("additional_service_config")
+        if additional_config:
+            merge_service_conf(additional_config)
+
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
 
@@ -216,16 +226,6 @@ class LandscapeServerCharm(CharmBase):
 
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
-
-        # Update additional configuration
-        deployment_mode = self.model.config.get("deployment_mode")
-        update_service_conf({"global": {"deployment-mode": deployment_mode}})
-
-        configure_for_deployment_mode(deployment_mode)
-
-        additional_config = self.model.config.get("additional_service_config")
-        if additional_config:
-            merge_service_conf(additional_config)
 
         self._update_ready_status(restart_services=True)
 
