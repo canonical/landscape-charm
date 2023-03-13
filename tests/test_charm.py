@@ -480,7 +480,8 @@ class TestCharm(unittest.TestCase):
             ),
         )
 
-    def test_on_manual_db_config_change_block_if_error(self):
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change_block_if_error(self, _):
         """
         If the schema migration doesn't go through on a manual config change,
         then block unit status
