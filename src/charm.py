@@ -375,13 +375,13 @@ class LandscapeServerCharm(CharmBase):
         else:
             host = master["host"]
 
-        config_password = self.model.config.get("db_password")
-        if config_password:
-            password = config_password
+        landscape_password = self.model.config.get("db_landscape_password")
+        if landscape_password:
+            password = landscape_password
         else:
             password = master["password"]
 
-        store_password = self.model.config.get("db_store_password")
+        schema_password = self.model.config.get("db_schema_password")
 
         config_port = self.model.config.get("db_port")
         if config_port:
@@ -391,14 +391,14 @@ class LandscapeServerCharm(CharmBase):
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
 
-        config_user = self.model.config.get("db_user")
+        config_user = self.model.config.get("db_schema_user")
         if config_user:
             user = config_user
         else:
             user = unit_data["user"]
 
-        update_db_conf(host=host, port=port, user=user, password=password, 
-                       store_password=store_password)
+        update_db_conf(host=host, port=port, user=user, password=password,
+                       schema_password=schema_password)
 
         if not self._migrate_schema_bootstrap():
             return

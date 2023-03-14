@@ -161,7 +161,7 @@ def write_ssl_cert(ssl_cert: str) -> None:
             "Unable to decode b64-encoded SSL certificate")
 
 
-def update_db_conf(host=None, password=None, store_password=None, port=DEFAULT_POSTGRES_PORT, 
+def update_db_conf(host=None, password=None, schema_password=None, port=DEFAULT_POSTGRES_PORT,
                    user=None):
     """Postgres specific settings override"""
     to_update = defaultdict(dict)
@@ -169,7 +169,7 @@ def update_db_conf(host=None, password=None, store_password=None, port=DEFAULT_P
         to_update["stores"]["host"] = "{}:{}".format(host, port)
     if password:
         to_update["stores"]["password"] = password
-        to_update["schema"]["store_password"] = store_password if store_password else password
+        to_update["schema"]["store_password"] = schema_password if schema_password else password
     if user:
         to_update["schema"]["store_user"] = user
     if to_update:
