@@ -891,7 +891,7 @@ class TestCharm(unittest.TestCase):
             apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
             self.harness.charm._upgrade(event)
 
-        self.assertEqual(event.log.call_count, 5)
+        self.assertEqual(event.log.call_count, 9)
         self.assertEqual(
             apt_mock.DebianPackage.from_apt_cache.call_count,
             len(LANDSCAPE_PACKAGES)
