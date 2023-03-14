@@ -204,18 +204,21 @@ class LandscapeServerCharm(CharmBase):
         self._bootstrap_account()
 
         config_host = self.model.config.get("db_host")
-        config_password = self.model.config.get("db_password")
+        schema_password = self.model.config.get("db_schema_password")
+        landscape_password = self.model.config.get("db_landscape_password")
         config_port = self.model.config.get("db_port")
-        config_user = self.model.config.get("db_user")
+        config_user = self.model.config.get("db_schema_user")
         db_kargs = {}
         if config_host:
             db_kargs["host"] = config_host
-        if config_password:
-            db_kargs["password"] = config_password
+        if schema_password:
+            db_kargs["schema_password"] = schema_password
         if config_port:
             db_kargs["port"] = config_port
         if config_user:
             db_kargs["user"] = config_user
+        if landscape_password:
+            db_kargs["password"] = landscape_password
         if db_kargs:
             update_db_conf(**db_kargs)
             if self._migrate_schema_bootstrap():

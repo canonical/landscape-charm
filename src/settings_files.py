@@ -169,7 +169,9 @@ def update_db_conf(host=None, password=None, schema_password=None, port=DEFAULT_
         to_update["stores"]["host"] = "{}:{}".format(host, port)
     if password:
         to_update["stores"]["password"] = password
-        to_update["schema"]["store_password"] = schema_password if schema_password else password
+        to_update["schema"]["store_password"] = password
+    if schema_password:  # Overrides password
+        to_update["schema"]["store_password"] = schema_password
     if user:
         to_update["schema"]["store_user"] = user
     if to_update:
