@@ -908,6 +908,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 event.log(f"Upgrading {package}...")
                 pkg = apt.DebianPackage.from_apt_cache(package)
                 pkg.ensure(state=apt.PackageState.Latest)
+                installed = apt.DebianPackage.from_installed_package(package)
+                event.log(f"Upgraded to {installed.version}...")
             except PackageNotFoundError as e:
                 logger.error(f"Could not upgrade package {package}. Reason: {e.message}")
                 event.fail(f"Could not upgrade package {package}. Reason: {e.message}")
