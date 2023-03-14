@@ -160,6 +160,11 @@ options:
     default:
     description: |
       Optionally specify the postgres user instead of getting it from the charm
+  db_store_password:
+    type: string
+    default:
+    description: |
+      If not set then uses db_password
   deployment_mode:
     type: string
     default: standalone

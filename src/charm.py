@@ -381,6 +381,8 @@ class LandscapeServerCharm(CharmBase):
         else:
             password = master["password"]
 
+        store_password = self.model.config.get("db_store_password")
+
         config_port = self.model.config.get("db_port")
         if config_port:
             port = config_port
@@ -395,7 +397,8 @@ class LandscapeServerCharm(CharmBase):
         else:
             user = unit_data["user"]
 
-        update_db_conf(host=host, port=port, user=user, password=password)
+        update_db_conf(host=host, port=port, user=user, password=password, 
+                       store_password=store_password)
 
         if not self._migrate_schema_bootstrap():
             return
