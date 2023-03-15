@@ -67,6 +67,19 @@ class ConfigureForDeploymentModeTestCase(TestCase):
             os.path.join(CONFIGS_DIR, "elite_dangerous")
         )
 
+    @patch("os.path.exists")
+    @patch("os.symlink")
+    def test_configure_for_deployment_mode_exists(self, symlink_mock, path_exists_mock):
+        """
+        If the symlink already exists, nothing is done.
+        """
+        path_exists_mock.return_value = True
+
+        configure_for_deployment_mode("jabberwocky")
+
+        path_exists_mock.assert_called_once_with(os.path.join(CONFIGS_DIR, "jabberwocky"))
+        symlink_mock.assert_not_called()
+
 
 class MergeServiceConfTestCase(TestCase):
 
