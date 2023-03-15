@@ -45,7 +45,12 @@ def configure_for_deployment_mode(mode: str) -> None:
     if mode == "standalone":
         return
 
-    os.symlink(os.path.join(CONFIGS_DIR, "standalone"), os.path.join(CONFIGS_DIR, mode))
+    sym_path = os.path.join(CONFIGS_DIR, mode)
+
+    if os.path.exists(sym_path):
+        return
+
+    os.symlink(os.path.join(CONFIGS_DIR, "standalone"), sym_path)
 
 
 def merge_service_conf(other: str) -> None:
