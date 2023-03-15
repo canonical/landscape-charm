@@ -333,8 +333,8 @@ class TestCharm(unittest.TestCase):
             {
                 "db_host": "hello",
                 "db_port": "world",
-                "db_user": "test",
-                "db_password": "test_pass",
+                "db_schema_user": "test",
+                "db_landscape_password": "test_pass",
             }
         )
         mock_event = Mock()
@@ -364,6 +364,51 @@ class TestCharm(unittest.TestCase):
                 "schema": {
                     "store_user": "test",
                     "store_password": "test_pass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_password(self):
+        '''
+        Test specifying both passwords in the juju config
+        '''
+        self.harness.disable_hooks()
+        self.harness.update_config(
+            {
+                "db_host": "hello",
+                "db_port": "world",
+                "db_schema_user": "test",
+                "db_landscape_password": "test_pass",
+                "db_schema_password": "schema_pass",
+            }
+        )
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "test_pass",
+                },
+                "schema": {
+                    "store_user": "test",
+                    "store_password": "schema_pass",
                 },
             }
         )

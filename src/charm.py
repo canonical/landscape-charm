@@ -204,18 +204,21 @@ class LandscapeServerCharm(CharmBase):
         self._bootstrap_account()
 
         config_host = self.model.config.get("db_host")
-        config_password = self.model.config.get("db_password")
+        schema_password = self.model.config.get("db_schema_password")
+        landscape_password = self.model.config.get("db_landscape_password")
         config_port = self.model.config.get("db_port")
-        config_user = self.model.config.get("db_user")
+        config_user = self.model.config.get("db_schema_user")
         db_kargs = {}
         if config_host:
             db_kargs["host"] = config_host
-        if config_password:
-            db_kargs["password"] = config_password
+        if schema_password:
+            db_kargs["schema_password"] = schema_password
         if config_port:
             db_kargs["port"] = config_port
         if config_user:
             db_kargs["user"] = config_user
+        if landscape_password:
+            db_kargs["password"] = landscape_password
         if db_kargs:
             update_db_conf(**db_kargs)
             if self._migrate_schema_bootstrap():
@@ -375,11 +378,13 @@ class LandscapeServerCharm(CharmBase):
         else:
             host = master["host"]
 
-        config_password = self.model.config.get("db_password")
-        if config_password:
-            password = config_password
+        landscape_password = self.model.config.get("db_landscape_password")
+        if landscape_password:
+            password = landscape_password
         else:
             password = master["password"]
+
+        schema_password = self.model.config.get("db_schema_password")
 
         config_port = self.model.config.get("db_port")
         if config_port:
@@ -389,13 +394,14 @@ class LandscapeServerCharm(CharmBase):
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
 
-        config_user = self.model.config.get("db_user")
+        config_user = self.model.config.get("db_schema_user")
         if config_user:
             user = config_user
         else:
             user = unit_data["user"]
 
-        update_db_conf(host=host, port=port, user=user, password=password)
+        update_db_conf(host=host, port=port, user=user, password=password,
+                       schema_password=schema_password)
 
         if not self._migrate_schema_bootstrap():
             return

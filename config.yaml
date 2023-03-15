@@ -145,21 +145,30 @@ options:
     default:
     description: |
       Optionally specify the host instead of getting it from the postgres charm
-  db_password:
+  db_landscape_password:
     type: string
     default:
-    description: Optionally specify db password
+    description: |
+      Password for landscape user which does normal read/write operations
   db_port:
     type: string
     default:
     description: |
       Optionally specify the db port instead of getting it from the postgres
       charm. Falls back to the default postgres port
-  db_user:
+  db_schema_user:
     type: string
     default:
     description: |
-      Optionally specify the postgres user instead of getting it from the charm
+      Database admin user to perform schema checks and migrations. If not
+      provided, the value from the postgres charm is used
+  db_schema_password:
+    type: string
+    default:
+    description: |
+      Password used by database admin to perform schema checks and 
+      migrations. If not set, postgres charm value, followed by
+      db_landscape_password is used.
   deployment_mode:
     type: string
     default: standalone
