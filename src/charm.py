@@ -51,6 +51,7 @@ NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
+HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases"
 
 LANDSCAPE_PACKAGES = (
     "landscape-server",
@@ -129,6 +130,8 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.upgrade_action, self._upgrade)
         self.framework.observe(self.on.migrate_schema_action,
                                self._migrate_schema)
+        self.framework.observe(self.on.hash_id_databases_action,
+                               self._hash_id_databases)
 
         # State
         self._stored.set_default(ready={
@@ -943,6 +946,19 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                        e.returncode)
             self.unit.status = BlockedStatus("Failed schema migration")
         else:
+            self.unit.status = prev_status
+
+    def _hash_id_databases(self, event: ActionEvent) -> None:
+        prev_status = self.unit.status
+        self.unit.status = MaintenanceStatus("Hashing ID databases...")
+        event.log("Running hash_id_databases")
+
+        try:
+            subprocess.run(["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True)
+        except CalledProcessError as e:
+            logger.error("Hashing ID databases failed with error code %s", e.returncode)
+            event.fail("Hashing ID databases failed with error code %s", e.returncode)
+        finally:
             self.unit.status = prev_status
 
 

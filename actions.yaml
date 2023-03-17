@@ -6,9 +6,15 @@ pause:
 resume:
   description: Resume the Landscape services.
 upgrade:
-  description: Upgrade software on the Landscape Server unit. This will update
+  description: |
+    Upgrade software on the Landscape Server unit. This will update
     APT package indices and upgrade the landscape-server package. Unit must
     already be paused using the 'pause' action.
 migrate-schema:
-  description: Upgrade the Landscape database schemas on the related databases.
+  description: |
+    Upgrade the Landscape database schemas on the related databases.
     Unit must already be paused using the 'pause' action.
+hash-id-databases:
+  description: |
+    Regenerate the package hash to id mapping files that are used to
+    speed up client package reporting.

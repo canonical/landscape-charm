@@ -24,7 +24,7 @@ from charms.operator_libs_linux.v0.apt import (
 
 from charm import (
     DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, LandscapeServerCharm)
+    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm)
 
 
 class TestCharm(unittest.TestCase):
@@ -1287,3 +1287,29 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)
         self.harness.update_config(config)  # Third time
         self.process_mock.assert_called_once()
+
+    @patch("subprocess.run")
+    def test_hash_id_databases(self, run_mock):
+        event = Mock(spec_set=ActionEvent)
+
+        self.harness.charm._hash_id_databases(event)
+
+        run_mock.assert_called_once_with(
+            ["sudo", "-u", "landscape", HASH_ID_DATABASES],
+            check=True,
+            text=True
+        )
+
+    @patch("subprocess.run")
+    def test_hash_id_databases_error(self, run_mock):
+        event = Mock(spec_set=ActionEvent)
+        run_mock.side_effect = CalledProcessError(127, "ouchie")
+
+        self.harness.charm._hash_id_databases(event)
+
+        run_mock.assert_called_once_with(
+            ["sudo", "-u", "landscape", HASH_ID_DATABASES],
+            check=True,
+            text=True
+        )
+        event.fail.assert_called_once()
