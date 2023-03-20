@@ -318,6 +318,7 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
         deployment_mode = self.model.config.get("deployment_mode")
+        is_standalone = deployment_mode == "standalone"
 
         update_default_settings({
             "RUN_ALL": "no",
@@ -329,8 +330,8 @@ class LandscapeServerCharm(CharmBase):
             "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
             "RUN_CRON": "yes" if is_leader else "no",
             "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader else "no",
-            "RUN_PPPA_PROXY": "yes" if deployment_mode != "standalone" else "no",
+            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader and is_standalone else "no",
+            "RUN_PPPA_PROXY": "no",
         })
 
         logger.info("Starting services")
