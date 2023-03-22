@@ -51,7 +51,7 @@ NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
-HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases"
+HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 
 LANDSCAPE_PACKAGES = (
     "landscape-server",
