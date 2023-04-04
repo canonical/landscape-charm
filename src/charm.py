@@ -36,7 +36,8 @@ from ops.model import (
     ActiveStatus, BlockedStatus, Relation, MaintenanceStatus, WaitingStatus)
 
 from settings_files import (
-    prepend_default_settings, update_default_settings, update_service_conf,
+    DEFAULT_POSTGRES_PORT, configure_for_deployment_mode, merge_service_conf,
+    prepend_default_settings, update_db_conf, update_default_settings, update_service_conf,
     write_license_file, write_ssl_cert)
 
 logger = logging.getLogger(__name__)
@@ -50,11 +51,13 @@ NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
+HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 
 LANDSCAPE_PACKAGES = (
     "landscape-server",
     "landscape-client",
     "landscape-common",
+    "landscape-hashids"
 )
 
 DEFAULT_SERVICES = (
@@ -129,6 +132,8 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.upgrade_action, self._upgrade)
         self.framework.observe(self.on.migrate_schema_action,
                                self._migrate_schema)
+        self.framework.observe(self.on.hash_id_databases_action,
+                               self._hash_id_databases)
 
         # State
         self._stored.set_default(ready={
@@ -138,6 +143,7 @@ class LandscapeServerCharm(CharmBase):
         })
         self._stored.set_default(leader_ip="")
         self._stored.set_default(running=False)
+        self._stored.set_default(paused=False)
         self._stored.set_default(default_root_url="")
         self._stored.set_default(account_bootstrapped=False)
 
@@ -146,6 +152,16 @@ class LandscapeServerCharm(CharmBase):
 
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
+
+        # Update additional configuration
+        deployment_mode = self.model.config.get("deployment_mode")
+        update_service_conf({"global": {"deployment-mode": deployment_mode}})
+
+        configure_for_deployment_mode(deployment_mode)
+
+        additional_config = self.model.config.get("additional_service_config")
+        if additional_config:
+            merge_service_conf(additional_config)
 
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
@@ -192,6 +208,30 @@ class LandscapeServerCharm(CharmBase):
 
         self._bootstrap_account()
 
+        config_host = self.model.config.get("db_host")
+        schema_password = self.model.config.get("db_schema_password")
+        landscape_password = self.model.config.get("db_landscape_password")
+        config_port = self.model.config.get("db_port")
+        config_user = self.model.config.get("db_schema_user")
+        db_kargs = {}
+        if config_host:
+            db_kargs["host"] = config_host
+        if schema_password:
+            db_kargs["schema_password"] = schema_password
+        if config_port:
+            db_kargs["port"] = config_port
+        if config_user:
+            db_kargs["user"] = config_user
+        if landscape_password:
+            db_kargs["password"] = landscape_password
+        if db_kargs:
+            update_db_conf(**db_kargs)
+            if self._migrate_schema_bootstrap():
+                self.unit.status = WaitingStatus("Waiting on relations")
+                self._stored.ready["db"] = True
+            else:
+                return
+
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
 
@@ -204,11 +244,11 @@ class LandscapeServerCharm(CharmBase):
         landscape_ppa = self.model.config["landscape_ppa"]
 
         try:
-            # Add the Landscape Server beta PPA and install via apt.
+            # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
-            apt.add_package("landscape-server")
+            apt.add_package(["landscape-server", "landscape-hashids"])
         except PackageNotFoundError:
-            logger.error("landscape-server package not found in package cache "
+            logger.error("Landscape package not found in package cache "
                          "or on system")
             self.unit.status = BlockedStatus("Failed to install packages")
             return
@@ -266,6 +306,10 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = ActiveStatus("Unit is ready")
             return
 
+        if self._stored.paused:
+            self.unit.status = MaintenanceStatus("Services stopped")
+            return
+
         self._stored.running = self._start_services()
 
     def _start_services(self) -> bool:
@@ -275,6 +319,8 @@ class LandscapeServerCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
+        deployment_mode = self.model.config.get("deployment_mode")
+        is_standalone = deployment_mode == "standalone"
 
         update_default_settings({
             "RUN_ALL": "no",
@@ -286,7 +332,8 @@ class LandscapeServerCharm(CharmBase):
             "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
             "RUN_CRON": "yes" if is_leader else "no",
             "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader else "no",
+            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader and is_standalone else "no",
+            "RUN_PPPA_PROXY": "no",
         })
 
         logger.info("Starting services")
@@ -304,10 +351,15 @@ class LandscapeServerCharm(CharmBase):
         unit_data = event.relation.data[event.unit]
 
         required_relation_data = ["master", "allowed-units", "port", "user"]
-        missing_relation_data = [i for i in required_relation_data if i not in unit_data]
+        missing_relation_data = [
+            i for i in required_relation_data if i not in unit_data
+        ]
         if missing_relation_data:
-            logger.info("db relation not yet ready. Missing keys: {}".format(
-                missing_relation_data))
+            logger.info(
+                "db relation not yet ready. Missing keys: {}".format(
+                    missing_relation_data
+                )
+            )
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
@@ -324,36 +376,60 @@ class LandscapeServerCharm(CharmBase):
 
         # We can't use unit_data["host"] because it can return the IP of the secondary
         master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
-        host = master["host"]
-        password = master["password"]
-        port = unit_data["port"]
-        user = unit_data["user"]
 
-        update_service_conf({
-            "stores": {
-                "host": "{}:{}".format(host, port),
-                "password": password,
-            },
-            "schema": {
-                "store_user": user,
-                "store_password": password,
-            },
-        })
+        # Override db config if manually set in juju
+        config_host = self.model.config.get("db_host")
+        if config_host:
+            host = config_host
+        else:
+            host = master["host"]
 
-        # Ensure the database users and schemas are set up.
-        try:
-            check_call(["/usr/bin/landscape-schema", "--bootstrap"])
-        except CalledProcessError as e:
-            logger.error(
-                "Landscape Server schema update failed with return code %d",
-                e.returncode)
-            self.unit.status = BlockedStatus(
-                "Failed to update database schema")
+        landscape_password = self.model.config.get("db_landscape_password")
+        if landscape_password:
+            password = landscape_password
+        else:
+            password = master["password"]
+
+        schema_password = self.model.config.get("db_schema_password")
+
+        config_port = self.model.config.get("db_port")
+        if config_port:
+            port = config_port
+        else:
+            port = unit_data["port"]
+        if not port:
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
+
+        config_user = self.model.config.get("db_schema_user")
+        if config_user:
+            user = config_user
+        else:
+            user = unit_data["user"]
+
+        update_db_conf(host=host, port=port, user=user, password=password,
+                       schema_password=schema_password)
+
+        if not self._migrate_schema_bootstrap():
             return
 
         self._stored.ready["db"] = True
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
+
+    def _migrate_schema_bootstrap(self):
+        """
+        Migrates schema along with the bootstrap command which ensures that the
+        databases along with the landscape user exists. Returns True on success
+        """
+        try:
+            check_call([SCHEMA_SCRIPT, "--bootstrap"])
+            return True
+        except CalledProcessError as e:
+            logger.error(
+                "Landscape Server schema update failed with return code %d",
+                e.returncode,
+            )
+            self.unit.status = BlockedStatus("Failed to update database schema")
 
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._stored.ready["amqp"] = False
@@ -837,6 +913,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             self.unit.status = MaintenanceStatus("Services stopped")
             self._stored.running = False
+            self._stored.paused = True
 
     def _resume(self, event: ActionEvent):
         self.unit.status = MaintenanceStatus("Starting services")
@@ -857,6 +934,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             event.fail("Failed to start services: %s", start_result.stdout)
         else:
             self._stored.running = True
+            self._stored.paused = False
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
 
@@ -877,6 +955,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 event.log(f"Upgrading {package}...")
                 pkg = apt.DebianPackage.from_apt_cache(package)
                 pkg.ensure(state=apt.PackageState.Latest)
+                installed = apt.DebianPackage.from_installed_package(package)
+                event.log(f"Upgraded to {installed.version}...")
             except PackageNotFoundError as e:
                 logger.error(f"Could not upgrade package {package}. Reason: {e.message}")
                 event.fail(f"Could not upgrade package {package}. Reason: {e.message}")
@@ -904,6 +984,19 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                        e.returncode)
             self.unit.status = BlockedStatus("Failed schema migration")
         else:
+            self.unit.status = prev_status
+
+    def _hash_id_databases(self, event: ActionEvent) -> None:
+        prev_status = self.unit.status
+        self.unit.status = MaintenanceStatus("Hashing ID databases...")
+        event.log("Running hash_id_databases")
+
+        try:
+            subprocess.run(["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True)
+        except CalledProcessError as e:
+            logger.error("Hashing ID databases failed with error code %s", e.returncode)
+            event.fail("Hashing ID databases failed with error code %s", e.returncode)
+        finally:
             self.unit.status = prev_status
 
 

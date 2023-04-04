@@ -140,3 +140,45 @@ options:
     description: |
       Comma-separated list of nagios servicegroups. If empty, the
       nagios-context will be used as the servicegroup.
+  db_host:
+    type: string
+    default:
+    description: |
+      Optionally specify the host instead of getting it from the postgres charm
+  db_landscape_password:
+    type: string
+    default:
+    description: |
+      Password for landscape user which does normal read/write operations
+  db_port:
+    type: string
+    default:
+    description: |
+      Optionally specify the db port instead of getting it from the postgres
+      charm. Falls back to the default postgres port
+  db_schema_user:
+    type: string
+    default:
+    description: |
+      Database admin user to perform schema checks and migrations. If not
+      provided, the value from the postgres charm is used
+  db_schema_password:
+    type: string
+    default:
+    description: |
+      Password used by database admin to perform schema checks and 
+      migrations. If not set, postgres charm value, followed by
+      db_landscape_password is used.
+  deployment_mode:
+    type: string
+    default: standalone
+    description: |
+      Landscape Server tenancy mode - do not modify unless you are able
+      to provide the additional configuration required to run
+      Landscape in SaaS mode.
+  additional_service_config:
+    type: string
+    default:
+    description: |
+      Additional service.conf settings to be merged with the default
+      configuration.

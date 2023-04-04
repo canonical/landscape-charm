@@ -10,7 +10,7 @@ from io import BytesIO
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
-from unittest.mock import DEFAULT, Mock, patch
+from unittest.mock import DEFAULT, Mock, patch, call
 
 import yaml
 
@@ -24,7 +24,7 @@ from charms.operator_libs_linux.v0.apt import (
 
 from charm import (
     DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, LandscapeServerCharm)
+    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm)
 
 
 class TestCharm(unittest.TestCase):
@@ -73,7 +73,8 @@ class TestCharm(unittest.TestCase):
 
         mocks["check_call"].assert_called_once_with(
             ["add-apt-repository", "-y", ppa])
-        mocks["apt"].add_package.assert_called_once_with("landscape-server")
+        mocks["apt"].add_package.assert_called_once_with(["landscape-server", 
+            "landscape-hashids"])
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
@@ -302,29 +303,153 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
-        patches = patch.multiple(
-            "charm",
-            check_call=DEFAULT,
-            update_service_conf=DEFAULT,
-        )
 
-        with patches as mocks:
-            self.harness.charm._db_relation_changed(mock_event)
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["db"])
 
-        mocks["update_service_conf"].assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_used(self):
+        self.harness.disable_hooks()
+        self.harness.update_config(
+            {
+                "db_host": "hello",
+                "db_port": "world",
+                "db_schema_user": "test",
+                "db_landscape_password": "test_pass",
+            }
+        )
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
                 "password": "testpass",
             },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "test_pass",
+                },
+                "schema": {
+                    "store_user": "test",
+                    "store_password": "test_pass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_password(self):
+        '''
+        Test specifying both passwords in the juju config
+        '''
+        self.harness.disable_hooks()
+        self.harness.update_config(
+            {
+                "db_host": "hello",
+                "db_port": "world",
+                "db_schema_user": "test",
+                "db_landscape_password": "test_pass",
+                "db_schema_password": "schema_pass",
+            }
+        )
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
             },
-        })
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "test_pass",
+                },
+                "schema": {
+                    "store_user": "test",
+                    "store_password": "schema_pass",
+                },
+            }
+        )
+
+    def test_db_manual_configs_used_partial(self):
+        """
+        Test that if some of the manual configs are provided, the rest are
+        gotten from the postgres unit
+        """
+        self.harness.disable_hooks()
+        self.harness.update_config({"db_host": "hello", "db_port": "world"})
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "hello:world",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
 
     def test_db_relation_changed_called_process_error(self):
         mock_event = Mock()
@@ -338,30 +463,99 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
-        patches = patch.multiple(
-            "charm",
-            check_call=DEFAULT,
-            update_service_conf=DEFAULT,
-        )
 
-        with patches as mocks:
-            mocks["check_call"].side_effect = CalledProcessError(127, "ouch")
-            self.harness.charm._db_relation_changed(mock_event)
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ) as update_service_conf_mock:
+                check_call_mock.side_effect = CalledProcessError(127, "ouch")
+                self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
         self.assertFalse(self.harness.charm._stored.ready["db"])
 
-        mocks["update_service_conf"].assert_called_once_with({
-            "stores": {
-                "host": "1.2.3.4:5678",
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
+
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change(self, _):
+        """
+        Test that the manual db settings are reflected if a config change happens later
+        """
+
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
                 "password": "testpass",
             },
-            "schema": {
-                "store_user": "testuser",
-                "store_password": "testpass",
-            }
-        })
+        }
+
+        with patch("charm.check_call"):
+            with patch(
+                "settings_files.update_service_conf",
+            ) as update_service_conf_mock:
+                self.harness.charm._db_relation_changed(mock_event)
+                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        self.assertEqual(update_service_conf_mock.call_count, 2)
+        self.assertEqual(
+            update_service_conf_mock.call_args_list[1],
+            call(
+                {
+                    "stores": {
+                        "host": "hello:world",
+                    },
+                }
+            ),
+        )
+
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change_block_if_error(self, _):
+        """
+        If the schema migration doesn't go through on a manual config change,
+        then block unit status
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ):
+                self.harness.charm._db_relation_changed(mock_event)
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch("settings_files.update_service_conf"):
+                check_call_mock.side_effect = CalledProcessError(127, "ouch")
+                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, BlockedStatus)
 
     def test_amqp_relation_joined(self):
         unit = self.harness.charm.unit
@@ -615,7 +809,8 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, WaitingStatus)
         write_cert_mock.assert_called_once_with("FANCYNEWCERT")
 
-    def test_on_config_changed_no_smtp_change(self):
+    @patch("charm.update_service_conf")
+    def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": ""})
@@ -623,7 +818,8 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._configure_smtp.assert_not_called()
         self.harness.charm._update_ready_status.assert_called_once()
 
-    def test_on_config_changed_smtp_change(self):
+    @patch("charm.update_service_conf")
+    def test_on_config_changed_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
         self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
@@ -740,7 +936,7 @@ class TestCharm(unittest.TestCase):
             apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
             self.harness.charm._upgrade(event)
 
-        event.log.assert_called_once()
+        self.assertEqual(event.log.call_count, 9)
         self.assertEqual(
             apt_mock.DebianPackage.from_apt_cache.call_count,
             len(LANDSCAPE_PACKAGES)
@@ -772,7 +968,7 @@ class TestCharm(unittest.TestCase):
             pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
             self.harness.charm._upgrade(event)
 
-        event.log.assert_called_once()
+        self.assertEqual(event.log.call_count, 2)
         event.fail.assert_called_once()
         apt_mock.DebianPackage.from_apt_cache.assert_called_once_with(
             "landscape-server")
@@ -961,14 +1157,16 @@ class TestBootstrapAccount(unittest.TestCase):
 
         self.harness.begin()
 
-    def test_bootstrap_account_doesnt_run_with_missing_configs(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_doesnt_run_with_missing_configs(self, _):
         self.harness.update_config(
             {"admin_email": "hello@ubuntu.com", "admin_name": "Hello Ubuntu"}
         )
         self.assertIn("password required", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
 
-    def test_bootstrap_account_doesnt_run_with_missing_rooturl(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_doesnt_run_with_missing_rooturl(self, _):
         self.harness.update_config(
             {
                 "admin_email": "hello@ubuntu.com",
@@ -979,7 +1177,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.assertIn("root url", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
 
-    def test_bootstrap_account_default_root_url_is_used(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_default_root_url_is_used(self, _):
         self.harness.charm._stored.default_root_url = "https://hello.lxd"
         self.harness.update_config(
             {
@@ -993,7 +1192,8 @@ class TestBootstrapAccount(unittest.TestCase):
             self.process_mock.call_args.args[0],
         )
 
-    def test_bootstrap_account_config_url_over_default(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_config_url_over_default(self, _):
         """If config root url and default root url exists, use config url"""
         self.harness.charm._stored.default_root_url = "https://hello.lxd"
         config_root_url = "https://www.landscape.com"
@@ -1007,7 +1207,8 @@ class TestBootstrapAccount(unittest.TestCase):
         )
         self.assertIn(config_root_url, self.process_mock.call_args.args[0])
 
-    def test_bootstrap_account_runs_once_with_correct_args(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_runs_once_with_correct_args(self, _):
         """
         Test that bootstrap account runs with correct args and that it can't
         run again after a successful run
@@ -1041,7 +1242,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)
         self.process_mock.assert_called_once()
 
-    def test_bootstrap_account_runs_twice_if_error(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_runs_twice_if_error(self, _):
         """
         If there's an error ensure that bootstrap account runs again and not
         a third time if successful
@@ -1063,7 +1265,8 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)  # Third time
         self.assertEqual(self.process_mock.call_count, 2)
 
-    def test_bootstrap_account_cannot_run_if_already_bootstrapped(self):
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_cannot_run_if_already_bootstrapped(self, update_service_conf_mock):
         """
         If user already has created an account outside of the charm,
         then the bootstrap account cannot run again
@@ -1084,3 +1287,29 @@ class TestBootstrapAccount(unittest.TestCase):
         self.harness.update_config(config)
         self.harness.update_config(config)  # Third time
         self.process_mock.assert_called_once()
+
+    @patch("subprocess.run")
+    def test_hash_id_databases(self, run_mock):
+        event = Mock(spec_set=ActionEvent)
+
+        self.harness.charm._hash_id_databases(event)
+
+        run_mock.assert_called_once_with(
+            ["sudo", "-u", "landscape", HASH_ID_DATABASES],
+            check=True,
+            text=True
+        )
+
+    @patch("subprocess.run")
+    def test_hash_id_databases_error(self, run_mock):
+        event = Mock(spec_set=ActionEvent)
+        run_mock.side_effect = CalledProcessError(127, "ouchie")
+
+        self.harness.charm._hash_id_databases(event)
+
+        run_mock.assert_called_once_with(
+            ["sudo", "-u", "landscape", HASH_ID_DATABASES],
+            check=True,
+            text=True
+        )
+        event.fail.assert_called_once()

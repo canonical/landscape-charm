@@ -7,9 +7,12 @@ filesystem.
 
 import os
 from base64 import b64decode, binascii
+from collections import defaultdict
 from configparser import ConfigParser
 from urllib.request import urlopen
 from urllib.error import URLError
+
+CONFIGS_DIR = "/opt/canonical/landscape/configs"
 
 DEFAULT_SETTINGS = "/etc/default/landscape-server"
 
@@ -23,6 +26,8 @@ LICENSE_FILE_PROTOCOLS = (
 SERVICE_CONF = "/etc/landscape/service.conf"
 SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 
+DEFAULT_POSTGRES_PORT = "5432"
+
 
 class LicenseFileReadException(Exception):
     pass
@@ -30,6 +35,35 @@ class LicenseFileReadException(Exception):
 
 class SSLCertReadException(Exception):
     pass
+
+
+def configure_for_deployment_mode(mode: str) -> None:
+    """
+    Places files where Landscape expects to find them for different deployment
+    modes.
+    """
+    if mode == "standalone":
+        return
+
+    sym_path = os.path.join(CONFIGS_DIR, mode)
+
+    if os.path.exists(sym_path):
+        return
+
+    os.symlink(os.path.join(CONFIGS_DIR, "standalone"), sym_path)
+
+
+def merge_service_conf(other: str) -> None:
+    """
+    Merges `other` into the Landscape Server configuration file,
+    overwriting existing config.
+    """
+    config = ConfigParser()
+    config.read(SERVICE_CONF)
+    config.read_string(other)
+
+    with open(SERVICE_CONF, "w") as config_fp:
+        config.write(config_fp)
 
 
 def prepend_default_settings(updates: dict) -> None:
@@ -130,3 +164,20 @@ def write_ssl_cert(ssl_cert: str) -> None:
     except binascii.Error:
         raise SSLCertReadException(
             "Unable to decode b64-encoded SSL certificate")
+
+
+def update_db_conf(host=None, password=None, schema_password=None, port=DEFAULT_POSTGRES_PORT,
+                   user=None):
+    """Postgres specific settings override"""
+    to_update = defaultdict(dict)
+    if host:  # Note that host is required if port is changed
+        to_update["stores"]["host"] = "{}:{}".format(host, port)
+    if password:
+        to_update["stores"]["password"] = password
+        to_update["schema"]["store_password"] = password
+    if schema_password:  # Overrides password
+        to_update["schema"]["store_password"] = schema_password
+    if user:
+        to_update["schema"]["store_user"] = user
+    if to_update:
+        update_service_conf(to_update)

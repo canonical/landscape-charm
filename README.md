@@ -33,7 +33,7 @@ TODO: Provide any relations which are provided or required by your charm
 ## Configuration
 
 Landscape requires configuration of a license file before deployment.
-Please sign in to your "hosted account" at
+Please sign in to your "SaaS account" at
 [https://landscape.canonical.com](https://landscape.canonical.com) to
 download your license file. It can be found by following the link on
 the left side of the page: "access the Landscape On Premises archive."
@@ -44,7 +44,7 @@ You can set this as a juju configuration option after deployment on each
 deployed landscape-server application:
 
 ```bash
-juju config landscape-server "license-file=$(cat license-file"
+juju config landscape-server "license_file=$(cat license-file)"
 ```
 
 ### SSL
@@ -64,3 +64,11 @@ service for other services that have different certificates).
 Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
 on enhancements to this charm following best practice guidelines, and
 `CONTRIBUTING.md` for developer guidance.
+
+When developing the charm, here's a quick way to test out changes as
+they would be deployed by `landscape-scalable`:
+
+```bash
+charmcraft pack
+juju deploy ./bundle.yaml
+```
