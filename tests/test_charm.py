@@ -95,11 +95,8 @@ class TestCharm(unittest.TestCase):
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageNotFoundError
-            harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+            self.assertRaises(PackageNotFoundError,
+                harness.begin_with_initial_hooks)
 
     def test_install_package_error(self):
         harness = Harness(LandscapeServerCharm)
@@ -116,11 +113,7 @@ class TestCharm(unittest.TestCase):
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageError("ouch")
-            harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+            self.assertRaises(PackageError, harness.begin_with_initial_hooks)
 
     def test_install_called_process_error(self):
         harness = Harness(LandscapeServerCharm)
@@ -131,11 +124,8 @@ class TestCharm(unittest.TestCase):
         with patch("charm.check_call") as mock:
             with patch("charm.update_service_conf"):
                 mock.side_effect = CalledProcessError(127, Mock())
-                harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+                self.assertRaises(CalledProcessError, 
+                    harness.begin_with_initial_hooks)
 
     def test_install_ssl_cert(self):
         harness = Harness(LandscapeServerCharm)
@@ -188,20 +178,28 @@ class TestCharm(unittest.TestCase):
 
     def test_install_license_file_b64(self):
         harness = Harness(LandscapeServerCharm)
-        harness.update_config({"license_file": "VEhJUyBJUyBBIExJQ0VOU0U="})
+        license_text = "VEhJUyBJUyBBIExJQ0VOU0U"
+        harness.update_config({"license_file": license_text})
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
             relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patch.multiple(
                 "charm",
+                apt=DEFAULT,
+                check_call=DEFAULT,
                 update_service_conf=DEFAULT,
+                prepend_default_settings=DEFAULT,
                 write_license_file=DEFAULT,
         ) as mocks:
             harness.begin_with_initial_hooks()
 
-        mocks["write_license_file"].assert_called_once_with(
-            "VEhJUyBJUyBBIExJQ0VOU0U=", 1000, 1000)
+        mock_write = mocks["write_license_file"]
+        self.assertEqual(len(mock_write.mock_calls), 2)
+        self.assertEqual(mock_write.mock_calls[0].args,
+            (license_text, 1000, 1000))
+        self.assertEqual(mock_write.mock_calls[1].args,
+            (license_text, 1000, 1000))
 
     def test_update_ready_status_not_running(self):
         self.harness.charm.unit.status = WaitingStatus()

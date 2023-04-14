@@ -37,6 +37,10 @@ class SSLCertReadException(Exception):
     pass
 
 
+class ServiceConfMissing(Exception):
+    pass
+
+
 def configure_for_deployment_mode(mode: str) -> None:
     """
     Places files where Landscape expects to find them for different deployment
@@ -111,6 +115,11 @@ def update_service_conf(updates: dict) -> None:
     `updates` is a mapping of {section => {key => value}}, to be applied
         to the config file.
     """
+    if not os.path.isfile(SERVICE_CONF):
+        # Landscape server will not overwrite this file on install, so we
+        # cannot get the default values if we create it here
+        raise ServiceConfMissing("Landscape server install failed!")
+
     config = ConfigParser()
     config.read(SERVICE_CONF)
 
