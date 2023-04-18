@@ -206,8 +206,6 @@ class LandscapeServerCharm(CharmBase):
                 "package-upload": {"root-url": root_url},
             })
 
-        self._bootstrap_account()
-
         config_host = self.model.config.get("db_host")
         schema_password = self.model.config.get("db_schema_password")
         landscape_password = self.model.config.get("db_landscape_password")
@@ -232,6 +230,8 @@ class LandscapeServerCharm(CharmBase):
             else:
                 return
 
+        self._bootstrap_account()
+
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
 
@@ -247,22 +247,9 @@ class LandscapeServerCharm(CharmBase):
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
             apt.add_package(["landscape-server", "landscape-hashids"])
-        except PackageNotFoundError:
-            logger.error("Landscape package not found in package cache "
-                         "or on system")
-            self.unit.status = BlockedStatus("Failed to install packages")
-            return
-        except PackageError as e:
-            logger.error(
-                "Could not install landscape-server package. Reason: %s",
-                e.message)
-            self.unit.status = BlockedStatus("Failed to install packages")
-            return
-        except CalledProcessError as e:
-            logger.error("Package install failed with return code %d",
-                         e.returncode)
-            self.unit.status = BlockedStatus("Failed to install packages")
-            return
+        except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
+            logger.error("Failed to install packages")
+            raise exc  # This will trigger juju's exponential retry
 
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
@@ -419,10 +406,12 @@ class LandscapeServerCharm(CharmBase):
     def _migrate_schema_bootstrap(self):
         """
         Migrates schema along with the bootstrap command which ensures that the
-        databases along with the landscape user exists. Returns True on success
+        databases along with the landscape user exists. In addition creates
+        admin if configured. Returns True on success
         """
         try:
             check_call([SCHEMA_SCRIPT, "--bootstrap"])
+            self._bootstrap_account()
             return True
         except CalledProcessError as e:
             logger.error(
