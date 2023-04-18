@@ -114,6 +114,8 @@ class LandscapeServerCharm(CharmBase):
                                self._website_relation_changed)
         self.framework.observe(self.on.nrpe_external_master_relation_joined,
                                self._nrpe_external_master_relation_joined)
+        self.framework.observe(self.on.application_dashboard_relation_joined,
+                               self._application_dashboard_relation_joined)
 
         # Leadership/peering
         self.framework.observe(self.on.leader_elected, self._leader_elected)
@@ -660,6 +662,41 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 continue
 
             os.remove(cfg_filename)
+
+    def _application_dashboard_relation_joined(self, event: RelationJoinedEvent):
+        if not self.unit.is_leader():
+            return
+
+        root_url = self.model.config.get("root_url")
+        if not root_url:
+            root_url = self._stored.default_root_url
+
+        if not root_url:
+            root_url = "https://" + str(
+                self.model.get_binding(event.relation).network.bind_address)
+
+        site_name = self.model.config.get("site_name")
+        if site_name:
+            subtitle = f"[{site_name}] Systems management"
+            group = f"[{site_name}] LMA"
+        else:
+            subtitle = "Systems management"
+            group = "LMA"
+
+        icon_file = f"{self.charm_dir or ''}/icon.svg"
+        if os.path.exists(icon_file):
+            with open(icon_file) as fp:
+                icon_data = fp.read()
+        else:
+            icon_data = None
+
+        event.relation.data[self.app].update({
+            "name": "Landscape",
+            "url": root_url,
+            "subtitle": subtitle,
+            "group": group,
+            "icon": icon_data,
+        })
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
         # Just because we received this event does not mean we are
