@@ -1,15 +1,12 @@
-description: Landscape Scalable
+description: Landscape Scalable Dev
+series: jammy
 applications:
   postgresql:
-    series: focal
+    channel: 14/edge
     charm: ch:postgresql
     num_units: 1
-    options:
-      extra_packages: python3-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython3-*
-      max_connections: 500
-      max_prepared_transactions: 500
   rabbitmq-server:
-    series: focal
+    channel: latest/edge
     charm: ch:rabbitmq-server
     num_units: 1
   haproxy:
@@ -23,7 +20,6 @@ applications:
       ssl_cert: SELFSIGNED
       global_default_bind_options: "no-tlsv10"
   landscape-server:
-    series: jammy
     charm: ./landscape-server_ubuntu-22.04-amd64-arm64_ubuntu-20.04-amd64-arm64.charm
     num_units: 1
 relations:
