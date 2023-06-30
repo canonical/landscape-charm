@@ -21,31 +21,48 @@ from subprocess import CalledProcessError, check_call
 import yaml
 
 from charms.operator_libs_linux.v0 import apt
-from charms.operator_libs_linux.v0.apt import (
-    PackageError, PackageNotFoundError)
+from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
 from charms.operator_libs_linux.v0.systemd import service_reload
 
 from ops.charm import (
-    ActionEvent, CharmBase, InstallEvent, LeaderElectedEvent,
-    LeaderSettingsChangedEvent, RelationChangedEvent, RelationJoinedEvent,
-    UpdateStatusEvent)
+    ActionEvent,
+    CharmBase,
+    InstallEvent,
+    LeaderElectedEvent,
+    LeaderSettingsChangedEvent,
+    RelationChangedEvent,
+    RelationDepartedEvent,
+    RelationJoinedEvent,
+    UpdateStatusEvent,
+)
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import (
-    ActiveStatus, BlockedStatus, Relation, MaintenanceStatus, WaitingStatus)
+    ActiveStatus,
+    BlockedStatus,
+    Relation,
+    MaintenanceStatus,
+    WaitingStatus,
+)
 
 from settings_files import (
-    DEFAULT_POSTGRES_PORT, configure_for_deployment_mode, merge_service_conf,
-    prepend_default_settings, update_db_conf, update_default_settings, update_service_conf,
-    write_license_file, write_ssl_cert)
+    DEFAULT_POSTGRES_PORT,
+    configure_for_deployment_mode,
+    merge_service_conf,
+    prepend_default_settings,
+    update_db_conf,
+    update_default_settings,
+    update_service_conf,
+    write_license_file,
+    write_ssl_cert,
+)
 
 logger = logging.getLogger(__name__)
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
-HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__),
-                                   "haproxy-config.yaml")
+HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "haproxy-config.yaml")
 LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
@@ -57,7 +74,6 @@ LANDSCAPE_PACKAGES = (
     "landscape-server",
     "landscape-client",
     "landscape-common",
-    "landscape-hashids"
 )
 
 DEFAULT_SERVICES = (
@@ -71,6 +87,7 @@ DEFAULT_SERVICES = (
 LEADER_SERVICES = (
     "landscape-package-search",
     "landscape-package-upload",
+    "landscape-hashid-databases",
 )
 
 OPENID_CONFIG_VALS = (
@@ -100,47 +117,59 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._update_status)
 
         # Relations
-        self.framework.observe(self.on.db_relation_joined,
-                               self._db_relation_changed)
-        self.framework.observe(self.on.db_relation_changed,
-                               self._db_relation_changed)
-        self.framework.observe(self.on.amqp_relation_joined,
-                               self._amqp_relation_joined)
-        self.framework.observe(self.on.amqp_relation_changed,
-                               self._amqp_relation_changed)
-        self.framework.observe(self.on.website_relation_joined,
-                               self._website_relation_joined)
-        self.framework.observe(self.on.website_relation_changed,
-                               self._website_relation_changed)
-        self.framework.observe(self.on.nrpe_external_master_relation_joined,
-                               self._nrpe_external_master_relation_joined)
-        self.framework.observe(self.on.application_dashboard_relation_joined,
-                               self._application_dashboard_relation_joined)
+        self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
+        self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
+        self.framework.observe(self.on.amqp_relation_joined, self._amqp_relation_joined)
+        self.framework.observe(
+            self.on.amqp_relation_changed, self._amqp_relation_changed
+        )
+        self.framework.observe(
+            self.on.website_relation_joined, self._website_relation_joined
+        )
+        self.framework.observe(
+            self.on.website_relation_changed, self._website_relation_changed
+        )
+        self.framework.observe(
+            self.on.website_relation_departed, self._website_relation_departed
+        )
+        self.framework.observe(
+            self.on.nrpe_external_master_relation_joined,
+            self._nrpe_external_master_relation_joined,
+        )
+        self.framework.observe(
+            self.on.application_dashboard_relation_joined,
+            self._application_dashboard_relation_joined,
+        )
 
         # Leadership/peering
         self.framework.observe(self.on.leader_elected, self._leader_elected)
-        self.framework.observe(self.on.leader_settings_changed,
-                               self._leader_settings_changed)
-        self.framework.observe(self.on.replicas_relation_joined,
-                               self._on_replicas_relation_joined)
-        self.framework.observe(self.on.replicas_relation_changed,
-                               self._on_replicas_relation_changed)
+        self.framework.observe(
+            self.on.leader_settings_changed, self._leader_settings_changed
+        )
+        self.framework.observe(
+            self.on.replicas_relation_joined, self._on_replicas_relation_joined
+        )
+        self.framework.observe(
+            self.on.replicas_relation_changed, self._on_replicas_relation_changed
+        )
 
         # Actions
         self.framework.observe(self.on.pause_action, self._pause)
         self.framework.observe(self.on.resume_action, self._resume)
         self.framework.observe(self.on.upgrade_action, self._upgrade)
-        self.framework.observe(self.on.migrate_schema_action,
-                               self._migrate_schema)
-        self.framework.observe(self.on.hash_id_databases_action,
-                               self._hash_id_databases)
+        self.framework.observe(self.on.migrate_schema_action, self._migrate_schema)
+        self.framework.observe(
+            self.on.hash_id_databases_action, self._hash_id_databases
+        )
 
         # State
-        self._stored.set_default(ready={
-            "db": False,
-            "amqp": False,
-            "haproxy": False,
-        })
+        self._stored.set_default(
+            ready={
+                "db": False,
+                "amqp": False,
+                "haproxy": False,
+            }
+        )
         self._stored.set_default(leader_ip="")
         self._stored.set_default(running=False)
         self._stored.set_default(paused=False)
@@ -173,10 +202,8 @@ class LandscapeServerCharm(CharmBase):
         # Write the license file, if it exists.
         license_file = self.model.config.get("license_file")
         if license_file:
-            self.unit.status = MaintenanceStatus(
-                "Writing Landscape license file")
-            write_license_file(
-                license_file, self.landscape_uid, self.root_gid)
+            self.unit.status = MaintenanceStatus("Writing Landscape license file")
+            write_license_file(license_file, self.landscape_uid, self.root_gid)
             self.unit.status = WaitingStatus("Waiting on relations")
 
         smtp_relay_host = self.model.config.get("smtp_relay_host")
@@ -189,10 +216,12 @@ class LandscapeServerCharm(CharmBase):
         for relation in haproxy_relations:
             self._update_haproxy_connection(relation)
 
-        if any(self.model.config.get(v) for v in OPENID_CONFIG_VALS) \
-                and any(self.model.config.get(v) for v in OIDC_CONFIG_VALS):
+        if any(self.model.config.get(v) for v in OPENID_CONFIG_VALS) and any(
+            self.model.config.get(v) for v in OIDC_CONFIG_VALS
+        ):
             self.unit.status = BlockedStatus(
-                "OpenID and OIDC configurations are mutually exclusive")
+                "OpenID and OIDC configurations are mutually exclusive"
+            )
         else:
             self._configure_openid()
             self._configure_oidc()
@@ -200,11 +229,13 @@ class LandscapeServerCharm(CharmBase):
         # Update root_url, if provided
         root_url = self.model.config.get("root_url")
         if root_url:
-            update_service_conf({
-                "global": {"root-url": root_url},
-                "api": {"root-url": root_url},
-                "package-upload": {"root-url": root_url},
-            })
+            update_service_conf(
+                {
+                    "global": {"root-url": root_url},
+                    "api": {"root-url": root_url},
+                    "package-upload": {"root-url": root_url},
+                }
+            )
 
         config_host = self.model.config.get("db_host")
         schema_password = self.model.config.get("db_schema_password")
@@ -262,8 +293,7 @@ class LandscapeServerCharm(CharmBase):
         license_file = self.model.config.get("license_file")
 
         if license_file:
-            self.unit.status = MaintenanceStatus(
-                "Writing Landscape license file")
+            self.unit.status = MaintenanceStatus("Writing Landscape license file")
             write_license_file(license_file, self.landscape_uid, self.root_gid)
 
         self.unit.status = ActiveStatus("Unit is ready")
@@ -283,10 +313,10 @@ class LandscapeServerCharm(CharmBase):
             return
 
         if not all(self._stored.ready.values()):
-            waiting_on = [
-                rel for rel, ready in self._stored.ready.items() if not ready]
+            waiting_on = [rel for rel, ready in self._stored.ready.items() if not ready]
             self.unit.status = WaitingStatus(
-                "Waiting on relations: {}".format(", ".join(waiting_on)))
+                "Waiting on relations: {}".format(", ".join(waiting_on))
+            )
             return
 
         if self._stored.running and not restart_services:
@@ -309,19 +339,23 @@ class LandscapeServerCharm(CharmBase):
         deployment_mode = self.model.config.get("deployment_mode")
         is_standalone = deployment_mode == "standalone"
 
-        update_default_settings({
-            "RUN_ALL": "no",
-            "RUN_APISERVER": str(self.model.config["worker_counts"]),
-            "RUN_ASYNC_FRONTEND": "yes",
-            "RUN_JOBHANDLER": "yes",
-            "RUN_APPSERVER": str(self.model.config["worker_counts"]),
-            "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
-            "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
-            "RUN_CRON": "yes" if is_leader else "no",
-            "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-            "RUN_PACKAGEUPLOADSERVER": "yes" if is_leader and is_standalone else "no",
-            "RUN_PPPA_PROXY": "no",
-        })
+        update_default_settings(
+            {
+                "RUN_ALL": "no",
+                "RUN_APISERVER": str(self.model.config["worker_counts"]),
+                "RUN_ASYNC_FRONTEND": "yes",
+                "RUN_JOBHANDLER": "yes",
+                "RUN_APPSERVER": str(self.model.config["worker_counts"]),
+                "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
+                "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
+                "RUN_CRON": "yes" if is_leader else "no",
+                "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
+                "RUN_PACKAGEUPLOADSERVER": "yes"
+                if is_leader and is_standalone
+                else "no",
+                "RUN_PPPA_PROXY": "no",
+            }
+        )
 
         logger.info("Starting services")
 
@@ -353,7 +387,7 @@ class LandscapeServerCharm(CharmBase):
 
         allowed_units = unit_data["allowed-units"].split()
         if self.unit.name not in allowed_units:
-            logger.info("%s not in allowed_units")
+            logger.info(f"{self.unit.name} not in allowed_units")
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
@@ -393,8 +427,13 @@ class LandscapeServerCharm(CharmBase):
         else:
             user = unit_data["user"]
 
-        update_db_conf(host=host, port=port, user=user, password=password,
-                       schema_password=schema_password)
+        update_db_conf(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            schema_password=schema_password,
+        )
 
         if not self._migrate_schema_bootstrap():
             return
@@ -424,10 +463,12 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready["amqp"] = False
         self.unit.status = MaintenanceStatus("Setting up amqp connection")
 
-        event.relation.data[self.unit].update({
-            "username": "landscape",
-            "vhost": "landscape",
-        })
+        event.relation.data[self.unit].update(
+            {
+                "username": "landscape",
+                "vhost": "landscape",
+            }
+        )
 
     def _amqp_relation_changed(self, event):
         unit_data = event.relation.data[event.unit]
@@ -442,12 +483,14 @@ class LandscapeServerCharm(CharmBase):
         if isinstance(hostname, list):
             hostname = ",".join(hostname)
 
-        update_service_conf({
-            "broker": {
-                "host": hostname,
-                "password": password,
+        update_service_conf(
+            {
+                "broker": {
+                    "host": hostname,
+                    "password": password,
+                }
             }
-        })
+        )
 
         self._stored.ready["amqp"] = True
         self.unit.status = ActiveStatus("Unit is ready")
@@ -460,11 +503,13 @@ class LandscapeServerCharm(CharmBase):
         if not self.model.config.get("root_url"):
             url = f'https://{event.relation.data[event.unit]["public-address"]}/'
             self._stored.default_root_url = url
-            update_service_conf({
-                "global": {"root-url": url},
-                "api": {"root-url": url},
-                "package-upload": {"root-url": url},
-            })
+            update_service_conf(
+                {
+                    "global": {"root-url": url},
+                    "api": {"root-url": url},
+                    "package-upload": {"root-url": url},
+                }
+            )
 
         self._update_ready_status()
 
@@ -480,7 +525,8 @@ class LandscapeServerCharm(CharmBase):
         if ssl_cert != "DEFAULT" and ssl_key == "":
             # We have a cert but no key, this is an error.
             self.unit.status = BlockedStatus(
-                "`ssl_cert` is specified but `ssl_key` is missing")
+                "`ssl_cert` is specified but `ssl_key` is missing"
+            )
             return
 
         if ssl_cert != "DEFAULT":
@@ -490,8 +536,8 @@ class LandscapeServerCharm(CharmBase):
                 ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
             except binascii.Error:
                 self.unit.status = BlockedStatus(
-                    "Unable to decode `ssl_cert` or `ssl_key` - must be "
-                    "b64-encoded")
+                    "Unable to decode `ssl_cert` or `ssl_key` - must be " "b64-encoded"
+                )
                 return
 
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
@@ -501,68 +547,83 @@ class LandscapeServerCharm(CharmBase):
         https_service = haproxy_config["https_service"]
         https_service["crts"] = [ssl_cert]
 
-        if self.unit.is_leader():
-            https_service["service_options"].extend(
-                haproxy_config["leader_service_options"])
-
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
         worker_counts = self.model.config["worker_counts"]
 
         (appservers, pingservers, message_servers, api_servers) = [
-            [(
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                haproxy_config["ports"][name] + i,
-                haproxy_config["server_options"],
-            ) for i in range(worker_counts)]
+            [
+                (
+                    f"landscape-{name}-{unit_name}-{i}",
+                    server_ip,
+                    haproxy_config["ports"][name] + i,
+                    haproxy_config["server_options"],
+                )
+                for i in range(worker_counts)
+            ]
             for name in ("appserver", "pingserver", "message-server", "api")
         ]
 
         # There should only ever be one package-upload-server service.
-        package_upload_servers = [(
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            haproxy_config["ports"]["package-upload"],
-            haproxy_config["server_options"],
-        )]
+        package_upload_servers = [
+            (
+                f"landscape-package-upload-{unit_name}-0",
+                server_ip,
+                haproxy_config["ports"]["package-upload"],
+                haproxy_config["server_options"],
+            )
+        ]
 
         http_service["servers"] = appservers
-        http_service["backends"] = [{
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        }]
+        http_service["backends"] = [
+            {
+                "backend_name": "landscape-ping",
+                "servers": pingservers,
+            }
+        ]
         https_service["servers"] = appservers
-        https_service["backends"] = [{
-            "backend_name": "landscape-message",
-            "servers": message_servers,
-        }, {
-            "backend_name": "landscape-api",
-            "servers": api_servers,
-        }]
-
-        if self.unit.is_leader():
-            https_service["backends"].append({
+        https_service["backends"] = [
+            {
+                "backend_name": "landscape-message",
+                "servers": message_servers,
+            },
+            {
+                "backend_name": "landscape-api",
+                "servers": api_servers,
+            },
+            # Only the leader should have servers for the landscape-package-upload
+            # and landscape-hashid-databases backends. However, when the leader
+            # is lost, haproxy will fail as the service options will reference
+            # a (no longer) existing backend. To prevent that, all units should
+            # declare all backends, even if a unit should not have any servers on
+            # a specific backend.
+            {
                 "backend_name": "landscape-package-upload",
-                "servers": package_upload_servers,
-            })
+                "servers": package_upload_servers if self.unit.is_leader() else [],
+            },
+            {
+                "backend_name": "landscape-hashid-databases",
+                "servers": appservers if self.unit.is_leader() else [],
+            },
+        ]
 
         error_files_location = haproxy_config["error_files"]["location"]
         error_files = []
         for code, filename in haproxy_config["error_files"]["files"].items():
             error_file_path = os.path.join(error_files_location, filename)
             with open(error_file_path, "rb") as error_file:
-                error_files.append({
-                    "http_status": code,
-                    "content": b64encode(error_file.read())
-                })
+                error_files.append(
+                    {"http_status": code, "content": b64encode(error_file.read())}
+                )
 
         http_service["error_files"] = error_files
         https_service["error_files"] = error_files
 
-        relation.data[self.unit].update({
-            "services": yaml.safe_dump([http_service, https_service])
-        })
+        relation.data[self.unit].update(
+            {
+                "services": yaml.safe_dump([http_service, https_service]),
+            }
+        )
 
         self._stored.ready["haproxy"] = True
 
@@ -591,13 +652,14 @@ class LandscapeServerCharm(CharmBase):
             write_ssl_cert(haproxy_ssl_cert)
 
         self.unit.status = ActiveStatus("Unit is ready")
-
         self._update_haproxy_connection(event.relation)
 
         self._update_ready_status()
 
-    def _nrpe_external_master_relation_joined(
-            self, event: RelationJoinedEvent) -> None:
+    def _website_relation_departed(self, event: RelationDepartedEvent) -> None:
+        event.relation.data[self.unit].update({"services": ""})
+
+    def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_nrpe_checks(event.relation)
 
     def _update_nrpe_checks(self, relation: Relation):
@@ -613,16 +675,16 @@ class LandscapeServerCharm(CharmBase):
         monitors = {
             "monitors": {
                 "remote": {
-                    "nrpe": {
-                        s: {"command": f"check_{s}"} for s in services_to_add
-                    },
+                    "nrpe": {s: {"command": f"check_{s}"} for s in services_to_add},
                 },
             },
         }
 
-        relation.data[self.unit].update({
-            "monitors": yaml.safe_dump(monitors),
-        })
+        relation.data[self.unit].update(
+            {
+                "monitors": yaml.safe_dump(monitors),
+            }
+        )
 
         if not os.path.exists(NRPE_D_DIR):
             logger.debug("NRPE directories not ready")
@@ -636,12 +698,14 @@ class LandscapeServerCharm(CharmBase):
                 continue
 
             with open(cfg_filename, "w") as cfg_fp:
-                cfg_fp.write(f"""# check {service}
+                cfg_fp.write(
+                    f"""# check {service}
 # The following header was added by the landscape-server charm
 # Modifying it will affect nagios monitoring and alerting
 # servicegroups: juju
 command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service}
-""")
+"""
+                )
 
         for service in services_to_remove:
             service_cfg = service.replace("-", "_")
@@ -662,7 +726,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         if not root_url:
             root_url = "https://" + str(
-                self.model.get_binding(event.relation).network.bind_address)
+                self.model.get_binding(event.relation).network.bind_address
+            )
 
         site_name = self.model.config.get("site_name")
         if site_name:
@@ -679,13 +744,15 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             icon_data = None
 
-        event.relation.data[self.app].update({
-            "name": "Landscape",
-            "url": root_url,
-            "subtitle": subtitle,
-            "group": group,
-            "icon": icon_data,
-        })
+        event.relation.data[self.app].update(
+            {
+                "name": "Landscape",
+                "url": root_url,
+                "subtitle": subtitle,
+                "group": group,
+                "icon": icon_data,
+            }
+        )
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
         # Just because we received this event does not mean we are
@@ -698,16 +765,17 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             ip = str(self.model.get_binding(peer_relation).network.bind_address)
             peer_relation.data[self.app].update({"leader-ip": ip})
 
-            update_service_conf({
-                "package-search": {
-                    "host": "localhost",
-                },
-            })
+            update_service_conf(
+                {
+                    "package-search": {
+                        "host": "localhost",
+                    },
+                }
+            )
 
         self._leader_changed()
 
-    def _leader_settings_changed(
-            self, event: LeaderSettingsChangedEvent) -> None:
+    def _leader_settings_changed(self, event: LeaderSettingsChangedEvent) -> None:
         # Just because we received this event does not mean we are
         # guaranteed to be a follower by the time we process it. See
         # https://juju.is/docs/sdk/leader-elected-event
@@ -717,11 +785,13 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             leader_ip = peer_relation.data[self.app].get("leader-ip")
 
             if leader_ip:
-                update_service_conf({
-                    "package-search": {
-                        "host": leader_ip,
-                    },
-                })
+                update_service_conf(
+                    {
+                        "package-search": {
+                            "host": leader_ip,
+                        },
+                    }
+                )
 
         self._leader_changed()
 
@@ -736,9 +806,10 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         for relation in nrpe_relations:
             self._update_nrpe_checks(relation)
 
-        haproxy_relations = self.model.relations.get("website", [])
-        for relation in haproxy_relations:
-            self._update_haproxy_connection(relation)
+        if self.unit.is_leader():
+            haproxy_relations = self.model.relations.get("website", [])
+            for relation in haproxy_relations:
+                self._update_haproxy_connection(relation)
 
         self._update_ready_status(restart_services=True)
 
@@ -749,12 +820,16 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         event.relation.data[self.unit].update({"unit-data": self.unit.name})
 
-    def _on_replicas_relation_changed(
-            self, event: RelationChangedEvent) -> None:
+    def _on_replicas_relation_changed(self, event: RelationChangedEvent) -> None:
         leader_ip_value = event.relation.data[self.app].get("leader-ip")
 
         if leader_ip_value and leader_ip_value != self._stored.leader_ip:
             self._stored.leader_ip = leader_ip_value
+
+        if self.unit.is_leader():
+            haproxy_relations = self.model.relations.get("website", [])
+            for relation in haproxy_relations:
+                self._update_haproxy_connection(relation)
 
     def _configure_smtp(self, relay_host: str) -> None:
 
@@ -789,27 +864,32 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         none_count = oidc_vals.count(None)
 
         if none_count == 0:
-            update_service_conf({
-                "landscape": {
-                    "oidc-issuer": oidc_issuer,
-                    "oidc-client-id": oidc_client_id,
-                    "oidc-client-secret": oidc_client_secret,
-                    "oidc-logout-url": oidc_logout_url,
-                },
-            })
+            update_service_conf(
+                {
+                    "landscape": {
+                        "oidc-issuer": oidc_issuer,
+                        "oidc-client-id": oidc_client_id,
+                        "oidc-client-secret": oidc_client_secret,
+                        "oidc-logout-url": oidc_logout_url,
+                    },
+                }
+            )
         elif none_count == 1 and oidc_logout_url is None:
             # Only the logout url is optional.
-            update_service_conf({
-                "landscape": {
-                    "oidc-issuer": oidc_issuer,
-                    "oidc-client-id": oidc_client_id,
-                    "oidc-client-secret": oidc_client_secret,
-                },
-            })
+            update_service_conf(
+                {
+                    "landscape": {
+                        "oidc-issuer": oidc_issuer,
+                        "oidc-client-id": oidc_client_id,
+                        "oidc-client-secret": oidc_client_secret,
+                    },
+                }
+            )
         elif none_count < 4:
             self.unit.status = BlockedStatus(
                 "OIDC connect config requires at least 'oidc_issuer', "
-                "'oidc_client_id', and 'oidc_client_secret' values")
+                "'oidc_client_id', and 'oidc_client_secret' values"
+            )
             return
 
         self.unit.status = WaitingStatus("Waiting on relations")
@@ -821,17 +901,20 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         openid_logout_url = self.model.config.get("openid_logout_url")
 
         if openid_provider_url and openid_logout_url:
-            update_service_conf({
-                "landscape": {
-                    "openid-provider-url": openid_provider_url,
-                    "openid-logout-url": openid_logout_url,
-                },
-            })
+            update_service_conf(
+                {
+                    "landscape": {
+                        "openid-provider-url": openid_provider_url,
+                        "openid-logout-url": openid_logout_url,
+                    },
+                }
+            )
             self.unit.status = WaitingStatus("Waiting on relations")
         elif openid_provider_url or openid_logout_url:
             self.unit.status = BlockedStatus(
                 "OpenID configuration requires both 'openid_provider_url' and "
-                "'openid_logout_url'")
+                "'openid_logout_url'"
+            )
 
     def _bootstrap_account(self):
         """If admin account details are provided, create admin"""
@@ -895,8 +978,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         try:
             check_call([LSCTL, "stop"])
         except CalledProcessError as e:
-            logger.error("Stopping services failed with return code %d",
-                         e.returncode)
+            logger.error("Stopping services failed with return code %d", e.returncode)
             self.unit.status = BlockedStatus("Failed to stop services")
             event.fail("Failed to stop services")
         else:
@@ -908,14 +990,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Starting services")
         event.log("Starting services")
 
-        start_result = subprocess.run([LSCTL, "start"], capture_output=True,
-                                      text=True)
+        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True)
 
         try:
             check_call([LSCTL, "status"])
         except CalledProcessError as e:
-            logger.error("Starting services failed with return code %d",
-                         e.returncode)
+            logger.error("Starting services failed with return code %d", e.returncode)
             logger.error("Failed to start services: %s", start_result.stdout)
             self.unit.status = MaintenanceStatus("Stopping services")
             subprocess.run([LSCTL, "stop"])
@@ -929,8 +1009,10 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _upgrade(self, event: ActionEvent) -> None:
         if self._stored.running:
-            event.fail("Cannot upgrade while running. Please run action "
-                       "'pause' prior to upgrade")
+            event.fail(
+                "Cannot upgrade while running. Please run action "
+                "'pause' prior to upgrade"
+            )
             return
 
         prev_status = self.unit.status
@@ -947,7 +1029,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 installed = apt.DebianPackage.from_installed_package(package)
                 event.log(f"Upgraded to {installed.version}...")
             except PackageNotFoundError as e:
-                logger.error(f"Could not upgrade package {package}. Reason: {e.message}")
+                logger.error(
+                    f"Could not upgrade package {package}. Reason: {e.message}"
+                )
                 event.fail(f"Could not upgrade package {package}. Reason: {e.message}")
                 self.unit.status = BlockedStatus("Failed to upgrade packages")
                 return
@@ -956,8 +1040,10 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _migrate_schema(self, event: ActionEvent) -> None:
         if self._stored.running:
-            event.fail("Cannot migrate schema while running. Please run action"
-                       " 'pause' prior to migration")
+            event.fail(
+                "Cannot migrate schema while running. Please run action"
+                " 'pause' prior to migration"
+            )
             return
 
         prev_status = self.unit.status
@@ -967,10 +1053,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         try:
             subprocess.run([SCHEMA_SCRIPT], check=True, text=True)
         except CalledProcessError as e:
-            logger.error("Schema migration failed with error code %s",
-                         e.returncode)
-            event.fail("Schema migration failed with error code %s",
-                       e.returncode)
+            logger.error("Schema migration failed with error code %s", e.returncode)
+            event.fail("Schema migration failed with error code %s", e.returncode)
             self.unit.status = BlockedStatus("Failed schema migration")
         else:
             self.unit.status = prev_status
@@ -981,7 +1065,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Running hash_id_databases")
 
         try:
-            subprocess.run(["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True)
+            subprocess.run(
+                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True
+            )
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
             event.fail("Hashing ID databases failed with error code %s", e.returncode)
