@@ -87,7 +87,6 @@ DEFAULT_SERVICES = (
 LEADER_SERVICES = (
     "landscape-package-search",
     "landscape-package-upload",
-    "landscape-hashid-databases",
 )
 
 OPENID_CONFIG_VALS = (
