@@ -277,6 +277,7 @@ class LandscapeServerCharm(CharmBase):
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
             apt.add_package(["landscape-server", "landscape-hashids"])
+            check_call(["apt-mark", "hold", "landscape-hashids"])
         except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
             logger.error("Failed to install packages")
             raise exc  # This will trigger juju's exponential retry

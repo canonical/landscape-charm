@@ -71,8 +71,10 @@ class TestCharm(unittest.TestCase):
         with patches as mocks:
             harness.begin_with_initial_hooks()
 
-        mocks["check_call"].assert_called_once_with(
+        mocks["check_call"].assert_has_call(
             ["add-apt-repository", "-y", ppa])
+        mocks["check_call"].assert_has_call(
+            ["apt-mark", "hold", "landscape-hashids"])
         mocks["apt"].add_package.assert_called_once_with(["landscape-server", 
             "landscape-hashids"])
         status = harness.charm.unit.status
