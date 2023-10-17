@@ -6,6 +6,11 @@ options:
     type: string
     default: "ppa:landscape/self-hosted-beta"
     description: The PPA from which Landscape Server will be installed.
+  landscape_ppa_key:
+    type: string
+    default: ""
+    description: |
+      Full ASCII-armoured GPG public key for the Landscape PPA source.
   worker_counts:
     type: int
     default: 2

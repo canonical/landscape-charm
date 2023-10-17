@@ -271,6 +271,14 @@ class LandscapeServerCharm(CharmBase):
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
 
+        landscape_ppa_key = self.model.config["landscape_ppa_key"]
+        if landscape_ppa_key != "":
+            try:
+                landscape_key_file = apt.import_key(landscape_ppa_key)
+                logger.info(f"Imported Landscape PPA key at {landscape_key_file}")
+            except apt.GPGKeyError:
+                logger.error("Failed to import Landscape PPA key")
+
         landscape_ppa = self.model.config["landscape_ppa"]
 
         try:
