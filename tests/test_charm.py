@@ -809,6 +809,29 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, WaitingStatus)
         write_cert_mock.assert_called_once_with("FANCYNEWCERT")
 
+    def test_website_relation_changed_strip_b_char(self):
+        self.harness.charm._update_haproxy_connection = Mock()
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {"ssl_cert": "b'FANCYNEWCERT'"},
+            self.harness.charm.unit: {
+                "private-address": "test",
+                "public-address": "test2",
+            },
+        }
+
+        with patch.multiple(
+                "charm",
+                write_ssl_cert=DEFAULT,
+                update_service_conf=DEFAULT,
+        ) as mocks:
+            write_cert_mock = mocks["write_ssl_cert"]
+            self.harness.charm._website_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, WaitingStatus)
+        write_cert_mock.assert_called_once_with("FANCYNEWCERT")
+
     @patch("charm.update_service_conf")
     def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
