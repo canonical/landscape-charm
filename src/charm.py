@@ -282,6 +282,8 @@ class LandscapeServerCharm(CharmBase):
         landscape_ppa = self.model.config["landscape_ppa"]
 
         try:
+            # This package is responsible for the hanging installs and ignores env vars
+            apt.remove_package(["needrestart"])
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
             apt.add_package(["landscape-server", "landscape-hashids"])
