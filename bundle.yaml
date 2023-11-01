@@ -10,7 +10,8 @@ applications:
     charm: ch:rabbitmq-server
     num_units: 1
   haproxy:
-    series: focal
+    series: jammy
+    channel: edge
     charm: ch:haproxy
     num_units: 1
     expose: true
