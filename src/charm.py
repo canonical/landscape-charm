@@ -286,7 +286,8 @@ class LandscapeServerCharm(CharmBase):
             apt.remove_package(["needrestart"])
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
-            apt.add_package(["landscape-server", "landscape-hashids"])
+            # Explicitly ensure cache is up-to-date after adding the PPA.
+            apt.add_package(["landscape-server", "landscape-hashids"], update_cache=True)
             check_call(["apt-mark", "hold", "landscape-hashids"])
         except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
             logger.error("Failed to install packages")
