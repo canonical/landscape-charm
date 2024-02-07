@@ -70,8 +70,9 @@ SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 
+LANDSCAPE_SERVER = "landscape-server"
 LANDSCAPE_PACKAGES = (
-    "landscape-server",
+    LANDSCAPE_SERVER,
     "landscape-client",
     "landscape-common",
 )
@@ -287,8 +288,8 @@ class LandscapeServerCharm(CharmBase):
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
             # Explicitly ensure cache is up-to-date after adding the PPA.
-            apt.add_package(["landscape-server", "landscape-hashids"], update_cache=True)
-            check_call(["apt-mark", "hold", "landscape-hashids"])
+            apt.add_package([LANDSCAPE_SERVER, "landscape-hashids"], update_cache=True)
+            check_call(["apt-mark", "hold", "landscape-hashids", LANDSCAPE_SERVER])
         except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
             logger.error("Failed to install packages")
             raise exc  # This will trigger juju's exponential retry
@@ -1039,10 +1040,14 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         for package in LANDSCAPE_PACKAGES:
             try:
                 event.log(f"Upgrading {package}...")
+                if package == LANDSCAPE_SERVER:
+                    check_call(["apt-mark", "unhold", LANDSCAPE_SERVER])
                 pkg = apt.DebianPackage.from_apt_cache(package)
                 pkg.ensure(state=apt.PackageState.Latest)
                 installed = apt.DebianPackage.from_installed_package(package)
                 event.log(f"Upgraded to {installed.version}...")
+                if package == LANDSCAPE_SERVER:
+                    check_call(["apt-mark", "hold", LANDSCAPE_SERVER])
             except PackageNotFoundError as e:
                 logger.error(
                     f"Could not upgrade package {package}. Reason: {e.message}"
