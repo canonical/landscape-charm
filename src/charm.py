@@ -49,8 +49,10 @@ from ops.model import (
 from settings_files import (
     DEFAULT_POSTGRES_PORT,
     configure_for_deployment_mode,
+    generate_secret_token,
     merge_service_conf,
     prepend_default_settings,
+    SecretTokenMissing,
     update_db_conf,
     update_default_settings,
     update_service_conf,
@@ -175,6 +177,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(paused=False)
         self._stored.set_default(default_root_url="")
         self._stored.set_default(account_bootstrapped=False)
+        self._stored.set_default(secret_token=None)
 
         self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
@@ -263,10 +266,35 @@ class LandscapeServerCharm(CharmBase):
 
         self._bootstrap_account()
 
+        secret_token = self._get_secret_token()
+        if self.unit.is_leader():
+            if not secret_token:
+                # If the secret token wasn't in the config, and we don't have one
+                # in the peer relation data, then the leader needs to generate one
+                # for all of the units to use.
+                logger.info("Generating new random secret token")
+                secret_token = generate_secret_token()
+                peer_relation = self.model.get_relation("replicas")
+                peer_relation.data[self.app].update({"secret-token": secret_token})
+        if (secret_token) and (secret_token != self._stored.secret_token):
+            self._write_secret_token(secret_token)
+            self._stored.secret_token = secret_token
+
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
 
         self._update_ready_status(restart_services=True)
+
+    def _get_secret_token(self):
+        secret_token = self.model.config.get("secret_token")
+        if not secret_token:
+            peer_relation = self.model.get_relation("replicas")
+            secret_token = peer_relation.data[self.app].get("secret-token", None)
+        return secret_token
+
+    def _write_secret_token(self, secret_token):
+        logger.info("Writing secret token")
+        update_service_conf({"landscape": {"secret-token": secret_token}})
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -658,7 +686,7 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = MaintenanceStatus("Configuring HAProxy")
         haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
 
-        # Sometimes the data has not been encoded propery in the HA charm
+        # Sometimes the data has not been encoded properly in the HA charm
         if haproxy_ssl_cert.startswith("b'"):
             haproxy_ssl_cert = haproxy_ssl_cert.strip('b').strip("'")
 
@@ -846,6 +874,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             haproxy_relations = self.model.relations.get("website", [])
             for relation in haproxy_relations:
                 self._update_haproxy_connection(relation)
+
+        secret_token = self._get_secret_token()
+        if (secret_token) and (secret_token != self._stored.secret_token):
+            self._write_secret_token(secret_token)
+            self._stored.secret_token = secret_token
+            self._update_ready_status(restart_services=True)
 
     def _configure_smtp(self, relay_host: str) -> None:
 

@@ -187,3 +187,9 @@ options:
     description: |
       Additional service.conf settings to be merged with the default
       configuration.
+  secret_token:
+    type: string
+    default:
+    description: |
+      A secret token for the landscape service. If not set one will be
+      generated securely.
