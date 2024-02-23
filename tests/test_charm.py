@@ -24,7 +24,8 @@ from charms.operator_libs_linux.v0.apt import (
 
 from charm import (
     DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm)
+    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm,
+    )
 
 
 class TestCharm(unittest.TestCase):

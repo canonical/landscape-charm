@@ -24,6 +24,7 @@ from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
 from charms.operator_libs_linux.v0.systemd import service_reload
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 
 from ops.charm import (
     ActionEvent,
@@ -181,6 +182,8 @@ class LandscapeServerCharm(CharmBase):
 
         self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
+
+        self._grafana_agent = COSAgentProvider(self)
 
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
