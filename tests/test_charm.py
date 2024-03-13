@@ -75,7 +75,7 @@ class TestCharm(unittest.TestCase):
         mocks["check_call"].assert_any_call(
             ["add-apt-repository", "-y", ppa])
         mocks["check_call"].assert_any_call(
-            ["apt-mark", "hold", "landscape-hashids"])
+            ["apt-mark", "hold", "landscape-hashids", "landscape-server"])
         mocks["apt"].add_package.assert_called_once_with(
             ["landscape-server", "landscape-hashids"], update_cache=True,
         )
@@ -507,6 +507,7 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
+        self.harness.add_relation("replicas", "landscape-server")
 
         with patch("charm.check_call"):
             with patch(
@@ -838,6 +839,7 @@ class TestCharm(unittest.TestCase):
     def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
+        self.harness.add_relation("replicas", "landscape-server")
         self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
@@ -847,6 +849,7 @@ class TestCharm(unittest.TestCase):
     def test_on_config_changed_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
+        self.harness.add_relation("replicas", "landscape-server")
         self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
 
         self.harness.charm._configure_smtp.assert_called_once_with(
@@ -957,9 +960,10 @@ class TestCharm(unittest.TestCase):
         prev_status = self.harness.charm.unit.status
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
-            pkg_mock = Mock()
-            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
-            self.harness.charm._upgrade(event)
+            with patch("charm.check_call"):
+                pkg_mock = Mock()
+                apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
+                self.harness.charm._upgrade(event)
 
         self.assertGreaterEqual(event.log.call_count, 5)
         self.assertEqual(
@@ -988,10 +992,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.running = False
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
-            pkg_mock = Mock()
-            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
-            pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
-            self.harness.charm._upgrade(event)
+            with patch("charm.check_call"):
+                pkg_mock = Mock()
+                apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
+                pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
+                self.harness.charm._upgrade(event)
 
         self.assertEqual(event.log.call_count, 2)
         event.fail.assert_called_once()

@@ -1,8 +1,8 @@
-description: Landscape Scalable Dev
+description: Landscape Scalable
 series: jammy
 applications:
   postgresql:
-    channel: 14/edge
+    channel: 14/beta
     charm: ch:postgresql
     num_units: 1
   rabbitmq-server:

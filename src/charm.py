@@ -53,7 +53,6 @@ from settings_files import (
     generate_secret_token,
     merge_service_conf,
     prepend_default_settings,
-    SecretTokenMissing,
     update_db_conf,
     update_default_settings,
     update_service_conf,
@@ -579,7 +578,7 @@ class LandscapeServerCharm(CharmBase):
                 ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
             except binascii.Error:
                 self.unit.status = BlockedStatus(
-                    "Unable to decode `ssl_cert` or `ssl_key` - must be " "b64-encoded"
+                    "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
                 )
                 return
 
