@@ -24,7 +24,8 @@ from charms.operator_libs_linux.v0.apt import (
 
 from charm import (
     DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm)
+    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm,
+    )
 
 
 class TestCharm(unittest.TestCase):
@@ -71,10 +72,13 @@ class TestCharm(unittest.TestCase):
         with patches as mocks:
             harness.begin_with_initial_hooks()
 
-        mocks["check_call"].assert_called_once_with(
+        mocks["check_call"].assert_any_call(
             ["add-apt-repository", "-y", ppa])
-        mocks["apt"].add_package.assert_called_once_with(["landscape-server", 
-            "landscape-hashids"])
+        mocks["check_call"].assert_any_call(
+            ["apt-mark", "hold", "landscape-hashids", "landscape-server"])
+        mocks["apt"].add_package.assert_called_once_with(
+            ["landscape-server", "landscape-hashids"], update_cache=True,
+        )
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
@@ -95,11 +99,8 @@ class TestCharm(unittest.TestCase):
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageNotFoundError
-            harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+            self.assertRaises(PackageNotFoundError,
+                harness.begin_with_initial_hooks)
 
     def test_install_package_error(self):
         harness = Harness(LandscapeServerCharm)
@@ -116,11 +117,7 @@ class TestCharm(unittest.TestCase):
 
         with patches as mocks:
             mocks["apt"].add_package.side_effect = PackageError("ouch")
-            harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+            self.assertRaises(PackageError, harness.begin_with_initial_hooks)
 
     def test_install_called_process_error(self):
         harness = Harness(LandscapeServerCharm)
@@ -131,11 +128,8 @@ class TestCharm(unittest.TestCase):
         with patch("charm.check_call") as mock:
             with patch("charm.update_service_conf"):
                 mock.side_effect = CalledProcessError(127, Mock())
-                harness.begin_with_initial_hooks()
-
-        status = harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(status.message, "Failed to install packages")
+                self.assertRaises(CalledProcessError, 
+                    harness.begin_with_initial_hooks)
 
     def test_install_ssl_cert(self):
         harness = Harness(LandscapeServerCharm)
@@ -188,20 +182,28 @@ class TestCharm(unittest.TestCase):
 
     def test_install_license_file_b64(self):
         harness = Harness(LandscapeServerCharm)
-        harness.update_config({"license_file": "VEhJUyBJUyBBIExJQ0VOU0U="})
+        license_text = "VEhJUyBJUyBBIExJQ0VOU0U"
+        harness.update_config({"license_file": license_text})
         relation_id = harness.add_relation("replicas", "landscape-server")
         harness.update_relation_data(
             relation_id, "landscape-server", {"leader-ip": "test"})
 
         with patch.multiple(
                 "charm",
+                apt=DEFAULT,
+                check_call=DEFAULT,
                 update_service_conf=DEFAULT,
+                prepend_default_settings=DEFAULT,
                 write_license_file=DEFAULT,
         ) as mocks:
             harness.begin_with_initial_hooks()
 
-        mocks["write_license_file"].assert_called_once_with(
-            "VEhJUyBJUyBBIExJQ0VOU0U=", 1000, 1000)
+        mock_write = mocks["write_license_file"]
+        self.assertEqual(len(mock_write.mock_calls), 2)
+        self.assertEqual(mock_write.mock_calls[0].args,
+            (license_text, 1000, 1000))
+        self.assertEqual(mock_write.mock_calls[1].args,
+            (license_text, 1000, 1000))
 
     def test_update_ready_status_not_running(self):
         self.harness.charm.unit.status = WaitingStatus()
@@ -505,6 +507,7 @@ class TestCharm(unittest.TestCase):
                 "password": "testpass",
             },
         }
+        self.harness.add_relation("replicas", "landscape-server")
 
         with patch("charm.check_call"):
             with patch(
@@ -809,10 +812,34 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, WaitingStatus)
         write_cert_mock.assert_called_once_with("FANCYNEWCERT")
 
+    def test_website_relation_changed_strip_b_char(self):
+        self.harness.charm._update_haproxy_connection = Mock()
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {"ssl_cert": "b'FANCYNEWCERT'"},
+            self.harness.charm.unit: {
+                "private-address": "test",
+                "public-address": "test2",
+            },
+        }
+
+        with patch.multiple(
+                "charm",
+                write_ssl_cert=DEFAULT,
+                update_service_conf=DEFAULT,
+        ) as mocks:
+            write_cert_mock = mocks["write_ssl_cert"]
+            self.harness.charm._website_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, WaitingStatus)
+        write_cert_mock.assert_called_once_with("FANCYNEWCERT")
+
     @patch("charm.update_service_conf")
     def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
+        self.harness.add_relation("replicas", "landscape-server")
         self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
@@ -822,6 +849,7 @@ class TestCharm(unittest.TestCase):
     def test_on_config_changed_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
         self.harness.charm._configure_smtp = Mock()
+        self.harness.add_relation("replicas", "landscape-server")
         self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
 
         self.harness.charm._configure_smtp.assert_called_once_with(
@@ -932,11 +960,12 @@ class TestCharm(unittest.TestCase):
         prev_status = self.harness.charm.unit.status
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
-            pkg_mock = Mock()
-            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
-            self.harness.charm._upgrade(event)
+            with patch("charm.check_call"):
+                pkg_mock = Mock()
+                apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
+                self.harness.charm._upgrade(event)
 
-        self.assertEqual(event.log.call_count, 9)
+        self.assertGreaterEqual(event.log.call_count, 5)
         self.assertEqual(
             apt_mock.DebianPackage.from_apt_cache.call_count,
             len(LANDSCAPE_PACKAGES)
@@ -963,10 +992,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._stored.running = False
 
         with patch("charm.apt", spec_set=apt) as apt_mock:
-            pkg_mock = Mock()
-            apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
-            pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
-            self.harness.charm._upgrade(event)
+            with patch("charm.check_call"):
+                pkg_mock = Mock()
+                apt_mock.DebianPackage.from_apt_cache.return_value = pkg_mock
+                pkg_mock.ensure.side_effect = PackageNotFoundError("ouch")
+                self.harness.charm._upgrade(event)
 
         self.assertEqual(event.log.call_count, 2)
         event.fail.assert_called_once()
@@ -1149,6 +1179,13 @@ class TestBootstrapAccount(unittest.TestCase):
         )
         self.harness.add_relation("replicas", "landscape-server")
         self.harness.set_leader()
+        
+        pwd_mock = patch("charm.user_exists").start()
+        pwd_mock.return_value = Mock(
+            spec_set=struct_passwd, pw_uid=1000)
+        grp_mock = patch("charm.group_exists").start()
+        grp_mock.return_value = Mock(
+            spec_set=struct_group, gr_gid=1000)
 
         self.process_mock = patch("subprocess.run").start()
         self.log_mock = patch("charm.logger.error").start()

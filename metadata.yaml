@@ -31,6 +31,8 @@ provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
+  cos-agent:
+    interface: cos_agent
 
 peers:
   replicas:

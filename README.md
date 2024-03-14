@@ -69,6 +69,5 @@ When developing the charm, here's a quick way to test out changes as
 they would be deployed by `landscape-scalable`:
 
 ```bash
-charmcraft pack
-juju deploy ./bundle.yaml
+make build
 ```

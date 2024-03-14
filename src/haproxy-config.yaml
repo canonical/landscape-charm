@@ -34,11 +34,11 @@ https_service:
     - use_backend landscape-message if attachment
     - use_backend landscape-api if api
     - use_backend landscape-ping if ping
-
-leader_service_options:
-  - acl package-upload path_beg -i /upload
-  - use_backend landscape-package-upload if package-upload
-  - reqrep ^([^\ ]*)\ /upload/(.*) \1\ /\2
+    - acl hashids path_beg -i /hash-id-databases
+    - use_backend landscape-hashid-databases if hashids
+    - acl package-upload path_beg -i /upload
+    - use_backend landscape-package-upload if package-upload
+    - http-request replace-path ^([^\ ]*)\ /upload/(.*) \1\ /\2
 
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
@@ -55,7 +55,6 @@ ports:
   message-server: 8090
   api: 9080
   package-upload: 9100
-  pppa-proxy: 9298
 
 server_options:
   - check

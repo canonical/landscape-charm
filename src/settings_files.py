@@ -9,6 +9,8 @@ import os
 from base64 import b64decode, binascii
 from collections import defaultdict
 from configparser import ConfigParser
+import secrets
+from string import ascii_letters, digits
 from urllib.request import urlopen
 from urllib.error import URLError
 
@@ -34,6 +36,14 @@ class LicenseFileReadException(Exception):
 
 
 class SSLCertReadException(Exception):
+    pass
+
+
+class ServiceConfMissing(Exception):
+    pass
+
+
+class SecretTokenMissing(Exception):
     pass
 
 
@@ -111,6 +121,11 @@ def update_service_conf(updates: dict) -> None:
     `updates` is a mapping of {section => {key => value}}, to be applied
         to the config file.
     """
+    if not os.path.isfile(SERVICE_CONF):
+        # Landscape server will not overwrite this file on install, so we
+        # cannot get the default values if we create it here
+        raise ServiceConfMissing("Landscape server install failed!")
+
     config = ConfigParser()
     config.read(SERVICE_CONF)
 
@@ -123,6 +138,11 @@ def update_service_conf(updates: dict) -> None:
 
     with open(SERVICE_CONF, "w") as config_fp:
         config.write(config_fp)
+
+
+def generate_secret_token():
+    alphanumerics = ascii_letters + digits
+    return "".join(secrets.choice(alphanumerics) for _ in range(172))
 
 
 def write_license_file(license_file: str, uid: int, gid: int) -> None:

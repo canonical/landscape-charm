@@ -6,6 +6,11 @@ options:
     type: string
     default: "ppa:landscape/self-hosted-23.03"
     description: The PPA from which Landscape Server will be installed.
+  landscape_ppa_key:
+    type: string
+    default: ""
+    description: |
+      Full ASCII-armoured GPG public key for the Landscape PPA source.
   worker_counts:
     type: int
     default: 2
@@ -182,3 +187,9 @@ options:
     description: |
       Additional service.conf settings to be merged with the default
       configuration.
+  secret_token:
+    type: string
+    default:
+    description: |
+      A secret token for the landscape service. If not set one will be
+      generated securely.

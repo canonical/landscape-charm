@@ -210,9 +210,11 @@ class UpdateServiceConfTestCase(TestCase):
             i += 1
             return retval
 
-        with patch("builtins.open") as open_mock:
-            open_mock.side_effect = return_conf
-            update_service_conf({"test": {"new": "yes"}})
+        with patch("os.path.isfile") as mock_isfile:
+            with patch("builtins.open") as open_mock:
+                mock_isfile.return_value = True
+                open_mock.side_effect = return_conf
+                update_service_conf({"test": {"new": "yes"}})
 
         self.assertEqual(outfile.captured,
                          "[fixed]\nold = no\n\n[test]\nnew = yes\n\n")
@@ -230,9 +232,11 @@ class UpdateServiceConfTestCase(TestCase):
             i += 1
             return retval
 
-        with patch("builtins.open") as open_mock:
-            open_mock.side_effect = return_conf
-            update_service_conf({"fixed": {"old": "yes"}})
+        with patch("os.path.isfile") as mock_isfile:
+            with patch("builtins.open") as open_mock:
+                mock_isfile.return_value = True
+                open_mock.side_effect = return_conf
+                update_service_conf({"fixed": {"old": "yes"}})
 
         self.assertEqual(outfile.captured, "[fixed]\nold = yes\n\n")
 
