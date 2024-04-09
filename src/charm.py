@@ -16,7 +16,9 @@ import logging
 import os
 import subprocess
 from base64 import b64decode, b64encode, binascii
+from functools import cached_property
 from subprocess import CalledProcessError, check_call
+from typing import List
 
 import yaml
 
@@ -53,7 +55,6 @@ from settings_files import (
     generate_secret_token,
     merge_service_conf,
     prepend_default_settings,
-    SecretTokenMissing,
     update_db_conf,
     update_default_settings,
     update_service_conf,
@@ -103,6 +104,12 @@ OIDC_CONFIG_VALS = (
     "oidc_client_secret",
     "oidc_logout_url",
 )
+
+PROXY_ENV_MAPPING = {
+    "JUJU_CHARM_HTTP_PROXY": "--with-http-proxy",
+    "JUJU_CHARM_HTTPS_PROXY": "--with-https-proxy",
+    "JUJU_CHARM_NO_PROXY": "--with-no-proxy",
+}
 
 
 class LandscapeServerCharm(CharmBase):
@@ -485,14 +492,40 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
+    @cached_property
+    def _proxy_settings(self) -> List[str]:
+        """Determines the current proxy settings from the juju-related environment
+        variables.
+
+        :returns: A list of proxy settings arguments suitable for passing to
+            `SCHEMA_SCRIPT`.
+        """
+        settings = []
+
+        for juju_env_var, schema_arg_name in PROXY_ENV_MAPPING.items():
+            value = os.environ.get(juju_env_var)
+
+            if value:
+                settings.append(schema_arg_name)
+                settings.append(value)
+
+        return settings
+
     def _migrate_schema_bootstrap(self):
         """
         Migrates schema along with the bootstrap command which ensures that the
-        databases along with the landscape user exists. In addition creates
-        admin if configured. Returns True on success
+        databases and the landscape user exists, and that proxy settings are set.
+        In addition, creates admin if configured.
+
+        :returns: True on success.
         """
+        call = [SCHEMA_SCRIPT, "--bootstrap"]
+
+        if self._proxy_settings:
+            call.extend(self._proxy_settings)
+
         try:
-            check_call([SCHEMA_SCRIPT, "--bootstrap"])
+            check_call(call)
             self._bootstrap_account()
             return True
         except CalledProcessError as e:
