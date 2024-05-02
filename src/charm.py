@@ -190,7 +190,10 @@ class LandscapeServerCharm(CharmBase):
         self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
 
-        self._grafana_agent = COSAgentProvider(self)
+        self._grafana_agent = COSAgentProvider(
+            self,
+            metrics_endpoints=[{"path": "/metrics", "port": 8080}],
+        )
 
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
@@ -400,9 +403,9 @@ class LandscapeServerCharm(CharmBase):
                 "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
                 "RUN_CRON": "yes" if is_leader else "no",
                 "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-                "RUN_PACKAGEUPLOADSERVER": "yes"
-                if is_leader and is_standalone
-                else "no",
+                "RUN_PACKAGEUPLOADSERVER": (
+                    "yes" if is_leader and is_standalone else "no"
+                ),
                 "RUN_PPPA_PROXY": "no",
             }
         )
@@ -724,7 +727,7 @@ class LandscapeServerCharm(CharmBase):
 
         # Sometimes the data has not been encoded properly in the HA charm
         if haproxy_ssl_cert.startswith("b'"):
-            haproxy_ssl_cert = haproxy_ssl_cert.strip('b').strip("'")
+            haproxy_ssl_cert = haproxy_ssl_cert.strip("b").strip("'")
 
         if haproxy_ssl_cert != "DEFAULT":
             # If DEFAULT, cert is being managed by a third party,
