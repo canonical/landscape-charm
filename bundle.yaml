@@ -2,13 +2,22 @@ description: Landscape Scalable
 series: jammy
 applications:
   postgresql:
-    channel: 14/beta
+    channel: 14/stable
     charm: ch:postgresql
     num_units: 1
+    options:
+      plugin_plpython3u_enable: true
+      plugin_ltree_enable: true
+      plugin_intarray_enable: true
+      plugin_debversion_enable: true
+      plugin_pg_trgm_enable: true
+      experimental_max_connections: 500
   rabbitmq-server:
     channel: latest/edge
     charm: ch:rabbitmq-server
     num_units: 1
+    options:
+      consumer-timeout: 259200000
   haproxy:
     series: jammy
     channel: edge
@@ -21,9 +30,12 @@ applications:
       ssl_cert: SELFSIGNED
       global_default_bind_options: "no-tlsv10"
   landscape-server:
-    charm: ./landscape-server_ubuntu-22.04-amd64-arm64_ubuntu-20.04-amd64-arm64.charm
+    charm: ./landscape-server_ubuntu-22.04-amd64-arm64_ubuntu-24.04-amd64-arm64_ubuntu-20.04-amd64-arm64.charm
     num_units: 1
+    series: noble
+    options:
+        landscape_ppa: ppa:landscape/self-hosted-24.04
 relations:
   - [landscape-server, rabbitmq-server]
   - [landscape-server, haproxy]
-  - ["landscape-server:db", "postgresql:db-admin"]
+  - [landscape-server:db, postgresql:db-admin]

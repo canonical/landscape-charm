@@ -1,5 +1,5 @@
 DIRNAME = $(notdir $(shell pwd))
-DIRNAME := $(addsuffix -auto, $(DIRNAME))
+DIRNAME := $(addsuffix -build, $(DIRNAME))
 
 build: clean
 	charmcraft pack
@@ -8,4 +8,4 @@ build: clean
 
 clean:
 	-rm *.charm
-	-juju destroy-model -y $(DIRNAME) --force
+	-juju destroy-model --no-prompt $(DIRNAME) --force
