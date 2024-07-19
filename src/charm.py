@@ -14,6 +14,8 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
+import platform
+import sys
 import subprocess
 from base64 import b64decode, b64encode, binascii
 from functools import cached_property
@@ -110,6 +112,20 @@ PROXY_ENV_MAPPING = {
     "JUJU_CHARM_HTTPS_PROXY": "--with-https-proxy",
     "JUJU_CHARM_NO_PROXY": "--with-no-proxy",
 }
+
+
+def get_modified_env_vars():
+    """
+    Because the python path gets munged by the juju env in noble, this grabs the current
+    env vars and returns a copy with the juju env removed from the python paths
+    """
+    env_vars = os.environ.copy()
+    if hasattr(platform, "freedesktop_os_release"):
+        if "24.04" in str(platform.freedesktop_os_release().get("VERSION_ID")):
+            logging.info("Noble detected. Fixing python paths")
+            new_paths = [path for path in sys.path if "juju" not in path]
+            env_vars["PYTHONPATH"] = ":".join(new_paths)
+    return env_vars
 
 
 class LandscapeServerCharm(CharmBase):
@@ -413,7 +429,7 @@ class LandscapeServerCharm(CharmBase):
         logger.info("Starting services")
 
         try:
-            check_call([LSCTL, "restart"])
+            check_call([LSCTL, "restart"], env=get_modified_env_vars())
             self.unit.status = ActiveStatus("Unit is ready")
             return True
         except CalledProcessError as e:
@@ -528,7 +544,7 @@ class LandscapeServerCharm(CharmBase):
             call.extend(self._proxy_settings)
 
         try:
-            check_call(call)
+            check_call(call, env=get_modified_env_vars())
             self._bootstrap_account()
             return True
         except CalledProcessError as e:
@@ -1044,7 +1060,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             logger.info(args)
-            result = subprocess.run(args, capture_output=True, text=True)
+            result = subprocess.run(args, capture_output=True, text=True, 
+                env=get_modified_env_vars())
         except FileNotFoundError:
             logger.error("Bootstrap script not found!")
             logger.error(BOOTSTRAP_ACCOUNT_SCRIPT)
@@ -1065,7 +1082,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Stopping services")
 
         try:
-            check_call([LSCTL, "stop"])
+            check_call([LSCTL, "stop"], env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Stopping services failed with return code %d", e.returncode)
             self.unit.status = BlockedStatus("Failed to stop services")
@@ -1079,15 +1096,16 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Starting services")
         event.log("Starting services")
 
-        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True)
+        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True,
+            env=get_modified_env_vars())
 
         try:
-            check_call([LSCTL, "status"])
+            check_call([LSCTL, "status"], env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Starting services failed with return code %d", e.returncode)
             logger.error("Failed to start services: %s", start_result.stdout)
             self.unit.status = MaintenanceStatus("Stopping services")
-            subprocess.run([LSCTL, "stop"])
+            subprocess.run([LSCTL, "stop"], env=get_modified_env_vars())
             self.unit.status = BlockedStatus("Failed to start services")
             event.fail("Failed to start services: %s", start_result.stdout)
         else:
@@ -1144,7 +1162,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Running schema migration...")
 
         try:
-            subprocess.run([SCHEMA_SCRIPT], check=True, text=True)
+            subprocess.run([SCHEMA_SCRIPT], check=True, text=True, 
+                env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Schema migration failed with error code %s", e.returncode)
             event.fail("Schema migration failed with error code %s", e.returncode)
@@ -1159,8 +1178,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             subprocess.run(
-                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True
-            )
+                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True,
+                env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
             event.fail("Hashing ID databases failed with error code %s", e.returncode)
