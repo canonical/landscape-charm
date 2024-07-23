@@ -203,7 +203,6 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(account_bootstrapped=False)
         self._stored.set_default(secret_token=None)
 
-        self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
 
         self._grafana_agent = COSAgentProvider(
@@ -235,7 +234,7 @@ class LandscapeServerCharm(CharmBase):
         license_file = self.model.config.get("license_file")
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
-            write_license_file(license_file, self.landscape_uid, self.root_gid)
+            write_license_file(license_file, user_exists("landscape").pw_uid, self.root_gid)
             self.unit.status = WaitingStatus("Waiting on relations")
 
         smtp_relay_host = self.model.config.get("smtp_relay_host")
@@ -363,7 +362,7 @@ class LandscapeServerCharm(CharmBase):
 
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
-            write_license_file(license_file, self.landscape_uid, self.root_gid)
+            write_license_file(license_file, user_exists("landscape").pw_uid, self.root_gid)
 
         self.unit.status = ActiveStatus("Unit is ready")
 
