@@ -14,9 +14,13 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
+import platform
+import sys
 import subprocess
 from base64 import b64decode, b64encode, binascii
+from functools import cached_property
 from subprocess import CalledProcessError, check_call
+from typing import List
 
 import yaml
 
@@ -103,6 +107,26 @@ OIDC_CONFIG_VALS = (
     "oidc_logout_url",
 )
 
+PROXY_ENV_MAPPING = {
+    "JUJU_CHARM_HTTP_PROXY": "--with-http-proxy",
+    "JUJU_CHARM_HTTPS_PROXY": "--with-https-proxy",
+    "JUJU_CHARM_NO_PROXY": "--with-no-proxy",
+}
+
+
+def get_modified_env_vars():
+    """
+    Because the python path gets munged by the juju env in noble, this grabs the current
+    env vars and returns a copy with the juju env removed from the python paths
+    """
+    env_vars = os.environ.copy()
+    if hasattr(platform, "freedesktop_os_release"):
+        if "24.04" in str(platform.freedesktop_os_release().get("VERSION_ID")):
+            logging.info("Noble detected. Fixing python paths")
+            new_paths = [path for path in sys.path if "juju" not in path]
+            env_vars["PYTHONPATH"] = ":".join(new_paths)
+    return env_vars
+
 
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
@@ -182,7 +206,10 @@ class LandscapeServerCharm(CharmBase):
         self.landscape_uid = user_exists("landscape").pw_uid
         self.root_gid = group_exists("root").gr_gid
 
-        self._grafana_agent = COSAgentProvider(self)
+        self._grafana_agent = COSAgentProvider(
+            self,
+            metrics_endpoints=[{"path": "/metrics", "port": 8080}],
+        )
 
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
@@ -392,9 +419,9 @@ class LandscapeServerCharm(CharmBase):
                 "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
                 "RUN_CRON": "yes" if is_leader else "no",
                 "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-                "RUN_PACKAGEUPLOADSERVER": "yes"
-                if is_leader and is_standalone
-                else "no",
+                "RUN_PACKAGEUPLOADSERVER": (
+                    "yes" if is_leader and is_standalone else "no"
+                ),
                 "RUN_PPPA_PROXY": "no",
             }
         )
@@ -402,7 +429,7 @@ class LandscapeServerCharm(CharmBase):
         logger.info("Starting services")
 
         try:
-            check_call([LSCTL, "restart"])
+            check_call([LSCTL, "restart"], env=get_modified_env_vars())
             self.unit.status = ActiveStatus("Unit is ready")
             return True
         except CalledProcessError as e:
@@ -484,14 +511,40 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
+    @cached_property
+    def _proxy_settings(self) -> List[str]:
+        """Determines the current proxy settings from the juju-related environment
+        variables.
+
+        :returns: A list of proxy settings arguments suitable for passing to
+            `SCHEMA_SCRIPT`.
+        """
+        settings = []
+
+        for juju_env_var, schema_arg_name in PROXY_ENV_MAPPING.items():
+            value = os.environ.get(juju_env_var)
+
+            if value:
+                settings.append(schema_arg_name)
+                settings.append(value)
+
+        return settings
+
     def _migrate_schema_bootstrap(self):
         """
         Migrates schema along with the bootstrap command which ensures that the
-        databases along with the landscape user exists. In addition creates
-        admin if configured. Returns True on success
+        databases and the landscape user exists, and that proxy settings are set.
+        In addition, creates admin if configured.
+
+        :returns: True on success.
         """
+        call = [SCHEMA_SCRIPT, "--bootstrap"]
+
+        if self._proxy_settings:
+            call.extend(self._proxy_settings)
+
         try:
-            check_call([SCHEMA_SCRIPT, "--bootstrap"])
+            check_call(call, env=get_modified_env_vars())
             self._bootstrap_account()
             return True
         except CalledProcessError as e:
@@ -690,7 +743,7 @@ class LandscapeServerCharm(CharmBase):
 
         # Sometimes the data has not been encoded properly in the HA charm
         if haproxy_ssl_cert.startswith("b'"):
-            haproxy_ssl_cert = haproxy_ssl_cert.strip('b').strip("'")
+            haproxy_ssl_cert = haproxy_ssl_cert.strip("b").strip("'")
 
         if haproxy_ssl_cert != "DEFAULT":
             # If DEFAULT, cert is being managed by a third party,
@@ -1007,7 +1060,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             logger.info(args)
-            result = subprocess.run(args, capture_output=True, text=True)
+            result = subprocess.run(args, capture_output=True, text=True, 
+                env=get_modified_env_vars())
         except FileNotFoundError:
             logger.error("Bootstrap script not found!")
             logger.error(BOOTSTRAP_ACCOUNT_SCRIPT)
@@ -1028,7 +1082,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Stopping services")
 
         try:
-            check_call([LSCTL, "stop"])
+            check_call([LSCTL, "stop"], env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Stopping services failed with return code %d", e.returncode)
             self.unit.status = BlockedStatus("Failed to stop services")
@@ -1042,15 +1096,16 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Starting services")
         event.log("Starting services")
 
-        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True)
+        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True,
+            env=get_modified_env_vars())
 
         try:
-            check_call([LSCTL, "status"])
+            check_call([LSCTL, "status"], env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Starting services failed with return code %d", e.returncode)
             logger.error("Failed to start services: %s", start_result.stdout)
             self.unit.status = MaintenanceStatus("Stopping services")
-            subprocess.run([LSCTL, "stop"])
+            subprocess.run([LSCTL, "stop"], env=get_modified_env_vars())
             self.unit.status = BlockedStatus("Failed to start services")
             event.fail("Failed to start services: %s", start_result.stdout)
         else:
@@ -1107,7 +1162,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Running schema migration...")
 
         try:
-            subprocess.run([SCHEMA_SCRIPT], check=True, text=True)
+            subprocess.run([SCHEMA_SCRIPT], check=True, text=True, 
+                env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Schema migration failed with error code %s", e.returncode)
             event.fail("Schema migration failed with error code %s", e.returncode)
@@ -1122,8 +1178,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             subprocess.run(
-                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True
-            )
+                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True,
+                env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
             event.fail("Hashing ID databases failed with error code %s", e.returncode)
