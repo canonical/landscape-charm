@@ -510,7 +510,7 @@ class LandscapeServerCharm(CharmBase):
 
         self._stored.ready["db"] = True
         self.unit.status = ActiveStatus("Unit is ready")
-        self._update_ready_status()
+        self._update_ready_status(restart_services=True)
 
     @cached_property
     def _proxy_settings(self) -> List[str]:
