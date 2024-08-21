@@ -14,7 +14,6 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
-import platform
 import sys
 import subprocess
 from base64 import b64decode, b64encode, binascii
@@ -116,15 +115,13 @@ PROXY_ENV_MAPPING = {
 
 def get_modified_env_vars():
     """
-    Because the python path gets munged by the juju env in noble, this grabs the current
+    Because the python path gets munged by the juju env, this grabs the current
     env vars and returns a copy with the juju env removed from the python paths
     """
     env_vars = os.environ.copy()
-    if hasattr(platform, "freedesktop_os_release"):
-        if "24.04" in str(platform.freedesktop_os_release().get("VERSION_ID")):
-            logging.info("Noble detected. Fixing python paths")
-            new_paths = [path for path in sys.path if "juju" not in path]
-            env_vars["PYTHONPATH"] = ":".join(new_paths)
+    logging.info("Fixing python paths")
+    new_paths = [path for path in sys.path if "juju" not in path]
+    env_vars["PYTHONPATH"] = ":".join(new_paths)
     return env_vars
 
 
@@ -343,9 +340,14 @@ class LandscapeServerCharm(CharmBase):
             apt.remove_package(["needrestart"])
             # Add the Landscape Server PPA and install via apt.
             check_call(["add-apt-repository", "-y", landscape_ppa])
-            # Explicitly ensure cache is up-to-date after adding the PPA.
-            apt.add_package([LANDSCAPE_SERVER, "landscape-hashids"], update_cache=True)
-            check_call(["apt-mark", "hold", "landscape-hashids", LANDSCAPE_SERVER])
+            if self.model.config["min_install"]:
+                logger.info("Not installing hashids..")
+                check_call(["apt", "install", LANDSCAPE_SERVER, "--no-install-recommends", "-y"])
+            else:
+                # Explicitly ensure cache is up-to-date after adding the PPA.
+                apt.add_package([LANDSCAPE_SERVER, "landscape-hashids"], update_cache=True)
+                check_call(["apt-mark", "hold", "landscape-hashids"])
+            check_call(["apt-mark", "hold", LANDSCAPE_SERVER])
         except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
             logger.error("Failed to install packages")
             raise exc  # This will trigger juju's exponential retry
