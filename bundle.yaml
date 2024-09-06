@@ -1,5 +1,5 @@
-description: Landscape Scalable
-series: jammy
+description: Landscape Scalable Dev
+base: ubuntu@22.04
 applications:
   postgresql:
     channel: 14/stable
@@ -19,7 +19,6 @@ applications:
     options:
       consumer-timeout: 259200000
   haproxy:
-    series: jammy
     channel: edge
     charm: ch:haproxy
     num_units: 1
@@ -32,9 +31,9 @@ applications:
   landscape-server:
     charm: ./landscape-server_ubuntu-22.04-amd64-arm64_ubuntu-24.04-amd64-arm64_ubuntu-20.04-amd64-arm64.charm
     num_units: 1
-    series: noble
     options:
-        landscape_ppa: ppa:landscape/self-hosted-24.04
+        landscape_ppa: ppa:landscape/self-hosted-beta
+        min_install: True
 relations:
   - [landscape-server, rabbitmq-server]
   - [landscape-server, haproxy]
