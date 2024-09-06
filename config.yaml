@@ -4,7 +4,7 @@
 options:
   landscape_ppa:
     type: string
-    default: "ppa:landscape/self-hosted-beta"
+    default: "ppa:landscape/self-hosted-24.04"
     description: The PPA from which Landscape Server will be installed.
   landscape_ppa_key:
     type: string
@@ -193,3 +193,9 @@ options:
     description: |
       A secret token for the landscape service. If not set one will be
       generated securely.
+  min_install:
+    type: boolean
+    default: False
+    description: |
+      Does not install recommended packages like hashids to
+      to speed up installation process.
