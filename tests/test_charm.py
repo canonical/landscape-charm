@@ -10,7 +10,7 @@ from io import BytesIO
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
-from unittest.mock import DEFAULT, Mock, patch, call
+from unittest.mock import DEFAULT, Mock, patch, call, ANY
 
 import yaml
 
@@ -24,7 +24,7 @@ from charms.operator_libs_linux.v0.apt import (
 
 from charm import (
     DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm,
+    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm, get_modified_env_vars
     )
 
 
@@ -75,7 +75,7 @@ class TestCharm(unittest.TestCase):
         mocks["check_call"].assert_any_call(
             ["add-apt-repository", "-y", ppa])
         mocks["check_call"].assert_any_call(
-            ["apt-mark", "hold", "landscape-hashids", "landscape-server"])
+            ["apt-mark", "hold", "landscape-server"])
         mocks["apt"].add_package.assert_called_once_with(
             ["landscape-server", "landscape-hashids"], update_cache=True,
         )
@@ -910,7 +910,7 @@ class TestCharm(unittest.TestCase):
         with patch("charm.check_call") as check_call_mock:
             self.harness.charm._pause(Mock())
 
-        check_call_mock.assert_called_once_with([LSCTL, "stop"])
+        check_call_mock.assert_called_once_with([LSCTL, "stop"], env=ANY)
         self.assertFalse(self.harness.charm._stored.running)
 
     def test_action_pause_CalledProcessError(self):
@@ -921,7 +921,7 @@ class TestCharm(unittest.TestCase):
             check_call_mock.side_effect = CalledProcessError(127, "ouch")
             self.harness.charm._pause(event)
 
-        check_call_mock.assert_called_once_with([LSCTL, "stop"])
+        check_call_mock.assert_called_once_with([LSCTL, "stop"], env=ANY)
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
         self.assertTrue(self.harness.charm._stored.running)
         event.fail.assert_called_once()
@@ -935,8 +935,8 @@ class TestCharm(unittest.TestCase):
                 self.harness.charm._resume(event)
 
         run_mock.assert_called_once_with([LSCTL, "start"], capture_output=True,
-                                         text=True)
-        check_call_mock.assert_called_once_with([LSCTL, "status"])
+                                         text=True, env=ANY)
+        check_call_mock.assert_called_once_with([LSCTL, "status"], env=ANY)
         self.harness.charm._update_ready_status.assert_called_once()
         self.assertTrue(self.harness.charm._stored.running)
         event.log.assert_called_once()
@@ -955,9 +955,9 @@ class TestCharm(unittest.TestCase):
 
         self.assertEqual(2, len(run_mock.mock_calls))
         run_mock.assert_any_call([LSCTL, "start"], capture_output=True,
-                                 text=True)
-        run_mock.assert_any_call([LSCTL, "stop"])
-        check_call_mock.assert_called_once_with([LSCTL, "status"])
+                                 text=True, env=ANY)
+        run_mock.assert_any_call([LSCTL, "stop"], env=ANY)
+        check_call_mock.assert_called_once_with([LSCTL, "status"], env=ANY)
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
         event.log.assert_called_once()
         event.fail.assert_called_once()
@@ -1025,7 +1025,7 @@ class TestCharm(unittest.TestCase):
         event.log.assert_called_once()
         event.fail.assert_not_called()
         run_mock.assert_called_once_with(
-            [SCHEMA_SCRIPT], check=True, text=True)
+            [SCHEMA_SCRIPT], check=True, text=True, env=ANY)
 
     def test_action_migrate_schema_running(self):
         """
@@ -1052,7 +1052,7 @@ class TestCharm(unittest.TestCase):
         event.log.assert_called_once()
         event.fail.assert_called_once()
         run_mock.assert_called_once_with(
-            [SCHEMA_SCRIPT], check=True, text=True)
+            [SCHEMA_SCRIPT], check=True, text=True, env=ANY)
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
 
     def test_nrpe_external_master_relation_joined(self):
@@ -1346,7 +1346,8 @@ class TestBootstrapAccount(unittest.TestCase):
         run_mock.assert_called_once_with(
             ["sudo", "-u", "landscape", HASH_ID_DATABASES],
             check=True,
-            text=True
+            text=True,
+            env=ANY
         )
 
     @patch("subprocess.run")
@@ -1359,6 +1360,23 @@ class TestBootstrapAccount(unittest.TestCase):
         run_mock.assert_called_once_with(
             ["sudo", "-u", "landscape", HASH_ID_DATABASES],
             check=True,
-            text=True
+            text=True,
+            env=ANY
         )
         event.fail.assert_called_once()
+
+
+class TestGetModifiedEnvVars(unittest.TestCase):
+    """Tests for the workaround to patch the PYTHONPATH."""
+
+    def test_removes_juju_python(self):
+        """Removes any python paths that contain `juju`"""
+
+        pythonpath = "/var/lib/juju/python3:/usr/lib/python3:/usr/lib/juju/python3.10"
+
+        with patch.dict(os.environ, {"PYTHONPATH": pythonpath}):
+            modified = get_modified_env_vars()["PYTHONPATH"]
+
+        self.assertNotIn("/var/lib/juju/python3", modified)
+        self.assertNotIn("/usr/lib/juju/python3.10", modified)
+        self.assertIn("/usr/lib/python3", modified)
