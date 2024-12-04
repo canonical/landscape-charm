@@ -510,7 +510,7 @@ class LandscapeServerCharm(CharmBase):
 
         self._stored.ready["db"] = True
         self.unit.status = ActiveStatus("Unit is ready")
-        self._update_ready_status()
+        self._update_ready_status(restart_services=True)
 
     @cached_property
     def _proxy_settings(self) -> List[str]:
@@ -1061,8 +1061,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             logger.info(args)
-            result = subprocess.run(args, capture_output=True, text=True, 
-                env=get_modified_env_vars())
+            result = subprocess.run(args, capture_output=True, text=True,
+                                    env=get_modified_env_vars())
         except FileNotFoundError:
             logger.error("Bootstrap script not found!")
             logger.error(BOOTSTRAP_ACCOUNT_SCRIPT)
@@ -1098,7 +1098,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Starting services")
 
         start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True,
-            env=get_modified_env_vars())
+                                      env=get_modified_env_vars())
 
         try:
             check_call([LSCTL, "status"], env=get_modified_env_vars())
@@ -1163,8 +1163,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Running schema migration...")
 
         try:
-            subprocess.run([SCHEMA_SCRIPT], check=True, text=True, 
-                env=get_modified_env_vars())
+            subprocess.run([SCHEMA_SCRIPT], check=True, text=True,
+                           env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Schema migration failed with error code %s", e.returncode)
             event.fail("Schema migration failed with error code %s", e.returncode)
