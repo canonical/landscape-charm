@@ -41,7 +41,7 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.main import main
+from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
@@ -338,8 +338,39 @@ class LandscapeServerCharm(CharmBase):
         try:
             # This package is responsible for the hanging installs and ignores env vars
             apt.remove_package(["needrestart"])
+
             # Add the Landscape Server PPA and install via apt.
-            check_call(["add-apt-repository", "-y", landscape_ppa])
+            # add-apt-repository doesn't use the proxy configuration from apt or juju
+            # let's make sure to use the http(s) proxy settings from the charm or at least
+            # any juju_proxy setting, add the classic http(s)_proxy to the env that will be
+            # used only for add-apt-repository call
+            add_apt_repository_env = os.environ.copy()
+            for proxy_var in ["http_proxy", "https_proxy"]:
+                juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
+
+                # if the charm has a proxy conf configured, override juju_http(s) configuration
+                if proxy_var in self.model.config:
+                    add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
+                elif juju_proxy_var in add_apt_repository_env:
+                    add_apt_repository_env[proxy_var] = add_apt_repository_env[juju_proxy_var]
+
+                if proxy_var in add_apt_repository_env:
+                    logger.info(
+                        f"add-apt-repository {proxy_var} variable set to : "
+                        f"{add_apt_repository_env[proxy_var]}"
+                    )
+
+            # juju_no_proxy is not perfectly compatible with Shell environment
+            # let's handle only the no_proxy from the charm's configuration
+            if "no_proxy" in self.model.config:
+                add_apt_repository_env["no_proxy"] = self.model.config["no_proxy"]
+                logger.info(
+                    f"add-apt-repository no_proxy variable set to : "
+                    f"{add_apt_repository_env['no_proxy']}"
+                )
+
+            check_call(["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env)
+
             if self.model.config["min_install"]:
                 logger.info("Not installing hashids..")
                 check_call(["apt", "install", LANDSCAPE_SERVER, "--no-install-recommends", "-y"])

@@ -68,12 +68,14 @@ class TestCharm(unittest.TestCase):
             update_service_conf=DEFAULT,
         )
         ppa = harness.model.config.get("landscape_ppa")
+        env_variables = os.environ.copy()
 
         with patches as mocks:
             harness.begin_with_initial_hooks()
 
         mocks["check_call"].assert_any_call(
-            ["add-apt-repository", "-y", ppa])
+            ["add-apt-repository", "-y", ppa], env=env_variables
+        )
         mocks["check_call"].assert_any_call(
             ["apt-mark", "hold", "landscape-server"])
         mocks["apt"].add_package.assert_called_once_with(
@@ -130,6 +132,34 @@ class TestCharm(unittest.TestCase):
                 mock.side_effect = CalledProcessError(127, Mock())
                 self.assertRaises(CalledProcessError, 
                     harness.begin_with_initial_hooks)
+
+    @patch.dict(
+        os.environ,
+        {
+            "JUJU_CHARM_HTTP_PROXY": "http://proxy.test:3128",
+            "JUJU_CHARM_HTTPS_PROXY": "http://proxy-https.test:3128",
+        },
+    )
+    def test_install_add_apt_repository_with_proxy(self):
+        harness = Harness(LandscapeServerCharm)
+        patches = patch.multiple(
+            "charm",
+            check_call=DEFAULT,
+            apt=DEFAULT,
+            update_service_conf=DEFAULT,
+            prepend_default_settings=DEFAULT,
+        )
+        env_variables = os.environ.copy()
+        env_variables["http_proxy"] = "http://proxy.test:3128"
+        env_variables["https_proxy"] = "http://proxy-https.test:3128"
+        ppa = harness.model.config.get("landscape_ppa")
+
+        with patches as mocks:
+            harness.begin_with_initial_hooks()
+
+        mocks["check_call"].assert_any_call(
+            ["add-apt-repository", "-y", ppa], env=env_variables
+        )
 
     def test_install_ssl_cert(self):
         harness = Harness(LandscapeServerCharm)
