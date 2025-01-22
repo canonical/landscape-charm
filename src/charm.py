@@ -907,9 +907,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self._leader_changed()
 
     def _leader_settings_changed(self, event: LeaderSettingsChangedEvent) -> None:
-        # Just because we received this event does not mean we are
-        # guaranteed to be a follower by the time we process it. See
-        # https://juju.is/docs/sdk/leader-elected-event
+        """
+        Applies changes on non-leader units after a new leader is elected
+        Deprecated call from Juju 3.x
+        It is better to handler non-leader specific configuration by using
+        the peer relation replicas_relation_changed contents
+        """
 
         if not self.unit.is_leader():
             peer_relation = self.model.get_relation("replicas")
@@ -957,10 +960,17 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if leader_ip_value and leader_ip_value != self._stored.leader_ip:
             self._stored.leader_ip = leader_ip_value
 
-        if self.unit.is_leader():
-            haproxy_relations = self.model.relations.get("website", [])
-            for relation in haproxy_relations:
-                self._update_haproxy_connection(relation)
+        if not self.unit.is_leader():
+            if leader_ip_value:
+                update_service_conf(
+                    {
+                        "package-search": {
+                            "host": leader_ip_value,
+                        },
+                    }
+                )
+
+        self._leader_changed()
 
         secret_token = self._get_secret_token()
         if (secret_token) and (secret_token != self._stored.secret_token):

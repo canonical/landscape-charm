@@ -878,7 +878,7 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
-        self.harness.charm._update_ready_status.assert_called_once()
+        self.assertEqual(self.harness.charm._update_ready_status.call_count, 2)
 
     @patch("charm.update_service_conf")
     def test_on_config_changed_smtp_change(self, _):
@@ -892,7 +892,7 @@ class TestCharm(unittest.TestCase):
 
         self.harness.charm._configure_smtp.assert_called_once_with(
             "smtp.example.com")
-        self.harness.charm._update_ready_status.assert_called_once()
+        self.assertEqual(self.harness.charm._update_ready_status.call_count, 2)
 
     def test_configure_smtp_relay_host(self):
         mock_postfix_cf = os.path.join(self.tempdir.name, "my_postfix.cf")
@@ -1188,22 +1188,49 @@ class TestCharm(unittest.TestCase):
                          len(DEFAULT_SERVICES + LEADER_SERVICES) + 1)
         self.assertEqual(len(os_remove_mock.mock_calls), 0)
 
-    def test_leader_settings_changed(self):
+    def test_on_replicas_relation_changed_leader(self):
         """
         Tests that _update_nrpe_checks is called when leader settings
         have changed and an nrpe-external-master relation exists.
         """
         self.harness.charm._update_nrpe_checks = Mock()
+        self.harness.charm._update_haproxy_connection = Mock()
         self.harness.hooks_disabled()
         self.harness.add_relation("nrpe-external-master", "nrpe")
+        self.harness.add_relation("website", "haproxy")
         relation_id = self.harness.add_relation("replicas", "landscape-server")
-        self.harness.update_relation_data(relation_id, "landscape-server",
-                                          {"leader-ip": "test"})
 
         with patch("charm.update_service_conf") as mock_update_conf:
-            self.harness.charm._leader_settings_changed(Mock())
+            self.harness.set_leader()
+            self.harness.update_relation_data(relation_id, "landscape-server",
+                                              {"leader-ip": "test"})
 
         self.harness.charm._update_nrpe_checks.assert_called_once()
+        self.harness.charm._update_haproxy_connection.assert_called_once()
+        mock_update_conf.assert_called_once_with({
+            "package-search": {
+                "host": "localhost",
+            },
+        })
+
+    def test_on_replicas_relation_changed_non_leader(self):
+        """
+        Tests that _update_nrpe_checks is called when leader settings
+        have changed and an nrpe-external-master relation exists.
+        """
+        self.harness.charm._update_nrpe_checks = Mock()
+        self.harness.charm._update_haproxy_connection = Mock()
+        self.harness.hooks_disabled()
+        self.harness.add_relation("nrpe-external-master", "nrpe")
+        self.harness.add_relation("website", "haproxy")
+        relation_id = self.harness.add_relation("replicas", "landscape-server")
+
+        with patch("charm.update_service_conf") as mock_update_conf:
+            self.harness.update_relation_data(relation_id, "landscape-server",
+                                              {"leader-ip": "test"})
+
+        self.harness.charm._update_nrpe_checks.assert_called_once()
+        self.harness.charm._update_haproxy_connection.assert_not_called()
         mock_update_conf.assert_called_once_with({
             "package-search": {
                 "host": "test",
@@ -1221,7 +1248,7 @@ class TestBootstrapAccount(unittest.TestCase):
         )
         self.harness.add_relation("replicas", "landscape-server")
         self.harness.set_leader()
-        
+
         pwd_mock = patch("charm.user_exists").start()
         pwd_mock.return_value = Mock(
             spec_set=struct_passwd, pw_uid=1000)
