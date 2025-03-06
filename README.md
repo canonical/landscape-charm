@@ -12,8 +12,8 @@ This charm will deploy Self-Hosted Landscape and needs to be connected
 to other charms to be fully functional. Example deployments are given
 below.
 
-For more information about Landscape, please visit
-[https://ubuntu.com/landscape](https://ubuntu.com/landscape)
+See the full [Landscape documentation](https://ubuntu.com/landscape/docs)
+for more details.
 
 ## Usage
 
