@@ -41,7 +41,7 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops.main import main
+from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
@@ -338,8 +338,39 @@ class LandscapeServerCharm(CharmBase):
         try:
             # This package is responsible for the hanging installs and ignores env vars
             apt.remove_package(["needrestart"])
+
             # Add the Landscape Server PPA and install via apt.
-            check_call(["add-apt-repository", "-y", landscape_ppa])
+            # add-apt-repository doesn't use the proxy configuration from apt or juju
+            # let's make sure to use the http(s) proxy settings from the charm or at least
+            # any juju_proxy setting, add the classic http(s)_proxy to the env that will be
+            # used only for add-apt-repository call
+            add_apt_repository_env = os.environ.copy()
+            for proxy_var in ["http_proxy", "https_proxy"]:
+                juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
+
+                # if the charm has a proxy conf configured, override juju_http(s) configuration
+                if proxy_var in self.model.config:
+                    add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
+                elif juju_proxy_var in add_apt_repository_env:
+                    add_apt_repository_env[proxy_var] = add_apt_repository_env[juju_proxy_var]
+
+                if proxy_var in add_apt_repository_env:
+                    logger.info(
+                        f"add-apt-repository {proxy_var} variable set to : "
+                        f"{add_apt_repository_env[proxy_var]}"
+                    )
+
+            # juju_no_proxy is not perfectly compatible with Shell environment
+            # let's handle only the no_proxy from the charm's configuration
+            if "no_proxy" in self.model.config:
+                add_apt_repository_env["no_proxy"] = self.model.config["no_proxy"]
+                logger.info(
+                    f"add-apt-repository no_proxy variable set to : "
+                    f"{add_apt_repository_env['no_proxy']}"
+                )
+
+            check_call(["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env)
+
             if self.model.config["min_install"]:
                 logger.info("Not installing hashids..")
                 check_call(["apt", "install", LANDSCAPE_SERVER, "--no-install-recommends", "-y"])
@@ -876,9 +907,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self._leader_changed()
 
     def _leader_settings_changed(self, event: LeaderSettingsChangedEvent) -> None:
-        # Just because we received this event does not mean we are
-        # guaranteed to be a follower by the time we process it. See
-        # https://juju.is/docs/sdk/leader-elected-event
+        """
+        Applies changes on non-leader units after a new leader is elected
+        Deprecated call from Juju 3.x
+        It is better to handler non-leader specific configuration by using
+        the peer relation replicas_relation_changed contents
+        """
 
         if not self.unit.is_leader():
             peer_relation = self.model.get_relation("replicas")
@@ -926,10 +960,17 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if leader_ip_value and leader_ip_value != self._stored.leader_ip:
             self._stored.leader_ip = leader_ip_value
 
-        if self.unit.is_leader():
-            haproxy_relations = self.model.relations.get("website", [])
-            for relation in haproxy_relations:
-                self._update_haproxy_connection(relation)
+        if not self.unit.is_leader():
+            if leader_ip_value:
+                update_service_conf(
+                    {
+                        "package-search": {
+                            "host": leader_ip_value,
+                        },
+                    }
+                )
+
+        self._leader_changed()
 
         secret_token = self._get_secret_token()
         if (secret_token) and (secret_token != self._stored.secret_token):
