@@ -14,21 +14,25 @@ develop a new k8s charm using the Operator Framework:
 
 import logging
 import os
-import sys
 import subprocess
+import sys
 from base64 import b64decode, b64encode, binascii
 from functools import cached_property
 from subprocess import CalledProcessError, check_call
 from typing import List
 
 import yaml
-
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
-from charms.operator_libs_linux.v0.systemd import service_reload
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
-
+from charms.operator_libs_linux.v1.systemd import (
+    SystemdError,
+    service_pause,
+    service_reload,
+    service_resume,
+    service_running,
+)
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -45,8 +49,8 @@ from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
-    Relation,
     MaintenanceStatus,
+    Relation,
     WaitingStatus,
 )
 
@@ -927,6 +931,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                     }
                 )
 
+
         self._leader_changed()
 
     def _leader_changed(self) -> None:
@@ -944,6 +949,22 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             haproxy_relations = self.model.relations.get("website", [])
             for relation in haproxy_relations:
                 self._update_haproxy_connection(relation)
+
+            # Enable leader services on this unit.
+            paused_services = (s for s in LEADER_SERVICES if not service_running(s))
+            for service in paused_services:
+                try:
+                    service_resume(service)
+                except SystemdError as e:
+                    logger.warn(str(e))
+        else:
+            # Disable leader services on this unit. Requests will be directed to the
+            # leader anyways.
+            for service in LEADER_SERVICES:
+                try:
+                    service_pause(service)
+                except SystemdError as e:
+                    logger.warn(str(e))
 
         self._update_ready_status(restart_services=True)
 
