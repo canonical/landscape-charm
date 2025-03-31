@@ -43,6 +43,12 @@ class TestCharm(unittest.TestCase):
         grp_mock.return_value = Mock(
             spec_set=struct_group, gr_gid=1000)
 
+        patch("charm.service_pause").start()
+        patch("charm.service_reload").start()
+        patch("charm.service_resume").start()
+        patch("charm.service_running").start()
+        patch("charm.service_running").start()
+
         self.addCleanup(patch.stopall)
 
         self.harness.begin()
@@ -1258,6 +1264,10 @@ class TestBootstrapAccount(unittest.TestCase):
 
         self.process_mock = patch("subprocess.run").start()
         self.log_mock = patch("charm.logger.error").start()
+        self.log_info_mock = patch("charm.logger.info").start()
+
+        env_mock = patch("os.environ").start()
+        env_mock.copy.return_value = {}
 
         self.addCleanup(patch.stopall)
 
@@ -1270,6 +1280,20 @@ class TestBootstrapAccount(unittest.TestCase):
         )
         self.assertIn("password required", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
+
+    @patch("charm.update_service_conf")
+    def test_bootstrap_account_password_redacted(self, _):
+        self.harness.update_config(
+            {
+                "admin_email": "hello@ubuntu.com",
+                "admin_name": "Hello Ubuntu",
+                "admin_password": "secret123",
+                "registration_key": "secret123",
+                "root_url": "https://www.landscape.com"
+            }
+        )
+        for call in self.log_info_mock.call_args_list:
+            self.assertNotIn("secret123", str(call.args))
 
     @patch("charm.update_service_conf")
     def test_bootstrap_account_doesnt_run_with_missing_rooturl(self, _):

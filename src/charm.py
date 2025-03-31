@@ -129,6 +129,21 @@ def get_modified_env_vars():
     return env_vars
 
 
+def get_args_with_secrets_removed(args, arg_names):
+    """
+    We log args passed in the command line. But we want to remove secrets. Returns a copy
+    of the args passed in with secrets associated with arg_names redacted
+    """
+    args = args.copy()
+    for arg_name in arg_names:
+        dash_arg_name = "--" + arg_name
+        if dash_arg_name in args:
+            idx = args.index(dash_arg_name) + 1
+            if idx < len(args):
+                args[idx] = 'REDACTED'
+    return args
+
+
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
 
@@ -931,7 +946,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                     }
                 )
 
-
         self._leader_changed()
 
     def _leader_changed(self) -> None:
@@ -1121,8 +1135,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             args.append("--" + key)
             args.append(value)
 
+        secret_args = ["admin_password", "registration_key"]
+        logged_args = get_args_with_secrets_removed(args, secret_args)
+        logger.info(logged_args)
+
         try:
-            logger.info(args)
             result = subprocess.run(args, capture_output=True, text=True,
                                     env=get_modified_env_vars())
         except FileNotFoundError:
