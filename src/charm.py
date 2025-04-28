@@ -1187,7 +1187,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self.unit.status = MaintenanceStatus("Stopping services")
             subprocess.run([LSCTL, "stop"], env=get_modified_env_vars())
             self.unit.status = BlockedStatus("Failed to start services")
-            event.fail("Failed to start services: %s", start_result.stdout)
+            event.fail(f"Failed to start services: {start_result.stdout}")
         else:
             self._stored.running = True
             self._stored.paused = False
@@ -1246,7 +1246,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                            env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Schema migration failed with error code %s", e.returncode)
-            event.fail("Schema migration failed with error code %s", e.returncode)
+            event.fail(f"Schema migration failed with error code {e.returncode}")
             self.unit.status = BlockedStatus("Failed schema migration")
         else:
             self.unit.status = prev_status
@@ -1262,7 +1262,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
-            event.fail("Hashing ID databases failed with error code %s", e.returncode)
+            event.fail(f"Hashing ID databases failed with error code {e.returncode}")
         finally:
             self.unit.status = prev_status
 
