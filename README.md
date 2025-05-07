@@ -71,3 +71,8 @@ they would be deployed by `landscape-scalable`:
 ```bash
 make build
 ```
+
+Note: this charm is using the `charmcraft 2.x.x` format for the `charmcraft.yaml`.
+It must packed using a compatible version of `charmcraft`.
+
+TODO: migrate to `charmcraft 3.x.x`.

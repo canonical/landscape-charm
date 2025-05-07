@@ -223,7 +223,13 @@ class LandscapeServerCharm(CharmBase):
 
         self._grafana_agent = COSAgentProvider(
             self,
-            metrics_endpoints=[{"path": "/metrics", "port": 8080}],
+            metrics_endpoints=[
+                {"path": "/metrics", "port": 8080},  # appserver
+                {"path": "/metrics", "port": 8070},  # pingserver
+                {"path": "/metrics", "port": 8090},  # message-server
+                {"path": "/metrics", "port": 9080},  # api
+                {"path": "/metrics", "port": 9100},  # package-upload
+            ],
         )
 
     def _on_config_changed(self, _) -> None:
