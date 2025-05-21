@@ -38,7 +38,7 @@ https_service:
     - use_backend landscape-hashid-databases if hashids
     - acl package-upload path_beg -i /upload
     - use_backend landscape-package-upload if package-upload
-    - http-request replace-path ^([^\ ]*)\ /upload/(.*) \1\ /\2
+    - http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
 
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
