@@ -1,0 +1,15 @@
+groups:
+  - name: package-search
+    rules:
+        # Package search runs only on the leader unit.
+        # We don't have excellent visibility into which unit is the leader, but we can
+        # determine that the service is not running on the leader by checking if it
+        # is running on *any* unit and alerting if not.
+      - alert: PackageSearchDown
+        expr: absent(up{landscape_service="package-search"} == 1)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Package search is down"
+          description: "The package-search service has not responded to Prometheus for over 10 minutes from any unit."

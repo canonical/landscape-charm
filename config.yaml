@@ -199,3 +199,9 @@ options:
     description: |
       Does not install recommended packages like hashids to
       to speed up installation process.
+  prometheus_scrape_interval:
+    type: string
+    default: 1m
+    description: |
+      Used by the Grafana machine agent subordinate charm. The duration between
+      Prometheus scrapes. Expects a Prometheus-style <duration> value, e.g., '1h30m5s'.

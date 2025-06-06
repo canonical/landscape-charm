@@ -3,6 +3,7 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import json
 import os
 import unittest
 from grp import struct_group
@@ -10,22 +11,108 @@ from io import BytesIO
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
+from typing import Iterable
 from unittest.mock import DEFAULT, Mock, patch, call, ANY
 
 import yaml
 
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops.testing import Harness
+from ops.testing import Context, Harness, Relation, State
 
 from charms.operator_libs_linux.v0 import apt
-from charms.operator_libs_linux.v0.apt import (
-    PackageError, PackageNotFoundError)
+from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 
 from charm import (
-    DEFAULT_SERVICES, HAPROXY_CONFIG_FILE, LANDSCAPE_PACKAGES, LEADER_SERVICES, LSCTL,
-    NRPE_D_DIR, SCHEMA_SCRIPT, HASH_ID_DATABASES, LandscapeServerCharm, get_modified_env_vars
-    )
+    DEFAULT_SERVICES,
+    HAPROXY_CONFIG_FILE,
+    LANDSCAPE_PACKAGES,
+    LEADER_SERVICES,
+    LSCTL,
+    NRPE_D_DIR,
+    SCHEMA_SCRIPT,
+    HASH_ID_DATABASES,
+    LandscapeServerCharm,
+    get_modified_env_vars,
+    METRIC_INSTRUMENTED_SERVICE_PORTS,
+)
+
+
+class TestGrafanaMachineAgentRelation(unittest.TestCase):
+
+    def _get_cos_agent_relation_config(self, state: State) -> dict:
+        """
+        Extract the cos-agent relation configuration.
+        """
+        for relation in state.relations:
+            if relation.endpoint == "cos-agent":
+                break
+        else:
+            raise ValueError("No cos-agent relation found.")
+
+        return json.loads(relation.local_unit_data["config"])
+
+    def test_relation(self):
+        """
+        Landscape provides configuration to the `cos-agent` relation when joined.
+
+        Landscape provides metrics scrape jobs and metrics alert rules to the relation.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("cos-agent")
+        state = State(relations=[relation])
+
+        result = context.run(context.on.relation_joined(relation), state)
+        config = self._get_cos_agent_relation_config(result)
+
+        self.assertIn("metrics_scrape_jobs", config)
+        self.assertIn("metrics_alert_rules", config)
+
+    def test_metrics_scrape_configs(self):
+        """
+        Landscape provides scrape configs for each instrumented Landscape service.
+        """
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation("cos-agent")
+        state = State(relations=[relation])
+
+        result = context.run(context.on.relation_joined(relation), state)
+        config = self._get_cos_agent_relation_config(result)
+
+        self.assertIn("metrics_scrape_jobs", config)
+        scrape_jobs = config["metrics_scrape_jobs"]
+
+        expected_static_configs = [
+            {
+                "targets": [f"localhost:{port}"],
+                "labels": {"landscape_service": f"{service}"},
+            }
+            for service, port in METRIC_INSTRUMENTED_SERVICE_PORTS
+        ]
+
+        actual_static_configs = [scrape["static_configs"][0] for scrape in scrape_jobs]
+
+        self.assertListEqual(expected_static_configs, actual_static_configs)
+
+    def test_scrape_interval(self):
+        """
+        Landscape exposes a Prometheus scrape interval configuration parameter
+        and forwards it to the relation.
+        """
+        scrape_interval = "5m"
+        context = Context(LandscapeServerCharm)
+        relation = Relation("cos-agent")
+        state = State(
+            relations=[relation],
+            config={"prometheus_scrape_interval": scrape_interval},
+        )
+
+        result = context.run(context.on.relation_joined(relation), state)
+        config = self._get_cos_agent_relation_config(result)
+
+        for scrape_job in config["metrics_scrape_jobs"]:
+            self.assertEqual(scrape_interval, scrape_job["scrape_interval"])
 
 
 class TestCharm(unittest.TestCase):

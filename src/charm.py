@@ -116,6 +116,27 @@ PROXY_ENV_MAPPING = {
     "JUJU_CHARM_NO_PROXY": "--with-no-proxy",
 }
 
+METRIC_INSTRUMENTED_SERVICE_PORTS = [
+    ("appserver", 8080),
+    ("pingserver", 8070),
+    ("message-server", 8090),
+    ("api", 9080),
+    ("package-upload", 9100),
+    ("package-search", 9099),
+]
+"""
+Default ports for Landscape services in a self-hosted deployment.
+
+Currently this var is only used for metrics configuration, so it only includes the
+applicable services.
+
+TODO all service configuration should be configurable through Juju and passed to the
+Landscape server configuration file.
+"""
+
+METRICS_RULES_DIR = os.path.join(os.path.dirname(__file__), "prometheus_alert_rules")
+"""The location of Prometheus metrics alerts rules for the COS relation."""
+
 
 def get_modified_env_vars():
     """
@@ -140,7 +161,7 @@ def get_args_with_secrets_removed(args, arg_names):
         if dash_arg_name in args:
             idx = args.index(dash_arg_name) + 1
             if idx < len(args):
-                args[idx] = 'REDACTED'
+                args[idx] = "REDACTED"
     return args
 
 
@@ -223,14 +244,31 @@ class LandscapeServerCharm(CharmBase):
 
         self._grafana_agent = COSAgentProvider(
             self,
-            metrics_endpoints=[
-                {"path": "/metrics", "port": 8080},  # appserver
-                {"path": "/metrics", "port": 8070},  # pingserver
-                {"path": "/metrics", "port": 8090},  # message-server
-                {"path": "/metrics", "port": 9080},  # api
-                {"path": "/metrics", "port": 9100},  # package-upload
+            scrape_configs=self._generate_scrape_configs,
+            metrics_rules_dir=METRICS_RULES_DIR,
+            refresh_events=[
+                self.on.config_changed,
+                self.on.upgrade_charm,
             ],
         )
+
+    def _generate_scrape_configs(self) -> list[dict]:
+        """
+        Return a scrape config for every metric-instrumented Landscape service.
+        """
+        return [
+            {
+                "scrape_interval": self.model.config.get("prometheus_scrape_interval"),
+                "metrics_path": "/metrics",
+                "static_configs": [
+                    {
+                        "targets": [f"localhost:{port}"],
+                        "labels": {"landscape_service": f"{service}"},
+                    },
+                ],
+            }
+            for service, port in METRIC_INSTRUMENTED_SERVICE_PORTS
+        ]
 
     def _on_config_changed(self, _) -> None:
         prev_status = self.unit.status
@@ -256,7 +294,9 @@ class LandscapeServerCharm(CharmBase):
         license_file = self.model.config.get("license_file")
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
-            write_license_file(license_file, user_exists("landscape").pw_uid, self.root_gid)
+            write_license_file(
+                license_file, user_exists("landscape").pw_uid, self.root_gid
+            )
             self.unit.status = WaitingStatus("Waiting on relations")
 
         smtp_relay_host = self.model.config.get("smtp_relay_host")
@@ -377,7 +417,9 @@ class LandscapeServerCharm(CharmBase):
                 if proxy_var in self.model.config:
                     add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
                 elif juju_proxy_var in add_apt_repository_env:
-                    add_apt_repository_env[proxy_var] = add_apt_repository_env[juju_proxy_var]
+                    add_apt_repository_env[proxy_var] = add_apt_repository_env[
+                        juju_proxy_var
+                    ]
 
                 if proxy_var in add_apt_repository_env:
                     logger.info(
@@ -394,14 +436,26 @@ class LandscapeServerCharm(CharmBase):
                     f"{add_apt_repository_env['no_proxy']}"
                 )
 
-            check_call(["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env)
+            check_call(
+                ["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env
+            )
 
             if self.model.config["min_install"]:
                 logger.info("Not installing hashids..")
-                check_call(["apt", "install", LANDSCAPE_SERVER, "--no-install-recommends", "-y"])
+                check_call(
+                    [
+                        "apt",
+                        "install",
+                        LANDSCAPE_SERVER,
+                        "--no-install-recommends",
+                        "-y",
+                    ]
+                )
             else:
                 # Explicitly ensure cache is up-to-date after adding the PPA.
-                apt.add_package([LANDSCAPE_SERVER, "landscape-hashids"], update_cache=True)
+                apt.add_package(
+                    [LANDSCAPE_SERVER, "landscape-hashids"], update_cache=True
+                )
                 check_call(["apt-mark", "hold", "landscape-hashids"])
             check_call(["apt-mark", "hold", LANDSCAPE_SERVER])
         except (PackageNotFoundError, PackageError, CalledProcessError) as exc:
@@ -420,7 +474,9 @@ class LandscapeServerCharm(CharmBase):
 
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
-            write_license_file(license_file, user_exists("landscape").pw_uid, self.root_gid)
+            write_license_file(
+                license_file, user_exists("landscape").pw_uid, self.root_gid
+            )
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1146,8 +1202,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         logger.info(logged_args)
 
         try:
-            result = subprocess.run(args, capture_output=True, text=True,
-                                    env=get_modified_env_vars())
+            result = subprocess.run(
+                args, capture_output=True, text=True, env=get_modified_env_vars()
+            )
         except FileNotFoundError:
             logger.error("Bootstrap script not found!")
             logger.error(BOOTSTRAP_ACCOUNT_SCRIPT)
@@ -1182,8 +1239,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Starting services")
         event.log("Starting services")
 
-        start_result = subprocess.run([LSCTL, "start"], capture_output=True, text=True,
-                                      env=get_modified_env_vars())
+        start_result = subprocess.run(
+            [LSCTL, "start"],
+            capture_output=True,
+            text=True,
+            env=get_modified_env_vars(),
+        )
 
         try:
             check_call([LSCTL, "status"], env=get_modified_env_vars())
@@ -1248,8 +1309,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Running schema migration...")
 
         try:
-            subprocess.run([SCHEMA_SCRIPT], check=True, text=True,
-                           env=get_modified_env_vars())
+            subprocess.run(
+                [SCHEMA_SCRIPT], check=True, text=True, env=get_modified_env_vars()
+            )
         except CalledProcessError as e:
             logger.error("Schema migration failed with error code %s", e.returncode)
             event.fail(f"Schema migration failed with error code {e.returncode}")
@@ -1264,8 +1326,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         try:
             subprocess.run(
-                ["sudo", "-u", "landscape", HASH_ID_DATABASES], check=True, text=True,
-                env=get_modified_env_vars())
+                ["sudo", "-u", "landscape", HASH_ID_DATABASES],
+                check=True,
+                text=True,
+                env=get_modified_env_vars(),
+            )
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
             event.fail(f"Hashing ID databases failed with error code {e.returncode}")

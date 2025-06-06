@@ -3,5 +3,8 @@ coverage
 flake8
 
 # Grafana Agent Library
-cosl
+cosl >= 1.0.0
 pydantic < 2
+
+# Testing
+ops[testing] ~= 2.19
