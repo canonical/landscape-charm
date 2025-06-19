@@ -115,6 +115,10 @@ class TestGrafanaMachineAgentRelation(unittest.TestCase):
             self.assertEqual(scrape_interval, scrape_job["scrape_interval"])
 
 
+from settings_files import AMQP_USERNAME, VHOSTS
+from src.charm import UPDATE_WSL_DISTRIBUTIONS_SCRIPT
+
+
 class TestCharm(unittest.TestCase):
     def setUp(self):
         self.harness = Harness(LandscapeServerCharm)
@@ -136,6 +140,9 @@ class TestCharm(unittest.TestCase):
         patch("charm.service_running").start()
         patch("charm.service_running").start()
 
+        self.log_error_mock = patch("charm.logger.error").start()
+        self.log_info_mock = patch("charm.logger.info").start()
+
         self.addCleanup(patch.stopall)
 
         self.harness.begin()
@@ -143,7 +150,8 @@ class TestCharm(unittest.TestCase):
     def test_init(self):
         self.assertEqual(self.harness.charm._stored.ready, {
             "db": False,
-            "amqp": False,
+            "inbound-amqp": False,
+            "outbound-amqp": False,
             "haproxy": False,
         })
 
@@ -177,7 +185,7 @@ class TestCharm(unittest.TestCase):
         status = harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(status.message,
-                         "Waiting on relations: db, amqp, haproxy")
+                         "Waiting on relations: db, inbound-amqp, outbound-amqp, haproxy")
 
     def test_install_package_not_found_error(self):
         harness = Harness(LandscapeServerCharm)
@@ -685,16 +693,105 @@ class TestCharm(unittest.TestCase):
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
 
-    def test_amqp_relation_joined(self):
+    @patch("charm.update_service_conf")
+    def test_on_db_relation_changed_update_wsl_distribution(self, _):
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ):
+                self.harness.charm._db_relation_changed(mock_event)
+
+        check_call_mock.assert_called_with(
+            [UPDATE_WSL_DISTRIBUTIONS_SCRIPT], env=ANY
+        )
+
+    @patch("charm.update_service_conf")
+    def test_on_db_relation_update_wsl_distributions_fail(self, _):
+        """
+        If the `update_wsl_distributions` script fails,
+        it will not result in a `BlockedStatus`.
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with patch("charm.check_call") as check_call_mock:
+            with patch(
+                "settings_files.update_service_conf"
+            ):
+                # Let bootstrap account go through
+                check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
+                self.harness.charm._db_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertNotIsInstance(status, BlockedStatus)
+
+        info_calls = [call.args for call in self.log_info_mock.call_args_list]
+        error_calls = [call.args for call in self.log_error_mock.call_args_list]
+        
+        self.assertIn(("Updating WSL distributions...",), info_calls)
+        self.assertIn(
+            (
+                "Try updating the stock WSL distributions again later by running '%s'.",
+                f"{UPDATE_WSL_DISTRIBUTIONS_SCRIPT}",
+            ),
+            info_calls,
+        )
+
+        self.assertIn(
+            ('Failed to update WSL distributions with return code %d', 127),
+            error_calls,
+        )
+
+    def test_inbound_amqp_relation_joined(self):
+        """
+        The inbound vhost is created.
+        """
         unit = self.harness.charm.unit
         mock_event = Mock()
+        relation_name = "inbound-amqp"
+        mock_event.relation.name = relation_name
         mock_event.relation.data = {unit: {}}
 
         self.harness.charm._amqp_relation_joined(mock_event)
 
-        self.assertEqual(mock_event.relation.data[unit]["username"],
-                         "landscape")
-        self.assertEqual(mock_event.relation.data[unit]["vhost"], "landscape")
+        self.assertEqual(mock_event.relation.data[unit]["username"], AMQP_USERNAME)
+        self.assertEqual(mock_event.relation.data[unit]["vhost"], VHOSTS[relation_name])
+
+    def test_outbound_amqp_relation_joined(self):
+        """
+        The outbound vhost is created.
+        """
+        unit = self.harness.charm.unit
+        mock_event = Mock()
+        relation_name = "outbound-amqp"
+        mock_event.relation.name = relation_name
+        mock_event.relation.data = {unit: {}}
+
+        self.harness.charm._amqp_relation_joined(mock_event)
+
+        self.assertEqual(mock_event.relation.data[unit]["username"], AMQP_USERNAME)
+        self.assertEqual(mock_event.relation.data[unit]["vhost"], VHOSTS[relation_name])
 
     def test_amqp_relation_changed_no_password(self):
         mock_event = Mock()
@@ -705,56 +802,96 @@ class TestCharm(unittest.TestCase):
 
         status = self.harness.charm.unit.status
         self.assertEqual(status, initial_status)
-        self.assertFalse(self.harness.charm._stored.ready["amqp"])
+        self.assertFalse(self.harness.charm._stored.ready["outbound-amqp"])
+        self.assertFalse(self.harness.charm._stored.ready["inbound-amqp"])
 
     def test_amqp_relation_changed(self):
-        mock_event = Mock()
-        mock_event.relation.data = {
-            mock_event.unit: {
-                "hostname": ["test1", "test2"],
-                "password": "testpass",
+        """
+        Tests proper handling when the event's hostname
+        is a list of strings.
+        """
+        hostname = ["test1", "test2"]
+        password = "testpass"
+
+        outbound_change_event = Mock()
+        outbound_change_event.relation.name = "outbound-amqp"
+        outbound_change_event.relation.data = {
+            outbound_change_event.unit: {
+                "hostname": hostname,
+                "password": password,
+            },
+        }
+
+        inbound_change_event = Mock()
+        inbound_change_event.relation.name = "inbound-amqp"
+        inbound_change_event.relation.data = {
+            inbound_change_event.unit: {
+                "hostname": hostname,
+                "password": password,
             },
         }
 
         with patch("charm.update_service_conf") as mock_update_conf:
-            self.harness.charm._amqp_relation_changed(mock_event)
+            self.harness.charm._amqp_relation_changed(inbound_change_event)
+            self.harness.charm._amqp_relation_changed(outbound_change_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
-        self.assertTrue(self.harness.charm._stored.ready["amqp"])
+        self.assertTrue(self.harness.charm._stored.ready["inbound-amqp"])
+        self.assertTrue(self.harness.charm._stored.ready["outbound-amqp"])
 
-        mock_update_conf.assert_called_once_with({
-            "broker": {
-                "host": "test1,test2",
-                "password": "testpass",
+        mock_update_conf.assert_called_once_with(
+            {
+                "broker": {
+                    "host": ",".join(hostname),
+                    "password": password,
+                },
+            }
+        )
+
+    def test_amqp_relation_changed_outbound_first(self):
+        """
+        Tests proper handling when the event's hostname is a single string
+        and the outbound amqp relation changes first.
+        """
+        hostname = "test"
+        password = "testpass"
+
+        outbound_change_event = Mock()
+        outbound_change_event.relation.name = "outbound-amqp"
+        outbound_change_event.relation.data = {
+            outbound_change_event.unit: {
+                "hostname": hostname,
+                "password": password,
             },
-        })
+        }
 
-    def test_amqp_relation_changed_str_hostname(self):
-        """
-        Tests proper handling when the event's hostname is a single string.
-        """
-        mock_event = Mock()
-        mock_event.relation.data = {
-            mock_event.unit: {
-                "hostname": "test1",
-                "password": "testpass",
+        inbound_change_event = Mock()
+        inbound_change_event.relation.name = "inbound-amqp"
+        inbound_change_event.relation.data = {
+            inbound_change_event.unit: {
+                "hostname": hostname,
+                "password": password,
             },
         }
 
         with patch("charm.update_service_conf") as mock_update_conf:
-            self.harness.charm._amqp_relation_changed(mock_event)
+            self.harness.charm._amqp_relation_changed(outbound_change_event)
+            self.harness.charm._amqp_relation_changed(inbound_change_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
-        self.assertTrue(self.harness.charm._stored.ready["amqp"])
+        self.assertTrue(self.harness.charm._stored.ready["inbound-amqp"])
+        self.assertTrue(self.harness.charm._stored.ready["outbound-amqp"])
 
-        mock_update_conf.assert_called_once_with({
-            "broker": {
-                "host": "test1",
-                "password": "testpass",
-            },
-        })
+        mock_update_conf.assert_called_once_with(
+            {
+                "broker": {
+                    "host": hostname,
+                    "password": password,
+                },
+            }
+        )
 
     def test_website_relation_joined_cert_no_key(self):
         mock_event = Mock()
@@ -1532,7 +1669,6 @@ class TestBootstrapAccount(unittest.TestCase):
             env=ANY
         )
         event.fail.assert_called_once()
-
 
 class TestGetModifiedEnvVars(unittest.TestCase):
     """Tests for the workaround to patch the PYTHONPATH."""

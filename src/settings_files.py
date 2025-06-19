@@ -30,6 +30,11 @@ SSL_CERT_PATH = "/etc/ssl/certs/landscape_server_ca.crt"
 
 DEFAULT_POSTGRES_PORT = "5432"
 
+AMQP_USERNAME = "landscape"
+VHOSTS = {
+    "inbound-amqp": "landscape",
+    "outbound-amqp": "landscape-hostagent",
+}
 
 class LicenseFileReadException(Exception):
     pass

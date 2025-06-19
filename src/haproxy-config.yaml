@@ -40,6 +40,13 @@ https_service:
     - use_backend landscape-package-upload if package-upload
     - http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
 
+grpc_service:
+  service_name: landscape-grpc
+  service_host: 0.0.0.0
+  service_port: 6554
+  server_options: 
+    - proto h2
+
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
   files:
@@ -55,6 +62,7 @@ ports:
   message-server: 8090
   api: 9080
   package-upload: 9100
+  hostagent-messenger: 50052
 
 server_options:
   - check
