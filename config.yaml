@@ -205,3 +205,9 @@ options:
     description: |
       Used by the Grafana machine agent subordinate charm. The duration between
       Prometheus scrapes. Expects a Prometheus-style <duration> value, e.g., '1h30m5s'.
+  autoregistration:
+    type: boolean
+    default: false
+    description: |
+      Bypassed Landscape administrator registration approval for clients that
+      register using the registration password.

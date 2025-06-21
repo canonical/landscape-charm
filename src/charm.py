@@ -79,6 +79,7 @@ NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
 SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
+AUTOREGISTRATION_SCRIPT = os.path.join(os.path.dirname(__file__), "autoregistration.py")
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 UPDATE_WSL_DISTRIBUTIONS_SCRIPT = "/opt/canonical/landscape/update-wsl-distributions"
 
@@ -151,7 +152,7 @@ def get_modified_env_vars():
     env_vars = os.environ.copy()
     logging.info("Fixing python paths")
     new_paths = [path for path in sys.path if "juju" not in path]
-    env_vars["PYTHONPATH"] = ":".join(new_paths)
+    env_vars["PYTHONPATH"] = ":".join(new_paths) + ":/opt/canonical/landscape"
     return env_vars
 
 
@@ -374,6 +375,7 @@ class LandscapeServerCharm(CharmBase):
                 return
 
         self._bootstrap_account()
+        self._set_autoregistration()
 
         secret_token = self._get_secret_token()
         if self.unit.is_leader():
@@ -681,6 +683,7 @@ class LandscapeServerCharm(CharmBase):
         try:
             check_call(call, env=get_modified_env_vars())
             self._bootstrap_account()
+            self._set_autoregistration()
             return True
         except CalledProcessError as e:
             logger.error(
@@ -1286,6 +1289,36 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             logger.info("Admin account successfully bootstrapped!")
             self._stored.account_bootstrapped = True
+
+    def _set_autoregistration(self) -> None:
+        """Turns autoregistration on or off.
+
+        Only the leader does this to prevent unnecessary DB writes.
+        We can only do this after the initial account is bootstrapped.
+        """
+        on = "on" if self.model.config["autoregistration"] else "off"
+
+        if not self.unit.is_leader():
+            return
+
+        if not self._stored.account_bootstrapped:
+            logger.error(
+                "Cannot modify autoregistration because no account exists."
+            )
+            return
+
+        logger.info("Setting autoregistration...")
+        result = subprocess.run(
+            ["python3", AUTOREGISTRATION_SCRIPT, on],
+            capture_output=True,
+            text=True,
+            env=get_modified_env_vars(),
+        )
+
+        logger.info(result.stdout)
+
+        if result.returncode:
+            logger.error(result.stderr)
 
     def _pause(self, event: ActionEvent) -> None:
         self.unit.status = MaintenanceStatus("Stopping services")
