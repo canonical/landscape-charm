@@ -13,6 +13,10 @@ http_service:
     - redirect scheme https unless ping OR repository
     - use_backend landscape-ping if ping
 
+    # metrics
+    - acl metrics path_end /metrics
+    - http-request deny if metrics
+
 https_service:
   service_name: landscape-https
   service_host: 0.0.0.0
@@ -27,9 +31,7 @@ https_service:
     - acl message path_beg -i /message-system
     - acl attachment path_beg -i /attachment
     - acl api path_beg -i /api
-    - acl prometheus_metrics path_beg -i /metrics
     - acl ping path_beg -i /ping
-    - http-request deny if prometheus_metrics
     - use_backend landscape-message if message
     - use_backend landscape-message if attachment
     - use_backend landscape-api if api
@@ -39,6 +41,12 @@ https_service:
     - acl package-upload path_beg -i /upload
     - use_backend landscape-package-upload if package-upload
     - http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
+
+    # metrics
+    - acl metrics path_end /metrics
+    - http-request deny if metrics
+    - acl prometheus_metrics path_beg -i /metrics
+    - http-request deny if prometheus_metrics
 
 grpc_service:
   service_name: landscape-grpc
