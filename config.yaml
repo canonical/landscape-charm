@@ -15,10 +15,8 @@ options:
     type: int
     default: 2
     description: |
-      Number of processes to spawn for message-server and ping-server.
-      If set to 0, the charm will automatically pick a value, trying
-      to maximize the use of the computer/memory resources available
-      on the unit.
+      Number of processes to spawn for the api, app-server,
+      message-server, and ping-server services.
   license_file:
     type: string
     default:

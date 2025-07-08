@@ -339,16 +339,21 @@ class LandscapeServerCharm(CharmBase):
             self._configure_openid()
             self._configure_oidc()
 
-        # Update root_url, if provided
+        # Update the service.conf
         root_url = self.model.config.get("root_url")
+        workers = self.model.config["worker_counts"]
+
+        service_conf_updates = {
+            service: {"workers": str(workers)}
+            for service in ("landscape", "api", "message-server", "pingserver")
+        }
+
         if root_url:
-            update_service_conf(
-                {
-                    "global": {"root-url": root_url},
-                    "api": {"root-url": root_url},
-                    "package-upload": {"root-url": root_url},
-                }
-            )
+            service_conf_updates["global"] = {"root-url": root_url}
+            service_conf_updates["api"]["root-url"] = root_url
+            service_conf_updates["package-upload"]["root-url"] = root_url
+
+        update_service_conf(service_conf_updates)
 
         config_host = self.model.config.get("db_host")
         schema_password = self.model.config.get("db_schema_password")
