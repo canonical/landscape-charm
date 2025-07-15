@@ -35,7 +35,6 @@ applications:
         landscape_ppa: ppa:landscape/self-hosted-24.04
         min_install: True
 relations:
-  - [landscape-server:inbound-amqp, rabbitmq-server:amqp]
-  - [landscape-server:outbound-amqp, rabbitmq-server:amqp]
+  - [landscape-server, rabbitmq-server]
   - [landscape-server, haproxy]
   - [landscape-server:db, postgresql:db-admin]
