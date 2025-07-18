@@ -4,7 +4,7 @@ DIRNAME := $(addsuffix -build, $(DIRNAME))
 build: clean
 	charmcraft pack
 	juju add-model $(DIRNAME)
-	juju deploy ./bundle.yaml
+	juju deploy ./bundle-examples/bundle.yaml
 
 clean:
 	-rm *.charm
