@@ -4,7 +4,7 @@
 options:
   landscape_ppa:
     type: string
-    default: "ppa:landscape/latest-stable"
+    default: "ppa:landscape/self-hosted-beta"
     description: The PPA from which Landscape Server will be installed.
   landscape_ppa_key:
     type: string
