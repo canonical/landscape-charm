@@ -55,9 +55,7 @@ from ops.model import (
 )
 
 from settings_files import (
-    AMQP_USERNAME,
     DEFAULT_POSTGRES_PORT,
-    VHOSTS,
     configure_for_deployment_mode,
     generate_secret_token,
     merge_service_conf,
@@ -81,7 +79,6 @@ SCHEMA_SCRIPT = "/usr/bin/landscape-schema"
 BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 AUTOREGISTRATION_SCRIPT = os.path.join(os.path.dirname(__file__), "autoregistration.py")
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
-UPDATE_WSL_DISTRIBUTIONS_SCRIPT = "/opt/canonical/landscape/update-wsl-distributions"
 
 LANDSCAPE_SERVER = "landscape-server"
 LANDSCAPE_PACKAGES = (
@@ -97,8 +94,6 @@ DEFAULT_SERVICES = (
     "landscape-job-handler",
     "landscape-msgserver",
     "landscape-pingserver",
-    "landscape-hostagent-messenger",
-    "landscape-hostagent-consumer",
 )
 LEADER_SERVICES = (
     "landscape-package-search",
@@ -188,23 +183,10 @@ class LandscapeServerCharm(CharmBase):
         # Relations
         self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
         self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
-
-        # Inbound vhost
+        self.framework.observe(self.on.amqp_relation_joined, self._amqp_relation_joined)
         self.framework.observe(
-            self.on.inbound_amqp_relation_joined, self._amqp_relation_joined
+            self.on.amqp_relation_changed, self._amqp_relation_changed
         )
-        self.framework.observe(
-            self.on.inbound_amqp_relation_changed, self._amqp_relation_changed
-        )
-
-        # Outbound
-        self.framework.observe(
-            self.on.outbound_amqp_relation_joined, self._amqp_relation_joined
-        )
-        self.framework.observe(
-            self.on.outbound_amqp_relation_changed, self._amqp_relation_changed
-        )
-
         self.framework.observe(
             self.on.website_relation_joined, self._website_relation_joined
         )
@@ -248,8 +230,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(
             ready={
                 "db": False,
-                "inbound-amqp": False,
-                "outbound-amqp": False,
+                "amqp": False,
                 "haproxy": False,
             }
         )
@@ -646,9 +627,6 @@ class LandscapeServerCharm(CharmBase):
         if not self._migrate_schema_bootstrap():
             return
 
-        if not self._update_wsl_distributions():
-            return
-
         self._stored.ready["db"] = True
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status(restart_services=True)
@@ -697,42 +675,22 @@ class LandscapeServerCharm(CharmBase):
             )
             self.unit.status = BlockedStatus("Failed to update database schema")
 
-    def _update_wsl_distributions(self) -> bool | None:
-        logger.info("Updating WSL distributions...")
-
-        try:
-            check_call(
-                [UPDATE_WSL_DISTRIBUTIONS_SCRIPT],
-                env=get_modified_env_vars(),
-            )
-            return True
-        except CalledProcessError as e:
-            logger.error(
-                "Failed to update WSL distributions with return code %d", e.returncode
-            )
-            logger.info(
-                "Try updating the stock WSL distributions again later by running '%s'.",
-                UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
-            )
-
     def _amqp_relation_joined(self, event: RelationJoinedEvent) -> None:
-        relation_name = event.relation.name
-        self._stored.ready[relation_name] = False
-        self.unit.status = MaintenanceStatus(f"Setting up {relation_name} connection")
+        self._stored.ready["amqp"] = False
+        self.unit.status = MaintenanceStatus("Setting up amqp connection")
 
         event.relation.data[self.unit].update(
             {
-                "username": AMQP_USERNAME,
-                "vhost": VHOSTS[relation_name],
+                "username": "landscape",
+                "vhost": "landscape",
             }
         )
 
     def _amqp_relation_changed(self, event):
         unit_data = event.relation.data[event.unit]
-        relation_name = event.relation.name
 
         if "password" not in unit_data:
-            logger.info("rabbitmq-server has not sent password yet")
+            logger.info("rabbimq-server has not sent password yet")
             return
 
         hostname = unit_data["hostname"]
@@ -740,16 +698,6 @@ class LandscapeServerCharm(CharmBase):
 
         if isinstance(hostname, list):
             hostname = ",".join(hostname)
-
-        self._stored.ready[relation_name] = True
-
-        if not (
-            self._stored.ready.get("inbound-amqp") and self._stored.ready.get("outbound-amqp")
-        ):
-            self.unit.status = MaintenanceStatus(
-                "Waiting for inbound and outbound AMQP details..."
-            )
-            return
 
         update_service_conf(
             {
@@ -760,6 +708,7 @@ class LandscapeServerCharm(CharmBase):
             }
         )
 
+        self._stored.ready["amqp"] = True
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
@@ -812,10 +761,7 @@ class LandscapeServerCharm(CharmBase):
 
         http_service = haproxy_config["http_service"]
         https_service = haproxy_config["https_service"]
-        grpc_service = haproxy_config["grpc_service"]
-
         https_service["crts"] = [ssl_cert]
-        grpc_service["crts"] = [ssl_cert]
 
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
@@ -877,18 +823,6 @@ class LandscapeServerCharm(CharmBase):
             },
         ]
 
-        hostagent_messengers = [
-            (
-                f"landscape-hostagent-messenger-{unit_name}-{i}",
-                server_ip,
-                haproxy_config["ports"]["hostagent-messenger"] + i,
-                haproxy_config["server_options"] + grpc_service["server_options"],
-            )
-            for i in range(worker_counts)
-        ]
-
-        grpc_service["servers"] = hostagent_messengers
-
         error_files_location = haproxy_config["error_files"]["location"]
         error_files = []
         for code, filename in haproxy_config["error_files"]["files"].items():
@@ -900,11 +834,10 @@ class LandscapeServerCharm(CharmBase):
 
         http_service["error_files"] = error_files
         https_service["error_files"] = error_files
-        grpc_service["error_files"] = error_files
 
         relation.data[self.unit].update(
             {
-                "services": yaml.safe_dump([http_service, https_service, grpc_service]),
+                "services": yaml.safe_dump([http_service, https_service]),
             }
         )
 
