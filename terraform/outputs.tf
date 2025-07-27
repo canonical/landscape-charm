@@ -24,10 +24,3 @@ output "provides" {
     website              = "website"
   }
 }
-
-output "endpoints" {
-  value = {
-    mimir_cluster = "mimir-cluster"
-    metrics       = "prometheus-metrics"
-  }
-}
