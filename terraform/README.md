@@ -1,6 +1,6 @@
 # Landscape Server charm Terraform module
 
-This folder contains a base [Terraform][Terraform] module for the landscape-server charm.
+This folder contains a base [Terraform][Terraform] module for the [landscape-server charm][Charm].
 
 The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm
 deployment onto any machine cloud environment managed by [Juju][Juju].
@@ -17,6 +17,7 @@ rather serve as a building block for higher level modules.
   by defining potential integration endpoints (charm integrations), but also by exposing
   the application name.
 - **versions.tf** - Defines the Terraform provider version.
+- **locals.tf** - Values computed at deploy time based on the variables provided.
 
 ## Using the landscape-server base module in higher level modules
 
@@ -58,4 +59,5 @@ The complete list of available integrations can be found [on Charmhub][integrati
 [Terraform]: https://www.terraform.io/
 [Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
 [Juju]: https://juju.is
-[integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
+[Integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
+[Charm]: https://charmhub.io/landscape-server?channel=latest-stable/edge
