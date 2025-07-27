@@ -2,3 +2,17 @@
 venv
 __pycache__
 *.charm
+terraform/terraform.tfvars
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars.json
+terraform/crash.log
+terraform/override.tf
+terraform/override.tf.json
+terraform/*_override.tf
+terraform/*_override.tf.json
+terraform/.terraformrc
+terraform/terraform.rc
+# other charm modules do not include the lock file it seems
+terraform/.terraform.lock.hcl
