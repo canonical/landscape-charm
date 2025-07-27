@@ -15,6 +15,5 @@ resource "juju_application" "landscape_server" {
   config      = var.config
   constraints = var.constraints
   units       = var.units
-  resources   = var.resources
   trust       = true
 }

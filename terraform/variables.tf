@@ -31,12 +31,6 @@ variable "model" {
   default     = ""
 }
 
-variable "resources" {
-  description = "Resources to use with the application. Details about available options can be found at https://charmhub.io/landscape-server/configurations."
-  type        = map(string)
-  default     = {}
-}
-
 variable "revision" {
   description = "Revision number of the charm"
   type        = number
