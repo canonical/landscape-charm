@@ -7,12 +7,10 @@ output "app_name" {
 }
 
 output "requires" {
-  value = {
+  value = merge({
     application_dashboard = "application-dashboard"
     db                    = "db"
-    inbound_amqp          = "inbound-amqp"
-    outbound_amqp         = "outbound-amqp"
-  }
+  }, local.amqp_relations)
 }
 
 output "provides" {

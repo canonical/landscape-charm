@@ -40,7 +40,7 @@ variable "resources" {
 variable "revision" {
   description = "Revision number of the charm"
   type        = number
-  default     = null
+  default     = 142
 }
 
 variable "base" {
