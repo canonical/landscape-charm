@@ -1,3 +1,6 @@
+# © 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 locals {
   legacy_amqp = var.channel != "latest-stable/edge" || var.revision <= 141
   # Needed since the relations changed to support the hostagent services after 141 on latest-stable/edge
