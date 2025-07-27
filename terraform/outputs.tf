@@ -6,13 +6,6 @@ output "app_name" {
   value       = juju_application.landscape_server.name
 }
 
-output "requires" {
-  value = merge({
-    application_dashboard = "application-dashboard"
-    db                    = "db"
-  }, local.amqp_relations)
-}
-
 output "provides" {
   value = {
     cos_agent            = "cos-agent"
@@ -21,4 +14,11 @@ output "provides" {
     nrpe_external_master = "nrpe-external-master"
     website              = "website"
   }
+}
+
+output "requires" {
+  value = merge({
+    application_dashboard = "application-dashboard"
+    db                    = "db"
+  }, local.amqp_relations)
 }

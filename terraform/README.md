@@ -1,6 +1,6 @@
 # Landscape Server charm Terraform module
 
-This folder contains a base [Terraform][Terraform] module for the [landscape-server charm][Charm].
+This folder contains a base [Terraform][Terraform] module for the [Landscape Server charm][Charm].
 
 The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm
 deployment onto any machine cloud environment managed by [Juju][Juju].
@@ -33,7 +33,7 @@ module "landscape_server" {
   source = "git::https://github.com/canonical/landscape-charm//terraform"
   
   model = juju_model.my_model.name
-  (Customize configuration variables here if needed)
+  # Customize configuration variables here if needed
 }
 ```
 
@@ -54,10 +54,10 @@ resource "juju_integration" "landscape_server_haproxy" {
 }
 ```
 
-The complete list of available integrations can be found [on Charmhub][integrations].
+The complete list of available integrations can be found on [Charmhub][integrations].
 
-[Terraform]: https://www.terraform.io/
-[Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
-[Juju]: https://juju.is
-[Integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
 [Charm]: https://charmhub.io/landscape-server?channel=latest-stable/edge
+[Integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
+[Juju]: https://juju.is
+[Terraform]: https://developer.hashicorp.com/terraform
+[Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
