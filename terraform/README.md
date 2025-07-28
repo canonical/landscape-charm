@@ -1,12 +1,10 @@
 # Landscape Server charm Terraform module
 
-This folder contains a base [Terraform][Terraform] module for the [Landscape Server charm][Charm].
+This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
-The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm
-deployment onto any machine cloud environment managed by [Juju][Juju].
+The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any machine cloud environment managed by [Juju][Juju].
 
-The base module is not intended to be deployed in separation (it is possible though), but should
-rather serve as a building block for higher level modules.
+While it is possible to deploy this base module in isolation, it should serve as a building block for higher level modules.
 
 ## Module structure
 
@@ -19,10 +17,9 @@ rather serve as a building block for higher level modules.
 - **versions.tf** - Defines the Terraform provider version.
 - **locals.tf** - Values computed at deploy time based on the variables provided.
 
-## Using the landscape-server base module in higher level modules
+## Using the module in higher level modules
 
-If you want to use `landscape-server` base module as part of your Terraform module, import it
-like shown below:
+To use this in your Terraform module, import it like this:
 
 ```hcl
 data "juju_model" "my_model" {
@@ -33,30 +30,34 @@ module "landscape_server" {
   source = "git::https://github.com/canonical/landscape-charm//terraform"
   
   model = juju_model.my_model.name
-  # Customize configuration variables here if needed
+  # Customize configuration variables here if needed, for example:
+  # config = {
+  #   min_install = true
+  # }
 }
 ```
 
-Create integrations, for instance:
+Then, create integrations, for example:
 
 ```hcl
 resource "juju_integration" "landscape_server_haproxy" {
   model = juju_model.my_model.name
+  
   application {
-    name     = module.landscape_server.app_name
-    endpoint = module.landscape_server.requires.website
+    name     = module.haproxy.app_name
+    endpoint = module.haproxy.requires.reverseproxy
   }
 
   application {
-    name     = module.haproxy.app_name
-    endpoint = module.haproxy.provides.website
+    name     = module.landscape_server.app_name
+    endpoint = module.landscape_server.provides.website
   }
 }
 ```
 
 The complete list of available integrations can be found on [Charmhub][integrations].
 
-[Charm]: https://charmhub.io/landscape-server?channel=latest-stable/edge
+[Landscape Server charm]: https://charmhub.io/landscape-server?channel=latest-stable/edge
 [Integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
 [Juju]: https://juju.is
 [Terraform]: https://developer.hashicorp.com/terraform
