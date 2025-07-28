@@ -40,7 +40,9 @@ variable "model" {
 variable "revision" {
   description = "Revision number of the charm"
   type        = number
-  default     = 142
+  # i.e., latest revision available for the channel
+  default     = null
+  nullable    = true
 }
 
 variable "units" {
