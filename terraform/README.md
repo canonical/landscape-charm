@@ -2,19 +2,16 @@
 
 This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
-The module uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any machine cloud environment managed by [Juju][Juju].
+It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
 
-While it is possible to deploy this base module in isolation, it should serve as a building block for higher level modules.
+While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules.
 
 ## Module structure
 
 - **main.tf** - Defines the Juju application to be deployed.
-- **variables.tf** - Allows customization of the deployment. Except for exposing the deployment
-  options (Juju model name, channel or application name) also models the charm configuration.
-- **output.tf** - Responsible for integrating the module with other Terraform modules, primarily
-  by defining potential integration endpoints (charm integrations), but also by exposing
-  the application name.
-- **versions.tf** - Defines the Terraform provider version.
+- **variables.tf** - Provides customizable deployment inputs. This includes options such as the Juju model name, channel, and application name, as well as charm-specific configuration parameters.
+- **output.tf** - Exposes values needed by other Terraform modules, such as the application name and integration endpoints (e.g., charm relations).
+- **versions.tf** - Defines the required Terraform and provider versions.
 - **locals.tf** - Values computed at deploy time based on the variables provided.
 
 ## Using the module in higher level modules
@@ -28,7 +25,7 @@ data "juju_model" "my_model" {
 
 module "landscape_server" {
   source = "git::https://github.com/canonical/landscape-charm//terraform"
-  
+
   model = juju_model.my_model.name
   # Customize configuration variables here if needed, for example:
   # config = {
@@ -42,7 +39,7 @@ Then, create integrations, for example:
 ```hcl
 resource "juju_integration" "landscape_server_haproxy" {
   model = juju_model.my_model.name
-  
+
   application {
     name     = module.haproxy.app_name
     endpoint = module.haproxy.requires.reverseproxy
