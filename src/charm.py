@@ -744,7 +744,8 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready[relation_name] = True
 
         if not (
-            self._stored.ready.get("inbound-amqp") and self._stored.ready.get("outbound-amqp")
+            self._stored.ready.get("inbound-amqp")
+            and self._stored.ready.get("outbound-amqp")
         ):
             self.unit.status = MaintenanceStatus(
                 "Waiting for inbound and outbound AMQP details..."
