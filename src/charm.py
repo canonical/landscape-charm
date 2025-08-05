@@ -192,6 +192,113 @@ def _get_ssl_cert(ssl_cert, ssl_key):
     return ssl_cert
 
 
+def _create_haproxy_services(
+    haproxy_config: dict,
+    ssl_cert: bytes | str,
+    server_ip: str,
+    unit_name: str,
+    worker_counts: int,
+    is_leader: bool,
+):
+    """
+    Create the Landscape `services` configurations for HAProxy.
+
+    See https://charmhub.io/haproxy/configurations#services for details on the format.
+    This is roughly a combination of HAProxy `frontend` and `backend` stanzas from a
+    traditional HAProxy configuration file.
+    """
+
+    http_service = haproxy_config["http_service"]
+    https_service = haproxy_config["https_service"]
+    grpc_service = haproxy_config["grpc_service"]
+
+    https_service["crts"] = [ssl_cert]
+    grpc_service["crts"] = [ssl_cert]
+
+    (appservers, pingservers, message_servers, api_servers) = [
+        [
+            (
+                f"landscape-{name}-{unit_name}-{i}",
+                server_ip,
+                haproxy_config["ports"][name] + i,
+                haproxy_config["server_options"],
+            )
+            for i in range(worker_counts)
+        ]
+        for name in ("appserver", "pingserver", "message-server", "api")
+    ]
+
+    # There should only ever be one package-upload-server service.
+    package_upload_servers = [
+        (
+            f"landscape-package-upload-{unit_name}-0",
+            server_ip,
+            haproxy_config["ports"]["package-upload"],
+            haproxy_config["server_options"],
+        )
+    ]
+
+    http_service["servers"] = appservers
+    http_service["backends"] = [
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers,
+        }
+    ]
+    https_service["servers"] = appservers
+    https_service["backends"] = [
+        {
+            "backend_name": "landscape-message",
+            "servers": message_servers,
+        },
+        {
+            "backend_name": "landscape-api",
+            "servers": api_servers,
+        },
+        # Only the leader should have servers for the landscape-package-upload
+        # and landscape-hashid-databases backends. However, when the leader
+        # is lost, haproxy will fail as the service options will reference
+        # a (no longer) existing backend. To prevent that, all units should
+        # declare all backends, even if a unit should not have any servers on
+        # a specific backend.
+        {
+            "backend_name": "landscape-package-upload",
+            "servers": package_upload_servers if is_leader else [],
+        },
+        {
+            "backend_name": "landscape-hashid-databases",
+            "servers": appservers if is_leader else [],
+        },
+    ]
+
+    hostagent_messengers = [
+        (
+            f"landscape-hostagent-messenger-{unit_name}-{i}",
+            server_ip,
+            haproxy_config["ports"]["hostagent-messenger"] + i,
+            haproxy_config["server_options"] + grpc_service["server_options"],
+        )
+        for i in range(worker_counts)
+    ]
+
+    grpc_service["servers"] = hostagent_messengers
+
+    error_files_location = haproxy_config["error_files"]["location"]
+    error_files = []
+    for code, filename in haproxy_config["error_files"]["files"].items():
+        error_file_path = os.path.join(error_files_location, filename)
+        with open(error_file_path, "rb") as error_file:
+            error_files.append(
+                {"http_status": code, "content": b64encode(error_file.read())}
+            )
+
+    http_service["error_files"] = error_files
+    https_service["error_files"] = error_files
+    grpc_service["error_files"] = error_files
+
+    return http_service, https_service, grpc_service
+
+
 class SSLConfigurationError(Exception):
     """
     Invalid SSL configuration.
@@ -826,97 +933,14 @@ class LandscapeServerCharm(CharmBase):
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
             haproxy_config = yaml.safe_load(haproxy_config_file)
 
-        http_service = haproxy_config["http_service"]
-        https_service = haproxy_config["https_service"]
-        grpc_service = haproxy_config["grpc_service"]
-
-        https_service["crts"] = [ssl_cert]
-        grpc_service["crts"] = [ssl_cert]
-
-        server_ip = relation.data[self.unit]["private-address"]
-        unit_name = self.unit.name.replace("/", "-")
-        worker_counts = self.model.config["worker_counts"]
-
-        (appservers, pingservers, message_servers, api_servers) = [
-            [
-                (
-                    f"landscape-{name}-{unit_name}-{i}",
-                    server_ip,
-                    haproxy_config["ports"][name] + i,
-                    haproxy_config["server_options"],
-                )
-                for i in range(worker_counts)
-            ]
-            for name in ("appserver", "pingserver", "message-server", "api")
-        ]
-
-        # There should only ever be one package-upload-server service.
-        package_upload_servers = [
-            (
-                f"landscape-package-upload-{unit_name}-0",
-                server_ip,
-                haproxy_config["ports"]["package-upload"],
-                haproxy_config["server_options"],
-            )
-        ]
-
-        http_service["servers"] = appservers
-        http_service["backends"] = [
-            {
-                "backend_name": "landscape-ping",
-                "servers": pingservers,
-            }
-        ]
-        https_service["servers"] = appservers
-        https_service["backends"] = [
-            {
-                "backend_name": "landscape-message",
-                "servers": message_servers,
-            },
-            {
-                "backend_name": "landscape-api",
-                "servers": api_servers,
-            },
-            # Only the leader should have servers for the landscape-package-upload
-            # and landscape-hashid-databases backends. However, when the leader
-            # is lost, haproxy will fail as the service options will reference
-            # a (no longer) existing backend. To prevent that, all units should
-            # declare all backends, even if a unit should not have any servers on
-            # a specific backend.
-            {
-                "backend_name": "landscape-package-upload",
-                "servers": package_upload_servers if self.unit.is_leader() else [],
-            },
-            {
-                "backend_name": "landscape-hashid-databases",
-                "servers": appservers if self.unit.is_leader() else [],
-            },
-        ]
-
-        hostagent_messengers = [
-            (
-                f"landscape-hostagent-messenger-{unit_name}-{i}",
-                server_ip,
-                haproxy_config["ports"]["hostagent-messenger"] + i,
-                haproxy_config["server_options"] + grpc_service["server_options"],
-            )
-            for i in range(worker_counts)
-        ]
-
-        grpc_service["servers"] = hostagent_messengers
-
-        error_files_location = haproxy_config["error_files"]["location"]
-        error_files = []
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            error_file_path = os.path.join(error_files_location, filename)
-            with open(error_file_path, "rb") as error_file:
-                error_files.append(
-                    {"http_status": code, "content": b64encode(error_file.read())}
-                )
-
-        http_service["error_files"] = error_files
-        https_service["error_files"] = error_files
-        grpc_service["error_files"] = error_files
+        http_service, https_service, grpc_service = _create_haproxy_services(
+            haproxy_config=haproxy_config,
+            ssl_cert=ssl_cert,
+            server_ip=relation.data[self.unit]["private-address"],
+            unit_name=self.unit.name.replace("/", "-"),
+            worker_counts=int(self.model.config["worker_counts"]),
+            is_leader=self.unit.is_leader(),
+        )
 
         relation.data[self.unit].update(
             {
