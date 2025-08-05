@@ -6,13 +6,13 @@ filesystem.
 """
 
 import os
+import secrets
 from base64 import b64decode, binascii
 from collections import defaultdict
 from configparser import ConfigParser
-import secrets
 from string import ascii_letters, digits
-from urllib.request import urlopen
 from urllib.error import URLError
+from urllib.request import urlopen
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
 

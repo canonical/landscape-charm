@@ -33,6 +33,7 @@ from charms.operator_libs_linux.v1.systemd import (
     service_resume,
     service_running,
 )
+from ops import main
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -45,7 +46,6 @@ from ops.charm import (
     UpdateStatusEvent,
 )
 from ops.framework import StoredState
-from ops import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
