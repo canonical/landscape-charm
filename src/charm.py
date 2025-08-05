@@ -171,6 +171,33 @@ def get_args_with_secrets_removed(args, arg_names):
     return args
 
 
+def _get_ssl_cert(ssl_cert, ssl_key):
+    """
+    Create an SSL certificate from the `ssl_cert` and `ssl_key` configuration
+    options.
+    """
+    if ssl_cert != "DEFAULT" and ssl_key == "":
+        # We have a cert but no key, this is an error.
+        raise SSLConfigurationError("`ssl_cert` is specified but `ssl_key` is missing")
+
+    if ssl_cert != "DEFAULT":
+        try:
+            ssl_cert = b64decode(ssl_cert)
+            ssl_key = b64decode(ssl_key)
+            ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
+        except binascii.Error:
+            raise SSLConfigurationError(
+                "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
+            )
+    return ssl_cert
+
+
+class SSLConfigurationError(Exception):
+    """
+    Invalid SSL configuration.
+    """
+
+
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
 
@@ -787,26 +814,14 @@ class LandscapeServerCharm(CharmBase):
 
         # Check the SSL cert stuff first. No sense doing all the other
         # work just to fail here.
-        ssl_cert = self.model.config["ssl_cert"]
-        ssl_key = self.model.config["ssl_key"]
-
-        if ssl_cert != "DEFAULT" and ssl_key == "":
-            # We have a cert but no key, this is an error.
-            self.unit.status = BlockedStatus(
-                "`ssl_cert` is specified but `ssl_key` is missing"
+        try:
+            ssl_cert = _get_ssl_cert(
+                ssl_cert=self.model.config["ssl_cert"],
+                ssl_key=self.model.config["ssl_key"],
             )
+        except SSLConfigurationError as e:
+            self.unit.status = BlockedStatus(str(e))
             return
-
-        if ssl_cert != "DEFAULT":
-            try:
-                ssl_cert = b64decode(ssl_cert)
-                ssl_key = b64decode(ssl_key)
-                ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
-            except binascii.Error:
-                self.unit.status = BlockedStatus(
-                    "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
-                )
-                return
 
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
             haproxy_config = yaml.safe_load(haproxy_config_file)
@@ -1308,9 +1323,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             return
 
         if not self._stored.account_bootstrapped:
-            logger.error(
-                "Cannot modify autoregistration because no account exists."
-            )
+            logger.error("Cannot modify autoregistration because no account exists.")
             return
 
         logger.info("Setting autoregistration...")
