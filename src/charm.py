@@ -11,15 +11,15 @@ develop a new k8s charm using the Operator Framework:
 
     https://discourse.charmhub.io/t/4208
 """
-
 import logging
 import os
 import subprocess
 import sys
 from base64 import b64decode, b64encode, binascii
+from dataclasses import asdict, dataclass
 from functools import cached_property
 from subprocess import CalledProcessError, check_call
-from typing import List
+from typing import Iterable, List
 
 import yaml
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -199,6 +199,7 @@ def _create_haproxy_services(
     unit_name: str,
     worker_counts: int,
     is_leader: bool,
+    error_files: Iterable["HAProxyErrorFile"],
 ):
     """
     Create the Landscape `services` configurations for HAProxy.
@@ -283,20 +284,35 @@ def _create_haproxy_services(
 
     grpc_service["servers"] = hostagent_messengers
 
+    http_service["error_files"] = [asdict(ef) for ef in error_files]
+    https_service["error_files"] = [asdict(ef) for ef in error_files]
+    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
+
+    return http_service, https_service, grpc_service
+
+
+@dataclass
+class HAProxyErrorFile:
+    http_status: int
+    """The status code the error file should handle."""
+    content: bytes
+    """The b64-encoded content of the error file."""
+
+
+def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
     error_files_location = haproxy_config["error_files"]["location"]
     error_files = []
     for code, filename in haproxy_config["error_files"]["files"].items():
         error_file_path = os.path.join(error_files_location, filename)
         with open(error_file_path, "rb") as error_file:
             error_files.append(
-                {"http_status": code, "content": b64encode(error_file.read())}
+                HAProxyErrorFile(
+                    http_status=code,
+                    content=b64encode(error_file.read()),
+                )
             )
 
-    http_service["error_files"] = error_files
-    https_service["error_files"] = error_files
-    grpc_service["error_files"] = error_files
-
-    return http_service, https_service, grpc_service
+    return error_files
 
 
 class SSLConfigurationError(Exception):
@@ -933,6 +949,11 @@ class LandscapeServerCharm(CharmBase):
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
             haproxy_config = yaml.safe_load(haproxy_config_file)
 
+        error_files = _get_haproxy_error_files(haproxy_config)
+        service_ports = _get_haproxy_service_ports(haproxy_config)
+        server_options = _get_haproxy_server_options(haproxy_config)
+        http, https, grpc = _get_haproxy_services(haproxy_config)
+
         http_service, https_service, grpc_service = _create_haproxy_services(
             haproxy_config=haproxy_config,
             ssl_cert=ssl_cert,
@@ -940,6 +961,7 @@ class LandscapeServerCharm(CharmBase):
             unit_name=self.unit.name.replace("/", "-"),
             worker_counts=int(self.model.config["worker_counts"]),
             is_leader=self.unit.is_leader(),
+            error_files=error_files,
         )
 
         relation.data[self.unit].update(
