@@ -193,7 +193,9 @@ def _get_ssl_cert(ssl_cert, ssl_key):
 
 
 def _create_haproxy_services(
-    haproxy_config: dict,
+    http_service: dict,
+    https_service: dict,
+    grpc_service: dict,
     ssl_cert: bytes | str,
     server_ip: str,
     unit_name: str,
@@ -210,10 +212,6 @@ def _create_haproxy_services(
     This is roughly a combination of HAProxy `frontend` and `backend` stanzas from a
     traditional HAProxy configuration file.
     """
-
-    http_service = haproxy_config["http_service"]
-    https_service = haproxy_config["https_service"]
-    grpc_service = haproxy_config["grpc_service"]
 
     https_service["crts"] = [ssl_cert]
     grpc_service["crts"] = [ssl_cert]
@@ -349,6 +347,14 @@ Additional configuration for a `server` stanza in an HAProxy configuration.
 
 def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
     return haproxy_config["server_options"]
+
+
+def _get_haproxy_services(haproxy_config: dict) -> tuple[dict, dict, dict]:
+    http_service = haproxy_config["http_service"]
+    https_service = haproxy_config["https_service"]
+    grpc_service = haproxy_config["grpc_service"]
+
+    return (http_service, https_service, grpc_service)
 
 
 class SSLConfigurationError(Exception):
@@ -991,7 +997,9 @@ class LandscapeServerCharm(CharmBase):
         http, https, grpc = _get_haproxy_services(haproxy_config)
 
         http_service, https_service, grpc_service = _create_haproxy_services(
-            haproxy_config=haproxy_config,
+            http_service=http,
+            https_service=https,
+            grpc_service=grpc,
             ssl_cert=ssl_cert,
             server_ip=relation.data[self.unit]["private-address"],
             unit_name=self.unit.name.replace("/", "-"),
