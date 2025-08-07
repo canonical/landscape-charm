@@ -12,26 +12,25 @@ develop a new k8s charm using the Operator Framework:
     https://discourse.charmhub.io/t/4208
 """
 
+from base64 import b64decode, b64encode, binascii
+from functools import cached_property
 import logging
 import os
 import subprocess
-import sys
-from base64 import b64decode, b64encode, binascii
-from functools import cached_property
 from subprocess import CalledProcessError, check_call
+import sys
 from typing import List
 
-import yaml
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
 from charms.operator_libs_linux.v1.systemd import (
-    SystemdError,
     service_pause,
     service_reload,
     service_resume,
     service_running,
+    SystemdError,
 )
 from ops import main
 from ops.charm import (
@@ -53,18 +52,19 @@ from ops.model import (
     Relation,
     WaitingStatus,
 )
+import yaml
 
 from settings_files import (
     AMQP_USERNAME,
-    DEFAULT_POSTGRES_PORT,
-    VHOSTS,
     configure_for_deployment_mode,
+    DEFAULT_POSTGRES_PORT,
     generate_secret_token,
     merge_service_conf,
     prepend_default_settings,
     update_db_conf,
     update_default_settings,
     update_service_conf,
+    VHOSTS,
     write_license_file,
     write_ssl_cert,
 )
@@ -1308,9 +1308,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             return
 
         if not self._stored.account_bootstrapped:
-            logger.error(
-                "Cannot modify autoregistration because no account exists."
-            )
+            logger.error("Cannot modify autoregistration because no account exists.")
             return
 
         logger.info("Setting autoregistration...")

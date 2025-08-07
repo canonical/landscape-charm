@@ -9,11 +9,11 @@ with landscape imports.
 import argparse
 import logging
 
-import transaction
 from canonical.landscape.application import setup_logging
 from canonical.landscape.model.account.management import AccountManagement
 from canonical.landscape.model.main.account import get_account_by_name
 from canonical.landscape.setup import load_config
+import transaction
 
 
 def main() -> None:
