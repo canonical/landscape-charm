@@ -19,7 +19,7 @@ from base64 import b64decode, b64encode, binascii
 from dataclasses import asdict, dataclass
 from functools import cached_property
 from subprocess import CalledProcessError, check_call
-from typing import Iterable, List
+from typing import Iterable, List, Mapping
 
 import yaml
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -200,6 +200,8 @@ def _create_haproxy_services(
     worker_counts: int,
     is_leader: bool,
     error_files: Iterable["HAProxyErrorFile"],
+    service_ports: "HAProxyServicePorts",
+    server_options: "HAProxyServerOptions",
 ):
     """
     Create the Landscape `services` configurations for HAProxy.
@@ -221,8 +223,8 @@ def _create_haproxy_services(
             (
                 f"landscape-{name}-{unit_name}-{i}",
                 server_ip,
-                haproxy_config["ports"][name] + i,
-                haproxy_config["server_options"],
+                service_ports[name] + i,
+                server_options,
             )
             for i in range(worker_counts)
         ]
@@ -234,8 +236,8 @@ def _create_haproxy_services(
         (
             f"landscape-package-upload-{unit_name}-0",
             server_ip,
-            haproxy_config["ports"]["package-upload"],
-            haproxy_config["server_options"],
+            service_ports["package-upload"],
+            server_options,
         )
     ]
 
@@ -276,8 +278,8 @@ def _create_haproxy_services(
         (
             f"landscape-hostagent-messenger-{unit_name}-{i}",
             server_ip,
-            haproxy_config["ports"]["hostagent-messenger"] + i,
-            haproxy_config["server_options"] + grpc_service["server_options"],
+            service_ports["hostagent-messenger"] + i,
+            server_options + grpc_service["server_options"],
         )
         for i in range(worker_counts)
     ]
@@ -293,6 +295,10 @@ def _create_haproxy_services(
 
 @dataclass
 class HAProxyErrorFile:
+    """
+    Configuration for HAProxy error files
+    """
+
     http_status: int
     """The status code the error file should handle."""
     content: bytes
@@ -313,6 +319,36 @@ def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
             )
 
     return error_files
+
+
+HAProxyServicePorts = Mapping[str, int]
+"""
+Configuration for the ports that Landscape services run on.
+
+Expects the following keys:
+- appserver
+- pingserver
+- message-server
+- api
+- package-upload
+- hostagent-messenger
+
+Each value is the port that service runs on.
+"""
+
+
+def _get_haproxy_service_ports(haproxy_config: dict) -> HAProxyServicePorts:
+    return haproxy_config["ports"]
+
+
+HAProxyServerOptions = list[str]
+"""
+Additional configuration for a `server` stanza in an HAProxy configuration.
+"""
+
+
+def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
+    return haproxy_config["server_options"]
 
 
 class SSLConfigurationError(Exception):
@@ -962,6 +998,8 @@ class LandscapeServerCharm(CharmBase):
             worker_counts=int(self.model.config["worker_counts"]),
             is_leader=self.unit.is_leader(),
             error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
         )
 
         relation.data[self.unit].update(
