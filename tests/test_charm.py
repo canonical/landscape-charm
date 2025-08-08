@@ -38,9 +38,9 @@ from charm import (
 )
 
 
-IS_CI = os.getenv("CI") == "true"
+IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
-GitHub actions will set `CI` to "true" during runs.
+GitHub actions will set `GITHUB_ACTIONS` during runs.
 """
 
 
