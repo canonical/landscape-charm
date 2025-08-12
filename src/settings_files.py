@@ -5,14 +5,14 @@ Functions for manipulating Landscape Server service settings in the
 filesystem.
 """
 
-import os
 from base64 import b64decode, binascii
 from collections import defaultdict
 from configparser import ConfigParser
+import os
 import secrets
 from string import ascii_letters, digits
-from urllib.request import urlopen
 from urllib.error import URLError
+from urllib.request import urlopen
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
 
@@ -35,6 +35,7 @@ VHOSTS = {
     "inbound-amqp": "landscape",
     "outbound-amqp": "landscape-hostagent",
 }
+
 
 class LicenseFileReadException(Exception):
     pass
@@ -159,20 +160,19 @@ def write_license_file(license_file: str, uid: int, gid: int) -> None:
     cannot be read
     """
 
-    if any((license_file.startswith(proto)
-            for proto in LICENSE_FILE_PROTOCOLS)):
+    if any((license_file.startswith(proto) for proto in LICENSE_FILE_PROTOCOLS)):
         try:
             license_file_data = urlopen(license_file).read()
         except URLError:
             raise LicenseFileReadException(
-                f"Unable to read license file at {license_file}")
+                f"Unable to read license file at {license_file}"
+            )
     else:
         # Assume b64-encoded
         try:
             license_file_data = b64decode(license_file.encode())
         except binascii.Error:
-            raise LicenseFileReadException(
-                "Unable to read b64-encoded license file")
+            raise LicenseFileReadException("Unable to read b64-encoded license file")
 
     with open(LICENSE_FILE, "wb") as license_fp:
         license_fp.write(license_file_data)
@@ -187,12 +187,16 @@ def write_ssl_cert(ssl_cert: str) -> None:
         with open(SSL_CERT_PATH, "wb") as ssl_cert_fp:
             ssl_cert_fp.write(b64decode(ssl_cert.encode()))
     except binascii.Error:
-        raise SSLCertReadException(
-            "Unable to decode b64-encoded SSL certificate")
+        raise SSLCertReadException("Unable to decode b64-encoded SSL certificate")
 
 
-def update_db_conf(host=None, password=None, schema_password=None, port=DEFAULT_POSTGRES_PORT,
-                   user=None):
+def update_db_conf(
+    host=None,
+    password=None,
+    schema_password=None,
+    port=DEFAULT_POSTGRES_PORT,
+    user=None,
+):
     """Postgres specific settings override"""
     to_update = defaultdict(dict)
     if host:  # Note that host is required if port is changed
