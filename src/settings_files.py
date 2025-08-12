@@ -5,11 +5,11 @@ Functions for manipulating Landscape Server service settings in the
 filesystem.
 """
 
-import os
-import secrets
 from base64 import b64decode, binascii
 from collections import defaultdict
 from configparser import ConfigParser
+import os
+import secrets
 from string import ascii_letters, digits
 from urllib.error import URLError
 from urllib.request import urlopen
