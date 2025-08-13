@@ -76,3 +76,21 @@ Note: this charm is using the `charmcraft 2.x.x` format for the `charmcraft.yaml
 It must packed using a compatible version of `charmcraft`.
 
 TODO: migrate to `charmcraft 3.x.x`.
+
+### Run tests
+
+```sh
+tox run -e unit
+```
+
+Or run specific test(s):
+
+```sh
+tox run -e unit -- tests/test_charm.py::TestCharm::test_install
+```
+
+### Lint code
+
+```sh
+tox -e run lint
+```

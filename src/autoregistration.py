@@ -9,12 +9,11 @@ with landscape imports.
 import argparse
 import logging
 
-import transaction
-
 from canonical.landscape.application import setup_logging
-from canonical.landscape.setup import load_config
 from canonical.landscape.model.account.management import AccountManagement
 from canonical.landscape.model.main.account import get_account_by_name
+from canonical.landscape.setup import load_config
+import transaction
 
 
 def main() -> None:
@@ -27,7 +26,7 @@ def main() -> None:
     parser.add_argument(
         "setting",
         choices=("on", "off"),
-        help="The desired state of the autoregistration setting."
+        help="The desired state of the autoregistration setting.",
     )
 
     args = parser.parse_args()
@@ -51,7 +50,11 @@ def _update_autoregistration(on: bool) -> None:
             return
 
         management = AccountManagement(account)
-        logging.info("setting autoregistration to %s for account %s", "on" if on else "off", account.name)
+        logging.info(
+            "setting autoregistration to %s for account %s",
+            "on" if on else "off",
+            account.name,
+        )
 
         management.set_preferences(auto_register_new_computers=on)
 

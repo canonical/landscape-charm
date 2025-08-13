@@ -1,0 +1,25 @@
+name: Run tox
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tox:
+    name: Run tox
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+      - name: Install tox
+        run: python3 -m pip install tox
+      - name: Lint
+        run: tox run -e lint
+      - name: Unit test
+        run: tox run -e unit
