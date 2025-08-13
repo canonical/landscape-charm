@@ -8,10 +8,29 @@ http_service:
     - timeout server 300000
     - balance leastconn
     - option httpchk HEAD / HTTP/1.0
+
+    # HTTP-only services
     - acl ping path_beg -i /ping
     - acl repository path_beg -i /repository
-    - redirect scheme https unless ping OR repository
     - use_backend landscape-ping if ping
+
+    # This can be switched off in config so that all services can be HTTP and HTTPS.
+    - redirect scheme https unless ping OR repository
+
+    # Other services, typically HTTPs.
+    - acl message path_beg -i /message-system
+    - acl attachment path_beg -i /attachment
+    - acl api path_beg -i /api
+    - acl ping path_beg -i /ping
+    - use_backend landscape-message if message
+    - use_backend landscape-message if attachment
+    - use_backend landscape-api if api
+    - use_backend landscape-ping if ping
+    - acl hashids path_beg -i /hash-id-databases
+    - use_backend landscape-hashid-databases if hashids
+    - acl package-upload path_beg -i /upload
+    - use_backend landscape-package-upload if package-upload
+    - http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
 
     # metrics
     - acl metrics path_end /metrics
@@ -28,6 +47,8 @@ https_service:
     - balance leastconn
     - option httpchk HEAD / HTTP/1.0
     - http-request set-header X-Forwarded-Proto https
+
+    # HTTPs services
     - acl message path_beg -i /message-system
     - acl attachment path_beg -i /attachment
     - acl api path_beg -i /api
