@@ -1576,7 +1576,7 @@ class TestCreateHAProxyServices(unittest.TestCase):
         )
 
         for service in (http, https, grpc):
-            self.assertEqual(service["error_files"], expected)
+            self.assertEqual(expected, service["error_files"])
 
     def test_http_services(self):
         """
