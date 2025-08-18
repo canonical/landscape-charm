@@ -3,6 +3,8 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+from base64 import b64encode
+from dataclasses import asdict
 import json
 import os
 import unittest
@@ -16,6 +18,7 @@ from unittest.mock import DEFAULT, Mock, patch, call, ANY
 
 import yaml
 
+from ops import testing
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Context, Harness, Relation, State
@@ -24,8 +27,12 @@ from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 
 from charm import (
+    _create_haproxy_services,
     DEFAULT_SERVICES,
     HAPROXY_CONFIG_FILE,
+    HAProxyErrorFile,
+    HAProxyServicePorts,
+    HAProxyServerOptions,
     LANDSCAPE_PACKAGES,
     LEADER_SERVICES,
     LSCTL,
@@ -1481,12 +1488,473 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_nrpe_checks.assert_called_once()
         self.harness.charm._update_haproxy_connection.assert_not_called()
         mock_update_conf.assert_called_once_with(
+            
             {
-                "package-search": {
-                    "host": "test",
-                },
-            }
+                    "package-search": {
+                        "host": "test",
+                    },
+                }
+        
         )
+
+
+class TestCreateHAProxyServices(unittest.TestCase):
+    """
+    Test that the Landscape services receive the correct stanzas in the HAProxy
+    configuration.
+    """
+
+    def setUp(self):
+        with open(HAPROXY_CONFIG_FILE) as f:
+            self.haproxy_config = yaml.safe_load(f)
+        self.service_ports = {
+            "appserver": 8000,
+            "pingserver": 8070,
+            "message-server": 8090,
+            "api": 9080,
+            "package-upload": 9100,
+            "hostagent-messenger": 50052,
+        }
+        self.server_options = ["check", "inter 5000", "rise 2", "fall 5", "maxconn 50"]
+        self.https_service = self.haproxy_config["https_service"]
+        self.http_service = self.haproxy_config["http_service"]
+        self.grpc_service = self.haproxy_config["grpc_service"]
+
+    def test_ssl_cert_set(self):
+        """
+        Uses the provided `ssl_cert` with the HTTPs and gRPC services.
+        """
+
+        ssl_cert = "some-ssl-cert"
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert=ssl_cert,
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        self.assertIn(ssl_cert, https["crts"])
+        self.assertIn(ssl_cert, grpc["crts"])
+        self.assertIsNone(http.get("crts"))
+
+    def test_error_files_set(self):
+        """
+        Assigns the proivided `error_files` to the http, https, and grpc services.
+        """
+        error_files = [
+            HAProxyErrorFile(http_status=404, content=b64encode(b"Not Found!")),
+            HAProxyErrorFile(http_status=405, content=b64encode(b"Not Allowed!")),
+            HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
+        ]
+
+        expected = [
+            {"http_status": 404, "content": b64encode(b"Not Found!")},
+            {"http_status": 405, "content": b64encode(b"Not Allowed!")},
+            {"http_status": 500, "content": b64encode(b"Oops, our fault...")},
+        ]
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=error_files,
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        for service in (http, https, grpc):
+            self.assertEqual(expected, service["error_files"])
+
+    def test_http_services(self):
+        """
+        pingserver and appserver are served over HTTP.
+        """
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+        backend_stanza = {"backend_name": "landscape-ping", "servers": ANY}
+
+        self.assertIn(backend_stanza, http["backends"])
+        self.assertNotIn(backend_stanza, https["backends"])
+
+    def test_https_services(self):
+        """
+        appserver, api, package upload, and message server are served over HTTPs.
+        """
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        backend_stanzas = (
+            {"backend_name": "landscape-message", "servers": ANY},
+            {"backend_name": "landscape-api", "servers": ANY},
+            {"backend_name": "landscape-package-upload", "servers": ANY},
+            {"backend_name": "landscape-hashid-databases", "servers": ANY},
+        )
+
+        for backend_stanza in backend_stanzas:
+            self.assertNotIn(backend_stanza, http["backends"])
+            self.assertIn(backend_stanza, https["backends"])
+
+    def test_configure_grpc_services(self):
+        """
+        Each hostagent-messenger receives a
+        `landscape-hostagent-messenger-<unit name>-<index> name,
+        the server_ip, the correct port, and the server options.
+
+        Counts are based on `worker_count`.
+
+        landscape-hostagent-messenger is set as a server on the gRPC service.
+        """
+
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = [
+            (
+                f"landscape-hostagent-messenger-{unit_name}-0",
+                server_ip,
+                self.service_ports["hostagent-messenger"],
+                self.server_options
+                + self.haproxy_config["grpc_service"]["server_options"],
+            )
+        ]
+
+        self.assertEqual(expected, grpc["servers"])
+
+    def test_configure_appservers(self):
+        """
+        Each appserver receives a `landscape-appserver-<unit name>-<index> name,
+        the server_ip, the correct port, and the server options.
+
+        Counts are based on `worker_count`.
+
+        Appservers are served over HTTP and HTTPs.
+        """
+
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = [
+            (
+                f"landscape-appserver-{unit_name}-0",
+                server_ip,
+                self.service_ports["appserver"],
+                self.server_options,
+            )
+        ]
+
+        self.assertEqual(expected, http["servers"])
+        self.assertEqual(expected, https["servers"])
+
+    def test_configure_pingservers(self):
+        """
+        Each pingserver receives a `landscape-pingserver-<unit name>-<index> name,
+        the server_ip, the correct port, and the global server options.
+
+        Counts are based on `worker_count`.
+        """
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+        worker_counts = 3
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-ping",
+            "servers": [
+                (
+                    f"landscape-pingserver-{unit_name}-{i}",
+                    server_ip,
+                    self.service_ports["pingserver"] + i,
+                    self.server_options,
+                )
+                for i in range(worker_counts)
+            ],
+        }
+
+        self.assertIn(expected, http["backends"])
+        self.assertNotIn(expected, https["backends"])
+
+    def test_configure_message_servers(self):
+        """
+        Each message server receives a `landscape-message-server-<unit name>-<index> name,
+        the server_ip, the correct port, and the global server options.
+
+        Counts are based on `worker_count`.
+        """
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+        worker_counts = 3
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-message",
+            "servers": [
+                (
+                    f"landscape-message-server-{unit_name}-{i}",
+                    server_ip,
+                    self.service_ports["message-server"] + i,
+                    self.server_options,
+                )
+                for i in range(worker_counts)
+            ],
+        }
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
+
+    def test_configure_api_servers(self):
+        """
+        Each API server receives a `landscape-api-<unit name>-<index> name,
+        the server_ip, the correct port assigned, the global server options.
+
+        Counts are based on `worker_count`.
+        """
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+        worker_counts = 3
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-api",
+            "servers": [
+                (
+                    f"landscape-api-{unit_name}-{i}",
+                    server_ip,
+                    self.service_ports["api"] + i,
+                    self.server_options,
+                )
+                for i in range(worker_counts)
+            ],
+        }
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
+
+    def test_configure_package_upload_server(self):
+        """
+        There is only one package upload server.
+
+        It receives a `landscape-package-upload-<unit name>-0 name, the server_ip,
+        the assigned port, and the global server options.
+
+        Package upload only has servers if the unit is the leader. Non-leaders
+        declare the backend but do not receive a `servers` configuration.
+        """
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+        worker_counts = 3
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-package-upload",
+            "servers": [
+                (
+                    f"landscape-package-upload-{unit_name}-0",
+                    server_ip,
+                    self.service_ports["package-upload"],
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-package-upload",
+            "servers": [],
+        }
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
+
+    def test_hashid_databases_backend(self):
+        """
+        Only the leader receives a server for the `landscape-hashid-databases backend.
+        The `landscape-hashids-databases` backend reuses the `appservers` configuration.
+
+        Non-leaders declare the backend but do not have a server.
+        """
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+        worker_counts = 3
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-hashid-databases",
+            "servers": [
+                (
+                    f"landscape-appserver-{unit_name}-{i}",
+                    server_ip,
+                    self.service_ports["appserver"] + i,
+                    self.server_options,
+                )
+                for i in range(worker_counts)
+            ],
+        }
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
+
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {"backend_name": "landscape-hashid-databases", "servers": []}
+
+        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, http["backends"])
 
 
 # TODO fix from broken commit.

@@ -13,13 +13,14 @@ develop a new k8s charm using the Operator Framework:
 """
 
 from base64 import b64decode, b64encode, binascii
+from dataclasses import asdict, dataclass
 from functools import cached_property
 import logging
 import os
 import subprocess
 from subprocess import CalledProcessError, check_call
 import sys
-from typing import List
+from typing import Iterable, List, Mapping
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
@@ -169,6 +170,198 @@ def get_args_with_secrets_removed(args, arg_names):
             if idx < len(args):
                 args[idx] = "REDACTED"
     return args
+
+
+def _get_ssl_cert(ssl_cert, ssl_key):
+    """
+    Create an SSL certificate from the `ssl_cert` and `ssl_key` configuration
+    options.
+    """
+    if ssl_cert != "DEFAULT" and ssl_key == "":
+        # We have a cert but no key, this is an error.
+        raise SSLConfigurationError("`ssl_cert` is specified but `ssl_key` is missing")
+
+    if ssl_cert != "DEFAULT":
+        try:
+            ssl_cert = b64decode(ssl_cert)
+            ssl_key = b64decode(ssl_key)
+            ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
+        except binascii.Error:
+            raise SSLConfigurationError(
+                "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
+            )
+    return ssl_cert
+
+
+def _create_haproxy_services(
+    http_service: dict,
+    https_service: dict,
+    grpc_service: dict,
+    ssl_cert: bytes | str,
+    server_ip: str,
+    unit_name: str,
+    worker_counts: int,
+    is_leader: bool,
+    error_files: Iterable["HAProxyErrorFile"],
+    service_ports: "HAProxyServicePorts",
+    server_options: "HAProxyServerOptions",
+):
+    """
+    Create the Landscape `services` configurations for HAProxy.
+
+    See https://charmhub.io/haproxy/configurations#services for details on the format.
+    This is roughly a combination of HAProxy `frontend` and `backend` stanzas from a
+    traditional HAProxy configuration file.
+    """
+
+    https_service["crts"] = [ssl_cert]
+    grpc_service["crts"] = [ssl_cert]
+
+    (appservers, pingservers, message_servers, api_servers) = [
+        [
+            (
+                f"landscape-{name}-{unit_name}-{i}",
+                server_ip,
+                service_ports[name] + i,
+                server_options,
+            )
+            for i in range(worker_counts)
+        ]
+        for name in ("appserver", "pingserver", "message-server", "api")
+    ]
+
+    # There should only ever be one package-upload-server service.
+    package_upload_servers = [
+        (
+            f"landscape-package-upload-{unit_name}-0",
+            server_ip,
+            service_ports["package-upload"],
+            server_options,
+        )
+    ]
+
+    http_service["servers"] = appservers
+    http_service["backends"] = [
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers,
+        }
+    ]
+    https_service["servers"] = appservers
+    https_service["backends"] = [
+        {
+            "backend_name": "landscape-message",
+            "servers": message_servers,
+        },
+        {
+            "backend_name": "landscape-api",
+            "servers": api_servers,
+        },
+        # Only the leader should have servers for the landscape-package-upload
+        # and landscape-hashid-databases backends. However, when the leader
+        # is lost, haproxy will fail as the service options will reference
+        # a (no longer) existing backend. To prevent that, all units should
+        # declare all backends, even if a unit should not have any servers on
+        # a specific backend.
+        {
+            "backend_name": "landscape-package-upload",
+            "servers": package_upload_servers if is_leader else [],
+        },
+        {
+            "backend_name": "landscape-hashid-databases",
+            "servers": appservers if is_leader else [],
+        },
+    ]
+
+    hostagent_messengers = [
+        (
+            f"landscape-hostagent-messenger-{unit_name}-{i}",
+            server_ip,
+            service_ports["hostagent-messenger"] + i,
+            server_options + grpc_service["server_options"],
+        )
+        for i in range(worker_counts)
+    ]
+
+    grpc_service["servers"] = hostagent_messengers
+
+    http_service["error_files"] = [asdict(ef) for ef in error_files]
+    https_service["error_files"] = [asdict(ef) for ef in error_files]
+    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
+
+    return http_service, https_service, grpc_service
+
+
+@dataclass
+class HAProxyErrorFile:
+    """
+    Configuration for HAProxy error files
+    """
+
+    http_status: int
+    """The status code the error file should handle."""
+    content: bytes
+    """The b64-encoded content of the error file."""
+
+
+def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
+    error_files_location = haproxy_config["error_files"]["location"]
+    error_files = []
+    for code, filename in haproxy_config["error_files"]["files"].items():
+        error_file_path = os.path.join(error_files_location, filename)
+        with open(error_file_path, "rb") as error_file:
+            error_files.append(
+                HAProxyErrorFile(
+                    http_status=code,
+                    content=b64encode(error_file.read()),
+                )
+            )
+
+    return error_files
+
+
+HAProxyServicePorts = Mapping[str, int]
+"""
+Configuration for the ports that Landscape services run on.
+
+Expects the following keys:
+- appserver
+- pingserver
+- message-server
+- api
+- package-upload
+- hostagent-messenger
+
+Each value is the port that service runs on.
+"""
+
+
+def _get_haproxy_service_ports(haproxy_config: dict) -> HAProxyServicePorts:
+    return haproxy_config["ports"]
+
+
+HAProxyServerOptions = list[str]
+"""
+Additional configuration for a `server` stanza in an HAProxy configuration.
+"""
+
+
+def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
+    return haproxy_config["server_options"]
+
+
+def _get_haproxy_services(haproxy_config: dict) -> tuple[dict, dict, dict]:
+    http_service = haproxy_config["http_service"]
+    https_service = haproxy_config["https_service"]
+    grpc_service = haproxy_config["grpc_service"]
+
+    return (http_service, https_service, grpc_service)
+
+
+class SSLConfigurationError(Exception):
+    """
+    Invalid SSL configuration.
+    """
 
 
 class LandscapeServerCharm(CharmBase):
@@ -787,121 +980,36 @@ class LandscapeServerCharm(CharmBase):
 
         # Check the SSL cert stuff first. No sense doing all the other
         # work just to fail here.
-        ssl_cert = self.model.config["ssl_cert"]
-        ssl_key = self.model.config["ssl_key"]
-
-        if ssl_cert != "DEFAULT" and ssl_key == "":
-            # We have a cert but no key, this is an error.
-            self.unit.status = BlockedStatus(
-                "`ssl_cert` is specified but `ssl_key` is missing"
+        try:
+            ssl_cert = _get_ssl_cert(
+                ssl_cert=self.model.config["ssl_cert"],
+                ssl_key=self.model.config["ssl_key"],
             )
+        except SSLConfigurationError as e:
+            self.unit.status = BlockedStatus(str(e))
             return
-
-        if ssl_cert != "DEFAULT":
-            try:
-                ssl_cert = b64decode(ssl_cert)
-                ssl_key = b64decode(ssl_key)
-                ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
-            except binascii.Error:
-                self.unit.status = BlockedStatus(
-                    "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
-                )
-                return
 
         with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
             haproxy_config = yaml.safe_load(haproxy_config_file)
 
-        http_service = haproxy_config["http_service"]
-        https_service = haproxy_config["https_service"]
-        grpc_service = haproxy_config["grpc_service"]
+        error_files = _get_haproxy_error_files(haproxy_config)
+        service_ports = _get_haproxy_service_ports(haproxy_config)
+        server_options = _get_haproxy_server_options(haproxy_config)
+        http, https, grpc = _get_haproxy_services(haproxy_config)
 
-        https_service["crts"] = [ssl_cert]
-        grpc_service["crts"] = [ssl_cert]
-
-        server_ip = relation.data[self.unit]["private-address"]
-        unit_name = self.unit.name.replace("/", "-")
-        worker_counts = self.model.config["worker_counts"]
-
-        (appservers, pingservers, message_servers, api_servers) = [
-            [
-                (
-                    f"landscape-{name}-{unit_name}-{i}",
-                    server_ip,
-                    haproxy_config["ports"][name] + i,
-                    haproxy_config["server_options"],
-                )
-                for i in range(worker_counts)
-            ]
-            for name in ("appserver", "pingserver", "message-server", "api")
-        ]
-
-        # There should only ever be one package-upload-server service.
-        package_upload_servers = [
-            (
-                f"landscape-package-upload-{unit_name}-0",
-                server_ip,
-                haproxy_config["ports"]["package-upload"],
-                haproxy_config["server_options"],
-            )
-        ]
-
-        http_service["servers"] = appservers
-        http_service["backends"] = [
-            {
-                "backend_name": "landscape-ping",
-                "servers": pingservers,
-            }
-        ]
-        https_service["servers"] = appservers
-        https_service["backends"] = [
-            {
-                "backend_name": "landscape-message",
-                "servers": message_servers,
-            },
-            {
-                "backend_name": "landscape-api",
-                "servers": api_servers,
-            },
-            # Only the leader should have servers for the landscape-package-upload
-            # and landscape-hashid-databases backends. However, when the leader
-            # is lost, haproxy will fail as the service options will reference
-            # a (no longer) existing backend. To prevent that, all units should
-            # declare all backends, even if a unit should not have any servers on
-            # a specific backend.
-            {
-                "backend_name": "landscape-package-upload",
-                "servers": package_upload_servers if self.unit.is_leader() else [],
-            },
-            {
-                "backend_name": "landscape-hashid-databases",
-                "servers": appservers if self.unit.is_leader() else [],
-            },
-        ]
-
-        hostagent_messengers = [
-            (
-                f"landscape-hostagent-messenger-{unit_name}-{i}",
-                server_ip,
-                haproxy_config["ports"]["hostagent-messenger"] + i,
-                haproxy_config["server_options"] + grpc_service["server_options"],
-            )
-            for i in range(worker_counts)
-        ]
-
-        grpc_service["servers"] = hostagent_messengers
-
-        error_files_location = haproxy_config["error_files"]["location"]
-        error_files = []
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            error_file_path = os.path.join(error_files_location, filename)
-            with open(error_file_path, "rb") as error_file:
-                error_files.append(
-                    {"http_status": code, "content": b64encode(error_file.read())}
-                )
-
-        http_service["error_files"] = error_files
-        https_service["error_files"] = error_files
-        grpc_service["error_files"] = error_files
+        http_service, https_service, grpc_service = _create_haproxy_services(
+            http_service=http,
+            https_service=https,
+            grpc_service=grpc,
+            ssl_cert=ssl_cert,
+            server_ip=relation.data[self.unit]["private-address"],
+            unit_name=self.unit.name.replace("/", "-"),
+            worker_counts=int(self.model.config["worker_counts"]),
+            is_leader=self.unit.is_leader(),
+            error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
+        )
 
         relation.data[self.unit].update(
             {
