@@ -1462,7 +1462,7 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_haproxy_connection.assert_called_once()
         mock_update_conf.assert_called_once_with(
             {
-                "package_search": {
+                "package-search": {
                     "host": "localhost",
                 },
             }
@@ -1490,7 +1490,7 @@ class TestCharm(unittest.TestCase):
         mock_update_conf.assert_called_once_with(
             
             {
-                    "package_search": {
+                    "package-search": {
                         "host": "test",
                     },
                 }

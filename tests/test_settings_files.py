@@ -2,31 +2,16 @@
 
 import os
 from base64 import b64encode
-from configparser import ConfigParser
 from io import BytesIO, StringIO
-import shutil
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 from urllib.error import URLError
 
-import charm
-import settings_files
 from settings_files import (
-    CONFIGS_DIR,
-    configure_for_deployment_mode,
-    LICENSE_FILE,
-    LicenseFileReadException,
-    migrate_service_conf,
-    merge_service_conf,
-    prepend_default_settings,
-    read_service_conf,
-    SSLCertReadException,
-    update_default_settings,
-    update_service_conf,
-    write_license_file,
-    write_ssl_cert,
-)
+    CONFIGS_DIR, LICENSE_FILE, LicenseFileReadException, SSLCertReadException,
+    configure_for_deployment_mode, merge_service_conf, prepend_default_settings,
+    update_default_settings, update_service_conf, write_license_file, write_ssl_cert)
 
 
 class CapturingBytesIO(BytesIO):
@@ -360,41 +345,3 @@ class WriteSSLCertTestCase(TestCase):
                 write_ssl_cert,
                 "notvalidb64haha",
             )
-
-class MigrateServiceConfTest(TestCase):
-
-    def test_migrate_service_conf(self):
-        tmpdir = TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-
-        deprecated_conf = os.path.join(tmpdir.name, "service.conf")
-        test_file = "tests/deprecated_service.conf"
-        shutil.copyfile(test_file, deprecated_conf)
-
-        expected_config = ConfigParser()
-        expected_config.read("tests/updated_service.conf")
-
-        migrate_service_conf(deprecated_conf)
-
-        config = read_service_conf(deprecated_conf)
-
-        self.assertEqual(expected_config, config)
-
-    def test_migrate_service_conf_idempotent(self):
-        tmpdir = TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-
-        deprecated_conf = os.path.join(tmpdir.name, "service.conf")
-        test_file = "tests/deprecated_service.conf"
-        shutil.copyfile(test_file, deprecated_conf)
-
-        expected_config = ConfigParser()
-        expected_config.read("tests/updated_service.conf")
-
-        migrate_service_conf(deprecated_conf)
-        first_pass = read_service_conf(deprecated_conf)
-
-        migrate_service_conf(deprecated_conf)
-        second_pass = read_service_conf(deprecated_conf)
-
-        self.assertEqual(first_pass, second_pass)

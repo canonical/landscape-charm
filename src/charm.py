@@ -61,10 +61,7 @@ from settings_files import (
     DEFAULT_POSTGRES_PORT,
     generate_secret_token,
     merge_service_conf,
-    migrate_service_conf,
     prepend_default_settings,
-    read_service_conf,
-    SERVICE_CONF,
     update_db_conf,
     update_default_settings,
     update_service_conf,
@@ -439,9 +436,6 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.hash_id_databases_action, self._hash_id_databases
         )
-        self.framework.observe(
-            self.on.migrate_service_conf_action, self._migrate_service_conf
-        )
 
         # State
         self._stored.set_default(
@@ -494,14 +488,13 @@ class LandscapeServerCharm(CharmBase):
 
         # Update additional configuration
         deployment_mode = self.model.config.get("deployment_mode")
-        update_service_conf({"system": {"deployment_mode": deployment_mode}})
+        update_service_conf({"global": {"deployment-mode": deployment_mode}})
 
         configure_for_deployment_mode(deployment_mode)
 
         additional_config = self.model.config.get("additional_service_config")
         if additional_config:
             merge_service_conf(additional_config)
-            migrate_service_conf()
 
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
@@ -545,13 +538,13 @@ class LandscapeServerCharm(CharmBase):
 
         service_conf_updates = {
             service: {"workers": str(workers)}
-            for service in ("appserver", "api", "message_server", "pingserver")
+            for service in ("landscape", "api", "message-server", "pingserver")
         }
 
         if root_url:
-            service_conf_updates["system"] = {"root_url": root_url}
-            service_conf_updates["api"]["root_url"] = root_url
-            service_conf_updates["package_upload"]["root_url"] = root_url
+            service_conf_updates["global"] = {"root-url": root_url}
+            service_conf_updates["api"]["root-url"] = root_url
+            service_conf_updates["package-upload"]["root-url"] = root_url
 
         update_service_conf(service_conf_updates)
 
@@ -610,7 +603,7 @@ class LandscapeServerCharm(CharmBase):
 
     def _write_secret_token(self, secret_token):
         logger.info("Writing secret token")
-        update_service_conf({"appserver": {"secret_token": secret_token}})
+        update_service_conf({"landscape": {"secret-token": secret_token}})
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -973,9 +966,9 @@ class LandscapeServerCharm(CharmBase):
             self._stored.default_root_url = url
             update_service_conf(
                 {
-                    "system": {"root_url": url},
-                    "api": {"root_url": url},
-                    "package_upload": {"root_url": url},
+                    "global": {"root-url": url},
+                    "api": {"root-url": url},
+                    "package-upload": {"root-url": url},
                 }
             )
 
@@ -1170,7 +1163,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
             update_service_conf(
                 {
-                    "package_search": {
+                    "package-search": {
                         "host": "localhost",
                     },
                 }
@@ -1193,7 +1186,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             if leader_ip:
                 update_service_conf(
                     {
-                        "package_search": {
+                        "package-search": {
                             "host": leader_ip,
                         },
                     }
@@ -1252,7 +1245,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             if leader_ip_value:
                 update_service_conf(
                     {
-                        "package_search": {
+                        "package-search": {
                             "host": leader_ip_value,
                         },
                     }
@@ -1301,11 +1294,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if none_count == 0:
             update_service_conf(
                 {
-                    "appserver": {
-                        "oidc_issuer": oidc_issuer,
-                        "oidc_client_id": oidc_client_id,
-                        "oidc_client_secret": oidc_client_secret,
-                        "oidc_logout_url": oidc_logout_url,
+                    "landscape": {
+                        "oidc-issuer": oidc_issuer,
+                        "oidc-client-id": oidc_client_id,
+                        "oidc-client-secret": oidc_client_secret,
+                        "oidc-logout-url": oidc_logout_url,
                     },
                 }
             )
@@ -1313,10 +1306,10 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             # Only the logout url is optional.
             update_service_conf(
                 {
-                    "appserver": {
-                        "oidc_issuer": oidc_issuer,
-                        "oidc_client_id": oidc_client_id,
-                        "oidc_client_secret": oidc_client_secret,
+                    "landscape": {
+                        "oidc-issuer": oidc_issuer,
+                        "oidc-client-id": oidc_client_id,
+                        "oidc-client-secret": oidc_client_secret,
                     },
                 }
             )
@@ -1338,9 +1331,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if openid_provider_url and openid_logout_url:
             update_service_conf(
                 {
-                    "appserver": {
-                        "openid_provider_url": openid_provider_url,
-                        "openid_logout_url": openid_logout_url,
+                    "landscape": {
+                        "openid-provider-url": openid_provider_url,
+                        "openid-logout-url": openid_logout_url,
                     },
                 }
             )
@@ -1553,30 +1546,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         except CalledProcessError as e:
             logger.error("Hashing ID databases failed with error code %s", e.returncode)
             event.fail(f"Hashing ID databases failed with error code {e.returncode}")
-        finally:
-            self.unit.status = prev_status
-
-    def _migrate_service_conf(self, event: ActionEvent) -> None:
-        prev_status = self.unit.status
-        self.unit.status = MaintenanceStatus("Migrating service.conf file...")
-        event.log("Migrating service.conf")
-
-        try:
-            prev_config = read_service_conf()
-            migrate_service_conf()
-        except Exception as e:
-            with open(SERVICE_CONF, "w") as conf_fp:
-                prev_config.write(conf_fp)
-            import traceback
-
-            logger.error("Error migrating service.conf: %s", e)
-            logger.error("Error migrating service.conf: %s", type(e))
-            logger.error("Error migrating service.conf: %s", e.args)
-            logger.error(
-                "Error migrating service.conf: %s", traceback.print_tb(e.__traceback__)
-            )
-            logger.warning("Reverting changes to service.conf")
-            event.fail(f"Error migrating service.conf: {e}")
         finally:
             self.unit.status = prev_status
 

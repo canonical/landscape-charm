@@ -9,9 +9,7 @@ upgrade:
   description: |
     Upgrade software on the Landscape Server unit. This will update
     APT package indices and upgrade the landscape-server package. Unit must
-    already be paused using the 'pause' action. If upgrading from a version
-    of Landscape Server earlier than 25.10, it is recommended to run the
-    migrate-service-conf action prior to upgrading.
+    already be paused using the 'pause' action.
 migrate-schema:
   description: |
     Upgrade the Landscape database schemas on the related databases.
@@ -20,10 +18,3 @@ hash-id-databases:
   description: |
     Regenerate the package hash to id mapping files that are used to
     speed up client package reporting.
-migrate-service-conf:
-  description: |
-    Rewrite the service.conf file on each unit, replacing deprecated
-    fields with the new ones. This action is idempotent and only needs
-    to be run if Landscape Server 25.10 or later is installed, but the
-    service.conf file was configured by an earlier version of Landscape
-    Server.
