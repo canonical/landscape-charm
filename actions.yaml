@@ -27,3 +27,6 @@ migrate-service-conf:
     to be run if Landscape Server 25.10 or later is installed, but the
     service.conf file was configured by an earlier version of Landscape
     Server.
+
+    This action will fail if the Landscape Server version installed is
+    earlier than 25.10~beta.4
