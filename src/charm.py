@@ -1559,7 +1559,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Migrating service.conf")
 
         try:
-            subprocess.run(MIGRATE_SERVICE_CONF_SCRIPT)
+            subprocess.run(
+                MIGRATE_SERVICE_CONF_SCRIPT,
+                check=True,
+                text=True,
+                env=get_modified_env_vars(),
+            )
         except CalledProcessError as e:
             logger.error(
                 "Migrating service.conf failed with error code %s", e.returncode
