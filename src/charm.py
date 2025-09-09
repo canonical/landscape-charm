@@ -61,10 +61,7 @@ from settings_files import (
     DEFAULT_POSTGRES_PORT,
     generate_secret_token,
     merge_service_conf,
-    migrate_service_conf,
     prepend_default_settings,
-    read_service_conf,
-    SERVICE_CONF,
     update_db_conf,
     update_default_settings,
     update_service_conf,
@@ -86,6 +83,7 @@ BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 AUTOREGISTRATION_SCRIPT = os.path.join(os.path.dirname(__file__), "autoregistration.py")
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 UPDATE_WSL_DISTRIBUTIONS_SCRIPT = "/opt/canonical/landscape/update-wsl-distributions"
+MIGRATE_SERVICE_CONF_SCRIPT = "/opt/canonical/landscape/migrate-service-conf"
 
 LANDSCAPE_SERVER = "landscape-server"
 LANDSCAPE_PACKAGES = (
@@ -501,7 +499,6 @@ class LandscapeServerCharm(CharmBase):
         additional_config = self.model.config.get("additional_service_config")
         if additional_config:
             merge_service_conf(additional_config)
-            migrate_service_conf()
 
         # Write the config-provided SSL certificate, if it exists.
         config_ssl_cert = self.model.config["ssl_cert"]
@@ -1562,21 +1559,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         event.log("Migrating service.conf")
 
         try:
-            prev_config = read_service_conf()
-            migrate_service_conf()
-        except Exception as e:
-            with open(SERVICE_CONF, "w") as conf_fp:
-                prev_config.write(conf_fp)
-            import traceback
-
-            logger.error("Error migrating service.conf: %s", e)
-            logger.error("Error migrating service.conf: %s", type(e))
-            logger.error("Error migrating service.conf: %s", e.args)
+            subprocess.run(MIGRATE_SERVICE_CONF_SCRIPT)
+        except CalledProcessError as e:
             logger.error(
-                "Error migrating service.conf: %s", traceback.print_tb(e.__traceback__)
+                "Migrating service.conf failed with error code %s", e.returncode
             )
-            logger.warning("Reverting changes to service.conf")
-            event.fail(f"Error migrating service.conf: {e}")
+            event.fail(f"Migrating service.conf failed with error code {e.returncode}")
         finally:
             self.unit.status = prev_status
 

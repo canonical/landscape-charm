@@ -17,10 +17,8 @@ from settings_files import (
     configure_for_deployment_mode,
     LICENSE_FILE,
     LicenseFileReadException,
-    migrate_service_conf,
     merge_service_conf,
     prepend_default_settings,
-    read_service_conf,
     SSLCertReadException,
     update_default_settings,
     update_service_conf,
@@ -360,41 +358,3 @@ class WriteSSLCertTestCase(TestCase):
                 write_ssl_cert,
                 "notvalidb64haha",
             )
-
-class MigrateServiceConfTest(TestCase):
-
-    def test_migrate_service_conf(self):
-        tmpdir = TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-
-        deprecated_conf = os.path.join(tmpdir.name, "service.conf")
-        test_file = "tests/deprecated_service.conf"
-        shutil.copyfile(test_file, deprecated_conf)
-
-        expected_config = ConfigParser()
-        expected_config.read("tests/updated_service.conf")
-
-        migrate_service_conf(deprecated_conf)
-
-        config = read_service_conf(deprecated_conf)
-
-        self.assertEqual(expected_config, config)
-
-    def test_migrate_service_conf_idempotent(self):
-        tmpdir = TemporaryDirectory()
-        self.addCleanup(tmpdir.cleanup)
-
-        deprecated_conf = os.path.join(tmpdir.name, "service.conf")
-        test_file = "tests/deprecated_service.conf"
-        shutil.copyfile(test_file, deprecated_conf)
-
-        expected_config = ConfigParser()
-        expected_config.read("tests/updated_service.conf")
-
-        migrate_service_conf(deprecated_conf)
-        first_pass = read_service_conf(deprecated_conf)
-
-        migrate_service_conf(deprecated_conf)
-        second_pass = read_service_conf(deprecated_conf)
-
-        self.assertEqual(first_pass, second_pass)
