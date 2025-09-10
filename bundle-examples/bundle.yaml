@@ -31,11 +31,8 @@ applications:
     charm: ../landscape-server_ubuntu@22.04-amd64.charm
     num_units: 1
     options:
-        landscape_ppa: ppa:landscape/latest-stable
+        landscape_ppa: ppa:landscape/self-hosted-beta
         min_install: True
-        additional_service_config: |
-          [api]
-          cookie-encryption-key = Lhc4EWVuIHjsUYy-jk1v6LjQ46O2vwB94KkpOtld6jA=
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]
