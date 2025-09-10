@@ -1,7 +1,8 @@
-# Copyright 2022 Canonical Ltd
+# Copyright 2025 Canonical Ltd
 # See LICENSE file for licensing details.
 #
-# Learn more about testing at: https://juju.is/docs/sdk/testing
+# Learn more about testing at
+# https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 from base64 import b64encode
 from dataclasses import asdict

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Canonical Ltd
+# Copyright 2025 Canonical Ltd
 # See LICENSE file for licensing details.
 #
 # Learn more at: https://juju.is/docs/sdk
@@ -15,11 +15,9 @@ develop a new k8s charm using the Operator Framework:
 from base64 import b64decode, b64encode, binascii
 from dataclasses import asdict, dataclass
 from functools import cached_property
-import logging
 import os
 import subprocess
 from subprocess import CalledProcessError, check_call
-import sys
 from typing import Iterable, List, Mapping
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -55,6 +53,7 @@ from ops.model import (
 )
 import yaml
 
+from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
     configure_for_deployment_mode,
@@ -69,8 +68,6 @@ from settings_files import (
     write_license_file,
     write_ssl_cert,
 )
-
-logger = logging.getLogger(__name__)
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
@@ -143,18 +140,6 @@ Landscape server configuration file.
 
 METRICS_RULES_DIR = os.path.join(os.path.dirname(__file__), "prometheus_alert_rules")
 """The location of Prometheus metrics alerts rules for the COS relation."""
-
-
-def get_modified_env_vars():
-    """
-    Because the python path gets munged by the juju env, this grabs the current
-    env vars and returns a copy with the juju env removed from the python paths
-    """
-    env_vars = os.environ.copy()
-    logging.info("Fixing python paths")
-    new_paths = [path for path in sys.path if "juju" not in path]
-    env_vars["PYTHONPATH"] = ":".join(new_paths) + ":/opt/canonical/landscape"
-    return env_vars
 
 
 def get_args_with_secrets_removed(args, arg_names):
@@ -435,6 +420,9 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.migrate_schema_action, self._migrate_schema)
         self.framework.observe(
             self.on.hash_id_databases_action, self._hash_id_databases
+        )
+        self.framework.observe(
+            self.on.migrate_service_conf_action, self._migrate_service_conf
         )
 
         # State
@@ -1451,14 +1439,13 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self.unit.status = MaintenanceStatus("Starting services")
         event.log("Starting services")
 
-        start_result = subprocess.run(
-            [LSCTL, "start"],
-            capture_output=True,
-            text=True,
-            env=get_modified_env_vars(),
-        )
-
         try:
+            start_result = subprocess.run(
+                [LSCTL, "start"],
+                capture_output=True,
+                text=True,
+                env=get_modified_env_vars(),
+            )
             check_call([LSCTL, "status"], env=get_modified_env_vars())
         except CalledProcessError as e:
             logger.error("Starting services failed with return code %d", e.returncode)
@@ -1548,6 +1535,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             event.fail(f"Hashing ID databases failed with error code {e.returncode}")
         finally:
             self.unit.status = prev_status
+
+    def _migrate_service_conf(self, event: ActionEvent) -> None:
+        migrate_service_conf()
 
 
 if __name__ == "__main__":  # pragma: no cover

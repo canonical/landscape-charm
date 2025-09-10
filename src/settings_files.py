@@ -1,4 +1,4 @@
-# Copyright 2022 Canonical Ltd
+# Copyright 2025 Canonical Ltd
 
 """
 Functions for manipulating Landscape Server service settings in the
@@ -13,6 +13,8 @@ import secrets
 from string import ascii_letters, digits
 from urllib.error import URLError
 from urllib.request import urlopen
+
+from helpers import migrate_service_conf
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
 
@@ -144,6 +146,8 @@ def update_service_conf(updates: dict) -> None:
 
     with open(SERVICE_CONF, "w") as config_fp:
         config.write(config_fp)
+
+    migrate_service_conf()
 
 
 def generate_secret_token():

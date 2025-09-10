@@ -1,6 +1,21 @@
-# Copyright 2022 Canonical Ltd
+# Copyright 2025 Canonical Ltd
 # See LICENSE file for licensing details.
 
+hash-id-databases:
+  description: |
+    Regenerate the package hash to id mapping files that are used to
+    speed up client package reporting.
+migrate-schema:
+  description: |
+    Upgrade the Landscape database schemas on the related databases.
+    Unit must already be paused using the 'pause' action.
+migrate-service-conf:
+  description: |
+    Migrate the service.conf file to have the sections and settings that
+    are expected by the Pydantic Settings models.
+
+    This action is idempotent. It has no effect if the Landscape Server package
+    did not ship with the corresponding script.
 pause:
   description: Pause the Landscape services.
 resume:
@@ -10,11 +25,3 @@ upgrade:
     Upgrade software on the Landscape Server unit. This will update
     APT package indices and upgrade the landscape-server package. Unit must
     already be paused using the 'pause' action.
-migrate-schema:
-  description: |
-    Upgrade the Landscape database schemas on the related databases.
-    Unit must already be paused using the 'pause' action.
-hash-id-databases:
-  description: |
-    Regenerate the package hash to id mapping files that are used to
-    speed up client package reporting.

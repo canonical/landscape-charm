@@ -1,4 +1,4 @@
-# Copyright 2022 Canonical Ltd
+# Copyright 2025 Canonical Ltd
 
 import os
 from base64 import b64encode
@@ -210,9 +210,13 @@ class UpdateServiceConfTestCase(TestCase):
             i += 1
             return retval
 
-        with patch("os.path.isfile") as mock_isfile:
-            with patch("builtins.open") as open_mock:
+        with (
+            patch("os.path.isfile") as mock_isfile,
+            patch("builtins.open") as open_mock,
+            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf
+        ):
                 mock_isfile.return_value = True
+                mock_migrate_service_conf.return_value = None
                 open_mock.side_effect = return_conf
                 update_service_conf({"test": {"new": "yes"}})
 
@@ -232,9 +236,13 @@ class UpdateServiceConfTestCase(TestCase):
             i += 1
             return retval
 
-        with patch("os.path.isfile") as mock_isfile:
-            with patch("builtins.open") as open_mock:
+        with (
+            patch("os.path.isfile") as mock_isfile,
+            patch("builtins.open") as open_mock,
+            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf
+        ):
                 mock_isfile.return_value = True
+                mock_migrate_service_conf.return_value = None
                 open_mock.side_effect = return_conf
                 update_service_conf({"fixed": {"old": "yes"}})
 
