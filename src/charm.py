@@ -190,6 +190,7 @@ def _create_haproxy_services(
     error_files: Iterable["HAProxyErrorFile"],
     service_ports: "HAProxyServicePorts",
     server_options: "HAProxyServerOptions",
+    ping_https: bool,
 ):
     """
     Create the Landscape `services` configurations for HAProxy.
@@ -226,12 +227,6 @@ def _create_haproxy_services(
     ]
 
     http_service["servers"] = appservers
-    http_service["backends"] = [
-        {
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        }
-    ]
     https_service["servers"] = appservers
     https_service["backends"] = [
         {
@@ -256,7 +251,20 @@ def _create_haproxy_services(
             "backend_name": "landscape-hashid-databases",
             "servers": appservers if is_leader else [],
         },
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers
+        }
     ]
+    if not ping_https:
+        http_service["backends"] = [
+            {
+                "backend_name": "landscape-ping",
+                "servers": pingservers,
+            }
+        ]
+    else:
+        http_service["backends"] = []
 
     hostagent_messengers = [
         (
@@ -997,6 +1005,7 @@ class LandscapeServerCharm(CharmBase):
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,
+            ping_https=self.model.config["ping_https"],
         )
 
         relation.data[self.unit].update(
