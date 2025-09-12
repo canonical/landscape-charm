@@ -209,3 +209,9 @@ options:
     description: |
       Bypassed Landscape administrator registration approval for clients that
       register using the registration password.
+  ping_https:
+    type: boolean
+    default: false
+    description: |
+      If true, /ping endpoint will redirect and serve over HTTPS only. 
+      If false, /ping endpoint will be available and served over both HTTP and HTTPS.
