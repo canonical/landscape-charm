@@ -532,7 +532,7 @@ class LandscapeServerCharm(CharmBase):
         if root_url:
             service_conf_updates["global"] = {"root-url": root_url}
             service_conf_updates["api"]["root-url"] = root_url
-            service_conf_updates["package-upload"]["root-url"] = root_url
+            service_conf_updates["package-upload"] = {"root-url": root_url}
 
         update_service_conf(service_conf_updates)
 
@@ -582,11 +582,22 @@ class LandscapeServerCharm(CharmBase):
 
         self._update_ready_status(restart_services=True)
 
-    def _get_secret_token(self):
+    def _get_secret_token(self) -> str | None:
+        """
+        Get the JWT secret token from either the juju config for this unit, or from
+        a replica.
+
+        If set on neither, return `None`.
+
+        FIXME raises an exception if not set locally and there is no replica.
+        """
         secret_token = self.model.config.get("secret_token")
         if not secret_token:
             peer_relation = self.model.get_relation("replicas")
-            secret_token = peer_relation.data[self.app].get("secret-token", None)
+            if peer_relation is not None:
+                secret_token = peer_relation.data[self.app].get("secret-token", None)
+            else:
+                secret_token = None
         return secret_token
 
     def _write_secret_token(self, secret_token):
