@@ -584,8 +584,8 @@ class LandscapeServerCharm(CharmBase):
 
     def _get_secret_token(self) -> str | None:
         """
-        Get the JWT secret token from either the juju config for this unit, or from
-        a replica.
+        Get the `secret-token` config from either the juju config for this unit, or from
+        app data in the replica relation.
 
         If set on neither, return `None`.
         """
