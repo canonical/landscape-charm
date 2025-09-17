@@ -56,7 +56,7 @@ GitHub actions will set `GITHUB_ACTIONS` during runs.
 """
 
 
-class ConfigurationRecorder:
+class ConfigReader:
 
     def __init__(self, tempfile):
         self.tempfile = tempfile
@@ -68,19 +68,18 @@ class ConfigurationRecorder:
 
 
 @pytest.fixture
-def capture_service_conf(tmp_path, monkeypatch):
+def capture_service_conf(tmp_path, monkeypatch) -> ConfigReader:
     """
-    Use a tempfile for the `service.conf`. Return a `ConfigurationRecorder`
-    that can get the parsed contents.
+    Redirect all writes to `SERVICE_CONF` to a tempfile within this fixture.
+    Return a `ConfigReader` that reads from this file.
     """
     conf_file = tmp_path / "service.conf"
     conf_file.write_text("")
 
     monkeypatch.setattr(settings_files, "SERVICE_CONF", str(conf_file))
 
-    recorder = ConfigurationRecorder(conf_file)
+    return ConfigReader(conf_file)
 
-    return recorder
 
 class TestGrafanaMachineAgentRelation(unittest.TestCase):
 
@@ -159,10 +158,12 @@ class TestGrafanaMachineAgentRelation(unittest.TestCase):
             self.assertEqual(scrape_interval, scrape_job["scrape_interval"])
 
 
-class TestOnConfigChanged(unittest.TestCase):
-
-    @patch("charm.update_service_conf")
-    def test_root_url(self, mock_update):
+class TestOnConfigChanged:
+    """
+    Tests for `on.config_changed` hooks.
+    """
+    
+    def test_root_url(self, capture_service_conf):
         """
         If the `root_url` is provided, update the global, api, and package-upload
         sections.
@@ -172,14 +173,13 @@ class TestOnConfigChanged(unittest.TestCase):
         state = State(config={"root_url": root_url})
         context.run(context.on.config_changed(), state)
 
-        mock_update.assert_called()
-        updates = mock_update.mock_calls[-1].args[0]
-        self.assertEqual(updates["global"]["root-url"], root_url)
-        self.assertEqual(updates["api"]["root-url"], root_url)
-        self.assertEqual(updates["package-upload"]["root-url"], root_url)
+        config = capture_service_conf.get_config()
 
-    @patch("charm.update_service_conf")
-    def test_worker_counts(self, mock_update):
+        assert config["global"]["root-url"] == root_url
+        assert config["api"]["root-url"] == root_url
+        assert config["package-upload"]["root-url"] == root_url
+
+    def test_worker_counts(self, capture_service_conf):
         """
         If the `worker_counts` are provided, update the landscape, api, message-server,
         and pingserver sections.
@@ -189,81 +189,106 @@ class TestOnConfigChanged(unittest.TestCase):
         state = State(config={"worker_counts": workers})
         context.run(context.on.config_changed(), state)
 
-        mock_update.assert_called()
-        updates = mock_update.mock_calls[-1].args[0]
-        self.assertEqual(updates["landscape"]["workers"], str(workers))
-        self.assertEqual(updates["api"]["workers"], str(workers))
-        self.assertEqual(updates["message-server"]["workers"], str(workers))
-        self.assertEqual(updates["pingserver"]["workers"], str(workers))
+        config = capture_service_conf.get_config()
+
+        assert config["landscape"]["workers"] == str(workers)
+        assert config["api"]["workers"] == str(workers)
+        assert config["message-server"]["workers"] == str(workers)
+        assert config["pingserver"]["workers"] == str(workers)
 
 
-def test_provided_in_config(capture_service_conf):
-    secret_token = "testsecretokenlotsofentropy"
-    context = Context(LandscapeServerCharm)
-    state = State(config={"secret_token": secret_token})
-    context.run(context.on.config_changed(), state)
+class TestGetSecretToken:
+    """
+    Tests for `on.config_changed` hooks that affect the `secret-token` configuration.
+    """
 
-    updates = capture_service_conf.get_config()
-    assert updates["landscape"]["secret-token"] == secret_token
+    def test_provided_in_config(self, capture_service_conf):
+        """
+        If the `secret_token` is provided in the configuration for this unit,
+        return it.
+        """
+        secret_token = "testsecretokenlotsofentropy"
+        context = Context(LandscapeServerCharm)
+        state = State(config={"secret_token": secret_token})
+        context.run(context.on.config_changed(), state)
 
+        config = capture_service_conf.get_config()
+        assert config["landscape"]["secret-token"] == secret_token
 
-# class TestGetSecretToken(unittest.TestCase):
+    def test_provided_in_replica(self, capture_service_conf):
+        """
+        If the `secret_token` is not provided in the configuration for this unit and
+        there is a replica, return the secret token from it.
+        """
+        secret_token = "testsecretokenlotsofentropy"
+        relation = PeerRelation(
+            "replicas", local_app_data={"secret-token": secret_token}
+        )
+        state = State(relations=[relation])
+        context = Context(LandscapeServerCharm)
 
-#     @patch("charm.update_service_conf")
-#     def test_provided_in_config(self, mock_update):
-#         """
-#         If the `secret_token` is provided in the configuration for this unit,
-#         return it.
-#         """
-#         secret_token = "testsecretokenlotsofentropy"
-#         context = Context(LandscapeServerCharm)
-#         state = State(config={"secret_token": secret_token})
-#         context.run(context.on.config_changed(), state)
+        context.run(context.on.config_changed(), state)
 
-#         mock_update.assert_called()
-#         updates = mock_update.mock_calls[-1].args[0]
-#         self.assertEqual(updates["landscape"]["secret-token"], secret_token)
+        config = capture_service_conf.get_config()
+        assert config["landscape"]["secret-token"] == secret_token
 
-#     @patch("charm.update_service_conf")
-#     def test_provided_in_replica(self, mock_update):
-#         """
-#         If the `secret_token` is not provided in the configuration for this unit and
-#         there is a replica, return the secret token from it.
-#         """
-#         secret_token = "testsecretokenlotsofentropy"
-#         relation = PeerRelation(
-#             "replicas", peers_data={1: {"secret-token": secret_token}}
-#         )
-#         state = State(relations=[relation])
-#         context = Context(LandscapeServerCharm)
+    def test_prefer_local_config(self, capture_service_conf):
+        """
+        If the `secret_token` is provided in a replica but also locally, prefer the
+        local version and return it.
+        """
+        local_secret_token = "testsecretokenlotsofentropy"
+        peer_secret_token = "thesecrettokenfromthepeerrelation"
+        relation = PeerRelation(
+            "replicas", peers_data={1: {"secret-token": peer_secret_token}}
+        )
+        state = State(relations=[relation], config={"secret_token": local_secret_token})
+        context = Context(LandscapeServerCharm)
 
-#         context.run(context.on.config_changed(), state)
+        context.run(context.on.config_changed(), state)
 
-#         mock_update.assert_called()
-#         updates = mock_update.mock_calls[-1].args[0]
-#         print(updates)
-#         self.assertEqual(updates["landscape"]["secret-token"], secret_token)
+        config = capture_service_conf.get_config()
+        assert config["landscape"]["secret-token"] == local_secret_token
 
-#     def test_prefer_local_config(self):
-#         """
-#         If the `secret_token` is provided in a replica but also locally, prefer the
-#         local version and return it.
-#         """
-#         self.fail()
+    def test_leader_generates_if_not_provided(self, capture_service_conf):
+        """
+        If the `secret_token` is not provided locally nor in a replica and we are the
+        leader unit, generate a new token and put it into the peer app relation databag.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state_in = State(relations=[relation], config={}, leader=True)
+        context = Context(LandscapeServerCharm)
 
-#     def test_leader_generates_if_not_provided(self):
-#         """
-#         If the `secret_token` is not provided locally or in a replica and we are the
-#         leader unit, generate a new token and put it into the peer relation databag.
-#         """
-#         self.fail()
+        before_config = capture_service_conf.get_config()
+        assert "landscape" not in before_config.sections()
 
-#     def test_follower_waits_if_not_provided(self):
-#         """
-#         If the `secret_token` is not provided locally or in a replica and we are not the
-#         leader unit, do nothing. We wait for the leader to generate a token.
-#         """
-#         self.fail()
+        with patch("charm.generate_secret_token") as mock_token:
+            token = "mytestsecrettoken"
+            mock_token.return_value = token
+            state_out = context.run(context.on.config_changed(), state_in)
+            
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data.get("secret-token") == token
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["landscape"].get("secret-token") == token
+
+    def test_follower_waits_if_not_provided(self, capture_service_conf):
+        """
+        If the `secret_token` is not provided locally nor in a replica and we are not the
+        leader unit, do nothing. We wait for the leader to generate a token.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state = State(relations=[relation], config={}, leader=False)
+        context = Context(LandscapeServerCharm)
+
+        before_config = capture_service_conf.get_config()
+        assert "landscape" not in before_config.sections()
+
+        context.run(context.on.config_changed(), state)
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["landscape"].get("secret-token", None) is None
 
 
 from settings_files import AMQP_USERNAME, VHOSTS

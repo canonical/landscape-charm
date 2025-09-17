@@ -588,8 +588,6 @@ class LandscapeServerCharm(CharmBase):
         a replica.
 
         If set on neither, return `None`.
-
-        FIXME raises an exception if not set locally and there is no replica.
         """
         secret_token = self.model.config.get("secret_token")
         if not secret_token:
