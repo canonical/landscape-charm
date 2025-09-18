@@ -227,6 +227,12 @@ def _create_haproxy_services(
     ]
 
     http_service["servers"] = appservers
+    http_service["backends"] = [
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers,
+        }
+    ]
     https_service["servers"] = appservers
     https_service["backends"] = [
         {
