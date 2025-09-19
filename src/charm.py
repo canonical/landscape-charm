@@ -58,6 +58,7 @@ from settings_files import (
     AMQP_USERNAME,
     configure_for_deployment_mode,
     DEFAULT_POSTGRES_PORT,
+    generate_cookie_encryption_key,
     generate_secret_token,
     merge_service_conf,
     prepend_default_settings,
@@ -440,6 +441,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(default_root_url="")
         self._stored.set_default(account_bootstrapped=False)
         self._stored.set_default(secret_token=None)
+        self._stored.set_default(cookie_encryption_key=None)
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -564,6 +566,7 @@ class LandscapeServerCharm(CharmBase):
         self._set_autoregistration()
 
         secret_token = self._get_secret_token()
+        cookie_encryption_key = self._get_cookie_encryption_key()
         if self.unit.is_leader():
             if not secret_token:
                 # If the secret token wasn't in the config, and we don't have one
@@ -573,9 +576,25 @@ class LandscapeServerCharm(CharmBase):
                 secret_token = generate_secret_token()
                 peer_relation = self.model.get_relation("replicas")
                 peer_relation.data[self.app].update({"secret-token": secret_token})
+
+            if not cookie_encryption_key:
+                logger.info("Generating new random cookie encryption key")
+                cookie_encryption_key = generate_cookie_encryption_key()
+                peer_relation = self.model.get_relation("replicas")
+                peer_relation.data[self.app].update(
+                    {"cookie-encryption-key": cookie_encryption_key}
+                )
+
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
+
+        if (
+            cookie_encryption_key
+            and cookie_encryption_key != self._stored.cookie_encryption_key
+        ):
+            self._write_cookie_encryption_key(cookie_encryption_key)
+            self._stored.cookie_encryption_key = cookie_encryption_key
 
         if isinstance(prev_status, BlockedStatus):
             self.unit.status = prev_status
@@ -598,9 +617,25 @@ class LandscapeServerCharm(CharmBase):
                 secret_token = None
         return secret_token
 
+    def _get_cookie_encryption_key(self):
+        cookie_encryption_key = self.model.config.get("cookie-encryption-key")
+        if not cookie_encryption_key:
+            peer_relation = self.model.get_relation("replicas")
+            if peer_relation is not None:
+                cookie_encryption_key = peer_relation.data[self.app].get(
+                    "cookie-encryption-key", None
+                )
+            else:
+                cookie_encryption_key = None
+        return cookie_encryption_key
+
     def _write_secret_token(self, secret_token):
         logger.info("Writing secret token")
         update_service_conf({"landscape": {"secret-token": secret_token}})
+
+    def _write_cookie_encryption_key(self, cookie_encryption_key):
+        logger.info("Writing cookie encryption key")
+        update_service_conf({"api": {"cookie-encryption-key": cookie_encryption_key}})
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -1254,6 +1289,15 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
+            self._update_ready_status(restart_services=True)
+
+        cookie_encryption_key = self._get_cookie_encryption_key()
+        if (
+            cookie_encryption_key
+            and cookie_encryption_key != self._stored.cookie_encryption_key
+        ):
+            self._write_cookie_encryption_key(cookie_encryption_key)
+            self._stored.cookie_encryption_key = cookie_encryption_key
             self._update_ready_status(restart_services=True)
 
     def _configure_smtp(self, relay_host: str) -> None:
