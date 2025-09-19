@@ -307,7 +307,7 @@ class TestGetCookieEncryptionKey:
         context.run(context.on.config_changed(), state)
 
         config = capture_service_conf.get_config()
-        assert config["api"]["cookie_encryption_key"] == cookie_encryption_key
+        assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
 
     def test_provided_in_replica(self, capture_service_conf):
         """

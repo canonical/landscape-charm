@@ -589,9 +589,8 @@ class LandscapeServerCharm(CharmBase):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
 
-        if (
-            cookie_encryption_key
-            and cookie_encryption_key != self._stored.cookie_encryption_key
+        if (cookie_encryption_key) and (
+            cookie_encryption_key != self._stored.cookie_encryption_key
         ):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
@@ -618,7 +617,7 @@ class LandscapeServerCharm(CharmBase):
         return secret_token
 
     def _get_cookie_encryption_key(self):
-        cookie_encryption_key = self.model.config.get("cookie-encryption-key")
+        cookie_encryption_key = self.model.config.get("cookie_encryption_key")
         if not cookie_encryption_key:
             peer_relation = self.model.get_relation("replicas")
             if peer_relation is not None:

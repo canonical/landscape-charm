@@ -191,6 +191,12 @@ options:
     description: |
       A secret token for the landscape service. If not set one will be
       generated securely.
+  cookie_encryption_key:
+    type: string
+    default:
+    description: |
+      A cookie encryption key used for API authentication flows. The value should be
+      32 url-safe, base64 encoded bytes. If not set, one will be generated securely.
   min_install:
     type: boolean
     default: False
