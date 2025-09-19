@@ -1762,7 +1762,7 @@ class TestCreateHAProxyServices(unittest.TestCase):
         backend_stanza = {"backend_name": "landscape-ping", "servers": ANY}
 
         self.assertIn(backend_stanza, http["backends"])
-        self.assertIn(backend_stanza, https["backends"])
+        self.assertNotIn(backend_stanza, https["backends"])
 
     def test_https_services(self):
         """
@@ -1793,6 +1793,30 @@ class TestCreateHAProxyServices(unittest.TestCase):
         for backend_stanza in backend_stanzas:
             self.assertNotIn(backend_stanza, http["backends"])
             self.assertIn(backend_stanza, https["backends"])
+
+    def test_ping_http_services(self):
+        """
+        pingserver is served over HTTPs.
+        """
+        http, https, grpc = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ssl_cert="",
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+            ping_https=False,
+        )
+
+        backend_stanza = {"backend_name": "landscape-ping", "servers": ANY}
+
+        self.assertIn(backend_stanza, http["backends"])
+        self.assertNotIn(backend_stanza, https["backends"])
 
     def test_ping_https_services(self):
         """
@@ -1939,7 +1963,7 @@ class TestCreateHAProxyServices(unittest.TestCase):
         }
 
         self.assertIn(expected, http["backends"])
-        self.assertIn(expected, https["backends"])
+        self.assertNotIn(expected, https["backends"])
 
     def test_configure_message_servers(self):
         """
