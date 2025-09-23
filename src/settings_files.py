@@ -5,6 +5,7 @@ Functions for manipulating Landscape Server service settings in the
 filesystem.
 """
 
+import base64
 from base64 import b64decode, binascii
 from collections import defaultdict
 from configparser import ConfigParser
@@ -153,6 +154,12 @@ def update_service_conf(updates: dict) -> None:
 def generate_secret_token():
     alphanumerics = ascii_letters + digits
     return "".join(secrets.choice(alphanumerics) for _ in range(172))
+
+
+def generate_cookie_encryption_key():
+    # NOTE: This is similar to Fernet key generation, but we avoid
+    # bringing extra modules this way.
+    return base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8")
 
 
 def write_license_file(license_file: str, uid: int, gid: int) -> None:

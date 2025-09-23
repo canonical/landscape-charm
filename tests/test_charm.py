@@ -266,7 +266,7 @@ class TestGetSecretToken:
             token = "mytestsecrettoken"
             mock_token.return_value = token
             state_out = context.run(context.on.config_changed(), state_in)
-            
+
         app_data = state_out.get_relation(relation.id).local_app_data
         assert app_data.get("secret-token") == token
 
@@ -289,6 +289,100 @@ class TestGetSecretToken:
 
         after_config = capture_service_conf.get_config()
         assert after_config["landscape"].get("secret-token", None) is None
+
+
+class TestGetCookieEncryptionKey:
+    """
+    Tests for `on.config_changed` hooks that affect the `cookie-encryption-key` configuration.
+    """
+
+    def test_provided_in_config(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is provided in the configuration for this unit,
+        return it.
+        """
+        cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        context = Context(LandscapeServerCharm)
+        state = State(config={"cookie_encryption_key": cookie_encryption_key})
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
+
+    def test_provided_in_replica(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided in the configuration for this unit and
+        there is a replica, return the encryption key from it.
+        """
+        cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        relation = PeerRelation(
+            "replicas", local_app_data={"cookie-encryption-key": cookie_encryption_key}
+        )
+        state = State(relations=[relation])
+        context = Context(LandscapeServerCharm)
+
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
+
+    def test_prefer_local_config(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is provided in a replica but also locally, prefer the
+        local version and return it.
+        """
+        local_cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        peer_cookie_encryption_key = "thecookieencryptionkeyfromthepeerrelation"
+        relation = PeerRelation(
+            "replicas", peers_data={1: {"cookie-encryption-key": peer_cookie_encryption_key}}
+        )
+        state = State(relations=[relation], config={"cookie_encryption_key": local_cookie_encryption_key})
+        context = Context(LandscapeServerCharm)
+
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == local_cookie_encryption_key
+
+    def test_leader_generates_if_not_provided(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided locally nor in a replica and we are the
+        leader unit, generate a new cookie encryption key and put it into the peer app relation databag.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state_in = State(relations=[relation], config={}, leader=True)
+        context = Context(LandscapeServerCharm)
+
+        before_config = capture_service_conf.get_config()
+        assert "api" not in before_config.sections()
+
+        with patch("charm.generate_cookie_encryption_key") as mock_cookie_encryption_key:
+            cookie_encryption_key = "mytestcookieencryptionkey"
+            mock_cookie_encryption_key.return_value = cookie_encryption_key
+            state_out = context.run(context.on.config_changed(), state_in)
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data.get("cookie-encryption-key") == cookie_encryption_key
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["api"].get("cookie-encryption-key") == cookie_encryption_key
+
+    def test_follower_waits_if_not_provided(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided locally nor in a replica and we are not the
+        leader unit, do nothing. We wait for the leader to generate a cookie encryption key.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state = State(relations=[relation], config={}, leader=False)
+        context = Context(LandscapeServerCharm)
+
+        before_config = capture_service_conf.get_config()
+        assert "api" not in before_config.sections()
+
+        context.run(context.on.config_changed(), state)
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["api"].get("cookie-encryption-key", None) is None
 
 
 from settings_files import AMQP_USERNAME, VHOSTS
