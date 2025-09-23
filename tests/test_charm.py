@@ -347,7 +347,7 @@ class TestGetCookieEncryptionKey:
     def test_leader_generates_if_not_provided(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is not provided locally nor in a replica and we are the
-        leader unit, generate a new token and put it into the peer app relation databag.
+        leader unit, generate a new cookie encryption key and put it into the peer app relation databag.
         """
         relation = PeerRelation("replicas", peers_data={})
         state_in = State(relations=[relation], config={}, leader=True)
@@ -356,21 +356,21 @@ class TestGetCookieEncryptionKey:
         before_config = capture_service_conf.get_config()
         assert "api" not in before_config.sections()
 
-        with patch("charm.generate_cookie_encryption_key") as mock_token:
-            token = "mytestcookieencryptionkey"
-            mock_token.return_value = token
+        with patch("charm.generate_cookie_encryption_key") as mock_cookie_encryption_key:
+            cookie_encryption_key = "mytestcookieencryptionkey"
+            mock_cookie_encryption_key.return_value = cookie_encryption_key
             state_out = context.run(context.on.config_changed(), state_in)
 
         app_data = state_out.get_relation(relation.id).local_app_data
-        assert app_data.get("cookie-encryption-key") == token
+        assert app_data.get("cookie-encryption-key") == cookie_encryption_key
 
         after_config = capture_service_conf.get_config()
-        assert after_config["api"].get("cookie-encryption-key") == token
+        assert after_config["api"].get("cookie-encryption-key") == cookie_encryption_key
 
     def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is not provided locally nor in a replica and we are not the
-        leader unit, do nothing. We wait for the leader to generate a token.
+        leader unit, do nothing. We wait for the leader to generate a cookie encryption key.
         """
         relation = PeerRelation("replicas", peers_data={})
         state = State(relations=[relation], config={}, leader=False)

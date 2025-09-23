@@ -157,6 +157,8 @@ def generate_secret_token():
 
 
 def generate_cookie_encryption_key():
+    # NOTE: This is similar to Fernet key generation, but we avoid
+    # bringing extra modules this way.
     return base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8")
 
 
