@@ -76,6 +76,13 @@ grpc_service:
   server_options: 
     - proto h2
 
+ubuntu_installer_attach_service:
+  service_name: landscape-ubuntu-installer-attach
+  service_host: 0.0.0.0
+  service_port: 50051
+  server_options: 
+    - proto h2
+
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
   files:
@@ -92,6 +99,7 @@ ports:
   api: 9080
   package-upload: 9100
   hostagent-messenger: 50052
+  ubuntu-installer-attach: 53354
 
 server_options:
   - check
