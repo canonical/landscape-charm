@@ -1322,15 +1322,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if should_update:
             self._update_ready_status(restart_services=True)
 
-        cookie_encryption_key = self._get_cookie_encryption_key()
-        if (
-            cookie_encryption_key
-            and cookie_encryption_key != self._stored.cookie_encryption_key
-        ):
-            self._write_cookie_encryption_key(cookie_encryption_key)
-            self._stored.cookie_encryption_key = cookie_encryption_key
-            self._update_ready_status(restart_services=True)
-
     def _configure_smtp(self, relay_host: str) -> None:
 
         # Rewrite postfix config.
