@@ -183,6 +183,7 @@ def _create_haproxy_services(
     http_service: dict,
     https_service: dict,
     grpc_service: dict,
+    ubuntu_installer_attach_service: dict,
     ssl_cert: bytes | str,
     server_ip: str,
     unit_name: str,
@@ -268,14 +269,25 @@ def _create_haproxy_services(
         )
         for i in range(worker_counts)
     ]
-
     grpc_service["servers"] = hostagent_messengers
+
+    ubuntu_installer_attach_server = [
+        (
+            f"landscape-ubuntu-installer-attach-{unit_name}-0",
+            server_ip,
+            service_ports["ubuntu-installer-attach"],
+            server_options + ubuntu_installer_attach_service["server_options"],
+        )
+    ]
+
+    ubuntu_installer_attach_service["servers"] = ubuntu_installer_attach_server
 
     http_service["error_files"] = [asdict(ef) for ef in error_files]
     https_service["error_files"] = [asdict(ef) for ef in error_files]
     grpc_service["error_files"] = [asdict(ef) for ef in error_files]
+    ubuntu_installer_attach_service["error_files"] = [asdict(ef) for ef in error_files]
 
-    return http_service, https_service, grpc_service
+    return http_service, https_service, grpc_service, ubuntu_installer_attach_service
 
 
 @dataclass
@@ -317,6 +329,7 @@ Expects the following keys:
 - api
 - package-upload
 - hostagent-messenger
+- ubuntu-installer-attach
 
 Each value is the port that service runs on.
 """
@@ -334,14 +347,6 @@ Additional configuration for a `server` stanza in an HAProxy configuration.
 
 def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
     return haproxy_config["server_options"]
-
-
-def _get_haproxy_services(haproxy_config: dict) -> tuple[dict, dict, dict]:
-    http_service = haproxy_config["http_service"]
-    https_service = haproxy_config["https_service"]
-    grpc_service = haproxy_config["grpc_service"]
-
-    return (http_service, https_service, grpc_service)
 
 
 class SSLConfigurationError(Exception):
@@ -1026,25 +1031,39 @@ class LandscapeServerCharm(CharmBase):
         error_files = _get_haproxy_error_files(haproxy_config)
         service_ports = _get_haproxy_service_ports(haproxy_config)
         server_options = _get_haproxy_server_options(haproxy_config)
-        http, https, grpc = _get_haproxy_services(haproxy_config)
 
-        http_service, https_service, grpc_service = _create_haproxy_services(
-            http_service=http,
-            https_service=https,
-            grpc_service=grpc,
-            ssl_cert=ssl_cert,
-            server_ip=relation.data[self.unit]["private-address"],
-            unit_name=self.unit.name.replace("/", "-"),
-            worker_counts=int(self.model.config["worker_counts"]),
-            is_leader=self.unit.is_leader(),
-            error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+        http = haproxy_config["http_service"]
+        https = haproxy_config["https_service"]
+        grpc = haproxy_config["grpc_service"]
+        ubuntu_installer_attach = haproxy_config["ubuntu_installer_attach_service"]
+
+        http_service, https_service, grpc_service, ubuntu_installer_attach_service = (
+            _create_haproxy_services(
+                http_service=http,
+                https_service=https,
+                grpc_service=grpc,
+                ubuntu_installer_attach_service=ubuntu_installer_attach,
+                ssl_cert=ssl_cert,
+                server_ip=relation.data[self.unit]["private-address"],
+                unit_name=self.unit.name.replace("/", "-"),
+                worker_counts=int(self.model.config["worker_counts"]),
+                is_leader=self.unit.is_leader(),
+                error_files=error_files,
+                service_ports=service_ports,
+                server_options=server_options,
+            )
         )
 
         relation.data[self.unit].update(
             {
-                "services": yaml.safe_dump([http_service, https_service, grpc_service]),
+                "services": yaml.safe_dump(
+                    [
+                        http_service,
+                        https_service,
+                        grpc_service,
+                        ubuntu_installer_attach_service,
+                    ]
+                ),
             }
         )
 
