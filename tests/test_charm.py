@@ -162,7 +162,7 @@ class TestOnConfigChanged:
     """
     Tests for `on.config_changed` hooks.
     """
-    
+
     def test_root_url(self, capture_service_conf):
         """
         If the `root_url` is provided, update the global, api, and package-upload
@@ -1762,18 +1762,14 @@ class TestCreateHAProxyServices(unittest.TestCase):
     def setUp(self):
         with open(HAPROXY_CONFIG_FILE) as f:
             self.haproxy_config = yaml.safe_load(f)
-        self.service_ports = {
-            "appserver": 8000,
-            "pingserver": 8070,
-            "message-server": 8090,
-            "api": 9080,
-            "package-upload": 9100,
-            "hostagent-messenger": 50052,
-        }
+        self.service_ports = self.haproxy_config["ports"]
         self.server_options = ["check", "inter 5000", "rise 2", "fall 5", "maxconn 50"]
         self.https_service = self.haproxy_config["https_service"]
         self.http_service = self.haproxy_config["http_service"]
         self.grpc_service = self.haproxy_config["grpc_service"]
+        self.ubuntu_installer_attach_service = self.haproxy_config[
+            "ubuntu_installer_attach_service"
+        ]
 
     def test_ssl_cert_set(self):
         """
@@ -1782,10 +1778,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
 
         ssl_cert = "some-ssl-cert"
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert=ssl_cert,
             server_ip="",
             unit_name="",
@@ -1816,10 +1813,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
             {"http_status": 500, "content": b64encode(b"Oops, our fault...")},
         ]
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip="",
             unit_name="",
@@ -1837,10 +1835,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         """
         pingserver and appserver are served over HTTP.
         """
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip="",
             unit_name="",
@@ -1859,10 +1858,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         """
         appserver, api, package upload, and message server are served over HTTPs.
         """
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip="",
             unit_name="",
@@ -1898,10 +1898,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         server_ip = "10.194.61.5"
         unit_name = "0"
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -1924,6 +1925,46 @@ class TestCreateHAProxyServices(unittest.TestCase):
 
         self.assertEqual(expected, grpc["servers"])
 
+    def test_configure_ubuntu_installer_attach_service(self):
+        """
+        There is only one Ubuntu installer attach server.
+
+        It receives a `landscape-ubuntu-installer-attach-<unit name>-0 name,
+        the server_ip, the correct port, and the server options.
+        """
+
+        server_ip = "10.194.61.5"
+        unit_name = "0"
+
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
+            http_service=self.http_service,
+            https_service=self.https_service,
+            grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = [
+            (
+                f"landscape-ubuntu-installer-attach-{unit_name}-0",
+                server_ip,
+                self.service_ports["ubuntu-installer-attach"],
+                self.server_options
+                + self.haproxy_config["ubuntu_installer_attach_service"][
+                    "server_options"
+                ],
+            )
+        ]
+
+        self.assertEqual(expected, ubuntu_installer_attach["servers"])
+
     def test_configure_appservers(self):
         """
         Each appserver receives a `landscape-appserver-<unit name>-<index> name,
@@ -1937,10 +1978,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         server_ip = "10.194.61.5"
         unit_name = "0"
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -1974,10 +2016,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         unit_name = "0"
         worker_counts = 3
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2015,10 +2058,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         unit_name = "0"
         worker_counts = 3
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2056,10 +2100,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         unit_name = "0"
         worker_counts = 3
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2100,10 +2145,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         unit_name = "0"
         worker_counts = 3
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2129,10 +2175,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         self.assertIn(expected, https["backends"])
         self.assertNotIn(expected, http["backends"])
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2162,10 +2209,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         unit_name = "0"
         worker_counts = 3
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
@@ -2192,10 +2240,11 @@ class TestCreateHAProxyServices(unittest.TestCase):
         self.assertIn(expected, https["backends"])
         self.assertNotIn(expected, http["backends"])
 
-        http, https, grpc = _create_haproxy_services(
+        http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
+            ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unit_name,
