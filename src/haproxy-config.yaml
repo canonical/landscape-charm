@@ -82,6 +82,12 @@ ubuntu_installer_attach_service:
   service_port: 50051
   server_options: 
     - proto h2
+  service_options:
+    # The X-FQDN header is required for multitenant installations:
+    - acl host_found hdr(host) -m found
+    - http-request set-var(req.full_fqdn) hdr(authority) if !host_found
+    - http-request set-var(req.full_fqdn) hdr(host) if host_found
+    - http-request set-header X-FQDN %[var(req.full_fqdn)]
 
 error_files:
   location: /opt/canonical/landscape/canonical/landscape/offline
