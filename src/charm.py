@@ -1285,10 +1285,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self._leader_changed()
 
         secret_token = self._get_secret_token()
+        should_update = False
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
-            self._update_ready_status(restart_services=True)
+            should_update = True
 
         cookie_encryption_key = self._get_cookie_encryption_key()
         if (
@@ -1297,6 +1298,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         ):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
+            should_update = True
+
+        if should_update:
             self._update_ready_status(restart_services=True)
 
     def _configure_smtp(self, relay_host: str) -> None:
