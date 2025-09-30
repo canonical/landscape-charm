@@ -203,6 +203,7 @@ def _create_haproxy_services(
 
     https_service["crts"] = [ssl_cert]
     grpc_service["crts"] = [ssl_cert]
+    ubuntu_installer_attach_service["crts"] = [ssl_cert]
 
     (appservers, pingservers, message_servers, api_servers) = [
         [

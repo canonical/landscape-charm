@@ -1931,17 +1931,21 @@ class TestCreateHAProxyServices(unittest.TestCase):
 
         It receives a `landscape-ubuntu-installer-attach-<unit name>-0 name,
         the server_ip, the correct port, and the server options.
+
+        The Ubuntu installer attach service uses an SSL frontend and uses the
+        provided cert.
         """
 
         server_ip = "10.194.61.5"
         unit_name = "0"
+        cert = "some ssl data"
 
         http, https, grpc, ubuntu_installer_attach = _create_haproxy_services(
             http_service=self.http_service,
             https_service=self.https_service,
             grpc_service=self.grpc_service,
             ubuntu_installer_attach_service=self.ubuntu_installer_attach_service,
-            ssl_cert="",
+            ssl_cert=cert,
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=1,
@@ -1964,6 +1968,7 @@ class TestCreateHAProxyServices(unittest.TestCase):
         ]
 
         self.assertEqual(expected, ubuntu_installer_attach["servers"])
+        self.assertEqual([cert], ubuntu_installer_attach["crts"])
 
     def test_configure_appservers(self):
         """
