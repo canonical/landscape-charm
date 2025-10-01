@@ -179,11 +179,58 @@ def _get_ssl_cert(ssl_cert, ssl_key):
     return ssl_cert
 
 
-def _create_haproxy_services(
+def _get_haproxy_config() -> dict:
+    with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
+        haproxy_config = yaml.safe_load(haproxy_config_file)
+
+    return haproxy_config
+
+
+# NOTE: See https://charmhub.io/haproxy/configurations#services for details on the format
+# of HAProxy service configurations.
+
+
+def _create_http_service(
     http_service: dict,
+    server_ip: str,
+    unit_name: str,
+    worker_counts: int,
+    error_files: Iterable["HAProxyErrorFile"],
+    service_ports: "HAProxyServicePorts",
+    server_options: "HAProxyServerOptions",
+):
+    """
+    Create the Landscape HTTP `services` configurations for HAProxy.
+    """
+
+    (appservers, pingservers) = [
+        [
+            (
+                f"landscape-{name}-{unit_name}-{i}",
+                server_ip,
+                service_ports[name] + i,
+                server_options,
+            )
+            for i in range(worker_counts)
+        ]
+        for name in ("appserver", "pingserver")
+    ]
+
+    http_service["servers"] = appservers
+    http_service["backends"] = [
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers,
+        }
+    ]
+
+    http_service["error_files"] = [asdict(ef) for ef in error_files]
+
+    return http_service
+
+
+def _create_https_service(
     https_service: dict,
-    grpc_service: dict,
-    ubuntu_installer_attach_service: dict,
     ssl_cert: bytes | str,
     server_ip: str,
     unit_name: str,
@@ -194,18 +241,12 @@ def _create_haproxy_services(
     server_options: "HAProxyServerOptions",
 ):
     """
-    Create the Landscape `services` configurations for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
-    This is roughly a combination of HAProxy `frontend` and `backend` stanzas from a
-    traditional HAProxy configuration file.
+    Create the Landscape HTTPS `services` configurations for HAProxy.
     """
 
     https_service["crts"] = [ssl_cert]
-    grpc_service["crts"] = [ssl_cert]
-    ubuntu_installer_attach_service["crts"] = [ssl_cert]
 
-    (appservers, pingservers, message_servers, api_servers) = [
+    (appservers, message_servers, api_servers) = [
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
@@ -215,7 +256,7 @@ def _create_haproxy_services(
             )
             for i in range(worker_counts)
         ]
-        for name in ("appserver", "pingserver", "message-server", "api")
+        for name in ("appserver", "message-server", "api")
     ]
 
     # There should only ever be one package-upload-server service.
@@ -228,13 +269,6 @@ def _create_haproxy_services(
         )
     ]
 
-    http_service["servers"] = appservers
-    http_service["backends"] = [
-        {
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        }
-    ]
     https_service["servers"] = appservers
     https_service["backends"] = [
         {
@@ -261,6 +295,26 @@ def _create_haproxy_services(
         },
     ]
 
+    https_service["error_files"] = [asdict(ef) for ef in error_files]
+
+    return https_service
+
+
+def _create_grpc_service(
+    grpc_service: dict,
+    ssl_cert: bytes | str,
+    server_ip: str,
+    unit_name: str,
+    worker_counts: int,
+    error_files: Iterable["HAProxyErrorFile"],
+    service_ports: "HAProxyServicePorts",
+    server_options: "HAProxyServerOptions",
+):
+    """
+    Create the Landscape WSL hostagent `services` configuration for HAProxy.
+    """
+
+    grpc_service["crts"] = [ssl_cert]
     hostagent_messengers = [
         (
             f"landscape-hostagent-messenger-{unit_name}-{i}",
@@ -271,7 +325,25 @@ def _create_haproxy_services(
         for i in range(worker_counts)
     ]
     grpc_service["servers"] = hostagent_messengers
+    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
 
+    return grpc_service
+
+
+def _create_ubuntu_installer_attach_service(
+    ubuntu_installer_attach_service: dict,
+    ssl_cert: bytes | str,
+    server_ip: str,
+    unit_name: str,
+    error_files: Iterable["HAProxyErrorFile"],
+    service_ports: "HAProxyServicePorts",
+    server_options: "HAProxyServerOptions",
+):
+    """
+    Create the Landscape Ubuntu installer attach `services` configuration for HAProxy.
+    """
+
+    ubuntu_installer_attach_service["crts"] = [ssl_cert]
     ubuntu_installer_attach_server = [
         (
             f"landscape-ubuntu-installer-attach-{unit_name}-0",
@@ -280,15 +352,10 @@ def _create_haproxy_services(
             server_options + ubuntu_installer_attach_service["server_options"],
         )
     ]
-
     ubuntu_installer_attach_service["servers"] = ubuntu_installer_attach_server
-
-    http_service["error_files"] = [asdict(ef) for ef in error_files]
-    https_service["error_files"] = [asdict(ef) for ef in error_files]
-    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
     ubuntu_installer_attach_service["error_files"] = [asdict(ef) for ef in error_files]
 
-    return http_service, https_service, grpc_service, ubuntu_installer_attach_service
+    return ubuntu_installer_attach_service
 
 
 @dataclass
@@ -1026,33 +1093,58 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
+        haproxy_config = _get_haproxy_config()
         error_files = _get_haproxy_error_files(haproxy_config)
         service_ports = _get_haproxy_service_ports(haproxy_config)
         server_options = _get_haproxy_server_options(haproxy_config)
 
-        http = haproxy_config["http_service"]
-        https = haproxy_config["https_service"]
-        grpc = haproxy_config["grpc_service"]
-        ubuntu_installer_attach = haproxy_config["ubuntu_installer_attach_service"]
+        server_ip = relation.data[self.unit]["private-address"]
+        unit_name = self.unit.name.replace("/", "-")
+        worker_counts = int(self.model.config["worker_counts"])
 
-        http_service, https_service, grpc_service, ubuntu_installer_attach_service = (
-            _create_haproxy_services(
-                http_service=http,
-                https_service=https,
-                grpc_service=grpc,
-                ubuntu_installer_attach_service=ubuntu_installer_attach,
-                ssl_cert=ssl_cert,
-                server_ip=relation.data[self.unit]["private-address"],
-                unit_name=self.unit.name.replace("/", "-"),
-                worker_counts=int(self.model.config["worker_counts"]),
-                is_leader=self.unit.is_leader(),
-                error_files=error_files,
-                service_ports=service_ports,
-                server_options=server_options,
-            )
+        http_service = _create_http_service(
+            http_service=haproxy_config["http_service"],
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
+        )
+
+        https_service = _create_https_service(
+            https_service=haproxy_config["https_service"],
+            ssl_cert=ssl_cert,
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=self.unit.is_leader(),
+            error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
+        )
+
+        grpc_service = _create_grpc_service(
+            grpc_service=haproxy_config["grpc_service"],
+            ssl_cert=ssl_cert,
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
+        )
+
+        ubuntu_installer_attach_service = _create_ubuntu_installer_attach_service(
+            ubuntu_installer_attach_service=haproxy_config[
+                "ubuntu_installer_attach_service"
+            ],
+            ssl_cert=ssl_cert,
+            server_ip=server_ip,
+            unit_name=unit_name,
+            error_files=error_files,
+            service_ports=service_ports,
+            server_options=server_options,
         )
 
         relation.data[self.unit].update(
