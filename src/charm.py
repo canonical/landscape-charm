@@ -186,6 +186,10 @@ def _get_haproxy_config() -> dict:
     return haproxy_config
 
 
+# NOTE: See https://charmhub.io/haproxy/configurations#services for details on the format
+# of HAProxy service configurations.
+
+
 def _create_http_service(
     http_service: dict,
     server_ip: str,
@@ -197,8 +201,6 @@ def _create_http_service(
 ):
     """
     Create the Landscape HTTP `services` configurations for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
     """
 
     (appservers, pingservers) = [
@@ -240,8 +242,6 @@ def _create_https_service(
 ):
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
     """
 
     https_service["crts"] = [ssl_cert]
@@ -312,8 +312,6 @@ def _create_grpc_service(
 ):
     """
     Create the Landscape WSL hostagent `services` configuration for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
     """
 
     grpc_service["crts"] = [ssl_cert]
@@ -343,8 +341,6 @@ def _create_ubuntu_installer_attach_service(
 ):
     """
     Create the Landscape Ubuntu installer attach `services` configuration for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
     """
 
     ubuntu_installer_attach_service["crts"] = [ssl_cert]
