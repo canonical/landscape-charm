@@ -237,8 +237,9 @@ class TestGetSecretToken:
 
     def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
-        If the `secret_token` is not provided locally nor in a replica and we are not the
-        leader unit, do nothing. We wait for the leader to generate a token.
+        If the `secret_token` is not provided locally nor in a replica and we
+        are not the leader unit, do nothing. We wait for the leader to generate
+        a token.
         """
         relation = PeerRelation("replicas", peers_data={})
         state = State(relations=[relation], config={}, leader=False)
@@ -255,7 +256,8 @@ class TestGetSecretToken:
 
 class TestGetCookieEncryptionKey:
     """
-    Tests for `on.config_changed` hooks that affect the `cookie-encryption-key` configuration.
+    Tests for `on.config_changed` hooks that affect the `cookie-encryption-key`
+    configuration.
     """
 
     def test_provided_in_config(self, capture_service_conf):
@@ -273,8 +275,9 @@ class TestGetCookieEncryptionKey:
 
     def test_provided_in_replica(self, capture_service_conf):
         """
-        If the `cookie_encryption_key` is not provided in the configuration for this unit and
-        there is a replica, return the encryption key from it.
+        If the `cookie_encryption_key` is not provided in the configuration
+        for this unit and there is a replica, return the encryption key from
+        it.
         """
         cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
         relation = PeerRelation(
@@ -290,8 +293,8 @@ class TestGetCookieEncryptionKey:
 
     def test_prefer_local_config(self, capture_service_conf):
         """
-        If the `cookie_encryption_key` is provided in a replica but also locally, prefer the
-        local version and return it.
+        If the `cookie_encryption_key` is provided in a replica but also
+        locally, prefer the local version and return it.
         """
         local_cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
         peer_cookie_encryption_key = "thecookieencryptionkeyfromthepeerrelation"
@@ -312,8 +315,9 @@ class TestGetCookieEncryptionKey:
 
     def test_leader_generates_if_not_provided(self, capture_service_conf):
         """
-        If the `cookie_encryption_key` is not provided locally nor in a replica and we are the
-        leader unit, generate a new cookie encryption key and put it into the peer app relation databag.
+        If the `cookie_encryption_key` is not provided locally nor in a replica
+        and we are the leader unit, generate a new cookie encryption key and
+        put it into the peer app relation databag.
         """
         relation = PeerRelation("replicas", peers_data={})
         state_in = State(relations=[relation], config={}, leader=True)
@@ -337,8 +341,9 @@ class TestGetCookieEncryptionKey:
 
     def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
-        If the `cookie_encryption_key` is not provided locally nor in a replica and we are not the
-        leader unit, do nothing. We wait for the leader to generate a cookie encryption key.
+        If the `cookie_encryption_key` is not provided locally nor in a replica
+        and we are not the leader unit, do nothing. We wait for the leader to
+        generate a cookie encryption key.
         """
         relation = PeerRelation("replicas", peers_data={})
         state = State(relations=[relation], config={}, leader=False)

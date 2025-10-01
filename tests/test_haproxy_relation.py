@@ -682,7 +682,8 @@ class TestCreateHTTPSService(unittest.TestCase):
 
     def test_no_package_upload_on_nonleader(self):
         """
-        Does not create a landscape-package-upload backend if the unit is not the leader.
+        Does not create a landscape-package-upload backend if the unit is not
+        the leader.
         """
         service = _create_https_service(
             https_service=self.https_service,

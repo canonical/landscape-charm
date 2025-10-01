@@ -1,23 +1,33 @@
 # Copyright 2025 Canonical Ltd
 
-import os
 from base64 import b64encode
 from io import BytesIO, StringIO
+import os
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 from urllib.error import URLError
 
 from settings_files import (
-    CONFIGS_DIR, LICENSE_FILE, LicenseFileReadException, SSLCertReadException,
-    configure_for_deployment_mode, merge_service_conf, prepend_default_settings,
-    update_default_settings, update_service_conf, write_license_file, write_ssl_cert)
+    CONFIGS_DIR,
+    configure_for_deployment_mode,
+    LICENSE_FILE,
+    LicenseFileReadException,
+    merge_service_conf,
+    prepend_default_settings,
+    SSLCertReadException,
+    update_default_settings,
+    update_service_conf,
+    write_license_file,
+    write_ssl_cert,
+)
 
 
 class CapturingBytesIO(BytesIO):
     """
     A BytesIO subclass that maintains its contents after being closed.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -33,6 +43,7 @@ class CapturingStringIO(StringIO):
     """
     A StringIO subclass that maintains its contents after being closed.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -58,13 +69,14 @@ class ConfigureForDeploymentModeTestCase(TestCase):
     @patch("os.symlink")
     def test_configure_for_deployment_mode_other(self, symlink_mock):
         """
-        Modes other than the magic "standalone" should symlink to a similarly named directory.
+        Modes other than the magic "standalone" should symlink to a similarly
+        named directory.
         """
         configure_for_deployment_mode("elite_dangerous")
 
         symlink_mock.assert_called_once_with(
             os.path.join(CONFIGS_DIR, "standalone"),
-            os.path.join(CONFIGS_DIR, "elite_dangerous")
+            os.path.join(CONFIGS_DIR, "elite_dangerous"),
         )
 
     @patch("os.path.exists")
@@ -77,7 +89,9 @@ class ConfigureForDeploymentModeTestCase(TestCase):
 
         configure_for_deployment_mode("jabberwocky")
 
-        path_exists_mock.assert_called_once_with(os.path.join(CONFIGS_DIR, "jabberwocky"))
+        path_exists_mock.assert_called_once_with(
+            os.path.join(CONFIGS_DIR, "jabberwocky")
+        )
         symlink_mock.assert_not_called()
 
 
@@ -213,15 +227,14 @@ class UpdateServiceConfTestCase(TestCase):
         with (
             patch("os.path.isfile") as mock_isfile,
             patch("builtins.open") as open_mock,
-            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf
+            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf,
         ):
-                mock_isfile.return_value = True
-                mock_migrate_service_conf.return_value = None
-                open_mock.side_effect = return_conf
-                update_service_conf({"test": {"new": "yes"}})
+            mock_isfile.return_value = True
+            mock_migrate_service_conf.return_value = None
+            open_mock.side_effect = return_conf
+            update_service_conf({"test": {"new": "yes"}})
 
-        self.assertEqual(outfile.captured,
-                         "[fixed]\nold = no\n\n[test]\nnew = yes\n\n")
+        self.assertEqual(outfile.captured, "[fixed]\nold = no\n\n[test]\nnew = yes\n\n")
 
     def test_section_exists(self):
         """Tests that a setting is updated if the section exists."""
@@ -239,12 +252,12 @@ class UpdateServiceConfTestCase(TestCase):
         with (
             patch("os.path.isfile") as mock_isfile,
             patch("builtins.open") as open_mock,
-            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf
+            patch("settings_files.migrate_service_conf") as mock_migrate_service_conf,
         ):
-                mock_isfile.return_value = True
-                mock_migrate_service_conf.return_value = None
-                open_mock.side_effect = return_conf
-                update_service_conf({"fixed": {"old": "yes"}})
+            mock_isfile.return_value = True
+            mock_migrate_service_conf.return_value = None
+            open_mock.side_effect = return_conf
+            update_service_conf({"fixed": {"old": "yes"}})
 
         self.assertEqual(outfile.captured, "[fixed]\nold = yes\n\n")
 
