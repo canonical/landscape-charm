@@ -195,6 +195,7 @@ def _create_http_service(
     server_ip: str,
     unit_name: str,
     worker_counts: int,
+    is_leader: bool,
     error_files: Iterable["HAProxyErrorFile"],
     service_ports: "HAProxyServicePorts",
     server_options: "HAProxyServerOptions",
@@ -203,7 +204,7 @@ def _create_http_service(
     Create the Landscape HTTP `services` configurations for HAProxy.
     """
 
-    (appservers, pingservers) = [
+    (appservers, pingservers, message_servers, api_servers) = [
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
@@ -213,7 +214,16 @@ def _create_http_service(
             )
             for i in range(worker_counts)
         ]
-        for name in ("appserver", "pingserver")
+        for name in ("appserver", "pingserver", "message-server", "api")
+    ]
+
+    package_upload_servers = [
+        (
+            f"landscape-package-upload-{unit_name}-0",
+            server_ip,
+            service_ports["package-upload"],
+            server_options,
+        )
     ]
 
     http_service["servers"] = appservers
@@ -221,7 +231,23 @@ def _create_http_service(
         {
             "backend_name": "landscape-ping",
             "servers": pingservers,
-        }
+        },
+        {
+            "backend_name": "landscape-message",
+            "servers": message_servers,
+        },
+        {
+            "backend_name": "landscape-api",
+            "servers": api_servers,
+        },
+        {
+            "backend_name": "landscape-package-upload",
+            "servers": package_upload_servers if is_leader else [],
+        },
+        {
+            "backend_name": "landscape-hashid-databases",
+            "servers": appservers if is_leader else [],
+        },
     ]
 
     http_service["error_files"] = [asdict(ef) for ef in error_files]
@@ -246,7 +272,7 @@ def _create_https_service(
 
     https_service["crts"] = [ssl_cert]
 
-    (appservers, message_servers, api_servers) = [
+    (appservers, pingservers, message_servers, api_servers) = [
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
@@ -256,7 +282,7 @@ def _create_https_service(
             )
             for i in range(worker_counts)
         ]
-        for name in ("appserver", "message-server", "api")
+        for name in ("appserver", "pingserver", "message-server", "api")
     ]
 
     # There should only ever be one package-upload-server service.
@@ -271,6 +297,10 @@ def _create_https_service(
 
     https_service["servers"] = appservers
     https_service["backends"] = [
+        {
+            "backend_name": "landscape-ping",
+            "servers": pingservers,
+        },
         {
             "backend_name": "landscape-message",
             "servers": message_servers,
@@ -1107,6 +1137,7 @@ class LandscapeServerCharm(CharmBase):
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
+            is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,

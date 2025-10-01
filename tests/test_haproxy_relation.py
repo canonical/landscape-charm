@@ -200,9 +200,15 @@ class TestCreateHTTPService(unittest.TestCase):
     def setUp(self):
         self.appserver_port = 9000
         self.pingserver_port = 10000
+        self.message_server_port = 11000
+        self.api_port = 12000
+        self.package_upload_port = 13000
         self.service_ports = {
             "appserver": self.appserver_port,
             "pingserver": self.pingserver_port,
+            "message-server": self.message_server_port,
+            "api": self.api_port,
+            "package-upload": self.package_upload_port,
         }
         self.server_options = ["check", "inter 5000", "rise 2", "fall 5", "maxconn 50"]
         self.http_service = {
@@ -220,30 +226,30 @@ class TestCreateHTTPService(unittest.TestCase):
         """
         Creates a backend for pingserver
         """
+        self.maxDiff = 10000
         http = _create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
             worker_counts=1,
+            is_leader=False,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
         )
 
-        self.assertEqual(
-            [
-                {
-                    "backend_name": "landscape-ping",
-                    "servers": [
-                        (
-                            "landscape-pingserver-unitname-0",
-                            "10.1.1.10",
-                            self.pingserver_port,
-                            self.server_options,
-                        )
-                    ],
-                }
-            ],
+        self.assertIn(
+            {
+                "backend_name": "landscape-ping",
+                "servers": [
+                    (
+                        "landscape-pingserver-unitname-0",
+                        "10.1.1.10",
+                        self.pingserver_port,
+                        self.server_options,
+                    )
+                ],
+            },
             http["backends"],
         )
 
@@ -260,27 +266,26 @@ class TestCreateHTTPService(unittest.TestCase):
             server_ip="10.1.1.10",
             unit_name="unitname",
             worker_counts=workers,
+            is_leader=False,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
         )
 
-        expected = [
-            {
-                "backend_name": "landscape-ping",
-                "servers": [
-                    (
-                        f"landscape-pingserver-unitname-{i}",
-                        "10.1.1.10",
-                        self.pingserver_port + i,
-                        self.server_options,
-                    )
-                    for i in range(workers)
-                ],
-            }
-        ]
+        expected = {
+            "backend_name": "landscape-ping",
+            "servers": [
+                (
+                    f"landscape-pingserver-unitname-{i}",
+                    "10.1.1.10",
+                    self.pingserver_port + i,
+                    self.server_options,
+                )
+                for i in range(workers)
+            ],
+        }
 
-        self.assertEqual(expected, http["backends"])
+        self.assertIn(expected, http["backends"])
 
     def test_appserver_server(self):
         """
@@ -292,6 +297,7 @@ class TestCreateHTTPService(unittest.TestCase):
             server_ip="10.1.1.10",
             unit_name="unitname",
             worker_counts=1,
+            is_leader=False,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -322,6 +328,7 @@ class TestCreateHTTPService(unittest.TestCase):
             server_ip="10.1.1.10",
             unit_name="unitname",
             worker_counts=workers,
+            is_leader=False,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -339,6 +346,249 @@ class TestCreateHTTPService(unittest.TestCase):
 
         self.assertEqual(expected, http["servers"])
 
+    def test_api_backend(self):
+        """
+        Creates a landscape-api backend.
+        """
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=1,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-api",
+            "servers": [
+                (
+                    f"landscape-api-{unitname}-0",
+                    server_ip,
+                    self.api_port,
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_api_workers(self):
+        """
+        Creates an landscape-api backend for each worker, incrementing the port by 1.
+        """
+        workers = 3
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=workers,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-api",
+            "servers": [
+                (
+                    f"landscape-api-{unitname}-{i}",
+                    server_ip,
+                    self.api_port + i,
+                    self.server_options,
+                )
+                for i in range(workers)
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_message_server_backend(self):
+        """
+        Creates a landscape-message backend.
+        """
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=1,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-message",
+            "servers": [
+                (
+                    f"landscape-message-server-{unitname}-0",
+                    server_ip,
+                    self.message_server_port,
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_message_server_workers(self):
+        """
+        Creates a landscape-message backend for each worker, incrementing the port by 1.
+        """
+        workers = 3
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=workers,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-message",
+            "servers": [
+                (
+                    f"landscape-message-server-{unitname}-{i}",
+                    server_ip,
+                    self.message_server_port + i,
+                    self.server_options,
+                )
+                for i in range(workers)
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_package_upload_backend(self):
+        """
+        Creates a landscape-package-upload backend if the unit is the leader.
+        """
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=1,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-package-upload",
+            "servers": [
+                (
+                    f"landscape-package-upload-{unitname}-0",
+                    server_ip,
+                    self.package_upload_port,
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_no_package_upload_on_nonleader(self):
+        """
+        Does not create a landscape-package-upload backend if the unit is not the leader.
+        """
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-package-upload",
+            "servers": [],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_hashid_databases_backend(self):
+        """
+        Creates a landscape-hashid-databases backend if the unit is the leader.
+
+        The landscape-hashid-databases backend uses the appservers.
+        """
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=1,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-hashid-databases",
+            "servers": [
+                (
+                    f"landscape-appserver-{unitname}-0",
+                    server_ip,
+                    self.appserver_port,
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_no_hashid_databases_on_nonleader(self):
+        """
+        Does not create a landscape-hashid-databases backend if the unit is not the
+        leader.
+        """
+        service = _create_http_service(
+            http_service=self.http_service,
+            server_ip="",
+            unit_name="",
+            worker_counts=1,
+            is_leader=False,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-hashid-databases",
+            "servers": [],
+        }
+
+        self.assertIn(expected, service["backends"])
+
     def test_error_files(self):
         """
         Sets error files for the service if provided.
@@ -354,6 +604,7 @@ class TestCreateHTTPService(unittest.TestCase):
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
+            is_leader=False,
             worker_counts=1,
             error_files=error_files,
             service_ports=self.service_ports,
@@ -376,11 +627,13 @@ class TestCreateHTTPSService(unittest.TestCase):
 
     def setUp(self):
         self.appserver_port = 9000
+        self.pingserver_port = 10000
         self.message_server_port = 11000
         self.api_port = 12000
         self.package_upload_port = 13000
         self.service_ports = {
             "appserver": self.appserver_port,
+            "pingserver": self.pingserver_port,
             "message-server": self.message_server_port,
             "api": self.api_port,
             "package-upload": self.package_upload_port,
