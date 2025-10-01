@@ -469,10 +469,12 @@ class TestCharm(unittest.TestCase):
             relation_id, "landscape-server", {"leader-ip": "test"}
         )
 
-        with patch("charm.check_call") as mock:
-            with patch("charm.update_service_conf"):
-                mock.side_effect = CalledProcessError(127, Mock())
-                self.assertRaises(CalledProcessError, harness.begin_with_initial_hooks)
+        with (
+            patch("charm.check_call") as mock,
+            patch("charm.update_service_conf"),
+        ):
+            mock.side_effect = CalledProcessError(127, Mock())
+            self.assertRaises(CalledProcessError, harness.begin_with_initial_hooks)
 
     @patch.dict(
         os.environ,
@@ -678,11 +680,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call"):
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
@@ -723,11 +725,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call"):
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -768,11 +770,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call"):
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -806,11 +808,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call"):
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -838,12 +840,12 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                check_call_mock.side_effect = CalledProcessError(127, "ouch")
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -884,12 +886,14 @@ class TestCharm(unittest.TestCase):
             peer_relation_id, "landscape-server", {"leader-ip": "test"}
         )
 
-        with patch("charm.check_call"):
-            with patch(
+        with (
+            patch("charm.check_call"),
+            patch(
                 "settings_files.update_service_conf",
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
-                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+            ) as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         self.assertEqual(update_service_conf_mock.call_count, 2)
         self.assertEqual(
@@ -921,14 +925,18 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                check_call_mock.side_effect = CalledProcessError(127, "ouch")
-                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -947,9 +955,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         check_call_mock.assert_called_with([UPDATE_WSL_DISTRIBUTIONS_SCRIPT], env=ANY)
 
@@ -971,11 +981,13 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                # Let bootstrap account go through
-                check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            # Let bootstrap account go through
+            check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertNotIsInstance(status, BlockedStatus)
@@ -1431,9 +1443,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_ready_status = Mock()
         event = Mock(spec_set=ActionEvent)
 
-        with patch("subprocess.run") as run_mock:
-            with patch("charm.check_call") as check_call_mock:
-                self.harness.charm._resume(event)
+        with (
+            patch("subprocess.run") as run_mock,
+            patch("charm.check_call") as check_call_mock,
+        ):
+            self.harness.charm._resume(event)
 
         run_mock.assert_called_once_with(
             [LSCTL, "start"], capture_output=True, text=True, env=ANY
@@ -1447,12 +1461,14 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_ready_status = Mock()
         event = Mock(spec_set=ActionEvent)
 
-        with patch("subprocess.run") as run_mock:
-            with patch("charm.check_call") as check_call_mock:
-                run_mock.return_value = Mock(stdout="Everything is on fire")
-                check_call_mock.side_effect = CalledProcessError(127, "uhoh")
+        with (
+            patch("subprocess.run") as run_mock,
+            patch("charm.check_call") as check_call_mock,
+        ):
+            run_mock.return_value = Mock(stdout="Everything is on fire")
+            check_call_mock.side_effect = CalledProcessError(127, "uhoh")
 
-                self.harness.charm._resume(event)
+            self.harness.charm._resume(event)
 
         self.assertEqual(2, len(run_mock.mock_calls))
         run_mock.assert_any_call(
@@ -1622,10 +1638,12 @@ class TestCharm(unittest.TestCase):
         unit = self.harness.charm.unit
         mock_event.relation.data = {unit: {}}
 
-        with patch("os.path.exists") as os_path_exists_mock:
-            with patch("os.remove") as os_remove_mock:
-                os_path_exists_mock.return_value = True
-                self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+        with (
+            patch("os.path.exists") as os_path_exists_mock,
+            patch("os.remove") as os_remove_mock,
+        ):
+            os_path_exists_mock.return_value = True
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
 
         self.assertEqual(
             len(os_path_exists_mock.mock_calls),
@@ -1650,10 +1668,12 @@ class TestCharm(unittest.TestCase):
 
             return False
 
-        with patch("os.path.exists") as os_path_exists_mock:
-            with patch("os.remove") as os_remove_mock:
-                os_path_exists_mock.side_effect = path_exists
-                self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+        with (
+            patch("os.path.exists") as os_path_exists_mock,
+            patch("os.remove") as os_remove_mock,
+        ):
+            os_path_exists_mock.side_effect = path_exists
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
 
         self.assertEqual(
             len(os_path_exists_mock.mock_calls),
