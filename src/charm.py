@@ -305,7 +305,6 @@ def _create_grpc_service(
     ssl_cert: bytes | str,
     server_ip: str,
     unit_name: str,
-    worker_counts: int,
     error_files: Iterable["HAProxyErrorFile"],
     service_ports: "HAProxyServicePorts",
     server_options: "HAProxyServerOptions",
@@ -315,16 +314,15 @@ def _create_grpc_service(
     """
 
     grpc_service["crts"] = [ssl_cert]
-    hostagent_messengers = [
+    hostagent_messenger = [
         (
-            f"landscape-hostagent-messenger-{unit_name}-{i}",
+            f"landscape-hostagent-messenger-{unit_name}-0",
             server_ip,
-            service_ports["hostagent-messenger"] + i,
+            service_ports["hostagent-messenger"],
             server_options + grpc_service["server_options"],
         )
-        for i in range(worker_counts)
     ]
-    grpc_service["servers"] = hostagent_messengers
+    grpc_service["servers"] = hostagent_messenger
     grpc_service["error_files"] = [asdict(ef) for ef in error_files]
 
     return grpc_service
@@ -1129,7 +1127,6 @@ class LandscapeServerCharm(CharmBase):
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,
