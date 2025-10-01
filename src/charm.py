@@ -179,6 +179,13 @@ def _get_ssl_cert(ssl_cert, ssl_key):
     return ssl_cert
 
 
+def _get_haproxy_config() -> dict:
+    with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
+        haproxy_config = yaml.safe_load(haproxy_config_file)
+
+    return haproxy_config
+
+
 def _create_http_service(
     http_service: dict,
     server_ip: str,
@@ -1090,18 +1097,20 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
+        haproxy_config = _get_haproxy_config()
         error_files = _get_haproxy_error_files(haproxy_config)
         service_ports = _get_haproxy_service_ports(haproxy_config)
         server_options = _get_haproxy_server_options(haproxy_config)
 
+        server_ip = relation.data[self.unit]["private-address"]
+        unit_name = self.unit.name.replace("/", "-")
+        worker_counts = int(self.model.config["worker_counts"])
+
         http_service = _create_http_service(
             http_service=haproxy_config["http_service"],
-            server_ip=relation.data[self.unit]["private-address"],
-            unit_name=self.unit.name.replace("/", "-"),
-            worker_counts=int(self.model.config["worker_counts"]),
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,
@@ -1110,9 +1119,9 @@ class LandscapeServerCharm(CharmBase):
         https_service = _create_https_service(
             https_service=haproxy_config["https_service"],
             ssl_cert=ssl_cert,
-            server_ip=relation.data[self.unit]["private-address"],
-            unit_name=self.unit.name.replace("/", "-"),
-            worker_counts=int(self.model.config["worker_counts"]),
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=service_ports,
@@ -1122,9 +1131,9 @@ class LandscapeServerCharm(CharmBase):
         grpc_service = _create_grpc_service(
             grpc_service=haproxy_config["grpc_service"],
             ssl_cert=ssl_cert,
-            server_ip=relation.data[self.unit]["private-address"],
-            unit_name=self.unit.name.replace("/", "-"),
-            worker_counts=int(self.model.config["worker_counts"]),
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,
@@ -1135,8 +1144,8 @@ class LandscapeServerCharm(CharmBase):
                 "ubuntu_installer_attach_service"
             ],
             ssl_cert=ssl_cert,
-            server_ip=relation.data[self.unit]["private-address"],
-            unit_name=self.unit.name.replace("/", "-"),
+            server_ip=server_ip,
+            unit_name=unit_name,
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,

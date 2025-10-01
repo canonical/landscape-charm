@@ -24,7 +24,7 @@ import yaml
 from ops import testing
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops.testing import Context, Harness, Relation, State, PeerRelation
+from ops.testing import Context, Harness, Relation, State, PeerRelation, RelationBase
 
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
@@ -2783,3 +2783,178 @@ class TestGetModifiedEnvVars(unittest.TestCase):
         self.assertNotIn("/var/lib/juju/python3", modified)
         self.assertNotIn("/usr/lib/juju/python3.10", modified)
         self.assertIn("/usr/lib/python3", modified)
+
+
+@pytest.fixture
+def get_haproxy_config():
+    """
+    Return a minimal HAProxy configuration.
+    """
+
+    with patch("charm._get_haproxy_config") as m:
+        m.return_value = {
+            "http_service": {
+                "service_name": "landscape-http",
+                "service_host": "0.0.0.0",
+                "service_port": "80",
+                "service_options": [],
+            },
+            "https_service": {
+                "service_name": "landscape-https",
+                "service_host": "0.0.0.0",
+                "service_port": "443",
+                "service_options": [],
+            },
+            "grpc_service": {
+                "service_name": "landscape-grpc",
+                "service_host": "0.0.0.0",
+                "service_port": "6554",
+                "server_options": [],
+                "service_options": [],
+            },
+            "ubuntu_installer_attach_service": {
+                "service_name": "landscape-ubuntu-installer-attach",
+                "service_host": "0.0.0.0",
+                "service_port": "50051",
+                "server_options": [],
+                "service_options": [],
+            },
+            "ports": {
+                "appserver": 10000,
+                "pingserver": 11000,
+                "message-server": 12000,
+                "api": 13000,
+                "package-upload": 14000,
+                "hostagent-messenger": 15000,
+                "ubuntu-installer-attach": 16000,
+            },
+            "server_options": [],
+        }
+        yield m
+
+
+@pytest.fixture
+def get_haproxy_error_files():
+    """
+    Return empty HAProxy error files.
+    """
+
+    with patch("charm._get_haproxy_error_files") as m:
+        m.return_value = ()
+        yield m
+
+
+class TestWebsiteRelationJoined:
+    """
+    Tests for handlers of the `on.website_relation_joined` hook.
+    """
+
+    def test_requires_ssl_cert_and_key(self):
+        """
+        If there is not a valid ssl_cert and ssl_key pair provided in the model
+        configuration, enter blocked status.
+        """
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={
+                "root_url": "http://fake-root.test",
+                "ssl_cert": "",
+                "ssl_key": "",
+            },
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+
+        assert isinstance(state_out.unit_status, BlockedStatus)
+
+    def test_allows_default_ssl_cert_without_key(
+        self,
+        get_haproxy_config,
+        get_haproxy_error_files,
+    ):
+        """
+        If the `ssl_cert` parameter is `"DEFAULT"`, then allow an empty `ssl_key`.
+        Use the `"DEFAULT"` literal for the SSL configurations of the HTTPS,
+        Ubuntu installer, and gRPC frontends.
+        """
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={
+                "root_url": "http://fake-root.test",
+                "ssl_cert": "DEFAULT",
+                "ssl_key": "",
+                "worker_counts": 1,
+            },
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        services = state_out.get_relation(relation.id).local_unit_data["services"]
+
+        frontends = {
+            "landscape-https",
+            "landscape-grpc",
+            "landscape-ubuntu-installer-attach",
+        }
+
+        for service in yaml.safe_load(services):
+            if service["service_name"] in frontends:
+                assert service["crts"] == ["DEFAULT"]
+
+    def test_nondefault_ssl_cert_must_be_b64_encoded(self):
+        """
+        If the `ssl_cert` parameter is not `"DEFAULT"`, then the cert and key must be
+        b64-encoded.
+        """
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={
+                "root_url": "http://fake-root.test",
+                "ssl_cert": "notb64encoded!",
+                "ssl_key": "notb64encoded!",
+            },
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+
+        assert isinstance(state_out.unit_status, BlockedStatus)
+
+    def test_sets_root_url(self, get_haproxy_error_files, capture_service_conf):
+        """
+        If the model does not provide a root URL, derive a root URL from the
+        relation and use it to set the root-url configuration.
+
+        Store the root URL as the 'default_root_url'.
+        """
+        public_address = "haproxy.test"
+        expected_root_url = "https://" + public_address + "/"
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website", remote_units_data={0: {"public-address": public_address}}
+        )
+        state_in = State(
+            config={
+                "root_url": "",
+                "ssl_cert": "DEFAULT",
+                "ssl_key": "",
+                "worker_counts": 1,
+            },
+            relations=[relation],
+        )
+
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+
+        stored_root_url = state_out.get_stored_state(
+            "_stored", owner_path="LandscapeServerCharm"
+        ).content.get("default_root_url")
+        assert stored_root_url == expected_root_url
+
+        config = capture_service_conf.get_config()
+        assert config["global"].get("root-url") == expected_root_url
+        assert config["api"].get("root-url") == expected_root_url
+        assert config["package-upload"].get("root-url") == expected_root_url
