@@ -791,7 +791,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert=ssl_cert,
             server_ip="",
             unit_name="",
-            worker_counts=1,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -814,7 +813,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unitname,
-            worker_counts=1,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -828,39 +826,6 @@ class TestCreateGRPCService(unittest.TestCase):
                 self.hostagent_port,
                 options,
             )
-        ]
-
-        self.assertEqual(expected, service["servers"])
-
-    def test_hostagent_messenger_workers(self):
-        """
-        Creates a landscape-hostagent-messenger backend for each worker, incrementing
-        the port by 1.
-        """
-        workers = 3
-        server_ip = "10.194.61.5"
-        unitname = "unitname"
-
-        service = _create_grpc_service(
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unitname,
-            worker_counts=workers,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        options = self.server_options + self.grpc_service["server_options"]
-        expected = [
-            (
-                f"landscape-hostagent-messenger-{unitname}-{i}",
-                server_ip,
-                self.hostagent_port + i,
-                options,
-            )
-            for i in range(workers)
         ]
 
         self.assertEqual(expected, service["servers"])
@@ -880,7 +845,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert="",
             server_ip="",
             unit_name="",
-            worker_counts=1,
             error_files=error_files,
             service_ports=self.service_ports,
             server_options=self.server_options,
