@@ -20,7 +20,7 @@ def main() -> None:
     """Parses arguments and updates the autoregistration setting."""
     parser = argparse.ArgumentParser(
         prog="Landscape autoregistration",
-        description="Turns on or off autoregistration for self-hosted landscape-server.",
+        description="Turns on or off autoregistration for self-hosted landscape-server.",  # noqa
     )
 
     parser.add_argument(
