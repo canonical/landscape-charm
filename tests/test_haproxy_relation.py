@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from ops.model import BlockedStatus
-from ops.testing import Context, Relation, State
+from ops.testing import Context, Relation, State, StoredState
 import pytest
 import yaml
 
@@ -62,19 +62,6 @@ def get_haproxy_config():
             },
             "server_options": [],
         }
-        yield m
-
-
-@pytest.fixture(autouse=True)
-def get_haproxy_error_files():
-    """
-    Return empty HAProxy error files.
-
-    Avoids attempts to read them from the filesystem.
-    """
-
-    with patch("charm._get_haproxy_error_files") as m:
-        m.return_value = ()
         yield m
 
 
@@ -188,6 +175,53 @@ class TestWebsiteRelationJoined:
         assert config["global"].get("root-url") == expected_root_url
         assert config["api"].get("root-url") == expected_root_url
         assert config["package-upload"].get("root-url") == expected_root_url
+
+    def test_excludes_ubuntu_installer_attach_if_disabled(self):
+        """
+        If the Ubuntu installer attach service is disabled, do not include a frontend
+        for it.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"root_url": "https//root.test"},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": False},
+                )
+            ],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        raw_services = state_out.get_relation(relation.id).local_unit_data["services"]
+        services = yaml.safe_load(raw_services)
+        service_names = (s["service_name"] for s in services)
+
+        assert "landscape-ubuntu-installer-attach" not in service_names
+
+    def test_includes_ubuntu_installer_attach_if_enabled(self):
+        """
+        If the Ubuntu installer attach service is enabled, include a frontend for it.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"root_url": "https//root.test"},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": True},
+                )
+            ],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        raw_services = state_out.get_relation(relation.id).local_unit_data["services"]
+        services = yaml.safe_load(raw_services)
+        service_names = (s["service_name"] for s in services)
+
+        assert "landscape-ubuntu-installer-attach" in service_names
 
 
 class TestCreateHTTPService(unittest.TestCase):

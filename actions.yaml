@@ -25,3 +25,11 @@ upgrade:
     Upgrade software on the Landscape Server unit. This will update
     APT package indices and upgrade the landscape-server package. Unit must
     already be paused using the 'pause' action.
+enable-ubuntu-installer-attach:
+  description: |
+    Install the `landscape_ubuntu_installer_attach` package on Landscape units
+    and create the frontend on HAProxy.
+disable-ubuntu-installer-attach:
+  description: |
+    Uninstall the `landscape_ubuntu_installer_attach` package on Landscape units
+    and remove the frontend on HAProxy.
