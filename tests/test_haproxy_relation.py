@@ -65,10 +65,12 @@ def get_haproxy_config():
         yield m
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def get_haproxy_error_files():
     """
     Return empty HAProxy error files.
+
+    Avoids attempts to read them from the filesystem.
     """
 
     with patch("charm._get_haproxy_error_files") as m:
@@ -101,11 +103,7 @@ class TestWebsiteRelationJoined:
 
         assert isinstance(state_out.unit_status, BlockedStatus)
 
-    def test_allows_default_ssl_cert_without_key(
-        self,
-        get_haproxy_config,
-        get_haproxy_error_files,
-    ):
+    def test_allows_default_ssl_cert_without_key(self, get_haproxy_config):
         """
         If the `ssl_cert` parameter is `"DEFAULT"`, then allow an empty `ssl_key`.
         Use the `"DEFAULT"` literal for the SSL configurations of the HTTPS,
@@ -156,7 +154,7 @@ class TestWebsiteRelationJoined:
 
         assert isinstance(state_out.unit_status, BlockedStatus)
 
-    def test_sets_root_url(self, get_haproxy_error_files, capture_service_conf):
+    def test_sets_root_url(self, capture_service_conf):
         """
         If the model does not provide a root URL, derive a root URL from the
         relation and use it to set the root-url configuration.
