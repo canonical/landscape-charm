@@ -25,8 +25,8 @@ WAIT_TIMEOUT_SECONDS = 60 * 20  # Landscape takes a long time to deploy.
 
 USE_HOST_JUJU_MODEL = os.getenv("USE_HOST_JUJU_MODEL") or False
 """
-A setting for test develoment. If set to `True`, return a reference the current Juju
-model on the host instead of a temporary model.
+If `True`, return a reference the current Juju model on the host instead of a temporary
+model.
 """
 
 
@@ -83,7 +83,12 @@ def bundle(juju: jubilant.Juju) -> None:
     """
     if not USE_HOST_JUJU_MODEL:
         juju.deploy(charm=bundle_path())
-    juju.wait(jubilant.all_active, timeout=WAIT_TIMEOUT_SECONDS)
+        juju.wait(
+            jubilant.all_active,
+            timeout=WAIT_TIMEOUT_SECONDS,
+            successes=5,  # Landscape can take a while to come up, fully active.
+            delay=5.0,
+        )
 
 
 def bundle_path() -> pathlib.Path:

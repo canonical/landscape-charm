@@ -66,8 +66,8 @@ def test_api_routing(juju: jubilant.Juju, bundle: None):
 
     The API runs only on HTTPS by default. HAProxy returns a 302 for HTTP requests.
 
-    NOTE: the API returns 404 for unknown paths; use the `/about` endpoint as a stand-in
-    for a health endpoint.
+    NOTE: the API does not have a `/` route to use as a simple check; use the `/about`
+    endpoint as a stand-in for a health endpoint.
     """
     host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
 
