@@ -88,6 +88,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-client",
     "landscape-common",
 )
+LANDSCAPE_UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
 
 DEFAULT_SERVICES = (
     "landscape-api",
@@ -498,6 +499,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
+        self.framework.observe(
+            self.on.enable_ubuntu_installer_attach_action,
+            self._enable_ubuntu_installer_attach,
+        )
+        self.framework.observe(
+            self.on.disable_ubuntu_installer_attach_action,
+            self._disable_ubuntu_installer_attach,
+        )
 
         # State
         self._stored.set_default(
@@ -515,6 +524,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(account_bootstrapped=False)
         self._stored.set_default(secret_token=None)
         self._stored.set_default(cookie_encryption_key=None)
+        self._stored.set_default(enable_ubuntu_installer_attach=False)
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -1135,33 +1145,25 @@ class LandscapeServerCharm(CharmBase):
             server_options=server_options,
         )
 
-        ubuntu_installer_attach_service = _create_ubuntu_installer_attach_service(
-            ubuntu_installer_attach_service=haproxy_config[
-                "ubuntu_installer_attach_service"
-            ],
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
-        )
+        services = [http_service, https_service, grpc_service]
 
-        relation.data[self.unit].update(
-            {
-                "services": yaml.safe_dump(
-                    [
-                        http_service,
-                        https_service,
-                        grpc_service,
-                        ubuntu_installer_attach_service,
-                    ]
-                ),
-            }
-        )
+        if self._stored.enable_ubuntu_installer_attach:
+            services.append(
+                _create_ubuntu_installer_attach_service(
+                    ubuntu_installer_attach_service=haproxy_config[
+                        "ubuntu_installer_attach_service"
+                    ],
+                    ssl_cert=ssl_cert,
+                    server_ip=server_ip,
+                    unit_name=unit_name,
+                    error_files=error_files,
+                    service_ports=service_ports,
+                    server_options=server_options,
+                )
+            )
 
+        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
         self._stored.ready["haproxy"] = True
-
         self.unit.status = WaitingStatus("")
 
     def _website_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -1702,6 +1704,22 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _migrate_service_conf(self, event: ActionEvent) -> None:
         migrate_service_conf()
+
+    def _enable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Install the Ubuntu installer attach and create the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = True
+        apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+        self._on_config_changed(None)
+
+    def _disable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Uninstall the Ubuntu installer attach service and remove the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = False
+        apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+        self._on_config_changed(None)
 
 
 if __name__ == "__main__":  # pragma: no cover
