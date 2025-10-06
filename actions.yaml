@@ -27,9 +27,9 @@ upgrade:
     already be paused using the 'pause' action.
 enable-ubuntu-installer-attach:
   description: |
-    Install the `landscape_ubuntu_installer_attach` package on Landscape units
-    and create the frontend on HAProxy.
+    Install the `landscape_ubuntu_installer_attach` package and create the
+    frontend on HAProxy.
 disable-ubuntu-installer-attach:
   description: |
-    Uninstall the `landscape_ubuntu_installer_attach` package on Landscape units
-    and remove the frontend on HAProxy.
+    Uninstall the `landscape_ubuntu_installer_attach` package and remove the
+    frontend on HAProxy.
