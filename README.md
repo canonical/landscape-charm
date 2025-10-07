@@ -90,10 +90,10 @@ tox run -e unit -- tests/test_charm.py::TestCharm::test_install
 tox run -e integration
 ```
 
-The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `USE_HOST_JUJU_MODEL=1`:
+The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
 
 ```sh
-USE_HOST_JUJU_MODEL=1 tox run -e integration
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox run -e integration
 ```
 
 ### Lint code

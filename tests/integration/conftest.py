@@ -23,7 +23,7 @@ The name of the bundle used for integration testing.
 WAIT_TIMEOUT_SECONDS = 60 * 20  # Landscape takes a long time to deploy.
 
 
-USE_HOST_JUJU_MODEL = os.getenv("USE_HOST_JUJU_MODEL") or False
+USE_HOST_JUJU_MODEL = os.getenv("LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL") or False
 """
 If `True`, return a reference the current Juju model on the host instead of a temporary
 model.
