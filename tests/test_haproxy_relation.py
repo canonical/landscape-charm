@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from ops.model import BlockedStatus
-from ops.testing import Context, Relation, State
+from ops.testing import Context, Relation, State, StoredState
 import pytest
 import yaml
 
@@ -65,17 +65,6 @@ def get_haproxy_config():
         yield m
 
 
-@pytest.fixture
-def get_haproxy_error_files():
-    """
-    Return empty HAProxy error files.
-    """
-
-    with patch("charm._get_haproxy_error_files") as m:
-        m.return_value = ()
-        yield m
-
-
 class TestWebsiteRelationJoined:
     """
     Tests for handlers of the `on.website_relation_joined` hook.
@@ -101,11 +90,7 @@ class TestWebsiteRelationJoined:
 
         assert isinstance(state_out.unit_status, BlockedStatus)
 
-    def test_allows_default_ssl_cert_without_key(
-        self,
-        get_haproxy_config,
-        get_haproxy_error_files,
-    ):
+    def test_allows_default_ssl_cert_without_key(self, get_haproxy_config):
         """
         If the `ssl_cert` parameter is `"DEFAULT"`, then allow an empty `ssl_key`.
         Use the `"DEFAULT"` literal for the SSL configurations of the HTTPS,
@@ -156,7 +141,7 @@ class TestWebsiteRelationJoined:
 
         assert isinstance(state_out.unit_status, BlockedStatus)
 
-    def test_sets_root_url(self, get_haproxy_error_files, capture_service_conf):
+    def test_sets_root_url(self, capture_service_conf):
         """
         If the model does not provide a root URL, derive a root URL from the
         relation and use it to set the root-url configuration.
@@ -190,6 +175,53 @@ class TestWebsiteRelationJoined:
         assert config["global"].get("root-url") == expected_root_url
         assert config["api"].get("root-url") == expected_root_url
         assert config["package-upload"].get("root-url") == expected_root_url
+
+    def test_excludes_ubuntu_installer_attach_if_disabled(self):
+        """
+        If the Ubuntu installer attach service is disabled, do not include a frontend
+        for it.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"root_url": "https//root.test"},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": False},
+                )
+            ],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        raw_services = state_out.get_relation(relation.id).local_unit_data["services"]
+        services = yaml.safe_load(raw_services)
+        service_names = (s["service_name"] for s in services)
+
+        assert "landscape-ubuntu-installer-attach" not in service_names
+
+    def test_includes_ubuntu_installer_attach_if_enabled(self):
+        """
+        If the Ubuntu installer attach service is enabled, include a frontend for it.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"root_url": "https//root.test"},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": True},
+                )
+            ],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        raw_services = state_out.get_relation(relation.id).local_unit_data["services"]
+        services = yaml.safe_load(raw_services)
+        service_names = (s["service_name"] for s in services)
+
+        assert "landscape-ubuntu-installer-attach" in service_names
 
 
 class TestCreateHTTPService(unittest.TestCase):
@@ -935,7 +967,8 @@ class TestCreateHTTPSService(unittest.TestCase):
 
     def test_no_package_upload_on_nonleader(self):
         """
-        Does not create a landscape-package-upload backend if the unit is not the leader.
+        Does not create a landscape-package-upload backend if the unit is not
+        the leader.
         """
         service = _create_https_service(
             https_service=self.https_service,
@@ -1044,7 +1077,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert=ssl_cert,
             server_ip="",
             unit_name="",
-            worker_counts=1,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -1067,7 +1099,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert="",
             server_ip=server_ip,
             unit_name=unitname,
-            worker_counts=1,
             error_files=(),
             service_ports=self.service_ports,
             server_options=self.server_options,
@@ -1081,39 +1112,6 @@ class TestCreateGRPCService(unittest.TestCase):
                 self.hostagent_port,
                 options,
             )
-        ]
-
-        self.assertEqual(expected, service["servers"])
-
-    def test_hostagent_messenger_workers(self):
-        """
-        Creates a landscape-hostagent-messenger backend for each worker, incrementing
-        the port by 1.
-        """
-        workers = 3
-        server_ip = "10.194.61.5"
-        unitname = "unitname"
-
-        service = _create_grpc_service(
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unitname,
-            worker_counts=workers,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        options = self.server_options + self.grpc_service["server_options"]
-        expected = [
-            (
-                f"landscape-hostagent-messenger-{unitname}-{i}",
-                server_ip,
-                self.hostagent_port + i,
-                options,
-            )
-            for i in range(workers)
         ]
 
         self.assertEqual(expected, service["servers"])
@@ -1133,7 +1131,6 @@ class TestCreateGRPCService(unittest.TestCase):
             ssl_cert="",
             server_ip="",
             unit_name="",
-            worker_counts=1,
             error_files=error_files,
             service_ports=self.service_ports,
             server_options=self.server_options,

@@ -88,6 +88,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-client",
     "landscape-common",
 )
+LANDSCAPE_UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
 
 DEFAULT_SERVICES = (
     "landscape-api",
@@ -145,8 +146,10 @@ METRICS_RULES_DIR = os.path.join(os.path.dirname(__file__), "prometheus_alert_ru
 
 def get_args_with_secrets_removed(args, arg_names):
     """
-    We log args passed in the command line. But we want to remove secrets. Returns a copy
-    of the args passed in with secrets associated with arg_names redacted
+    We log args passed in the command line. But we want to remove secrets.
+
+    Returns a copy of the args passed in with secrets associated with arg_names
+    redacted.
     """
     args = args.copy()
     for arg_name in arg_names:
@@ -186,8 +189,8 @@ def _get_haproxy_config() -> dict:
     return haproxy_config
 
 
-# NOTE: See https://charmhub.io/haproxy/configurations#services for details on the format
-# of HAProxy service configurations.
+# NOTE: See https://charmhub.io/haproxy/configurations#services for details on
+# the format of HAProxy service configurations.
 
 
 def _create_http_service(
@@ -335,7 +338,6 @@ def _create_grpc_service(
     ssl_cert: bytes | str,
     server_ip: str,
     unit_name: str,
-    worker_counts: int,
     error_files: Iterable["HAProxyErrorFile"],
     service_ports: "HAProxyServicePorts",
     server_options: "HAProxyServerOptions",
@@ -345,16 +347,15 @@ def _create_grpc_service(
     """
 
     grpc_service["crts"] = [ssl_cert]
-    hostagent_messengers = [
+    hostagent_messenger = [
         (
-            f"landscape-hostagent-messenger-{unit_name}-{i}",
+            f"landscape-hostagent-messenger-{unit_name}-0",
             server_ip,
-            service_ports["hostagent-messenger"] + i,
+            service_ports["hostagent-messenger"],
             server_options + grpc_service["server_options"],
         )
-        for i in range(worker_counts)
     ]
-    grpc_service["servers"] = hostagent_messengers
+    grpc_service["servers"] = hostagent_messenger
     grpc_service["error_files"] = [asdict(ef) for ef in error_files]
 
     return grpc_service
@@ -528,6 +529,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
+        self.framework.observe(
+            self.on.enable_ubuntu_installer_attach_action,
+            self._enable_ubuntu_installer_attach,
+        )
+        self.framework.observe(
+            self.on.disable_ubuntu_installer_attach_action,
+            self._disable_ubuntu_installer_attach,
+        )
 
         # State
         self._stored.set_default(
@@ -545,6 +554,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(account_bootstrapped=False)
         self._stored.set_default(secret_token=None)
         self._stored.set_default(cookie_encryption_key=None)
+        self._stored.set_default(enable_ubuntu_installer_attach=False)
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -759,14 +769,15 @@ class LandscapeServerCharm(CharmBase):
 
             # Add the Landscape Server PPA and install via apt.
             # add-apt-repository doesn't use the proxy configuration from apt or juju
-            # let's make sure to use the http(s) proxy settings from the charm or at least
-            # any juju_proxy setting, add the classic http(s)_proxy to the env that will be
-            # used only for add-apt-repository call
+            # let's make sure to use the http(s) proxy settings from the charm or at
+            # least any juju_proxy setting, add the classic http(s)_proxy to the env
+            # that will be used only for add-apt-repository call
             add_apt_repository_env = os.environ.copy()
             for proxy_var in ["http_proxy", "https_proxy"]:
                 juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
 
-                # if the charm has a proxy conf configured, override juju_http(s) configuration
+                # if the charm has a proxy conf configured, override juju_http(s)
+                # configuration
                 if proxy_var in self.model.config:
                     add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
                 elif juju_proxy_var in add_apt_repository_env:
@@ -954,7 +965,7 @@ class LandscapeServerCharm(CharmBase):
         else:
             port = unit_data["port"]
         if not port:
-            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
         config_user = self.model.config.get("db_schema_user")
         if config_user:
@@ -1160,39 +1171,30 @@ class LandscapeServerCharm(CharmBase):
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
             error_files=error_files,
             service_ports=service_ports,
             server_options=server_options,
         )
 
-        ubuntu_installer_attach_service = _create_ubuntu_installer_attach_service(
-            ubuntu_installer_attach_service=haproxy_config[
-                "ubuntu_installer_attach_service"
-            ],
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
-        )
+        services = [http_service, https_service, grpc_service]
 
-        relation.data[self.unit].update(
-            {
-                "services": yaml.safe_dump(
-                    [
-                        http_service,
-                        https_service,
-                        grpc_service,
-                        ubuntu_installer_attach_service,
-                    ]
-                ),
-            }
-        )
+        if self._stored.enable_ubuntu_installer_attach:
+            services.append(
+                _create_ubuntu_installer_attach_service(
+                    ubuntu_installer_attach_service=haproxy_config[
+                        "ubuntu_installer_attach_service"
+                    ],
+                    ssl_cert=ssl_cert,
+                    server_ip=server_ip,
+                    unit_name=unit_name,
+                    error_files=error_files,
+                    service_ports=service_ports,
+                    server_options=server_options,
+                )
+            )
 
+        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
         self._stored.ready["haproxy"] = True
-
         self.unit.status = WaitingStatus("")
 
     def _website_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -1733,6 +1735,22 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _migrate_service_conf(self, event: ActionEvent) -> None:
         migrate_service_conf()
+
+    def _enable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Install the Ubuntu installer attach and create the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = True
+        apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+        self._on_config_changed(None)
+
+    def _disable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Uninstall the Ubuntu installer attach service and remove the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = False
+        apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+        self._on_config_changed(None)
 
 
 if __name__ == "__main__":  # pragma: no cover
