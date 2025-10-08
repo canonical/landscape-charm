@@ -6,6 +6,17 @@ and HAProxy.
 import jubilant
 import requests
 
+from tests.helpers import build_url
+
+
+def _get_haproxy_address(juju: jubilant.Juju) -> str:
+    """
+    Get the public address for the HAProxy unit in the Juju model.
+    """
+    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    assert host, "No public address on haproxy/0 unit"
+    return host
+
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
     """
@@ -14,16 +25,19 @@ def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
     This includes the older `<host>/metrics` endpoint, and any newer per-service
     endpoints that end with `/metrics`, like `<host>/api/metrics`.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = _get_haproxy_address(juju)
 
-    assert requests.get(f"http://{host}/metrics").status_code == 403
-    assert requests.get(f"https://{host}/metrics", verify=False).status_code == 403
+    response = requests.get(build_url("http", host, "/metrics"))
+    assert response.status_code == 403
+
+    response = requests.get(build_url("https", host, "/metrics"), verify=False)
+    assert response.status_code == 403
 
     services = ("message-system", "api", "ping")
 
     for service in services:
         for scheme in ("http", "https"):
-            url = f"{scheme}://{host}/{service}/metrics"
+            url = build_url(scheme, host, f"/{service}/metrics")
             assert requests.get(url, verify=False).status_code == 403
 
 
@@ -33,10 +47,10 @@ def test_pingserver_routing(juju: jubilant.Juju, bundle: None):
 
     Pingserver runs over HTTPS and HTTP.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = _get_haproxy_address(juju)
 
     for scheme in ("http", "https"):
-        url = f"{scheme}://{host}/ping"
+        url = build_url(scheme, host, "/ping")
         assert requests.get(url, verify=False, allow_redirects=False).status_code == 200
 
 
@@ -47,14 +61,13 @@ def test_message_server_routing(juju: jubilant.Juju, bundle: None):
     Message server runs only on HTTPS by default. HAProxy returns a 302 for HTTP
     requests.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = _get_haproxy_address(juju)
 
-    response = requests.get(f"https://{host}/message-system", verify=False)
+    response = requests.get(build_url("https", host, "/message-system"), verify=False)
     assert response.status_code == 200
 
     response = requests.get(
-        f"http://{host}/message-system",
-        verify=False,
+        build_url("http", host, "/message-system"),
         allow_redirects=False,
     )
     assert response.status_code == 302
@@ -69,14 +82,13 @@ def test_api_routing(juju: jubilant.Juju, bundle: None):
     NOTE: the API does not have a `/` route to use as a simple check; use the `/about`
     endpoint as a stand-in for a health endpoint.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = _get_haproxy_address(juju)
 
-    response = requests.get(f"https://{host}/api/about", verify=False)
+    response = requests.get(build_url("https", host, "/api/about"), verify=False)
     assert response.status_code == 200
 
     response = requests.get(
-        f"http://{host}/api/about",
-        verify=False,
+        build_url("http", host, "/api/about"),
         allow_redirects=False,
     )
     assert response.status_code == 302
