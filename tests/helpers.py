@@ -1,7 +1,3 @@
-"""
-Helper functions for integration tests.
-"""
-
 import ipaddress
 from urllib.parse import urlunparse
 
