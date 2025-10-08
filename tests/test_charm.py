@@ -19,12 +19,10 @@ from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Context, Harness, PeerRelation, Relation, State
-import yaml
 
 from charm import (
     DEFAULT_SERVICES,
     get_modified_env_vars,
-    HAPROXY_CONFIG_FILE,
     HASH_ID_DATABASES,
     LANDSCAPE_PACKAGES,
     LandscapeServerCharm,
@@ -1212,25 +1210,7 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
-        haproxy_config["error_files"]["location"] = self.tempdir.name
-
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            with open(os.path.join(self.tempdir.name, filename), "w") as error_file:
-                error_file.write("THIS IS ERROR FILE FOR {}\n".format(code))
-
-        mock_haproxy_config = os.path.join(self.tempdir.name, "my-haproxy-config.yaml")
-
-        with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
-            yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
-
-        with patch.multiple(
-            "charm",
-            HAPROXY_CONFIG_FILE=mock_haproxy_config,
-            update_service_conf=DEFAULT,
-        ):
+        with patch.multiple("charm", update_service_conf=DEFAULT):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]
@@ -1246,25 +1226,7 @@ class TestCharm(unittest.TestCase):
             mock_event.unit: {"public-address": "8.8.8.8"},
         }
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
-        haproxy_config["error_files"]["location"] = self.tempdir.name
-
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            with open(os.path.join(self.tempdir.name, filename), "w") as error_file:
-                error_file.write("THIS IS ERROR FILE FOR {}\n".format(code))
-
-        mock_haproxy_config = os.path.join(self.tempdir.name, "my-haproxy-config.yaml")
-
-        with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
-            yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
-
-        with patch.multiple(
-            "charm",
-            HAPROXY_CONFIG_FILE=mock_haproxy_config,
-            update_service_conf=DEFAULT,
-        ):
+        with patch.multiple("charm", update_service_conf=DEFAULT):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]

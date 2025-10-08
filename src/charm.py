@@ -53,6 +53,15 @@ from ops.model import (
 )
 import yaml
 
+from haproxy import (
+    ERROR_FILES,
+    GRPC_SERVICE,
+    HTTP_SERVICE,
+    HTTPS_SERVICE,
+    PORTS,
+    SERVER_OPTIONS,
+    UBUNTU_INSTALLER_ATTACH_SERVICE,
+)
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -72,7 +81,6 @@ from settings_files import (
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
-HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "haproxy-config.yaml")
 LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
@@ -180,13 +188,6 @@ def _get_ssl_cert(ssl_cert, ssl_key):
                 "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
             )
     return ssl_cert
-
-
-def _get_haproxy_config() -> dict:
-    with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-        haproxy_config = yaml.safe_load(haproxy_config_file)
-
-    return haproxy_config
 
 
 # NOTE: See https://charmhub.io/haproxy/configurations#services for details on
@@ -371,10 +372,10 @@ class HAProxyErrorFile:
     """The b64-encoded content of the error file."""
 
 
-def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
-    error_files_location = haproxy_config["error_files"]["location"]
+def _get_haproxy_error_files(error_files_config: dict) -> list[HAProxyErrorFile]:
+    error_files_location = error_files_config["location"]
     error_files = []
-    for code, filename in haproxy_config["error_files"]["files"].items():
+    for code, filename in error_files_config["files"].items():
         error_file_path = os.path.join(error_files_location, filename)
         with open(error_file_path, "rb") as error_file:
             error_files.append(
@@ -404,18 +405,10 @@ Each value is the port that service runs on.
 """
 
 
-def _get_haproxy_service_ports(haproxy_config: dict) -> HAProxyServicePorts:
-    return haproxy_config["ports"]
-
-
 HAProxyServerOptions = list[str]
 """
 Additional configuration for a `server` stanza in an HAProxy configuration.
 """
-
-
-def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
-    return haproxy_config["server_options"]
 
 
 class SSLConfigurationError(Exception):
@@ -1104,45 +1097,41 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
-        haproxy_config = _get_haproxy_config()
-        error_files = _get_haproxy_error_files(haproxy_config)
-        service_ports = _get_haproxy_service_ports(haproxy_config)
-        server_options = _get_haproxy_server_options(haproxy_config)
-
+        error_files = _get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
         worker_counts = int(self.model.config["worker_counts"])
 
         http_service = _create_http_service(
-            http_service=haproxy_config["http_service"],
+            http_service=asdict(HTTP_SERVICE),
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
         https_service = _create_https_service(
-            https_service=haproxy_config["https_service"],
+            https_service=asdict(HTTPS_SERVICE),
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
         grpc_service = _create_grpc_service(
-            grpc_service=haproxy_config["grpc_service"],
+            grpc_service=asdict(GRPC_SERVICE),
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
         services = [http_service, https_service, grpc_service]
@@ -1150,15 +1139,15 @@ class LandscapeServerCharm(CharmBase):
         if self._stored.enable_ubuntu_installer_attach:
             services.append(
                 _create_ubuntu_installer_attach_service(
-                    ubuntu_installer_attach_service=haproxy_config[
-                        "ubuntu_installer_attach_service"
-                    ],
+                    ubuntu_installer_attach_service=asdict(
+                        UBUNTU_INSTALLER_ATTACH_SERVICE
+                    ),
                     ssl_cert=ssl_cert,
                     server_ip=server_ip,
                     unit_name=unit_name,
                     error_files=error_files,
-                    service_ports=service_ports,
-                    server_options=server_options,
+                    service_ports=PORTS,
+                    server_options=SERVER_OPTIONS,
                 )
             )
 

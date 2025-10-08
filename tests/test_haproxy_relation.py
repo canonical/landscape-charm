@@ -1,10 +1,8 @@
 from base64 import b64encode
 import unittest
-from unittest.mock import patch
 
 from ops.model import BlockedStatus
 from ops.testing import Context, Relation, State, StoredState
-import pytest
 import yaml
 
 from charm import (
@@ -15,54 +13,6 @@ from charm import (
     HAProxyErrorFile,
     LandscapeServerCharm,
 )
-
-
-@pytest.fixture
-def get_haproxy_config():
-    """
-    Return a minimal HAProxy configuration.
-    """
-
-    with patch("charm._get_haproxy_config") as m:
-        m.return_value = {
-            "http_service": {
-                "service_name": "landscape-http",
-                "service_host": "0.0.0.0",
-                "service_port": "80",
-                "service_options": [],
-            },
-            "https_service": {
-                "service_name": "landscape-https",
-                "service_host": "0.0.0.0",
-                "service_port": "443",
-                "service_options": [],
-            },
-            "grpc_service": {
-                "service_name": "landscape-grpc",
-                "service_host": "0.0.0.0",
-                "service_port": "6554",
-                "server_options": [],
-                "service_options": [],
-            },
-            "ubuntu_installer_attach_service": {
-                "service_name": "landscape-ubuntu-installer-attach",
-                "service_host": "0.0.0.0",
-                "service_port": "50051",
-                "server_options": [],
-                "service_options": [],
-            },
-            "ports": {
-                "appserver": 10000,
-                "pingserver": 11000,
-                "message-server": 12000,
-                "api": 13000,
-                "package-upload": 14000,
-                "hostagent-messenger": 15000,
-                "ubuntu-installer-attach": 16000,
-            },
-            "server_options": [],
-        }
-        yield m
 
 
 class TestWebsiteRelationJoined:
@@ -90,7 +40,7 @@ class TestWebsiteRelationJoined:
 
         assert isinstance(state_out.unit_status, BlockedStatus)
 
-    def test_allows_default_ssl_cert_without_key(self, get_haproxy_config):
+    def test_allows_default_ssl_cert_without_key(self):
         """
         If the `ssl_cert` parameter is `"DEFAULT"`, then allow an empty `ssl_key`.
         Use the `"DEFAULT"` literal for the SSL configurations of the HTTPS,
