@@ -5,13 +5,13 @@ from ops.model import BlockedStatus
 from ops.testing import Context, Relation, State, StoredState
 import yaml
 
-from charm import (
-    _create_grpc_service,
-    _create_http_service,
-    _create_https_service,
-    _create_ubuntu_installer_attach_service,
+from charm import LandscapeServerCharm
+from haproxy import (
+    create_grpc_service,
+    create_http_service,
+    create_https_service,
+    create_ubuntu_installer_attach_service,
     HAProxyErrorFile,
-    LandscapeServerCharm,
 )
 
 
@@ -202,7 +202,7 @@ class TestCreateHTTPService(unittest.TestCase):
         """
         Creates a backend for pingserver
         """
-        http = _create_http_service(
+        http = create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
@@ -237,7 +237,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
         workers = 3
 
-        http = _create_http_service(
+        http = create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
@@ -269,7 +269,7 @@ class TestCreateHTTPService(unittest.TestCase):
         Creates a server stanza for the appserver.
         """
 
-        http = _create_http_service(
+        http = create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
@@ -299,7 +299,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
         workers = 3
 
-        http = _create_http_service(
+        http = create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
@@ -332,7 +332,7 @@ class TestCreateHTTPService(unittest.TestCase):
             HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
         ]
 
-        http = _create_http_service(
+        http = create_http_service(
             http_service=self.http_service,
             server_ip="10.1.1.10",
             unit_name="unitname",
@@ -386,7 +386,7 @@ class TestCreateHTTPSService(unittest.TestCase):
 
         ssl_cert = "some-ssl-data-plz-trust-this"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert=ssl_cert,
             server_ip="",
@@ -411,7 +411,7 @@ class TestCreateHTTPSService(unittest.TestCase):
             HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
         ]
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip="",
@@ -438,7 +438,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -469,7 +469,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -500,7 +500,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -534,7 +534,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -568,7 +568,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -602,7 +602,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -636,7 +636,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -667,7 +667,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         Does not create a landscape-package-upload backend if the unit is not
         the leader.
         """
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip="",
@@ -695,7 +695,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -726,7 +726,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         Does not create a landscape-hashid-databases backend if the unit is not the
         leader.
         """
-        service = _create_https_service(
+        service = create_https_service(
             https_service=self.https_service,
             ssl_cert="",
             server_ip="",
@@ -769,7 +769,7 @@ class TestCreateGRPCService(unittest.TestCase):
         """
         ssl_cert = "some-ssl-cert-data"
 
-        service = _create_grpc_service(
+        service = create_grpc_service(
             grpc_service=self.grpc_service,
             ssl_cert=ssl_cert,
             server_ip="",
@@ -791,7 +791,7 @@ class TestCreateGRPCService(unittest.TestCase):
         server_ip = "10.194.61.5"
         unitname = "unitname"
 
-        service = _create_grpc_service(
+        service = create_grpc_service(
             grpc_service=self.grpc_service,
             ssl_cert="",
             server_ip=server_ip,
@@ -823,7 +823,7 @@ class TestCreateGRPCService(unittest.TestCase):
             HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
         ]
 
-        service = _create_grpc_service(
+        service = create_grpc_service(
             grpc_service=self.grpc_service,
             ssl_cert="",
             server_ip="",
@@ -870,7 +870,7 @@ class TestCreateUbuntuInstallerAttachService(unittest.TestCase):
         """
         ssl_cert = "some-ssl-cert-data"
 
-        service = _create_ubuntu_installer_attach_service(
+        service = create_ubuntu_installer_attach_service(
             ubuntu_installer_attach_service=self.service,
             ssl_cert=ssl_cert,
             server_ip="",
@@ -890,7 +890,7 @@ class TestCreateUbuntuInstallerAttachService(unittest.TestCase):
         server_ip = "10.194.61.15"
         unitname = "unitname"
 
-        service = _create_ubuntu_installer_attach_service(
+        service = create_ubuntu_installer_attach_service(
             ubuntu_installer_attach_service=self.service,
             ssl_cert="",
             server_ip=server_ip,
@@ -922,7 +922,7 @@ class TestCreateUbuntuInstallerAttachService(unittest.TestCase):
             HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
         ]
 
-        service = _create_ubuntu_installer_attach_service(
+        service = create_ubuntu_installer_attach_service(
             ubuntu_installer_attach_service=self.service,
             ssl_cert="",
             server_ip="",
