@@ -1,6 +1,9 @@
 """
 Integration tests for the Landscape scalable bundle, using Postgres, RabbitMQ,
 and HAProxy.
+
+NOTE: These tests assume an IPv4 public address for HAProxy. Our HAProxy relation
+does not currently bind to IPv6.
 """
 
 import jubilant
