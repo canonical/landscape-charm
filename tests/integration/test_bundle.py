@@ -6,7 +6,7 @@ and HAProxy.
 import jubilant
 import requests
 
-from tests.helpers import build_url
+from tests.integration.helpers import build_url
 
 
 def _get_haproxy_address(juju: jubilant.Juju) -> str:

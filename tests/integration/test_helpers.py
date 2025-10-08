@@ -1,6 +1,6 @@
 import pytest
 
-from tests.helpers import build_url
+from tests.integration.helpers import build_url
 
 
 @pytest.mark.parametrize(
