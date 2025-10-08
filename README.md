@@ -75,35 +75,35 @@ make build
 ### Run unit tests
 
 ```sh
-tox run -e unit
+tox -e unit
 ```
 
 Or run specific test(s):
 
 ```sh
-tox run -e unit -- tests/test_charm.py::TestCharm::test_install
+tox -e unit -- tests/test_charm.py::TestCharm::test_install
 ```
 
 ### Run integration tests
 
 ```sh
-tox run -e integration
+tox -e integration
 ```
 
 The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
 
 ```sh
-LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox run -e integration
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 ```
 
 ### Lint code
 
 ```sh
-tox run -e lint
+tox -e lint
 ```
 
 ### Format code
 
 ```sh
-tox run -e fmt
+tox -e fmt
 ```
