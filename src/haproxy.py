@@ -31,10 +31,13 @@ HTTP_SERVICE = Service(
         "timeout server 300000",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
+        # HTTP-only services
         "acl ping path_beg -i /ping",
         "acl repository path_beg -i /repository",
         "use_backend landscape-ping if ping",
+        # TODO allow the HTTPS redirect to be configured
         "redirect scheme https unless ping OR repository",
+        # Other services, typically HTTPs.
         "acl message path_beg -i /message-system",
         "acl attachment path_beg -i /attachment",
         "acl api path_beg -i /api",
@@ -48,6 +51,7 @@ HTTP_SERVICE = Service(
         "acl package-upload path_beg -i /upload",
         "use_backend landscape-package-upload if package-upload",
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
+        # metrics
         "acl metrics path_end /metrics",
         "http-request deny if metrics",
     ],
@@ -65,6 +69,7 @@ HTTPS_SERVICE = Service(
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
+        # HTTPs services
         "acl message path_beg -i /message-system",
         "acl attachment path_beg -i /attachment",
         "acl api path_beg -i /api",
@@ -78,6 +83,7 @@ HTTPS_SERVICE = Service(
         "acl package-upload path_beg -i /upload",
         "use_backend landscape-package-upload if package-upload",
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
+        # metrics
         "acl metrics path_end /metrics",
         "http-request deny if metrics",
         "acl prometheus_metrics path_beg -i /metrics",
@@ -99,6 +105,7 @@ UBUNTU_INSTALLER_ATTACH_SERVICE = Service(
     service_port=50051,
     server_options=["proto h2"],
     service_options=[
+        # The X-FQDN header is required for multitenant installations
         "acl host_found hdr(host) -m found",
         "http-request set-var(req.full_fqdn) hdr(authority) if !host_found",
         "http-request set-var(req.full_fqdn) hdr(host) if host_found",
