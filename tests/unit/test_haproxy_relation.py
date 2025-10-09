@@ -14,6 +14,8 @@ from haproxy import (
     create_https_service,
     create_ubuntu_installer_attach_service,
     HAProxyErrorFile,
+    HTTPBackend,
+    HTTPSBackend,
     RedirectKeyword,
 )
 
@@ -224,7 +226,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
         self.assertIn(
             {
-                "backend_name": "landscape-http-ping",
+                "backend_name": f"{HTTPBackend.PING}",
                 "servers": [
                     (
                         "landscape-pingserver-unitname-0",
@@ -257,7 +259,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-ping",
+            "backend_name": f"{HTTPBackend.PING}",
             "servers": [
                 (
                     f"landscape-pingserver-unitname-{i}",
@@ -349,7 +351,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-api",
+            "backend_name": f"{HTTPBackend.API}",
             "servers": [
                 (
                     f"landscape-api-{unitname}-0",
@@ -382,7 +384,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-api",
+            "backend_name": f"{HTTPBackend.API}",
             "servers": [
                 (
                     f"landscape-api-{unitname}-{i}",
@@ -415,7 +417,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-message",
+            "backend_name": f"{HTTPBackend.MESSAGE}",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-0",
@@ -448,7 +450,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-message",
+            "backend_name": f"{HTTPBackend.MESSAGE}",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-{i}",
@@ -464,7 +466,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
     def test_package_upload_backend(self):
         """
-        Creates a landscape-http-package-upload backend if the unit is the leader.
+        Creates a landscape-package-upload backend if the unit is the leader.
         """
         server_ip = "10.194.61.5"
         unitname = "unitname"
@@ -481,7 +483,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-package-upload",
+            "backend_name": f"{HTTPBackend.PACKAGE_UPLOAD}",
             "servers": [
                 (
                     f"landscape-package-upload-{unitname}-0",
@@ -496,7 +498,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
     def test_no_package_upload_on_nonleader(self):
         """
-        Does not create a landscape-http-package-upload backend if the unit is not the
+        Does not create a landscape-package-upload backend if the unit is not the
         leader.
         """
         service = create_http_service(
@@ -511,7 +513,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-package-upload",
+            "backend_name": f"{HTTPBackend.PACKAGE_UPLOAD}",
             "servers": [],
         }
 
@@ -538,7 +540,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-hashid-databases",
+            "backend_name": f"{HTTPBackend.HASHIDS}",
             "servers": [
                 (
                     f"landscape-appserver-{unitname}-0",
@@ -568,7 +570,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-http-hashid-databases",
+            "backend_name": f"{HTTPBackend.HASHIDS}",
             "servers": [],
         }
 
@@ -769,7 +771,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-api",
+            "backend_name": f"{HTTPSBackend.API}",
             "servers": [
                 (
                     f"landscape-api-{unitname}-0",
@@ -803,7 +805,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-api",
+            "backend_name": f"{HTTPSBackend.API}",
             "servers": [
                 (
                     f"landscape-api-{unitname}-{i}",
@@ -837,7 +839,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-ping",
+            "backend_name": f"{HTTPSBackend.PING}",
             "servers": [
                 (
                     f"landscape-pingserver-{unitname}-0",
@@ -871,7 +873,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-ping",
+            "backend_name": f"{HTTPSBackend.PING}",
             "servers": [
                 (
                     f"landscape-pingserver-{unitname}-{i}",
@@ -905,7 +907,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-message",
+            "backend_name": f"{HTTPSBackend.MESSAGE}",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-0",
@@ -939,7 +941,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-message",
+            "backend_name": f"{HTTPSBackend.MESSAGE}",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-{i}",
@@ -973,7 +975,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-package-upload",
+            "backend_name": f"{HTTPSBackend.PACKAGE_UPLOAD}",
             "servers": [
                 (
                     f"landscape-package-upload-{unitname}-0",
@@ -1004,7 +1006,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-package-upload",
+            "backend_name": f"{HTTPSBackend.PACKAGE_UPLOAD}",
             "servers": [],
         }
 
@@ -1032,7 +1034,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-hashid-databases",
+            "backend_name": f"{HTTPSBackend.HASHIDS}",
             "servers": [
                 (
                     f"landscape-appserver-{unitname}-0",
@@ -1063,7 +1065,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-https-hashid-databases",
+            "backend_name": f"{HTTPSBackend.HASHIDS}",
             "servers": [],
         }
 

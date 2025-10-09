@@ -27,6 +27,32 @@ class ACL(str, Enum):
         return self.value
 
 
+class HTTPBackend(str, Enum):
+
+    API = "landscape-http-api"
+    HASHIDS = "landscape-http-hashid-databases"
+    MESSAGE = "landscape-http-message"
+    PACKAGE_UPLOAD = "landscape-http-package-upload"
+    PING = "landscape-http-ping"
+    REPOSITORY = "landscape-http-repository"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class HTTPSBackend(str, Enum):
+
+    API = "landscape-https-api"
+    HASHIDS = "landscape-https-hashid-databases"
+    MESSAGE = "landscape-https-message"
+    PACKAGE_UPLOAD = "landscape-https-package-upload"
+    PING = "landscape-https-ping"
+    REPOSITORY = "landscape-https-repository"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class RedirectKeyword(str, Enum):
     """
     Special keywords to redirect all/no routes.
@@ -81,12 +107,12 @@ HTTP_SERVICE = Service(
         # A placeholder for the HTTPS redirect, which is configurable.
         DEFAULT_REDIRECT_SCHEME,
         # Backends
-        "use_backend landscape-message if message",
-        "use_backend landscape-message if attachment",
-        "use_backend landscape-api if api",
-        "use_backend landscape-ping if ping",
-        "use_backend landscape-hashid-databases if hashids",
-        "use_backend landscape-package-upload if package-upload",
+        f"use_backend {HTTPBackend.MESSAGE} if {ACL.MESSAGE}",
+        f"use_backend {HTTPBackend.MESSAGE} if {ACL.ATTACHMENT}",
+        f"use_backend {HTTPBackend.API} if {ACL.API}",
+        f"use_backend {HTTPBackend.PING} if {ACL.PING}",
+        f"use_backend {HTTPBackend.HASHIDS} if {ACL.HASHIDS}",
+        f"use_backend {HTTPBackend.PACKAGE_UPLOAD} if {ACL.PACKAGE_UPLOAD}",
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Metrics
         "acl metrics path_end /metrics",
@@ -117,12 +143,12 @@ HTTPS_SERVICE = Service(
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
         # Backends
-        "use_backend landscape-message if message",
-        "use_backend landscape-message if attachment",
-        "use_backend landscape-api if api",
-        "use_backend landscape-ping if ping",
-        "use_backend landscape-hashid-databases if hashids",
-        "use_backend landscape-package-upload if package-upload",
+        f"use_backend {HTTPSBackend.MESSAGE} if {ACL.MESSAGE}",
+        f"use_backend {HTTPSBackend.MESSAGE} if {ACL.ATTACHMENT}",
+        f"use_backend {HTTPSBackend.API} if {ACL.API}",
+        f"use_backend {HTTPSBackend.PING} if {ACL.PING}",
+        f"use_backend {HTTPSBackend.HASHIDS} if {ACL.HASHIDS}",
+        f"use_backend {HTTPSBackend.PACKAGE_UPLOAD} if {ACL.PACKAGE_UPLOAD}",
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Metrics
         "acl metrics path_end /metrics",
