@@ -54,6 +54,7 @@ from ops.model import (
 import yaml
 
 from haproxy import (
+    ACL,
     create_grpc_service,
     create_http_service,
     create_https_service,
@@ -64,6 +65,7 @@ from haproxy import (
     HTTP_SERVICE,
     HTTPS_SERVICE,
     PORTS,
+    RedirectKeyword,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
 )
@@ -193,6 +195,48 @@ def _get_ssl_cert(ssl_cert, ssl_key):
                 "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
             )
     return ssl_cert
+
+
+class InvalidRedirectHTTPS(Exception):
+    """
+    Raised when an invalid `redirect_https` configuration is provided.
+    """
+
+
+def _get_redirect_https(redirect_https: str) -> list[ACL] | RedirectKeyword:
+    """
+    Validate and return the `redirect_https` configuration parameter.
+
+    Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
+    """
+    split = redirect_https.split(",")
+
+    try:
+        value = RedirectKeyword(split[0])
+        if len(split) > 1:
+            raise InvalidRedirectHTTPS(
+                "Invalid `https_redirect`: 'all' and 'none' cannot be accompanied "
+                "by other keys."
+            )
+        return value
+    except ValueError:
+        pass  # might be ACLs instead of all/none
+    except IndexError:
+        raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
+
+    acls = []
+    errors = []
+    for value in split:
+        try:
+            acls.append(ACL(value))
+        except ValueError:
+            errors.append(value)
+
+    if errors:
+        joined = ",".join(errors)
+        raise InvalidRedirectHTTPS(f"Invalid `https_redirect` keys: {joined}")
+
+    return acls
 
 
 class SSLConfigurationError(Exception):
@@ -881,6 +925,14 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
+        try:
+            redirect_https = _get_redirect_https(
+                str(self.model.config["redirect_https"])
+            )
+        except InvalidRedirectHTTPS as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
+
         error_files = get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
@@ -895,6 +947,7 @@ class LandscapeServerCharm(CharmBase):
             error_files=error_files,
             service_ports=PORTS,
             server_options=SERVER_OPTIONS,
+            redirect_https=redirect_https,
         )
 
         https_service = create_https_service(

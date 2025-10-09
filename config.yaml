@@ -215,3 +215,10 @@ options:
     description: |
       Bypassed Landscape administrator registration approval for clients that
       register using the registration password.
+  redirect_https:
+    type: string
+    default: "api,attachment,hashids,message,package-upload,default"
+    description: |
+      Redirect HTTP requests that match these routes to HTTPS. May be a comma-separated
+      list of routes from {api,attachment,hashids,message,package-upload,ping,
+      repository,default}, or either of the keywords 'none' or 'all'.

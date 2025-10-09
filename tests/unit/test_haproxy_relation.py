@@ -3,15 +3,18 @@ import unittest
 
 from ops.model import BlockedStatus
 from ops.testing import Context, Relation, State, StoredState
+import pytest
 import yaml
 
 from charm import LandscapeServerCharm
 from haproxy import (
+    ACL,
     create_grpc_service,
     create_http_service,
     create_https_service,
     create_ubuntu_installer_attach_service,
     HAProxyErrorFile,
+    RedirectKeyword,
 )
 
 
@@ -1192,3 +1195,171 @@ class TestCreateUbuntuInstallerAttachService(unittest.TestCase):
         ]
 
         self.assertEqual(expected, service["error_files"])
+
+
+def test_no_overlapping_acls_with_keywords():
+    """
+    Ensure that the special keywords "all" and "none" are not used as ACLs.
+    """
+
+    assert not (set(r.value for r in RedirectKeyword) & set(a.value for a in ACL))
+
+
+class TestRedirectHTTPS:
+    """
+    Tests for the effect of the `redirect_https` configuration parameter on the
+    HAProxy relation.
+    """
+
+    def _get_http_service(self, state: State, relation: Relation) -> dict:
+        """
+        Helper to get the HTTP service configuration.
+        """
+        haproxy_unit_data = state.get_relation(relation.id).local_unit_data
+        raw_services = haproxy_unit_data.get("services")
+        assert (
+            raw_services is not None
+        ), f"No 'services' in HAProxy unit data: {haproxy_unit_data}"
+
+        services = yaml.safe_load(raw_services)
+        for service in services:
+            if service["service_name"] == "landscape-http":
+                return service
+
+        raise Exception("No landscape-http service")
+
+    def test_none(self):
+        """
+        If `redirect_https=none`, the redirect stanza does not appear in the HTTP
+        service configuration. The commented-out placeholder appears instead.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website",
+            remote_units_data={0: {"public-address": "https://haproxy.test"}},
+        )
+        state_in = State(
+            config={"redirect_https": "none"},
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        http_service = self._get_http_service(state_out, relation)
+        assert not any(
+            "redirect scheme https" in stanza
+            for stanza in http_service["service_options"]
+        )
+        assert "# No HTTPS redirect" in http_service["service_options"]
+
+    def test_all(self):
+        """
+        If `redirect_https=all`, the redirect stanza appears and does not list any
+        conditional ACLs.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website",
+            remote_units_data={0: {"public-address": "https://haproxy.test"}},
+        )
+        state_in = State(
+            config={"redirect_https": "all"},
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        http_service = self._get_http_service(state_out, relation)
+        assert "redirect scheme https" in http_service["service_options"]
+
+    @pytest.mark.parametrize(
+        "redirect_https,expected_redirect_stanza",
+        [
+            (
+                f"{ACL.API}",
+                f"redirect scheme https if {ACL.API}",
+            ),
+            (
+                f"{ACL.API},{ACL.PING}",
+                f"redirect scheme https if {ACL.API} OR {ACL.PING}",
+            ),
+            (
+                f"{ACL.DEFAULT}",
+                f"redirect scheme https if {ACL.DEFAULT}",
+            ),
+            (
+                f"{ACL.DEFAULT},{ACL.API}",
+                f"redirect scheme https if {ACL.DEFAULT} OR {ACL.API}",
+            ),
+        ],
+    )
+    def test_custom_list(self, redirect_https, expected_redirect_stanza):
+        """
+        If `redirect_https` is set to a valid comma-separated list of ACLs, the ACLs
+        appear in the redirect stanza.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website",
+            remote_units_data={0: {"public-address": "https://haproxy.test"}},
+        )
+        state_in = State(
+            config={"redirect_https": redirect_https},
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        http_service = self._get_http_service(state_out, relation)
+        assert expected_redirect_stanza in http_service["service_options"]
+
+    @pytest.mark.parametrize(
+        "redirect_https",
+        [
+            "none,all",
+            f"none,{ACL.API}",
+            f"all,{ACL.API}",
+            "all,all",
+            "none,none",
+        ],
+    )
+    def test_none_all_exclusive(self, redirect_https):
+        """
+        If `redirect_https` includes `none` or `all`, it cannot include any other
+        values. The configuration will fail if others are provided.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website",
+            remote_units_data={0: {"public-address": "https://haproxy.test"}},
+        )
+        state_in = State(
+            config={"redirect_https": redirect_https},
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        assert isinstance(state_out.unit_status, BlockedStatus)
+
+    @pytest.mark.parametrize(
+        "redirect_https",
+        [
+            "some-fake-acl",
+            "some-fake-acl,another-fake-acl",
+            f"{ACL.API},some-fake-acl",
+            f"{ACL.API};{ACL.HASHIDS}",
+            f"{ACL.API} {ACL.ATTACHMENT}",
+        ],
+    )
+    def test_invalid_acl(self, redirect_https):
+        """
+        If an unrecognized ACL is included in a list, fail the configuration changed
+        hook.
+        """
+        assert "some-fake-acl" not in ACL
+        assert "another-fake-acl" not in ACL
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation(
+            "website",
+            remote_units_data={0: {"public-address": "https://haproxy.test"}},
+        )
+        state_in = State(
+            config={"redirect_https": redirect_https},
+            relations=[relation],
+        )
+        state_out = context.run(context.on.relation_joined(relation), state_in)
+        assert isinstance(state_out.unit_status, BlockedStatus)
