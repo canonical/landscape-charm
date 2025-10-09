@@ -263,23 +263,23 @@ def create_http_service(
     http_service["servers"] = appservers
     http_service["backends"] = [
         {
-            "backend_name": "landscape-ping",
+            "backend_name": "landscape-http-ping",
             "servers": pingservers,
         },
         {
-            "backend_name": "landscape-message",
+            "backend_name": "landscape-http-message",
             "servers": message_servers,
         },
         {
-            "backend_name": "landscape-api",
+            "backend_name": "landscape-http-api",
             "servers": api_servers,
         },
         {
-            "backend_name": "landscape-package-upload",
+            "backend_name": "landscape-http-package-upload",
             "servers": package_upload_servers if is_leader else [],
         },
         {
-            "backend_name": "landscape-hashid-databases",
+            "backend_name": "landscape-http-hashid-databases",
             "servers": appservers if is_leader else [],
         },
     ]
@@ -330,16 +330,53 @@ def create_https_service(
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
     """
-    https_service = create_http_service(
-        http_service=https_service,
-        server_ip=server_ip,
-        unit_name=unit_name,
-        worker_counts=worker_counts,
-        is_leader=is_leader,
-        error_files=error_files,
-        service_ports=service_ports,
-        server_options=server_options,
-    )
+    (appservers, pingservers, message_servers, api_servers) = [
+        [
+            (
+                f"landscape-{name}-{unit_name}-{i}",
+                server_ip,
+                service_ports[name] + i,
+                server_options,
+            )
+            for i in range(worker_counts)
+        ]
+        for name in ("appserver", "pingserver", "message-server", "api")
+    ]
+
+    package_upload_servers = [
+        (
+            f"landscape-package-upload-{unit_name}-0",
+            server_ip,
+            service_ports["package-upload"],
+            server_options,
+        )
+    ]
+
+    https_service["servers"] = appservers
+    https_service["backends"] = [
+        {
+            "backend_name": "landscape-https-ping",
+            "servers": pingservers,
+        },
+        {
+            "backend_name": "landscape-https-message",
+            "servers": message_servers,
+        },
+        {
+            "backend_name": "landscape-https-api",
+            "servers": api_servers,
+        },
+        {
+            "backend_name": "landscape-https-package-upload",
+            "servers": package_upload_servers if is_leader else [],
+        },
+        {
+            "backend_name": "landscape-https-hashid-databases",
+            "servers": appservers if is_leader else [],
+        },
+    ]
+
+    https_service["error_files"] = [asdict(ef) for ef in error_files]
     https_service["crts"] = [ssl_cert]
     return https_service
 

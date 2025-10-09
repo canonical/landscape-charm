@@ -224,7 +224,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
         self.assertIn(
             {
-                "backend_name": "landscape-ping",
+                "backend_name": "landscape-http-ping",
                 "servers": [
                     (
                         "landscape-pingserver-unitname-0",
@@ -257,7 +257,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-ping",
+            "backend_name": "landscape-http-ping",
             "servers": [
                 (
                     f"landscape-pingserver-unitname-{i}",
@@ -349,7 +349,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-api",
+            "backend_name": "landscape-http-api",
             "servers": [
                 (
                     f"landscape-api-{unitname}-0",
@@ -382,7 +382,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-api",
+            "backend_name": "landscape-http-api",
             "servers": [
                 (
                     f"landscape-api-{unitname}-{i}",
@@ -415,7 +415,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-message",
+            "backend_name": "landscape-http-message",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-0",
@@ -448,7 +448,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-message",
+            "backend_name": "landscape-http-message",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-{i}",
@@ -464,7 +464,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
     def test_package_upload_backend(self):
         """
-        Creates a landscape-package-upload backend if the unit is the leader.
+        Creates a landscape-http-package-upload backend if the unit is the leader.
         """
         server_ip = "10.194.61.5"
         unitname = "unitname"
@@ -481,7 +481,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-package-upload",
+            "backend_name": "landscape-http-package-upload",
             "servers": [
                 (
                     f"landscape-package-upload-{unitname}-0",
@@ -496,7 +496,7 @@ class TestCreateHTTPService(unittest.TestCase):
 
     def test_no_package_upload_on_nonleader(self):
         """
-        Does not create a landscape-package-upload backend if the unit is not the
+        Does not create a landscape-http-package-upload backend if the unit is not the
         leader.
         """
         service = create_http_service(
@@ -511,7 +511,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-package-upload",
+            "backend_name": "landscape-http-package-upload",
             "servers": [],
         }
 
@@ -538,7 +538,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-hashid-databases",
+            "backend_name": "landscape-http-hashid-databases",
             "servers": [
                 (
                     f"landscape-appserver-{unitname}-0",
@@ -568,7 +568,7 @@ class TestCreateHTTPService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-hashid-databases",
+            "backend_name": "landscape-http-hashid-databases",
             "servers": [],
         }
 
@@ -769,7 +769,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-api",
+            "backend_name": "landscape-https-api",
             "servers": [
                 (
                     f"landscape-api-{unitname}-0",
@@ -803,12 +803,80 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-api",
+            "backend_name": "landscape-https-api",
             "servers": [
                 (
                     f"landscape-api-{unitname}-{i}",
                     server_ip,
                     self.api_port + i,
+                    self.server_options,
+                )
+                for i in range(workers)
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_pingserver_backend(self):
+        """
+        Creates a landscape-ping backend.
+        """
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = create_https_service(
+            https_service=self.https_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=1,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-https-ping",
+            "servers": [
+                (
+                    f"landscape-pingserver-{unitname}-0",
+                    server_ip,
+                    self.pingserver_port,
+                    self.server_options,
+                )
+            ],
+        }
+
+        self.assertIn(expected, service["backends"])
+
+    def test_pingserver_workers(self):
+        """
+        Creates an landscape-ping backend for each worker, incrementing the port by 1.
+        """
+        workers = 3
+        server_ip = "10.194.61.5"
+        unitname = "unitname"
+
+        service = create_https_service(
+            https_service=self.https_service,
+            ssl_cert="",
+            server_ip=server_ip,
+            unit_name=unitname,
+            worker_counts=workers,
+            is_leader=True,
+            error_files=(),
+            service_ports=self.service_ports,
+            server_options=self.server_options,
+        )
+
+        expected = {
+            "backend_name": "landscape-https-ping",
+            "servers": [
+                (
+                    f"landscape-pingserver-{unitname}-{i}",
+                    server_ip,
+                    self.pingserver_port + i,
                     self.server_options,
                 )
                 for i in range(workers)
@@ -837,7 +905,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-message",
+            "backend_name": "landscape-https-message",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-0",
@@ -871,7 +939,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-message",
+            "backend_name": "landscape-https-message",
             "servers": [
                 (
                     f"landscape-message-server-{unitname}-{i}",
@@ -905,7 +973,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-package-upload",
+            "backend_name": "landscape-https-package-upload",
             "servers": [
                 (
                     f"landscape-package-upload-{unitname}-0",
@@ -936,7 +1004,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-package-upload",
+            "backend_name": "landscape-https-package-upload",
             "servers": [],
         }
 
@@ -964,7 +1032,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-hashid-databases",
+            "backend_name": "landscape-https-hashid-databases",
             "servers": [
                 (
                     f"landscape-appserver-{unitname}-0",
@@ -995,7 +1063,7 @@ class TestCreateHTTPSService(unittest.TestCase):
         )
 
         expected = {
-            "backend_name": "landscape-hashid-databases",
+            "backend_name": "landscape-https-hashid-databases",
             "servers": [],
         }
 
