@@ -45,6 +45,6 @@ def get_haproxy_error_files():
     environment.
     """
 
-    with patch("charm._get_haproxy_error_files") as m:
+    with patch("charm.get_haproxy_error_files") as m:
         m.return_value = ()
         yield m

@@ -13,12 +13,12 @@ develop a new k8s charm using the Operator Framework:
 """
 
 from base64 import b64decode, b64encode, binascii
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from functools import cached_property
 import os
 import subprocess
 from subprocess import CalledProcessError, check_call
-from typing import Iterable, List, Mapping
+from typing import List
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
@@ -53,6 +53,20 @@ from ops.model import (
 )
 import yaml
 
+from haproxy import (
+    create_grpc_service,
+    create_http_service,
+    create_https_service,
+    create_ubuntu_installer_attach_service,
+    ERROR_FILES,
+    get_haproxy_error_files,
+    GRPC_SERVICE,
+    HTTP_SERVICE,
+    HTTPS_SERVICE,
+    PORTS,
+    SERVER_OPTIONS,
+    UBUNTU_INSTALLER_ATTACH_SERVICE,
+)
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -72,7 +86,6 @@ from settings_files import (
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
-HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "haproxy-config.yaml")
 LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
@@ -180,272 +193,6 @@ def _get_ssl_cert(ssl_cert, ssl_key):
                 "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
             )
     return ssl_cert
-
-
-def _get_haproxy_config() -> dict:
-    with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-        haproxy_config = yaml.safe_load(haproxy_config_file)
-
-    return haproxy_config
-
-
-# NOTE: See https://charmhub.io/haproxy/configurations#services for details on
-# the format of HAProxy service configurations.
-
-
-def _create_http_service(
-    http_service: dict,
-    server_ip: str,
-    unit_name: str,
-    worker_counts: int,
-    is_leader: bool,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-):
-    """
-    Create the Landscape HTTP `services` configurations for HAProxy.
-    """
-
-    (appservers, pingservers, message_servers, api_servers) = [
-        [
-            (
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                service_ports[name] + i,
-                server_options,
-            )
-            for i in range(worker_counts)
-        ]
-        for name in ("appserver", "pingserver", "message-server", "api")
-    ]
-
-    package_upload_servers = [
-        (
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            service_ports["package-upload"],
-            server_options,
-        )
-    ]
-
-    http_service["servers"] = appservers
-    http_service["backends"] = [
-        {
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        },
-        {
-            "backend_name": "landscape-message",
-            "servers": message_servers,
-        },
-        {
-            "backend_name": "landscape-api",
-            "servers": api_servers,
-        },
-        {
-            "backend_name": "landscape-package-upload",
-            "servers": package_upload_servers if is_leader else [],
-        },
-        {
-            "backend_name": "landscape-hashid-databases",
-            "servers": appservers if is_leader else [],
-        },
-    ]
-
-    http_service["error_files"] = [asdict(ef) for ef in error_files]
-
-    return http_service
-
-
-def _create_https_service(
-    https_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    worker_counts: int,
-    is_leader: bool,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-):
-    """
-    Create the Landscape HTTPS `services` configurations for HAProxy.
-    """
-
-    https_service["crts"] = [ssl_cert]
-
-    (appservers, pingservers, message_servers, api_servers) = [
-        [
-            (
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                service_ports[name] + i,
-                server_options,
-            )
-            for i in range(worker_counts)
-        ]
-        for name in ("appserver", "pingserver", "message-server", "api")
-    ]
-
-    # There should only ever be one package-upload-server service.
-    package_upload_servers = [
-        (
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            service_ports["package-upload"],
-            server_options,
-        )
-    ]
-
-    https_service["servers"] = appservers
-    https_service["backends"] = [
-        {
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        },
-        {
-            "backend_name": "landscape-message",
-            "servers": message_servers,
-        },
-        {
-            "backend_name": "landscape-api",
-            "servers": api_servers,
-        },
-        # Only the leader should have servers for the landscape-package-upload
-        # and landscape-hashid-databases backends. However, when the leader
-        # is lost, haproxy will fail as the service options will reference
-        # a (no longer) existing backend. To prevent that, all units should
-        # declare all backends, even if a unit should not have any servers on
-        # a specific backend.
-        {
-            "backend_name": "landscape-package-upload",
-            "servers": package_upload_servers if is_leader else [],
-        },
-        {
-            "backend_name": "landscape-hashid-databases",
-            "servers": appservers if is_leader else [],
-        },
-    ]
-
-    https_service["error_files"] = [asdict(ef) for ef in error_files]
-
-    return https_service
-
-
-def _create_grpc_service(
-    grpc_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-):
-    """
-    Create the Landscape WSL hostagent `services` configuration for HAProxy.
-    """
-
-    grpc_service["crts"] = [ssl_cert]
-    hostagent_messenger = [
-        (
-            f"landscape-hostagent-messenger-{unit_name}-0",
-            server_ip,
-            service_ports["hostagent-messenger"],
-            server_options + grpc_service["server_options"],
-        )
-    ]
-    grpc_service["servers"] = hostagent_messenger
-    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
-
-    return grpc_service
-
-
-def _create_ubuntu_installer_attach_service(
-    ubuntu_installer_attach_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-):
-    """
-    Create the Landscape Ubuntu installer attach `services` configuration for HAProxy.
-    """
-
-    ubuntu_installer_attach_service["crts"] = [ssl_cert]
-    ubuntu_installer_attach_server = [
-        (
-            f"landscape-ubuntu-installer-attach-{unit_name}-0",
-            server_ip,
-            service_ports["ubuntu-installer-attach"],
-            server_options + ubuntu_installer_attach_service["server_options"],
-        )
-    ]
-    ubuntu_installer_attach_service["servers"] = ubuntu_installer_attach_server
-    ubuntu_installer_attach_service["error_files"] = [asdict(ef) for ef in error_files]
-
-    return ubuntu_installer_attach_service
-
-
-@dataclass
-class HAProxyErrorFile:
-    """
-    Configuration for HAProxy error files
-    """
-
-    http_status: int
-    """The status code the error file should handle."""
-    content: bytes
-    """The b64-encoded content of the error file."""
-
-
-def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
-    error_files_location = haproxy_config["error_files"]["location"]
-    error_files = []
-    for code, filename in haproxy_config["error_files"]["files"].items():
-        error_file_path = os.path.join(error_files_location, filename)
-        with open(error_file_path, "rb") as error_file:
-            error_files.append(
-                HAProxyErrorFile(
-                    http_status=code,
-                    content=b64encode(error_file.read()),
-                )
-            )
-
-    return error_files
-
-
-HAProxyServicePorts = Mapping[str, int]
-"""
-Configuration for the ports that Landscape services run on.
-
-Expects the following keys:
-- appserver
-- pingserver
-- message-server
-- api
-- package-upload
-- hostagent-messenger
-- ubuntu-installer-attach
-
-Each value is the port that service runs on.
-"""
-
-
-def _get_haproxy_service_ports(haproxy_config: dict) -> HAProxyServicePorts:
-    return haproxy_config["ports"]
-
-
-HAProxyServerOptions = list[str]
-"""
-Additional configuration for a `server` stanza in an HAProxy configuration.
-"""
-
-
-def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
-    return haproxy_config["server_options"]
 
 
 class SSLConfigurationError(Exception):
@@ -1134,62 +881,58 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
-        haproxy_config = _get_haproxy_config()
-        error_files = _get_haproxy_error_files(haproxy_config)
-        service_ports = _get_haproxy_service_ports(haproxy_config)
-        server_options = _get_haproxy_server_options(haproxy_config)
-
+        error_files = get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
         worker_counts = int(self.model.config["worker_counts"])
 
-        http_service = _create_http_service(
-            http_service=haproxy_config["http_service"],
+        http_service = create_http_service(
+            http_service=asdict(HTTP_SERVICE),
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
-        https_service = _create_https_service(
-            https_service=haproxy_config["https_service"],
+        https_service = create_https_service(
+            https_service=asdict(HTTPS_SERVICE),
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
-        grpc_service = _create_grpc_service(
-            grpc_service=haproxy_config["grpc_service"],
+        grpc_service = create_grpc_service(
+            grpc_service=asdict(GRPC_SERVICE),
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
             error_files=error_files,
-            service_ports=service_ports,
-            server_options=server_options,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
         services = [http_service, https_service, grpc_service]
 
         if self._stored.enable_ubuntu_installer_attach:
             services.append(
-                _create_ubuntu_installer_attach_service(
-                    ubuntu_installer_attach_service=haproxy_config[
-                        "ubuntu_installer_attach_service"
-                    ],
+                create_ubuntu_installer_attach_service(
+                    ubuntu_installer_attach_service=asdict(
+                        UBUNTU_INSTALLER_ATTACH_SERVICE
+                    ),
                     ssl_cert=ssl_cert,
                     server_ip=server_ip,
                     unit_name=unit_name,
                     error_files=error_files,
-                    service_ports=service_ports,
-                    server_options=server_options,
+                    service_ports=PORTS,
+                    server_options=SERVER_OPTIONS,
                 )
             )
 
