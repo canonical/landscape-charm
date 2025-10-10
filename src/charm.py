@@ -54,7 +54,6 @@ from ops.model import (
 import yaml
 
 from haproxy import (
-    ACL,
     create_grpc_service,
     create_http_service,
     create_https_service,
@@ -65,7 +64,7 @@ from haproxy import (
     HTTP_SERVICE,
     HTTPS_SERVICE,
     PORTS,
-    RedirectKeyword,
+    RedirectHTTPS,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
 )
@@ -203,40 +202,16 @@ class InvalidRedirectHTTPS(Exception):
     """
 
 
-def _get_redirect_https(redirect_https: str) -> list[ACL] | RedirectKeyword:
+def _get_redirect_https(redirect_https: str) -> RedirectHTTPS:
     """
     Validate and return the `redirect_https` configuration parameter.
 
     Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
     """
-    split = redirect_https.split(",")
-
     try:
-        value = RedirectKeyword(split[0])
-        if len(split) > 1:
-            raise InvalidRedirectHTTPS(
-                "Invalid `https_redirect`: 'all' and 'none' cannot be accompanied "
-                "by other keys."
-            )
-        return value
+        return RedirectHTTPS(redirect_https)
     except ValueError:
-        pass  # might be ACLs instead of all/none
-    except IndexError:
         raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
-
-    acls = []
-    errors = []
-    for value in split:
-        try:
-            acls.append(ACL(value))
-        except ValueError:
-            errors.append(value)
-
-    if errors:
-        joined = ",".join(errors)
-        raise InvalidRedirectHTTPS(f"Invalid `https_redirect` keys: {joined}")
-
-    return acls
 
 
 class SSLConfigurationError(Exception):

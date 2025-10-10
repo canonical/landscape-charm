@@ -8,15 +8,15 @@ import yaml
 
 from charm import LandscapeServerCharm
 from haproxy import (
-    ACL,
     create_grpc_service,
     create_http_service,
     create_https_service,
     create_ubuntu_installer_attach_service,
+    DEFAULT_REDIRECT_SCHEME,
     HAProxyErrorFile,
     HTTPBackend,
     HTTPSBackend,
-    RedirectKeyword,
+    RedirectHTTPS,
 )
 
 
@@ -1267,14 +1267,6 @@ class TestCreateUbuntuInstallerAttachService(unittest.TestCase):
         self.assertEqual(expected, service["error_files"])
 
 
-def test_no_overlapping_acls_with_keywords():
-    """
-    Ensure that the special keywords "all" and "none" are not used as ACLs.
-    """
-
-    assert not (set(r.value for r in RedirectKeyword) & set(a.value for a in ACL))
-
-
 class TestRedirectHTTPS:
     """
     Tests for the effect of the `redirect_https` configuration parameter on the
@@ -1338,31 +1330,10 @@ class TestRedirectHTTPS:
         http_service = self._get_http_service(state_out, relation)
         assert "redirect scheme https" in http_service["service_options"]
 
-    @pytest.mark.parametrize(
-        "redirect_https,expected_redirect_stanza",
-        [
-            (
-                f"{ACL.API}",
-                f"redirect scheme https if {ACL.API}",
-            ),
-            (
-                f"{ACL.API},{ACL.PING}",
-                f"redirect scheme https if {ACL.API} OR {ACL.PING}",
-            ),
-            (
-                f"{ACL.DEFAULT}",
-                f"redirect scheme https if {ACL.DEFAULT}",
-            ),
-            (
-                f"{ACL.DEFAULT},{ACL.API}",
-                f"redirect scheme https if {ACL.DEFAULT} OR {ACL.API}",
-            ),
-        ],
-    )
-    def test_custom_list(self, redirect_https, expected_redirect_stanza):
+    def test_default(self):
         """
-        If `redirect_https` is set to a valid comma-separated list of ACLs, the ACLs
-        appear in the redirect stanza.
+        If `redirect_https=default`, the redirect stanza appears and includes only
+        ping and repository.
         """
         context = Context(LandscapeServerCharm)
         relation = Relation(
@@ -1370,57 +1341,24 @@ class TestRedirectHTTPS:
             remote_units_data={0: {"public-address": "https://haproxy.test"}},
         )
         state_in = State(
-            config={"redirect_https": redirect_https},
+            config={"redirect_https": "default"},
             relations=[relation],
         )
         state_out = context.run(context.on.relation_joined(relation), state_in)
         http_service = self._get_http_service(state_out, relation)
-        assert expected_redirect_stanza in http_service["service_options"]
+        assert DEFAULT_REDIRECT_SCHEME in http_service["service_options"]
 
     @pytest.mark.parametrize(
         "redirect_https",
-        [
-            "none,all",
-            f"none,{ACL.API}",
-            f"all,{ACL.API}",
-            "all,all",
-            "none,none",
-        ],
+        ["some-fake-redirect-config", "another-fake-redirect-config"],
     )
-    def test_none_all_exclusive(self, redirect_https):
-        """
-        If `redirect_https` includes `none` or `all`, it cannot include any other
-        values. The configuration will fail if others are provided.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation(
-            "website",
-            remote_units_data={0: {"public-address": "https://haproxy.test"}},
-        )
-        state_in = State(
-            config={"redirect_https": redirect_https},
-            relations=[relation],
-        )
-        state_out = context.run(context.on.relation_joined(relation), state_in)
-        assert isinstance(state_out.unit_status, BlockedStatus)
-
-    @pytest.mark.parametrize(
-        "redirect_https",
-        [
-            "some-fake-acl",
-            "some-fake-acl,another-fake-acl",
-            f"{ACL.API},some-fake-acl",
-            f"{ACL.API};{ACL.HASHIDS}",
-            f"{ACL.API} {ACL.ATTACHMENT}",
-        ],
-    )
-    def test_invalid_acl(self, redirect_https):
+    def test_invalid_redirect_https(self, redirect_https):
         """
         If an unrecognized ACL is included in a list, fail the configuration changed
-        hook.
+        hook. The message includes the invalid configuration value.
         """
-        assert "some-fake-acl" not in ACL
-        assert "another-fake-acl" not in ACL
+        assert "some-fake-redirect-config" not in RedirectHTTPS
+        assert "another-fake-redirect-config" not in RedirectHTTPS
 
         context = Context(LandscapeServerCharm)
         relation = Relation(
@@ -1433,3 +1371,4 @@ class TestRedirectHTTPS:
         )
         state_out = context.run(context.on.relation_joined(relation), state_in)
         assert isinstance(state_out.unit_status, BlockedStatus)
+        assert redirect_https in state_out.unit_status.message

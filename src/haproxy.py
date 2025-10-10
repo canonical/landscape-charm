@@ -21,7 +21,6 @@ class ACL(str, Enum):
     PACKAGE_UPLOAD = "package-upload"
     PING = "ping"
     REPOSITORY = "repository"
-    DEFAULT = "default"  # special case ACL for default route; not a "real" ACL.
 
     def __str__(self) -> str:
         return self.value
@@ -53,20 +52,14 @@ class HTTPSBackend(str, Enum):
         return self.value
 
 
-class RedirectKeyword(str, Enum):
+class RedirectHTTPS(str, Enum):
     """
-    Special keywords to redirect all/no routes.
+    Keywords to specify which HTTP routes should be redirected to HTTPS.
     """
 
     ALL = "all"
     NONE = "none"
-
-
-_default_acl_condition = " ".join(f"!{acl}" for acl in ACL if acl != ACL.DEFAULT)
-"""
-The default ACL is the negation of all other ACLs; this is necessary to allow
-users to selectively redirect the default route to HTTPS.
-"""
+    DEFAULT = "default"
 
 
 @dataclass(frozen=True)
@@ -103,9 +96,10 @@ HTTP_SERVICE = Service(
         f"acl {ACL.API} path_beg -i /api",
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
-        f"acl {ACL.DEFAULT} {_default_acl_condition}",
-        # A placeholder for the HTTPS redirect, which is configurable.
+        # A default for the HTTPS redirect, which is configurable.
         DEFAULT_REDIRECT_SCHEME,
+        # Rewrite rules:
+        "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Backends
         f"use_backend {HTTPBackend.MESSAGE} if {ACL.MESSAGE}",
         f"use_backend {HTTPBackend.MESSAGE} if {ACL.ATTACHMENT}",
@@ -113,7 +107,6 @@ HTTP_SERVICE = Service(
         f"use_backend {HTTPBackend.PING} if {ACL.PING}",
         f"use_backend {HTTPBackend.HASHIDS} if {ACL.HASHIDS}",
         f"use_backend {HTTPBackend.PACKAGE_UPLOAD} if {ACL.PACKAGE_UPLOAD}",
-        "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Metrics
         "acl metrics path_end /metrics",
         "http-request deny if metrics",
@@ -142,6 +135,8 @@ HTTPS_SERVICE = Service(
         f"acl {ACL.API} path_beg -i /api",
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
+        # Rewrite rules:
+        "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Backends
         f"use_backend {HTTPSBackend.MESSAGE} if {ACL.MESSAGE}",
         f"use_backend {HTTPSBackend.MESSAGE} if {ACL.ATTACHMENT}",
@@ -149,7 +144,6 @@ HTTPS_SERVICE = Service(
         f"use_backend {HTTPSBackend.PING} if {ACL.PING}",
         f"use_backend {HTTPSBackend.HASHIDS} if {ACL.HASHIDS}",
         f"use_backend {HTTPSBackend.PACKAGE_UPLOAD} if {ACL.PACKAGE_UPLOAD}",
-        "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Metrics
         "acl metrics path_end /metrics",
         "http-request deny if metrics",
@@ -259,7 +253,7 @@ def create_http_service(
     error_files: Iterable["HAProxyErrorFile"],
     service_ports: "HAProxyServicePorts",
     server_options: "HAProxyServerOptions",
-    redirect_https: list[ACL] | RedirectKeyword | None = None,
+    redirect_https: RedirectHTTPS | None = None,
 ) -> dict:
     """
     Create the Landscape HTTP `services` configurations for HAProxy.
@@ -313,32 +307,39 @@ def create_http_service(
     http_service["error_files"] = [asdict(ef) for ef in error_files]
 
     if redirect_https:
-        http_service = _configure_redirect_https(http_service, redirect_https)
+        _configure_redirect_https(http_service, redirect_https)
 
     return http_service
 
 
 def _configure_redirect_https(
     http_service: dict,
-    redirect_https: list[ACL] | RedirectKeyword,
+    redirect_https: RedirectHTTPS,
+    marker_stanza: str = DEFAULT_REDIRECT_SCHEME,
 ) -> dict:
     """
-    Configure the routes that should redirect to HTTPS.
+    Configure the HTTP routes that should redirect to HTTPS.
+
+    Requieres the presence of a `marker_stanza` in the `http_service` to
+    identify the stanza to reconfigure.
     """
-    try:
-        index = http_service["service_options"].index(DEFAULT_REDIRECT_SCHEME)
-    except ValueError:
-        raise Exception("Redirect scheme not found; cannot configure `redirect_https`.")
     match redirect_https:
-        case RedirectKeyword.ALL:
+        case RedirectHTTPS.ALL:
             stanza = "redirect scheme https"
-        case RedirectKeyword.NONE:
-            stanza = "# No HTTPS redirect"
-        case list() as acls:
-            joined = " OR ".join(acls)
-            stanza = f"redirect scheme https if {joined}"
+        case RedirectHTTPS.NONE:
+            stanza = "# No HTTPS redirect"  # use an HAProxy comment for 'no redirect'
+        case RedirectHTTPS.DEFAULT:
+            stanza = DEFAULT_REDIRECT_SCHEME
+
+    try:
+        index = http_service["service_options"].index(marker_stanza)
+    except ValueError:
+        raise Exception(
+            f"No '{marker_stanza}' found in service; cannot configure redirect."
+        )
 
     http_service["service_options"][index] = stanza
+
     return http_service
 
 
