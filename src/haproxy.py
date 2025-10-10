@@ -326,7 +326,7 @@ def _configure_redirect_https(
     """
     Configure the HTTP routes that should redirect to HTTPS.
 
-    Requieres the presence of a `marker_stanza` in the `http_service` to
+    Requires the presence of a `marker_stanza` in the `http_service` to
     identify the stanza to reconfigure.
     """
     match redirect_https:
