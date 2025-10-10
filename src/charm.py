@@ -353,7 +353,20 @@ class LandscapeServerCharm(CharmBase):
         ]
 
     def _on_config_changed(self, _) -> None:
+        """
+        Handle configuration changes.
+        """
         prev_status = self.unit.status
+
+        try:
+            # Validate the config
+            raw_redirect_https = str(self.model.config["redirect_https"])
+            _get_redirect_https(raw_redirect_https)
+        except InvalidRedirectHTTPS as e:
+            # TODO Should be "blocked" eventually, but this causes the charm to be
+            # stuck in the "blocked" state permanently.
+            self.unit.status = MaintenanceStatus(str(e))
+            return
 
         # Update additional configuration
         deployment_mode = self.model.config.get("deployment_mode")
