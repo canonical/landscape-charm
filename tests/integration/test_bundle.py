@@ -7,7 +7,10 @@ does not currently bind to IPv6.
 """
 
 import jubilant
+import pytest
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
@@ -30,56 +33,134 @@ def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
             assert requests.get(url, verify=False).status_code == 403
 
 
-def test_pingserver_routing(juju: jubilant.Juju, bundle: None):
+def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
     """
-    HAProxy correctly routes pingserver requests to the pingserver backend.
+    If `redirect_https=all`, then redirect all HTTP requests on all routes to HTTPS.
+    """
+    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    juju.config("landscape-server", values={"redirect_https": "all"})
+    juju.wait(jubilant.all_active, timeout=10.0)
 
-    Pingserver runs over HTTPS and HTTP.
+    redirect_routes = (
+        "",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    for route in redirect_routes:
+
+        assert requests.get(
+            f"http://{host}/{route}",
+            allow_redirects=False,
+        ).is_redirect
+
+
+def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
+    """
+    If `redirect_https=none`, then do not redirect any HTTP requests on any routes
+    to HTTPS.
+    """
+    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    juju.config("landscape-server", values={"redirect_https": "none"})
+    juju.wait(jubilant.all_active, timeout=10.0)
+
+    no_redirect_routes = (
+        "",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    for route in no_redirect_routes:
+
+        assert not requests.get(
+            f"http://{host}/{route}",
+            allow_redirects=False,
+        ).is_redirect
+
+
+def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
+    """
+    If `redirect_https=default`, then redirect all HTTP requests except for those to the
+    /repository and /ping routes to HTTPS.
+    """
+    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    juju.config("landscape-server", values={"redirect_https": "default"})
+    juju.wait(jubilant.all_active, timeout=10.0)
+
+    no_redirect_routes = (
+        "ping",
+        "repository",
+    )
+    for route in no_redirect_routes:
+
+        assert not requests.get(
+            f"http://{host}/{route}",
+            allow_redirects=False,
+        ).is_redirect
+
+    redirect_routes = (
+        "",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "message-system",
+        "upload",
+        "zzz-some-default-route",
+    )
+    for route in redirect_routes:
+
+        assert requests.get(
+            f"http://{host}/{route}",
+            allow_redirects=False,
+        ).is_redirect
+
+
+@pytest.mark.parametrize("route", ["ping", "api/about", "message-system", ""])
+def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
+    """
+    Services are responding over HTTPS.
     """
     host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
 
-    for scheme in ("http", "https"):
-        url = f"{scheme}://{host}/ping"
-        assert requests.get(url, verify=False, allow_redirects=False).status_code == 200
+    response = get_session().get(f"https://{host}/{route}", verify=False)
+    assert response.status_code == 200
 
 
-def test_message_server_routing(juju: jubilant.Juju, bundle: None):
+def get_session(
+    retries: int = 5,
+    backoff_factor: float = 0.3,
+    status_forcelist: tuple[int, ...] = (503,),
+) -> requests.Session:
     """
-    HAProxy correctly routes message system requests to the message server backend.
+    Create a session that includes retries for 503 statuses.
 
-    Message server runs only on HTTPS by default. HAProxy returns a 302 for HTTP
+    This is useful for HAProxy tests because the HAProxy unit and the Landscape unit
+    can report "ready" in Juju even if Landscape server is not yet ready to serve
     requests.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
 
-    response = requests.get(f"https://{host}/message-system", verify=False)
-    assert response.status_code == 200
-
-    response = requests.get(
-        f"http://{host}/message-system",
-        verify=False,
-        allow_redirects=False,
+    session = requests.Session()
+    strategy = Retry(
+        total=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"),
+        raise_on_status=True,
     )
-    assert response.status_code == 302
 
-
-def test_api_routing(juju: jubilant.Juju, bundle: None):
-    """
-    HAProxy correctly routes API requests to the API backend.
-
-    The API runs only on HTTPS by default. HAProxy returns a 302 for HTTP requests.
-
-    NOTE: the API does not have a `/` route to use as a simple check; use the `/about`
-    endpoint as a stand-in for a health endpoint.
-    """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
-
-    response = requests.get(f"https://{host}/api/about", verify=False)
-    assert response.status_code == 200
-
-    response = requests.get(
-        f"http://{host}/api/about",
-        verify=False,
-        allow_redirects=False,
-    )
-    assert response.status_code == 302
+    adapter = HTTPAdapter(max_retries=strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
