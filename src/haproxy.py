@@ -257,6 +257,12 @@ def create_http_service(
 ) -> dict:
     """
     Create the Landscape HTTP `services` configurations for HAProxy.
+
+    NOTE: Only the leader should have servers for the package-upload and
+    hashid-databases backends. However, when the leader is lost, haproxy will fail as
+    the service options will reference a (no longer) existing backend. To prevent that,
+    all units should declare all backends, even if a unit should not have any servers on
+    a specific backend.
     """
     (appservers, pingservers, message_servers, api_servers) = [
         [
@@ -356,6 +362,12 @@ def create_https_service(
 ) -> dict:
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
+
+    NOTE: Only the leader should have servers for the package-upload and
+    hashid-databases backends. However, when the leader is lost, haproxy will fail as
+    the service options will reference a (no longer) existing backend. To prevent that,
+    all units should declare all backends, even if a unit should not have any servers on
+    a specific backend.
     """
     (appservers, pingservers, message_servers, api_servers) = [
         [

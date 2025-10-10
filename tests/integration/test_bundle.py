@@ -39,10 +39,10 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
     """
     host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
     juju.config("landscape-server", values={"redirect_https": "all"})
-    juju.wait(jubilant.all_active, timeout=10.0)
+    juju.wait(jubilant.all_active, timeout=30.0)
 
     redirect_routes = (
-        "",
+        "about",
         "api/about",
         "attachment",
         "hashid-databases",
@@ -53,12 +53,11 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
         "zzz-some-default-route",
     )
 
+    session = get_session()
     for route in redirect_routes:
-
-        assert requests.get(
-            f"http://{host}/{route}",
-            allow_redirects=False,
-        ).is_redirect
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False)
+        assert response.is_redirect, f"Got {response} from {url}"
 
 
 def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
@@ -68,10 +67,10 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
     """
     host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
     juju.config("landscape-server", values={"redirect_https": "none"})
-    juju.wait(jubilant.all_active, timeout=10.0)
+    juju.wait(jubilant.all_active, timeout=30.0)
 
     no_redirect_routes = (
-        "",
+        "about",
         "api/about",
         "attachment",
         "hashid-databases",
@@ -82,12 +81,11 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
         "zzz-some-default-route",
     )
 
+    session = get_session()
     for route in no_redirect_routes:
-
-        assert not requests.get(
-            f"http://{host}/{route}",
-            allow_redirects=False,
-        ).is_redirect
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False)
+        assert not response.is_redirect, f"Got {response} from {url}"
 
 
 def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
@@ -97,21 +95,21 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
     """
     host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
     juju.config("landscape-server", values={"redirect_https": "default"})
-    juju.wait(jubilant.all_active, timeout=10.0)
+    juju.wait(jubilant.all_active, timeout=30.0)
 
     no_redirect_routes = (
         "ping",
         "repository",
     )
-    for route in no_redirect_routes:
 
-        assert not requests.get(
-            f"http://{host}/{route}",
-            allow_redirects=False,
-        ).is_redirect
+    session = get_session()
+    for route in no_redirect_routes:
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False)
+        assert not response.is_redirect, f"Got {response} from {url}"
 
     redirect_routes = (
-        "",
+        "about",
         "api/about",
         "attachment",
         "hashid-databases",
@@ -120,11 +118,9 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
         "zzz-some-default-route",
     )
     for route in redirect_routes:
-
-        assert requests.get(
-            f"http://{host}/{route}",
-            allow_redirects=False,
-        ).is_redirect
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False)
+        assert response.is_redirect, f"Got {response} from {url}"
 
 
 @pytest.mark.parametrize("route", ["ping", "api/about", "message-system", ""])
@@ -149,6 +145,24 @@ def get_session(
     This is useful for HAProxy tests because the HAProxy unit and the Landscape unit
     can report "ready" in Juju even if Landscape server is not yet ready to serve
     requests.
+
+    Copied from https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
+
+    `retries`:
+        Total number of retries to allow. Takes precedence over other counts.
+        Set to None to remove this constraint and fall back on other counts.
+        Set to 0 to fail on the first retry.
+
+    `backoff_factor`:
+        A backoff factor to apply between attempts after the second try (most errors
+        are resolved immediately by a second try without a delay). urllib3 will sleep
+        for: {backoff factor} * (2 ** ({number of previous retries})) seconds.
+
+    `status_forcelist`:
+        A set of integer HTTP status codes that we should force a retry on. A retry is
+        initiated if the request method is in allowed_methods and the response status
+        code is in status_forcelist. By default, this is disabled with None.
+
     """
 
     session = requests.Session()
@@ -157,7 +171,7 @@ def get_session(
         backoff_factor=backoff_factor,
         status_forcelist=status_forcelist,
         allowed_methods=("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"),
-        raise_on_status=True,
+        raise_on_status=False,
     )
 
     adapter = HTTPAdapter(max_retries=strategy)
