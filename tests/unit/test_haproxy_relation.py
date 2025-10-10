@@ -1357,8 +1357,8 @@ class TestRedirectHTTPS:
         If an unrecognized ACL is included in a list, fail the configuration changed
         hook. The message includes the invalid configuration value.
         """
-        assert "some-fake-redirect-config" not in RedirectHTTPS
-        assert "another-fake-redirect-config" not in RedirectHTTPS
+        assert "some-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
+        assert "another-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
 
         context = Context(LandscapeServerCharm)
         relation = Relation(
