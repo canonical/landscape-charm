@@ -220,4 +220,6 @@ options:
     default: default
     description: |
       Redirect HTTP requests to HTTPS. May be one of {default|all|none}. The 'default'
-      option will redirect all HTTP traffic except for /ping and /repository.
+      option will redirect all HTTP traffic except for /ping and /repository. If an
+      invalid value is provided, the charm will remain in the maintenance status
+      until a valid value is given.
