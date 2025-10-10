@@ -64,6 +64,7 @@ from haproxy import (
     HTTP_SERVICE,
     HTTPS_SERVICE,
     PORTS,
+    RedirectHTTPS,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
 )
@@ -193,6 +194,24 @@ def _get_ssl_cert(ssl_cert, ssl_key):
                 "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
             )
     return ssl_cert
+
+
+class InvalidRedirectHTTPS(Exception):
+    """
+    Raised when an invalid `redirect_https` configuration is provided.
+    """
+
+
+def _get_redirect_https(redirect_https: str) -> RedirectHTTPS:
+    """
+    Validate and return the `redirect_https` configuration parameter.
+
+    Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
+    """
+    try:
+        return RedirectHTTPS(redirect_https)
+    except ValueError:
+        raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
 
 
 class SSLConfigurationError(Exception):
@@ -334,7 +353,20 @@ class LandscapeServerCharm(CharmBase):
         ]
 
     def _on_config_changed(self, _) -> None:
+        """
+        Handle configuration changes.
+        """
         prev_status = self.unit.status
+
+        try:
+            # Validate the config
+            raw_redirect_https = str(self.model.config["redirect_https"])
+            _get_redirect_https(raw_redirect_https)
+        except InvalidRedirectHTTPS as e:
+            # TODO Should be "blocked" eventually, but this causes the charm to be
+            # stuck in the "blocked" state permanently.
+            self.unit.status = MaintenanceStatus(str(e))
+            return
 
         # Update additional configuration
         deployment_mode = self.model.config.get("deployment_mode")
@@ -881,6 +913,14 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
+        try:
+            redirect_https = _get_redirect_https(
+                str(self.model.config["redirect_https"])
+            )
+        except InvalidRedirectHTTPS as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
+
         error_files = get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
@@ -891,9 +931,11 @@ class LandscapeServerCharm(CharmBase):
             server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=worker_counts,
+            is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=PORTS,
             server_options=SERVER_OPTIONS,
+            redirect_https=redirect_https,
         )
 
         https_service = create_https_service(
