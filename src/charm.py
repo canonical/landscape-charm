@@ -53,6 +53,7 @@ from ops.model import (
 )
 import yaml
 
+from config import RedirectHTTPS
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -64,7 +65,6 @@ from haproxy import (
     HTTP_SERVICE,
     HTTPS_SERVICE,
     PORTS,
-    RedirectHTTPS,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
 )

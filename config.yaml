@@ -51,6 +51,7 @@ options:
     description: OpenID-Connect client secret.
   oidc_logout_url:
     type: string
+    default:
     description: |
       OpenID-Connect issuer URL to use to log out of Landscape Servers is.
   root_url:

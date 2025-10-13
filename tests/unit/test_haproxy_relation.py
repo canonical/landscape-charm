@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from charm import LandscapeServerCharm
+from config import RedirectHTTPS
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -16,7 +17,6 @@ from haproxy import (
     HAProxyErrorFile,
     HTTPBackend,
     HTTPSBackend,
-    RedirectHTTPS,
 )
 
 
