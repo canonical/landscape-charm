@@ -368,7 +368,7 @@ class LandscapeServerCharm(CharmBase):
         """
         try:
             self._charm_config = LandscapeCharmConfiguration.validate(self.model.config)
-            self.unit.status = MaintenanceStatus("Configuration validated...")
+            self.unit.status = WaitingStatus("Configuration validated...")
         except ValidationError as e:
             logger.error(f"Invalid configuration: {e.errors()}")
             self.unit.status = BlockedStatus(
@@ -377,82 +377,60 @@ class LandscapeServerCharm(CharmBase):
             return
 
         # Update additional configuration
-        deployment_mode = self.model.config.get("deployment_mode")
-        update_service_conf({"global": {"deployment-mode": deployment_mode}})
+        update_service_conf(
+            {"global": {"deployment-mode": self.charm_config.deployment_mode}}
+        )
+        configure_for_deployment_mode(self.charm_config.deployment_mode)
 
-        configure_for_deployment_mode(deployment_mode)
+        if self.charm_config.additional_service_config:
+            merge_service_conf(self.charm_config.additional_service_config)
 
-        additional_config = self.model.config.get("additional_service_config")
-        if additional_config:
-            merge_service_conf(additional_config)
-
-        # Write the config-provided SSL certificate, if it exists.
-        config_ssl_cert = self.model.config["ssl_cert"]
-
-        if config_ssl_cert != "DEFAULT":
+        if self.charm_config.ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(config_ssl_cert)
+            write_ssl_cert(self.charm_config.ssl_cert)
 
-        # Write the license file, if it exists.
-        license_file = self.model.config.get("license_file")
-        if license_file:
+        if self.charm_config.license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
             write_license_file(
-                license_file, user_exists("landscape").pw_uid, self.root_gid
+                self.charm_config.license_file,
+                user_exists("landscape").pw_uid,
+                self.root_gid,
             )
             self.unit.status = WaitingStatus("Waiting on relations")
 
-        smtp_relay_host = self.model.config.get("smtp_relay_host")
-        if smtp_relay_host:
+        if self.charm_config.smtp_relay_host:
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
-            self._configure_smtp(smtp_relay_host)
+            self._configure_smtp(self.charm_config.smtp_relay_host)
 
         # Update HAProxy relations, if they exist.
-        haproxy_relations = self.model.relations.get("website", [])
-        for relation in haproxy_relations:
+        for relation in self.model.relations.get("website", []):
             self._update_haproxy_connection(relation)
 
-        if any(self.model.config.get(v) for v in OPENID_CONFIG_VALS) and any(
-            self.model.config.get(v) for v in OIDC_CONFIG_VALS
-        ):
-            self.unit.status = BlockedStatus(
-                "OpenID and OIDC configurations are mutually exclusive"
-            )
-        else:
-            self._configure_openid()
-            self._configure_oidc()
-
-        # Update the service.conf
-        root_url = self.model.config.get("root_url")
-        workers = self.model.config["worker_counts"]
+        self._configure_openid()
+        self._configure_oidc()
 
         service_conf_updates = {
-            service: {"workers": str(workers)}
+            service: {"workers": str(self.charm_config.worker_counts)}
             for service in ("landscape", "api", "message-server", "pingserver")
         }
 
-        if root_url:
+        if root_url := self.charm_config.root_url:
             service_conf_updates["global"] = {"root-url": root_url}
             service_conf_updates["api"]["root-url"] = root_url
             service_conf_updates["package-upload"] = {"root-url": root_url}
 
         update_service_conf(service_conf_updates)
 
-        config_host = self.model.config.get("db_host")
-        schema_password = self.model.config.get("db_schema_password")
-        landscape_password = self.model.config.get("db_landscape_password")
-        config_port = self.model.config.get("db_port")
-        config_user = self.model.config.get("db_schema_user")
         db_kargs = {}
-        if config_host:
+        if config_host := self.charm_config.db_host:
             db_kargs["host"] = config_host
-        if schema_password:
+        if schema_password := self.charm_config.db_schema_password:
             db_kargs["schema_password"] = schema_password
-        if config_port:
+        if config_port := self.charm_config.db_port:
             db_kargs["port"] = config_port
-        if config_user:
+        if config_user := self.charm_config.db_schema_user:
             db_kargs["user"] = config_user
-        if landscape_password:
+        if landscape_password := self.charm_config.db_landscape_password:
             db_kargs["password"] = landscape_password
         if db_kargs:
             update_db_conf(**db_kargs)
@@ -1256,67 +1234,39 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self.unit.status = WaitingStatus("Waiting on relations")
 
     def _configure_oidc(self) -> None:
+        if not self.charm_config.oidc_issuer:  # not doing OIDC
+            return
+
         self.unit.status = MaintenanceStatus("Configuring OIDC")
 
-        oidc_issuer = self.model.config.get("oidc_issuer")
-        oidc_client_id = self.model.config.get("oidc_client_id")
-        oidc_client_secret = self.model.config.get("oidc_client_secret")
-        oidc_logout_url = self.model.config.get("oidc_logout_url")
-        oidc_vals = (oidc_issuer, oidc_client_id, oidc_client_secret, oidc_logout_url)
-        none_count = oidc_vals.count(None)
+        updates = {
+            "landscape": {
+                "oidc-issuer": self.charm_config.oidc_issuer,
+                "oidc-client-id": self.charm_config.oidc_client_id,
+                "oidc-client-secret": self.charm_config.oidc_client_secret,
+            },
+        }
+        if self.charm_config.oidc_logout_url:
+            updates["landscape"]["oidc-logout-url"] = self.charm_config.oidc_logout_url
 
-        if none_count == 0:
-            update_service_conf(
-                {
-                    "landscape": {
-                        "oidc-issuer": oidc_issuer,
-                        "oidc-client-id": oidc_client_id,
-                        "oidc-client-secret": oidc_client_secret,
-                        "oidc-logout-url": oidc_logout_url,
-                    },
-                }
-            )
-        elif none_count == 1 and oidc_logout_url is None:
-            # Only the logout url is optional.
-            update_service_conf(
-                {
-                    "landscape": {
-                        "oidc-issuer": oidc_issuer,
-                        "oidc-client-id": oidc_client_id,
-                        "oidc-client-secret": oidc_client_secret,
-                    },
-                }
-            )
-        elif none_count < 4:
-            self.unit.status = BlockedStatus(
-                "OIDC connect config requires at least 'oidc_issuer', "
-                "'oidc_client_id', and 'oidc_client_secret' values"
-            )
-            return
+        update_service_conf(updates)
 
         self.unit.status = WaitingStatus("Waiting on relations")
 
     def _configure_openid(self) -> None:
+        if not self.charm_config.openid_provider_url:  # not doing OpenID
+            return
+
         self.unit.status = MaintenanceStatus("Configuring OpenID")
-
-        openid_provider_url = self.model.config.get("openid_provider_url")
-        openid_logout_url = self.model.config.get("openid_logout_url")
-
-        if openid_provider_url and openid_logout_url:
-            update_service_conf(
-                {
-                    "landscape": {
-                        "openid-provider-url": openid_provider_url,
-                        "openid-logout-url": openid_logout_url,
-                    },
-                }
-            )
-            self.unit.status = WaitingStatus("Waiting on relations")
-        elif openid_provider_url or openid_logout_url:
-            self.unit.status = BlockedStatus(
-                "OpenID configuration requires both 'openid_provider_url' and "
-                "'openid_logout_url'"
-            )
+        update_service_conf(
+            {
+                "landscape": {
+                    "openid-provider-url": self.charm_config.openid_provider_url,
+                    "openid-logout-url": self.charm_config.openid_logout_url,
+                },
+            }
+        )
+        self.unit.status = WaitingStatus("Waiting on relations")
 
     def _bootstrap_account(self):
         """If admin account details are provided, create admin"""
