@@ -1,10 +1,9 @@
 from pathlib import Path
 from typing import Any
-import pytest
-import yaml
 
 from pydantic import ValidationError
-
+import pytest
+import yaml
 
 from src.config import LandscapeCharmConfiguration, RedirectHTTPS
 

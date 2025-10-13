@@ -2,7 +2,7 @@ from base64 import b64encode
 import unittest
 
 from ops.model import BlockedStatus
-from ops.testing import Context, MaintenanceStatus, Relation, State, StoredState
+from ops.testing import Context, Relation, State, StoredState
 import pytest
 import yaml
 
@@ -1358,9 +1358,6 @@ class TestRedirectHTTPS:
         hook. The message includes the invalid configuration value.
 
         The HAProxy relation does not receive a 'services' configuration.
-
-        # TODO this should check for the BlockedStatus once we can use that during
-        failed config-changed events.
         """
         assert "some-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
         assert "another-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
@@ -1375,8 +1372,7 @@ class TestRedirectHTTPS:
             relations=[relation],
         )
         state_out = context.run(context.on.config_changed(), state_in)
-        assert isinstance(state_out.unit_status, MaintenanceStatus)
-        assert redirect_https in state_out.unit_status.message
+        assert isinstance(state_out.unit_status, BlockedStatus)
 
         services = state_out.get_relation(relation.id).local_unit_data.get("services")
         assert services is None

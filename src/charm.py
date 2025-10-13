@@ -51,9 +51,10 @@ from ops.model import (
     Relation,
     WaitingStatus,
 )
+from pydantic import ValidationError
 import yaml
 
-from config import RedirectHTTPS
+from config import LandscapeCharmConfiguration, RedirectHTTPS
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -333,6 +334,15 @@ class LandscapeServerCharm(CharmBase):
                 self.on.upgrade_charm,
             ],
         )
+        self._charm_config: LandscapeCharmConfiguration | None = None
+
+    @property
+    def charm_config(self) -> LandscapeCharmConfiguration:
+        if self._charm_config is None:
+            raise Exception(
+                "Configuration is not initialized; need config-changed hook to run."
+            )
+        return self._charm_config
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -356,16 +366,14 @@ class LandscapeServerCharm(CharmBase):
         """
         Handle configuration changes.
         """
-        prev_status = self.unit.status
-
         try:
-            # Validate the config
-            raw_redirect_https = str(self.model.config["redirect_https"])
-            _get_redirect_https(raw_redirect_https)
-        except InvalidRedirectHTTPS as e:
-            # TODO Should be "blocked" eventually, but this causes the charm to be
-            # stuck in the "blocked" state permanently.
-            self.unit.status = MaintenanceStatus(str(e))
+            self._charm_config = LandscapeCharmConfiguration.validate(self.model.config)
+            self.unit.status = MaintenanceStatus("Configuration validated...")
+        except ValidationError as e:
+            logger.error(f"Invalid configuration: {e.errors()}")
+            self.unit.status = BlockedStatus(
+                "Invalid configuration. See `juju debug-log`."
+            )
             return
 
         # Update additional configuration
@@ -486,9 +494,6 @@ class LandscapeServerCharm(CharmBase):
         ):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
-
-        if isinstance(prev_status, BlockedStatus):
-            self.unit.status = prev_status
 
         self._update_ready_status(restart_services=True)
 
