@@ -13,15 +13,6 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '**.md'
-    
-  # Triggered on push to branch "main" by .github/workflows/release.yaml
-  # TODO: Actually add this workflow for our charm.
-  workflow_call:
-    outputs:
-      artifact-prefix:
-        description: build_charm.yaml `artifact-prefix` output
-        value: ${{ jobs.build.outputs.artifact-prefix }}
-  workflow_dispatch:
 
 jobs:
   unit-test:
