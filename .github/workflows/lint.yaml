@@ -1,0 +1,20 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+# Adapted from: https://github.com/canonical/postgresql-operator/blob/main/.github/workflows/ci.yaml
+name: Lint charm
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - 'LICENSE'
+      - '**.md'
+
+jobs:
+  lint:
+    name: Lint
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v35.0.2
