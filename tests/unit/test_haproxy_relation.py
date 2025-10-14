@@ -1,8 +1,10 @@
 from base64 import b64encode
 import unittest
+from unittest.mock import patch
 
 from ops.model import BlockedStatus
 from ops.testing import Context, Relation, State, StoredState
+import pytest
 import yaml
 
 from charm import LandscapeServerCharm
@@ -23,7 +25,15 @@ class TestWebsiteRelationJoined:
     Tests for handlers of the `on.website_relation_joined` hook.
     """
 
-    def test_requires_ssl_cert_and_key(self):
+    @pytest.mark.parametrize(
+        "ssl_cert",
+        [
+            "NOTDEFAULT",
+            "",
+            "dGhpc2lzYmFzZTY0ZW5jb2RlZA==",
+        ],
+    )
+    def test_requires_ssl_cert_and_key(self, ssl_cert):
         """
         If there is not a valid ssl_cert and ssl_key pair provided in the model
         configuration, enter blocked status.
@@ -34,7 +44,7 @@ class TestWebsiteRelationJoined:
         state_in = State(
             config={
                 "root_url": "http://fake-root.test",
-                "ssl_cert": "",
+                "ssl_cert": ssl_cert,
                 "ssl_key": "",
             },
             relations=[relation],
@@ -74,7 +84,15 @@ class TestWebsiteRelationJoined:
             if service["service_name"] in frontends:
                 assert service["crts"] == ["DEFAULT"]
 
-    def test_nondefault_ssl_cert_must_be_b64_encoded(self):
+    @pytest.mark.parametrize(
+        "ssl_cert,ssl_key",
+        [
+            ("notb64encoded!", "notb64encoded!"),
+            ("notb64encoded!", "dGhpc2lzYmFzZTY0ZW5jb2RlZA=="),
+            ("dGhpc2lzYmFzZTY0ZW5jb2RlZA==", "notb64encoded!"),
+        ],
+    )
+    def test_nondefault_ssl_cert_must_be_b64_encoded(self, ssl_cert, ssl_key):
         """
         If the `ssl_cert` parameter is not `"DEFAULT"`, then the cert and key must be
         b64-encoded.
@@ -85,8 +103,8 @@ class TestWebsiteRelationJoined:
         state_in = State(
             config={
                 "root_url": "http://fake-root.test",
-                "ssl_cert": "notb64encoded!",
-                "ssl_key": "notb64encoded!",
+                "ssl_cert": ssl_cert,
+                "ssl_key": ssl_key,
             },
             relations=[relation],
         )
@@ -175,6 +193,29 @@ class TestWebsiteRelationJoined:
         service_names = (s["service_name"] for s in services)
 
         assert "landscape-ubuntu-installer-attach" in service_names
+
+
+class TestWebsiteRelationChanged:
+
+    def test_cert_not_default(self):
+        """
+        If the cert provided is not the special value `"DEFAULT"`, then do nothing.
+
+        Do not change the unit status, and do not write the SSL cert.
+        """
+
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"root_url": "https//root.test"},
+            relations=[relation],
+        )
+
+        with patch("charm.write_ssl_cert") as write_cert_mock:
+            state_out = context.run(context.on.relation_changed(relation), state_in)
+
+        assert state_out.unit_status == state_in.unit_status
+        write_cert_mock.assert_not_called()
 
 
 class TestCreateHTTPService(unittest.TestCase):
