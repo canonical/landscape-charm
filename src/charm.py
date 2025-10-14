@@ -240,8 +240,9 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._update_status)
 
         # Relations
-        self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
-        self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
+        self.database = DatabaseRequires(self, relation_name="database", database_name="landscape_db")
+        self.framework.observe(self.database.on.database_created, self._on_database_created)
+        self.framework.observe(self.database.on.endpoints_changed, self._on_database_created)
 
         # Inbound vhost
         self.framework.observe(
@@ -338,6 +339,11 @@ class LandscapeServerCharm(CharmBase):
                 self.on.upgrade_charm,
             ],
         )
+
+    def _on_database_created(
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
+        pass
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
