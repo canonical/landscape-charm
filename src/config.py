@@ -3,8 +3,11 @@ Configuration for the Landscape charm.
 """
 
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, root_validator
+import yaml
 
 
 class RedirectHTTPS(str, Enum):
@@ -118,3 +121,24 @@ class LandscapeCharmConfiguration(BaseModel):
                 f"Got {fields}."
             )
         return values
+
+
+def get_config_defaults() -> dict[str, Any]:
+    """
+    Get the `config.yaml`-defined configuration defaults for the charm.
+    """
+    config_file = Path(__file__).parent.parent / "config.yaml"
+    assert config_file.exists(), f"Could not find config.yaml at {config_file}"
+
+    with open(config_file) as f:
+        raw = yaml.safe_load(f)
+
+    configs = raw["options"]
+    return {key: configs[key]["default"] for key in configs}
+
+
+DEFAULT_CONFIGURATION = LandscapeCharmConfiguration.validate(get_config_defaults())
+"""
+A `LandscapeCharmConfiguration` populated with the defaults, for use as a fallback
+when the charm is deployed with invalid configuration.
+"""

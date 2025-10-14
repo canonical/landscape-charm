@@ -1,39 +1,20 @@
-from pathlib import Path
-from typing import Any
-
 from pydantic import ValidationError
 import pytest
-import yaml
 
-from src.config import LandscapeCharmConfiguration, RedirectHTTPS
-
-
-def _get_config_defaults() -> dict[str, Any]:
-    """
-    Get the `config.yaml`-defined configuration defaults for the charm.
-    """
-    config_file = Path(__file__).parent.parent.parent / "config.yaml"
-    assert config_file.exists(), f"Could not find config.yaml at {config_file}"
-
-    with open(config_file) as f:
-        raw = yaml.safe_load(f)
-
-    configs = raw["options"]
-    return {key: configs[key]["default"] for key in configs}
+from src.config import (
+    DEFAULT_CONFIGURATION,
+    get_config_defaults,
+    LandscapeCharmConfiguration,
+    RedirectHTTPS,
+)
 
 
-@pytest.fixture()
-def config() -> LandscapeCharmConfiguration:
-    """
-    Populate a `Config` with charm-defined defaults.
-    """
-    return LandscapeCharmConfiguration(**_get_config_defaults())
-
-
-def test_defaults(config):
+def test_defaults():
     """
     Get a default configuration.
     """
+
+    config = DEFAULT_CONFIGURATION
 
     assert config.landscape_ppa == "ppa:landscape/self-hosted-beta"
     assert config.landscape_ppa_key == ""
@@ -91,7 +72,7 @@ def test_openid_oidc_exlusive_openid(openid_parameter):
     """
     If OIDC is configured, cannot configure OpenID.
     """
-    defaults = _get_config_defaults()
+    defaults = get_config_defaults()
     defaults["oidc_issuer"] = "https://oidc-issuer.test"
     defaults[openid_parameter] = "https://some-url.test"
     with pytest.raises(ValidationError, match="mutually exclusive"):
@@ -106,7 +87,7 @@ def test_openid_oidc_exlusive_oidc(oidc_parameter):
     """
     If OpenID is configured, cannot configure OIDC.
     """
-    defaults = _get_config_defaults()
+    defaults = get_config_defaults()
     defaults["openid_provider_url"] = "https://open-provider.test"
     defaults[oidc_parameter] = "https://some-url.test"
     with pytest.raises(ValidationError, match="mutually exclusive"):
@@ -127,7 +108,7 @@ def test_openid_minimum_fields(openid_provider_url, openid_logout_url, valid):
     OpenID requires both `openid_provider_url` and `openid_logout_url` if either
     are provided.
     """
-    defaults = _get_config_defaults()
+    defaults = get_config_defaults()
     defaults["openid_provider_url"] = openid_provider_url
     defaults["openid_logout_url"] = openid_logout_url
 
@@ -157,7 +138,7 @@ def test_oidc_minimum_fields(
     OIDC requires all of `oidc_issuer`, `oidc_client_id`, `oidc_client_secret`. The
     `oidc_logout_url` is optional.
     """
-    defaults = _get_config_defaults()
+    defaults = get_config_defaults()
     defaults["oidc_issuer"] = oidc_issuer
     defaults["oidc_client_id"] = oidc_client_id
     defaults["oidc_client_secret"] = oidc_client_secret

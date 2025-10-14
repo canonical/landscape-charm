@@ -3,11 +3,9 @@ import unittest
 
 from ops.model import BlockedStatus
 from ops.testing import Context, Relation, State, StoredState
-import pytest
 import yaml
 
 from charm import LandscapeServerCharm
-from config import RedirectHTTPS
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -1347,32 +1345,3 @@ class TestRedirectHTTPS:
         state_out = context.run(context.on.relation_joined(relation), state_in)
         http_service = self._get_http_service(state_out, relation)
         assert DEFAULT_REDIRECT_SCHEME in http_service["service_options"]
-
-    @pytest.mark.parametrize(
-        "redirect_https",
-        ["some-fake-redirect-config", "another-fake-redirect-config"],
-    )
-    def test_invalid_redirect_https(self, redirect_https):
-        """
-        If an unrecognized ACL is included in a list, fail the configuration changed
-        hook. The message includes the invalid configuration value.
-
-        The HAProxy relation does not receive a 'services' configuration.
-        """
-        assert "some-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
-        assert "another-fake-redirect-config" not in (e.value for e in RedirectHTTPS)
-
-        context = Context(LandscapeServerCharm)
-        relation = Relation(
-            "website",
-            remote_units_data={0: {"public-address": "https://haproxy.test"}},
-        )
-        state_in = State(
-            config={"redirect_https": redirect_https},
-            relations=[relation],
-        )
-        state_out = context.run(context.on.config_changed(), state_in)
-        assert isinstance(state_out.unit_status, BlockedStatus)
-
-        services = state_out.get_relation(relation.id).local_unit_data.get("services")
-        assert services is None

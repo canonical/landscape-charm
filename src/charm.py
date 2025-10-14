@@ -54,7 +54,7 @@ from ops.model import (
 from pydantic import ValidationError
 import yaml
 
-from config import LandscapeCharmConfiguration, RedirectHTTPS
+from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration, RedirectHTTPS
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -334,15 +334,14 @@ class LandscapeServerCharm(CharmBase):
                 self.on.upgrade_charm,
             ],
         )
-        self._charm_config: LandscapeCharmConfiguration | None = None
-
-    @property
-    def charm_config(self) -> LandscapeCharmConfiguration:
-        if self._charm_config is None:
-            raise Exception(
-                "Configuration is not initialized; need config-changed hook to run."
+        try:
+            self.charm_config = LandscapeCharmConfiguration.validate(self.model.config)
+        except ValidationError as e:
+            logger.error(f"Invalid configuration: {e.errors()}")
+            self.charm_config = DEFAULT_CONFIGURATION
+            self.unit.status = BlockedStatus(
+                "Invalid configuration. See `juju debug-log`."
             )
-        return self._charm_config
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -350,7 +349,7 @@ class LandscapeServerCharm(CharmBase):
         """
         return [
             {
-                "scrape_interval": self.model.config.get("prometheus_scrape_interval"),
+                "scrape_interval": self.charm_config.prometheus_scrape_interval,
                 "metrics_path": "/metrics",
                 "static_configs": [
                     {
@@ -367,7 +366,7 @@ class LandscapeServerCharm(CharmBase):
         Handle configuration changes.
         """
         try:
-            self._charm_config = LandscapeCharmConfiguration.validate(self.model.config)
+            self.charm_config = LandscapeCharmConfiguration.validate(self.model.config)
             self.unit.status = WaitingStatus("Configuration validated...")
         except ValidationError as e:
             logger.error(f"Invalid configuration: {e.errors()}")
@@ -482,7 +481,7 @@ class LandscapeServerCharm(CharmBase):
 
         If set on neither, return `None`.
         """
-        secret_token = self.model.config.get("secret_token")
+        secret_token = self.charm_config.secret_token
         if not secret_token:
             peer_relation = self.model.get_relation("replicas")
             if peer_relation is not None:
@@ -492,7 +491,7 @@ class LandscapeServerCharm(CharmBase):
         return secret_token
 
     def _get_cookie_encryption_key(self):
-        cookie_encryption_key = self.model.config.get("cookie_encryption_key")
+        cookie_encryption_key = self.charm_config.cookie_encryption_key
         if not cookie_encryption_key:
             peer_relation = self.model.get_relation("replicas")
             if peer_relation is not None:
@@ -515,7 +514,7 @@ class LandscapeServerCharm(CharmBase):
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
 
-        landscape_ppa_key = self.model.config["landscape_ppa_key"]
+        landscape_ppa_key = self.charm_config.landscape_ppa_key
         if landscape_ppa_key != "":
             try:
                 landscape_key_file = apt.import_key(landscape_ppa_key)
@@ -523,7 +522,7 @@ class LandscapeServerCharm(CharmBase):
             except apt.GPGKeyError:
                 logger.error("Failed to import Landscape PPA key")
 
-        landscape_ppa = self.model.config["landscape_ppa"]
+        landscape_ppa = self.charm_config.landscape_ppa
 
         try:
             # This package is responsible for the hanging installs and ignores env vars
@@ -535,13 +534,16 @@ class LandscapeServerCharm(CharmBase):
             # least any juju_proxy setting, add the classic http(s)_proxy to the env
             # that will be used only for add-apt-repository call
             add_apt_repository_env = os.environ.copy()
-            for proxy_var in ["http_proxy", "https_proxy"]:
+            for proxy_var, proxy_var_value in [
+                ("http_proxy", self.charm_config.http_proxy),
+                ("https_proxy", self.charm_config.https_proxy),
+            ]:
                 juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
 
                 # if the charm has a proxy conf configured, override juju_http(s)
                 # configuration
-                if proxy_var in self.model.config:
-                    add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
+                if proxy_var_value:
+                    add_apt_repository_env[proxy_var] = proxy_var_value
                 elif juju_proxy_var in add_apt_repository_env:
                     add_apt_repository_env[proxy_var] = add_apt_repository_env[
                         juju_proxy_var
@@ -555,8 +557,8 @@ class LandscapeServerCharm(CharmBase):
 
             # juju_no_proxy is not perfectly compatible with Shell environment
             # let's handle only the no_proxy from the charm's configuration
-            if "no_proxy" in self.model.config:
-                add_apt_repository_env["no_proxy"] = self.model.config["no_proxy"]
+            if self.charm_config.no_proxy:
+                add_apt_repository_env["no_proxy"] = self.charm_config.no_proxy
                 logger.info(
                     f"add-apt-repository no_proxy variable set to : "
                     f"{add_apt_repository_env['no_proxy']}"
@@ -566,7 +568,7 @@ class LandscapeServerCharm(CharmBase):
                 ["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env
             )
 
-            if self.model.config["min_install"]:
+            if self.charm_config.min_install:
                 logger.info("Not installing hashids..")
                 check_call(
                     [
@@ -589,14 +591,14 @@ class LandscapeServerCharm(CharmBase):
             raise exc  # This will trigger juju's exponential retry
 
         # Write the config-provided SSL certificate, if it exists.
-        config_ssl_cert = self.model.config["ssl_cert"]
+        config_ssl_cert = self.charm_config.ssl_cert
 
         if config_ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
             write_ssl_cert(config_ssl_cert)
 
         # Write the license file, if it exists.
-        license_file = self.model.config.get("license_file")
+        license_file = self.charm_config.license_file
 
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
@@ -644,18 +646,18 @@ class LandscapeServerCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
-        deployment_mode = self.model.config.get("deployment_mode")
+        deployment_mode = self.charm_config.deployment_mode
         is_standalone = deployment_mode == "standalone"
 
         update_default_settings(
             {
                 "RUN_ALL": "no",
-                "RUN_APISERVER": str(self.model.config["worker_counts"]),
+                "RUN_APISERVER": str(self.charm_config.worker_counts),
                 "RUN_ASYNC_FRONTEND": "yes",
                 "RUN_JOBHANDLER": "yes",
-                "RUN_APPSERVER": str(self.model.config["worker_counts"]),
-                "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
-                "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
+                "RUN_APPSERVER": str(self.charm_config.worker_counts),
+                "RUN_MSGSERVER": str(self.charm_config.worker_counts),
+                "RUN_PINGSERVER": str(self.charm_config.worker_counts),
                 "RUN_CRON": "yes" if is_leader else "no",
                 "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
                 "RUN_PACKAGEUPLOADSERVER": (
@@ -707,21 +709,21 @@ class LandscapeServerCharm(CharmBase):
         master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
 
         # Override db config if manually set in juju
-        config_host = self.model.config.get("db_host")
+        config_host = self.charm_config.db_host
         if config_host:
             host = config_host
         else:
             host = master["host"]
 
-        landscape_password = self.model.config.get("db_landscape_password")
+        landscape_password = self.charm_config.db_landscape_password
         if landscape_password:
             password = landscape_password
         else:
             password = master["password"]
 
-        schema_password = self.model.config.get("db_schema_password")
+        schema_password = self.charm_config.db_schema_password
 
-        config_port = self.model.config.get("db_port")
+        config_port = self.charm_config.db_port
         if config_port:
             port = config_port
         else:
@@ -729,7 +731,7 @@ class LandscapeServerCharm(CharmBase):
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
-        config_user = self.model.config.get("db_schema_user")
+        config_user = self.charm_config.db_schema_user
         if config_user:
             user = config_user
         else:
@@ -868,7 +870,7 @@ class LandscapeServerCharm(CharmBase):
         self._update_haproxy_connection(event.relation)
 
         # Update root_url, if not provided.
-        if not self.model.config.get("root_url"):
+        if not self.charm_config.root_url:
             url = f'https://{event.relation.data[event.unit]["public-address"]}/'
             self._stored.default_root_url = url
             update_service_conf(
@@ -889,36 +891,27 @@ class LandscapeServerCharm(CharmBase):
         # work just to fail here.
         try:
             ssl_cert = _get_ssl_cert(
-                ssl_cert=self.model.config["ssl_cert"],
-                ssl_key=self.model.config["ssl_key"],
+                ssl_cert=self.charm_config.ssl_cert,
+                ssl_key=self.charm_config.ssl_key,
             )
         except SSLConfigurationError as e:
-            self.unit.status = BlockedStatus(str(e))
-            return
-
-        try:
-            redirect_https = _get_redirect_https(
-                str(self.model.config["redirect_https"])
-            )
-        except InvalidRedirectHTTPS as e:
             self.unit.status = BlockedStatus(str(e))
             return
 
         error_files = get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
-        worker_counts = int(self.model.config["worker_counts"])
 
         http_service = create_http_service(
             http_service=asdict(HTTP_SERVICE),
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
+            worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=PORTS,
             server_options=SERVER_OPTIONS,
-            redirect_https=redirect_https,
+            redirect_https=self.charm_config.redirect_https,
         )
 
         https_service = create_https_service(
@@ -926,7 +919,7 @@ class LandscapeServerCharm(CharmBase):
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
+            worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=PORTS,
@@ -969,7 +962,7 @@ class LandscapeServerCharm(CharmBase):
         Writes the HAProxy-provided SSL certificate for
         Landscape Server, if config has not provided one.
         """
-        config_ssl_cert = self.model.config["ssl_cert"]
+        config_ssl_cert = self.charm_config.ssl_cert
 
         if config_ssl_cert != "DEFAULT":
             # No-op: cert has been provided by config.
@@ -1059,7 +1052,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if not self.unit.is_leader():
             return
 
-        root_url = self.model.config.get("root_url")
+        root_url = self.charm_config.root_url
         if not root_url:
             root_url = self._stored.default_root_url
 
@@ -1068,7 +1061,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 self.model.get_binding(event.relation).network.bind_address
             )
 
-        site_name = self.model.config.get("site_name")
+        site_name = self.charm_config.site_name
         if site_name:
             subtitle = f"[{site_name}] Systems management"
             group = f"[{site_name}] LMA"
@@ -1275,9 +1268,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if self._stored.account_bootstrapped:  # Admin already created
             return
         karg = {}  # Keyword args for command line
-        karg["admin_email"] = self.model.config.get("admin_email")
-        karg["admin_name"] = self.model.config.get("admin_name")
-        karg["admin_password"] = self.model.config.get("admin_password")
+        karg["admin_email"] = self.charm_config.admin_email
+        karg["admin_name"] = self.charm_config.admin_name
+        karg["admin_password"] = self.charm_config.admin_password
         required_args = karg.values()
         if not any(required_args):  # Return since no args are specified
             return
@@ -1286,7 +1279,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 "Admin email, name, and password required for bootstrap account"
             )
             return
-        karg["root_url"] = self.model.config.get("root_url")
+        karg["root_url"] = self.charm_config.root_url
         if not karg["root_url"]:
             default_root_url = self._stored.default_root_url
             if default_root_url:
@@ -1294,8 +1287,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             else:
                 logger.error("Bootstrap account waiting on default root url..")
                 return
-        karg["registration_key"] = self.model.config.get("registration_key")
-        karg["system_email"] = self.model.config.get("system_email")
+        karg["registration_key"] = self.charm_config.registration_key
+        karg["system_email"] = self.charm_config.system_email
 
         # Collect command line arguments
         args = [BOOTSTRAP_ACCOUNT_SCRIPT]
@@ -1334,7 +1327,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         Only the leader does this to prevent unnecessary DB writes.
         We can only do this after the initial account is bootstrapped.
         """
-        on = "on" if self.model.config["autoregistration"] else "off"
+        on = "on" if self.charm_config.autoregistration else "off"
 
         if not self.unit.is_leader():
             return
