@@ -41,7 +41,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Install tox & poetry
+      - name: Install tox
         run: |
           pipx install tox
       - name: Run tests
