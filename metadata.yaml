@@ -11,8 +11,10 @@ maintainers:
 summary: Charm for installing and using Self-Hosted Landscape Server.
 
 requires:
-  db:
-    interface: pgsql
+  database:
+    interface: postgresql_client
+    limit: 1
+    optional: false
   inbound-amqp:
     interface: rabbitmq
   outbound-amqp:

@@ -84,6 +84,11 @@ from settings_files import (
     write_license_file,
     write_ssl_cert,
 )
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
