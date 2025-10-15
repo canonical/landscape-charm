@@ -159,7 +159,7 @@ class TestOnConfigChanged:
         assert config["pingserver"]["workers"] == str(workers)
 
     def test_hostagent_services_default(self):
-        relation = PeerRelation("website", peers_data={})
+        relation = Relation("website")
         state_in = State(relations=[relation], config={})
         context = Context(LandscapeServerCharm)
 
@@ -170,7 +170,7 @@ class TestOnConfigChanged:
         assert GRPC_SERVICE.service_name not in service_names
 
     def test_hostagent_services_when_disabled(self):
-        relation = PeerRelation("website", peers_data={})
+        relation = Relation("website")
         state_in = State(
             relations=[relation], config={"enable_hostagent_messenger": False}
         )
@@ -183,7 +183,7 @@ class TestOnConfigChanged:
         assert GRPC_SERVICE.service_name not in service_names
 
     def test_hostagent_services_when_enabled(self):
-        relation = PeerRelation("website", peers_data={})
+        relation = Relation("website")
         state_in = State(
             relations=[relation], config={"enable_hostagent_messenger": True}
         )

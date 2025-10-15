@@ -227,7 +227,8 @@ options:
     type: boolean
     default: false
     description: |
-      Whether or not the hostagent services should run. If true, HAProxy frontends will be
-      to route traffic to these services. By default, those frontends will not be configured.
-      Note that the hostagent services still need to be configured in the Landscape Server
-      settings for the services to function.
+      Whether or not the hostagent services should run. If true, HAProxy frontends
+      will be created to route traffic to the landscape-hostagent-messenger services.
+      By default, those frontends will not be configured. Note that the hostagent
+      services still need to be configured in the Landscape Server settings for
+      the services to function.
