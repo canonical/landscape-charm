@@ -13,6 +13,7 @@ on:
       - '.gitignore'
       - 'LICENSE'
       - '**.md'
+      - '.jujuignore'
     
   # Triggered on push to branch "main" by .github/workflows/release.yaml
   # TODO: Actually add this workflow for our charm.
