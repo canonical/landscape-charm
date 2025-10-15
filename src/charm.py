@@ -243,11 +243,11 @@ class LandscapeServerCharm(CharmBase):
         self.database = DatabaseRequires(
             self, relation_name="database", database_name="database"
         )
-        logger.info(
-            "Initial database relation data: %s", self.database.fetch_relation_data()
-        )
         self.framework.observe(
             self.database.on.database_created, self._on_database_created
+        )
+        self.framework.observe(
+            self.database.on.endpoints_changed, self._on_database_endpoints_changed
         )
 
         # Inbound vhost
@@ -346,42 +346,24 @@ class LandscapeServerCharm(CharmBase):
             ],
         )
 
-    def _on_database_created(
-        self, event: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
-    ) -> None:
-        """Event is fired when postgres database is created or endpoint is changed."""
-        logger.debug("Database created event: %s", event)
-
-        relations = self.fetch_postgres_relation_data()
-        logger.debug("Got following database data: %s", relations)
-        logger.debug("Event: %s", str(event))
-
     def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """Fetch postgres relation data.
-
-        This function retrieves relation data from a postgres database using
-        the `fetch_relation_data` method of the `database` object. The retrieved data is
-        then logged for debugging purposes, and any non-empty data is processed to extract
-        endpoint information, username, and password. This processed data is then returned as
-        a dictionary. If no data is retrieved, the unit is set to waiting status and
-        the program exits with a zero status code.
-        """
-        relations = self.database.fetch_relation_data()
-        logger.debug("Got following database data: %s", relations)
-        for data in relations.values():
+        relation_data = self.database.fetch_relation_data()
+        logger.debug(
+            "Got following data from the `database` relation: %s", relation_data
+        )
+        for data in relation_data.values():
             if not data:
                 continue
+
             logger.info("New database endpoint is %s", data["endpoints"])
             host, port = data["endpoints"].split(":")
             db_data = {
-                "db_host": host,
-                "db_port": port,
-                "db_username": data["username"],
-                "db_password": data["password"],
+                "host": host,
+                "port": port,
+                "username": data["username"],
+                "password": data["password"],
             }
             return db_data
-
-        # update_db_conf(host=host, password=data["password"])
 
         return {}
 
@@ -744,16 +726,16 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus("Failed to start services")
             return False
 
-    def _db_relation_changed(self, event: RelationChangedEvent) -> None:
-        logger.debug("DB relation changed event: %s", event)
-        unit_data = self.fetch_postgres_relation_data()
-        logger.debug("unit data: %s", unit_data)
-        if "endpoints" not in unit_data or "username" not in unit_data:
-            self.unit.status = WaitingStatus("Waiting for PostgreSQL credentials")
-            return
-        required_relation_data = ["master", "allowed-units", "port", "user"]
+    def _database_relation_changed(
+        self, event: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
+        logger.debug("Database relation changed: %s", event)
+        database_relation_data = self.fetch_postgres_relation_data()
+        logger.debug("unit data: %s", database_relation_data)
+
+        required_relation_data = ["user", "password", "port", "host"]
         missing_relation_data = [
-            i for i in required_relation_data if i not in unit_data
+            i for i in required_relation_data if i not in database_relation_data
         ]
         if missing_relation_data:
             logger.info(
@@ -768,21 +750,18 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready["database"] = False
         self.unit.status = MaintenanceStatus("Setting up databases")
 
-        # We can't use unit_data["host"] because it can return the IP of the secondary
-        master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
-
         # Override db config if manually set in juju
         config_host = self.model.config.get("db_host")
         if config_host:
             host = config_host
         else:
-            host = master["host"]
+            host = database_relation_data["host"]
 
         landscape_password = self.model.config.get("db_landscape_password")
         if landscape_password:
             password = landscape_password
         else:
-            password = master["password"]
+            password = database_relation_data["password"]
 
         schema_password = self.model.config.get("db_schema_password")
 
@@ -790,7 +769,7 @@ class LandscapeServerCharm(CharmBase):
         if config_port:
             port = config_port
         else:
-            port = unit_data["port"]
+            port = database_relation_data["port"]
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
@@ -798,7 +777,7 @@ class LandscapeServerCharm(CharmBase):
         if config_user:
             user = config_user
         else:
-            user = unit_data["user"]
+            user = database_relation_data["user"]
 
         update_db_conf(
             host=host,
