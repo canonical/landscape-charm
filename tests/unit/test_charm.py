@@ -4,11 +4,13 @@
 # Learn more about testing at
 # https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
+from configparser import ConfigParser
 from grp import struct_group
 from io import BytesIO
 import json
 import os
 from pwd import struct_passwd
+import pytest
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 import unittest
@@ -33,7 +35,10 @@ from charm import (
     SCHEMA_SCRIPT,
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
+from haproxy import GRPC_SERVICE
+import settings_files
 from settings_files import AMQP_USERNAME, VHOSTS
+from tests.unit.helpers import get_haproxy_services
 
 IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
@@ -179,6 +184,39 @@ class TestOnConfigChanged:
         assert config["api"]["workers"] == str(workers)
         assert config["message-server"]["workers"] == str(workers)
         assert config["pingserver"]["workers"] == str(workers)
+
+    def test_hostagent_services_default(self):
+        relation = PeerRelation("website", peers_data={})
+        state_in = State(relations=[relation], config={})
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name not in service_names
+
+    def test_hostagent_services_when_disabled(self):
+        relation = PeerRelation("website", peers_data={})
+        state_in = State(relations=[relation], config={"enable_hostagent_services": False})
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name not in service_names
+
+    def test_hostagent_services_when_enabled(self):
+        relation = PeerRelation("website", peers_data={})
+        state_in = State(relations=[relation], config={"enable_hostagent_services": True})
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name in service_names
 
 
 class TestGetSecretToken:
