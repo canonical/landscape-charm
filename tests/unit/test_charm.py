@@ -4,7 +4,6 @@
 # Learn more about testing at
 # https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
-from configparser import ConfigParser
 from grp import struct_group
 from io import BytesIO
 import json
@@ -20,7 +19,6 @@ from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Context, Harness, PeerRelation, Relation, State
-import pytest
 
 from charm import (
     DEFAULT_SERVICES,
@@ -36,7 +34,6 @@ from charm import (
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
 from haproxy import GRPC_SERVICE
-import settings_files
 from settings_files import AMQP_USERNAME, VHOSTS
 from tests.unit.helpers import get_haproxy_services
 
@@ -44,31 +41,6 @@ IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
 GitHub actions will set `GITHUB_ACTIONS` during runs.
 """
-
-
-class ConfigReader:
-
-    def __init__(self, tempfile):
-        self.tempfile = tempfile
-
-    def get_config(self) -> ConfigParser:
-        config = ConfigParser()
-        config.read(self.tempfile)
-        return config
-
-
-@pytest.fixture
-def capture_service_conf(tmp_path, monkeypatch) -> ConfigReader:
-    """
-    Redirect all writes to `SERVICE_CONF` to a tempfile within this fixture.
-    Return a `ConfigReader` that reads from this file.
-    """
-    conf_file = tmp_path / "service.conf"
-    conf_file.write_text("")
-
-    monkeypatch.setattr(settings_files, "SERVICE_CONF", str(conf_file))
-
-    return ConfigReader(conf_file)
 
 
 class TestGrafanaMachineAgentRelation(unittest.TestCase):
