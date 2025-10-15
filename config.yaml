@@ -223,7 +223,7 @@ options:
       option will redirect all HTTP traffic except for /ping and /repository. If an
       invalid value is provided, the charm will remain in the maintenance status
       until a valid value is given.
-  enable_hostagent_services:
+  enable_hostagent_messenger:
     type: boolean
     default: false
     description: |

@@ -10,7 +10,6 @@ from io import BytesIO
 import json
 import os
 from pwd import struct_passwd
-import pytest
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 import unittest
@@ -21,6 +20,7 @@ from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Context, Harness, PeerRelation, Relation, State
+import pytest
 
 from charm import (
     DEFAULT_SERVICES,
@@ -152,6 +152,7 @@ class TestOnConfigChanged:
     """
     Tests for `on.config_changed` hooks.
     """
+
     def test_root_url(self, capture_service_conf):
         """
         If the `root_url` is provided, update the global, api, and package-upload
@@ -198,7 +199,9 @@ class TestOnConfigChanged:
 
     def test_hostagent_services_when_disabled(self):
         relation = PeerRelation("website", peers_data={})
-        state_in = State(relations=[relation], config={"enable_hostagent_services": False})
+        state_in = State(
+            relations=[relation], config={"enable_hostagent_messenger": False}
+        )
         context = Context(LandscapeServerCharm)
 
         state_out = context.run(context.on.config_changed(), state_in)
@@ -209,7 +212,9 @@ class TestOnConfigChanged:
 
     def test_hostagent_services_when_enabled(self):
         relation = PeerRelation("website", peers_data={})
-        state_in = State(relations=[relation], config={"enable_hostagent_services": True})
+        state_in = State(
+            relations=[relation], config={"enable_hostagent_messenger": True}
+        )
         context = Context(LandscapeServerCharm)
 
         state_out = context.run(context.on.config_changed(), state_in)

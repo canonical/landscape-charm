@@ -952,7 +952,7 @@ class LandscapeServerCharm(CharmBase):
 
         services = [http_service, https_service]
 
-        if self.model.config.get("enable_hostagent_services"):
+        if self.model.config.get("enable_hostagent_messenger"):
             grpc_service = create_grpc_service(
                 grpc_service=asdict(GRPC_SERVICE),
                 ssl_cert=ssl_cert,
