@@ -2,7 +2,7 @@ DIRNAME = $(notdir $(shell pwd))
 DIRNAME := $(addsuffix -build, $(DIRNAME))
 
 build: clean
-	charmcraft pack
+	ccc pack
 	juju add-model $(DIRNAME)
 	juju deploy ./bundle-examples/bundle.yaml
 
