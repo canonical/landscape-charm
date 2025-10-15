@@ -1,9 +1,9 @@
 from unittest.mock import patch
 
 from ops.testing import Context, Relation, State, StoredState
-import yaml
 
 from charm import LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LandscapeServerCharm
+from tests.unit.helpers import get_haproxy_services
 
 MODULE = "src.charm"
 
@@ -37,7 +37,7 @@ class TestUbuntuInstallerAttach:
             state=state_in,
         )
 
-        services = _get_haproxy_services(state_out, relation)
+        services = get_haproxy_services(state_out, relation)
         service_names = (s["service_name"] for s in services)
 
         assert "landscape-ubuntu-installer-attach" in service_names
@@ -76,7 +76,7 @@ class TestUbuntuInstallerAttach:
             state=state_in,
         )
 
-        services = _get_haproxy_services(state_out, relation)
+        services = get_haproxy_services(state_out, relation)
         service_names = (s["service_name"] for s in services)
 
         assert "landscape-ubuntu-installer-attach" not in service_names
@@ -84,17 +84,3 @@ class TestUbuntuInstallerAttach:
             "_stored", owner_path="LandscapeServerCharm"
         ).content.get("enable_ubuntu_installer_attach")
         mock_remove_package.assert_called_once_with(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-
-
-def _get_haproxy_services(state: State, relation: Relation) -> list[dict]:
-    """
-    Return the services configured in the HAProxy relation with Landscape server.
-    """
-    raw_services = state.get_relation(relation.id).local_unit_data["services"]
-    services = yaml.safe_load(raw_services)
-
-    assert isinstance(services, list)
-    assert len(services) > 0
-    assert isinstance(services[0], dict)
-
-    return services

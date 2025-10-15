@@ -33,7 +33,9 @@ from charm import (
     SCHEMA_SCRIPT,
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
+from haproxy import GRPC_SERVICE
 from settings_files import AMQP_USERNAME, VHOSTS
+from tests.unit.helpers import get_haproxy_services
 
 IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
@@ -156,6 +158,43 @@ class TestOnConfigChanged:
         assert config["message-server"]["workers"] == str(workers)
         assert config["pingserver"]["workers"] == str(workers)
 
+    def test_hostagent_services_default(self):
+        relation = Relation("website")
+        state_in = State(relations=[relation], config={})
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name not in service_names
+
+    def test_hostagent_services_when_disabled(self):
+        relation = Relation("website")
+        state_in = State(
+            relations=[relation], config={"enable_hostagent_messenger": False}
+        )
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name not in service_names
+
+    def test_hostagent_services_when_enabled(self):
+        relation = Relation("website")
+        state_in = State(
+            relations=[relation], config={"enable_hostagent_messenger": True}
+        )
+        context = Context(LandscapeServerCharm)
+
+        state_out = context.run(context.on.config_changed(), state_in)
+
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+        assert GRPC_SERVICE.service_name in service_names
+
 
 class TestGetSecretToken:
     """
@@ -226,7 +265,6 @@ class TestGetSecretToken:
             token = "mytestsecrettoken"
             mock_token.return_value = token
             state_out = context.run(context.on.config_changed(), state_in)
-
         app_data = state_out.get_relation(relation.id).local_app_data
         assert app_data.get("secret-token") == token
 
