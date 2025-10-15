@@ -20,15 +20,15 @@ for more details.
 Typically, Landscape deployment is done using a Juju bundle. This charm
 is not useful without a deployed bundle of services.
 
-Please use one of the following bundle types, depending o your needs:
-  - [landscape-scalable](https://charmhub.io/landscape-scalable)
-  - [landscape-dense-maas](https://charmhub.io/landscape-dense-maas)
-  - [landscape-dense](https://charmhub.io/landscape-dense)
+Please use one of the following bundle types, depending on your needs:
 
+- [landscape-scalable](https://charmhub.io/landscape-scalable)
+- [landscape-dense-maas](https://charmhub.io/landscape-dense-maas)
+- [landscape-dense](https://charmhub.io/landscape-dense)
 
 ## Relations
 
-TODO: Provide any relations which are provided or required by your charm
+See `metadata.yaml` for required and provided relations.
 
 ## Configuration
 
@@ -72,25 +72,38 @@ they would be deployed by `landscape-scalable`:
 make build
 ```
 
-Note: this charm is using the `charmcraft 2.x.x` format for the `charmcraft.yaml`.
-It must packed using a compatible version of `charmcraft`.
-
-TODO: migrate to `charmcraft 3.x.x`.
-
-### Run tests
+### Run unit tests
 
 ```sh
-tox run -e unit
+tox -e unit
 ```
 
 Or run specific test(s):
 
 ```sh
-tox run -e unit -- tests/test_charm.py::TestCharm::test_install
+tox -e unit -- tests/test_charm.py::TestCharm::test_install
+```
+
+### Run integration tests
+
+```sh
+tox -e integration
+```
+
+The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
+
+```sh
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 ```
 
 ### Lint code
 
 ```sh
-tox -e run lint
+tox -e lint
+```
+
+### Format code
+
+```sh
+tox -e fmt
 ```

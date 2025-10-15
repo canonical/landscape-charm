@@ -4,51 +4,36 @@
 # Learn more about testing at
 # https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
-from base64 import b64encode
-from configparser import ConfigParser
-from dataclasses import asdict
-import json
-import os
-import unittest
 from grp import struct_group
 from io import BytesIO
+import json
+import os
 from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
-from typing import Iterable
-from unittest.mock import DEFAULT, Mock, patch, call, ANY
-
-import pytest
-import yaml
-
-from ops import testing
-from ops.charm import ActionEvent
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops.testing import Context, Harness, Relation, State, PeerRelation
+import unittest
+from unittest.mock import ANY, call, DEFAULT, Mock, patch
 
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
+from ops.charm import ActionEvent
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.testing import Context, Harness, PeerRelation, Relation, State
 
 from charm import (
-    _create_haproxy_services,
     DEFAULT_SERVICES,
-    HAPROXY_CONFIG_FILE,
-    HAProxyErrorFile,
-    HAProxyServicePorts,
-    HAProxyServerOptions,
+    get_modified_env_vars,
+    HASH_ID_DATABASES,
     LANDSCAPE_PACKAGES,
+    LandscapeServerCharm,
     LEADER_SERVICES,
     LSCTL,
+    METRIC_INSTRUMENTED_SERVICE_PORTS,
     NRPE_D_DIR,
     SCHEMA_SCRIPT,
-    HASH_ID_DATABASES,
-    LandscapeServerCharm,
-    get_modified_env_vars,
-    METRIC_INSTRUMENTED_SERVICE_PORTS,
+    UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
-
-import settings_files
-
+from settings_files import AMQP_USERNAME, VHOSTS
 
 IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
@@ -162,7 +147,6 @@ class TestOnConfigChanged:
     """
     Tests for `on.config_changed` hooks.
     """
-    
     def test_root_url(self, capture_service_conf):
         """
         If the `root_url` is provided, update the global, api, and package-upload
@@ -266,7 +250,6 @@ class TestGetSecretToken:
             token = "mytestsecrettoken"
             mock_token.return_value = token
             state_out = context.run(context.on.config_changed(), state_in)
-            
         app_data = state_out.get_relation(relation.id).local_app_data
         assert app_data.get("secret-token") == token
 
@@ -275,8 +258,9 @@ class TestGetSecretToken:
 
     def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
-        If the `secret_token` is not provided locally nor in a replica and we are not the
-        leader unit, do nothing. We wait for the leader to generate a token.
+        If the `secret_token` is not provided locally nor in a replica and we
+        are not the leader unit, do nothing. We wait for the leader to generate
+        a token.
         """
         relation = PeerRelation("replicas", peers_data={})
         state = State(relations=[relation], config={}, leader=False)
@@ -291,8 +275,108 @@ class TestGetSecretToken:
         assert after_config["landscape"].get("secret-token", None) is None
 
 
-from settings_files import AMQP_USERNAME, VHOSTS
-from src.charm import UPDATE_WSL_DISTRIBUTIONS_SCRIPT
+class TestGetCookieEncryptionKey:
+    """
+    Tests for `on.config_changed` hooks that affect the `cookie-encryption-key`
+    configuration.
+    """
+
+    def test_provided_in_config(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is provided in the configuration for this unit,
+        return it.
+        """
+        cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        context = Context(LandscapeServerCharm)
+        state = State(config={"cookie_encryption_key": cookie_encryption_key})
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
+
+    def test_provided_in_replica(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided in the configuration
+        for this unit and there is a replica, return the encryption key from
+        it.
+        """
+        cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        relation = PeerRelation(
+            "replicas", local_app_data={"cookie-encryption-key": cookie_encryption_key}
+        )
+        state = State(relations=[relation])
+        context = Context(LandscapeServerCharm)
+
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
+
+    def test_prefer_local_config(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is provided in a replica but also
+        locally, prefer the local version and return it.
+        """
+        local_cookie_encryption_key = "testcookieencryptionkeylotsofentropy"
+        peer_cookie_encryption_key = "thecookieencryptionkeyfromthepeerrelation"
+        relation = PeerRelation(
+            "replicas",
+            peers_data={1: {"cookie-encryption-key": peer_cookie_encryption_key}},
+        )
+        state = State(
+            relations=[relation],
+            config={"cookie_encryption_key": local_cookie_encryption_key},
+        )
+        context = Context(LandscapeServerCharm)
+
+        context.run(context.on.config_changed(), state)
+
+        config = capture_service_conf.get_config()
+        assert config["api"]["cookie-encryption-key"] == local_cookie_encryption_key
+
+    def test_leader_generates_if_not_provided(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided locally nor in a replica
+        and we are the leader unit, generate a new cookie encryption key and
+        put it into the peer app relation databag.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state_in = State(relations=[relation], config={}, leader=True)
+        context = Context(LandscapeServerCharm)
+
+        before_config = capture_service_conf.get_config()
+        assert "api" not in before_config.sections()
+
+        with patch(
+            "charm.generate_cookie_encryption_key"
+        ) as mock_cookie_encryption_key:
+            cookie_encryption_key = "mytestcookieencryptionkey"
+            mock_cookie_encryption_key.return_value = cookie_encryption_key
+            state_out = context.run(context.on.config_changed(), state_in)
+
+        app_data = state_out.get_relation(relation.id).local_app_data
+        assert app_data.get("cookie-encryption-key") == cookie_encryption_key
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["api"].get("cookie-encryption-key") == cookie_encryption_key
+
+    def test_follower_waits_if_not_provided(self, capture_service_conf):
+        """
+        If the `cookie_encryption_key` is not provided locally nor in a replica
+        and we are not the leader unit, do nothing. We wait for the leader to
+        generate a cookie encryption key.
+        """
+        relation = PeerRelation("replicas", peers_data={})
+        state = State(relations=[relation], config={}, leader=False)
+        context = Context(LandscapeServerCharm)
+
+        before_config = capture_service_conf.get_config()
+        assert "api" not in before_config.sections()
+
+        context.run(context.on.config_changed(), state)
+
+        after_config = capture_service_conf.get_config()
+        assert after_config["api"].get("cookie-encryption-key", None) is None
 
 
 class TestCharm(unittest.TestCase):
@@ -411,10 +495,12 @@ class TestCharm(unittest.TestCase):
             relation_id, "landscape-server", {"leader-ip": "test"}
         )
 
-        with patch("charm.check_call") as mock:
-            with patch("charm.update_service_conf"):
-                mock.side_effect = CalledProcessError(127, Mock())
-                self.assertRaises(CalledProcessError, harness.begin_with_initial_hooks)
+        with (
+            patch("charm.check_call") as mock,
+            patch("charm.update_service_conf"),
+        ):
+            mock.side_effect = CalledProcessError(127, Mock())
+            self.assertRaises(CalledProcessError, harness.begin_with_initial_hooks)
 
     @patch.dict(
         os.environ,
@@ -620,11 +706,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, WaitingStatus)
@@ -665,11 +751,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -710,11 +796,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -748,11 +834,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call"),
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         update_service_conf_mock.assert_called_once_with(
             {
@@ -780,12 +866,12 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch(
-                "settings_files.update_service_conf"
-            ) as update_service_conf_mock:
-                check_call_mock.side_effect = CalledProcessError(127, "ouch")
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -826,12 +912,14 @@ class TestCharm(unittest.TestCase):
             peer_relation_id, "landscape-server", {"leader-ip": "test"}
         )
 
-        with patch("charm.check_call"):
-            with patch(
+        with (
+            patch("charm.check_call"),
+            patch(
                 "settings_files.update_service_conf",
-            ) as update_service_conf_mock:
-                self.harness.charm._db_relation_changed(mock_event)
-                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+            ) as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         self.assertEqual(update_service_conf_mock.call_count, 2)
         self.assertEqual(
@@ -863,14 +951,18 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                check_call_mock.side_effect = CalledProcessError(127, "ouch")
-                self.harness.update_config({"db_host": "hello", "db_port": "world"})
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
 
         status = self.harness.charm.unit.status
         self.assertIsInstance(status, BlockedStatus)
@@ -889,9 +981,11 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
 
         check_call_mock.assert_called_with([UPDATE_WSL_DISTRIBUTIONS_SCRIPT], env=ANY)
 
@@ -913,11 +1007,13 @@ class TestCharm(unittest.TestCase):
             },
         }
 
-        with patch("charm.check_call") as check_call_mock:
-            with patch("settings_files.update_service_conf"):
-                # Let bootstrap account go through
-                check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
-                self.harness.charm._db_relation_changed(mock_event)
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            # Let bootstrap account go through
+            check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
+            self.harness.charm._db_relation_changed(mock_event)
 
         status = self.harness.charm.unit.status
         self.assertNotIsInstance(status, BlockedStatus)
@@ -1137,25 +1233,7 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
-        haproxy_config["error_files"]["location"] = self.tempdir.name
-
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            with open(os.path.join(self.tempdir.name, filename), "w") as error_file:
-                error_file.write("THIS IS ERROR FILE FOR {}\n".format(code))
-
-        mock_haproxy_config = os.path.join(self.tempdir.name, "my-haproxy-config.yaml")
-
-        with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
-            yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
-
-        with patch.multiple(
-            "charm",
-            HAPROXY_CONFIG_FILE=mock_haproxy_config,
-            update_service_conf=DEFAULT,
-        ):
+        with patch.multiple("charm", update_service_conf=DEFAULT):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]
@@ -1171,25 +1249,7 @@ class TestCharm(unittest.TestCase):
             mock_event.unit: {"public-address": "8.8.8.8"},
         }
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
-        haproxy_config["error_files"]["location"] = self.tempdir.name
-
-        for code, filename in haproxy_config["error_files"]["files"].items():
-            with open(os.path.join(self.tempdir.name, filename), "w") as error_file:
-                error_file.write("THIS IS ERROR FILE FOR {}\n".format(code))
-
-        mock_haproxy_config = os.path.join(self.tempdir.name, "my-haproxy-config.yaml")
-
-        with open(mock_haproxy_config, "w") as mock_haproxy_config_file:
-            yaml.safe_dump(haproxy_config, mock_haproxy_config_file)
-
-        with patch.multiple(
-            "charm",
-            HAPROXY_CONFIG_FILE=mock_haproxy_config,
-            update_service_conf=DEFAULT,
-        ):
+        with patch.multiple("charm", update_service_conf=DEFAULT):
             self.harness.charm._website_relation_joined(mock_event)
 
         relation_data = mock_event.relation.data[self.harness.charm.unit]
@@ -1373,9 +1433,11 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_ready_status = Mock()
         event = Mock(spec_set=ActionEvent)
 
-        with patch("subprocess.run") as run_mock:
-            with patch("charm.check_call") as check_call_mock:
-                self.harness.charm._resume(event)
+        with (
+            patch("subprocess.run") as run_mock,
+            patch("charm.check_call") as check_call_mock,
+        ):
+            self.harness.charm._resume(event)
 
         run_mock.assert_called_once_with(
             [LSCTL, "start"], capture_output=True, text=True, env=ANY
@@ -1389,12 +1451,14 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_ready_status = Mock()
         event = Mock(spec_set=ActionEvent)
 
-        with patch("subprocess.run") as run_mock:
-            with patch("charm.check_call") as check_call_mock:
-                run_mock.return_value = Mock(stdout="Everything is on fire")
-                check_call_mock.side_effect = CalledProcessError(127, "uhoh")
+        with (
+            patch("subprocess.run") as run_mock,
+            patch("charm.check_call") as check_call_mock,
+        ):
+            run_mock.return_value = Mock(stdout="Everything is on fire")
+            check_call_mock.side_effect = CalledProcessError(127, "uhoh")
 
-                self.harness.charm._resume(event)
+            self.harness.charm._resume(event)
 
         self.assertEqual(2, len(run_mock.mock_calls))
         run_mock.assert_any_call(
@@ -1564,10 +1628,12 @@ class TestCharm(unittest.TestCase):
         unit = self.harness.charm.unit
         mock_event.relation.data = {unit: {}}
 
-        with patch("os.path.exists") as os_path_exists_mock:
-            with patch("os.remove") as os_remove_mock:
-                os_path_exists_mock.return_value = True
-                self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+        with (
+            patch("os.path.exists") as os_path_exists_mock,
+            patch("os.remove") as os_remove_mock,
+        ):
+            os_path_exists_mock.return_value = True
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
 
         self.assertEqual(
             len(os_path_exists_mock.mock_calls),
@@ -1592,10 +1658,12 @@ class TestCharm(unittest.TestCase):
 
             return False
 
-        with patch("os.path.exists") as os_path_exists_mock:
-            with patch("os.remove") as os_remove_mock:
-                os_path_exists_mock.side_effect = path_exists
-                self.harness.charm._nrpe_external_master_relation_joined(mock_event)
+        with (
+            patch("os.path.exists") as os_path_exists_mock,
+            patch("os.remove") as os_remove_mock,
+        ):
+            os_path_exists_mock.side_effect = path_exists
+            self.harness.charm._nrpe_external_master_relation_joined(mock_event)
 
         self.assertEqual(
             len(os_path_exists_mock.mock_calls),
@@ -1659,465 +1727,6 @@ class TestCharm(unittest.TestCase):
         )
 
 
-class TestCreateHAProxyServices(unittest.TestCase):
-    """
-    Test that the Landscape services receive the correct stanzas in the HAProxy
-    configuration.
-    """
-
-    def setUp(self):
-        with open(HAPROXY_CONFIG_FILE) as f:
-            self.haproxy_config = yaml.safe_load(f)
-        self.service_ports = {
-            "appserver": 8000,
-            "pingserver": 8070,
-            "message-server": 8090,
-            "api": 9080,
-            "package-upload": 9100,
-            "hostagent-messenger": 50052,
-        }
-        self.server_options = ["check", "inter 5000", "rise 2", "fall 5", "maxconn 50"]
-        self.https_service = self.haproxy_config["https_service"]
-        self.http_service = self.haproxy_config["http_service"]
-        self.grpc_service = self.haproxy_config["grpc_service"]
-
-    def test_ssl_cert_set(self):
-        """
-        Uses the provided `ssl_cert` with the HTTPs and gRPC services.
-        """
-
-        ssl_cert = "some-ssl-cert"
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert=ssl_cert,
-            server_ip="",
-            unit_name="",
-            worker_counts=1,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        self.assertIn(ssl_cert, https["crts"])
-        self.assertIn(ssl_cert, grpc["crts"])
-        self.assertIsNone(http.get("crts"))
-
-    def test_error_files_set(self):
-        """
-        Assigns the proivided `error_files` to the http, https, and grpc services.
-        """
-        error_files = [
-            HAProxyErrorFile(http_status=404, content=b64encode(b"Not Found!")),
-            HAProxyErrorFile(http_status=405, content=b64encode(b"Not Allowed!")),
-            HAProxyErrorFile(http_status=500, content=b64encode(b"Oops, our fault...")),
-        ]
-
-        expected = [
-            {"http_status": 404, "content": b64encode(b"Not Found!")},
-            {"http_status": 405, "content": b64encode(b"Not Allowed!")},
-            {"http_status": 500, "content": b64encode(b"Oops, our fault...")},
-        ]
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip="",
-            unit_name="",
-            worker_counts=1,
-            is_leader=False,
-            error_files=error_files,
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        for service in (http, https, grpc):
-            self.assertEqual(expected, service["error_files"])
-
-    def test_http_services(self):
-        """
-        pingserver and appserver are served over HTTP.
-        """
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip="",
-            unit_name="",
-            worker_counts=1,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-        backend_stanza = {"backend_name": "landscape-ping", "servers": ANY}
-
-        self.assertIn(backend_stanza, http["backends"])
-        self.assertNotIn(backend_stanza, https["backends"])
-
-    def test_https_services(self):
-        """
-        appserver, api, package upload, and message server are served over HTTPs.
-        """
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip="",
-            unit_name="",
-            worker_counts=1,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        backend_stanzas = (
-            {"backend_name": "landscape-message", "servers": ANY},
-            {"backend_name": "landscape-api", "servers": ANY},
-            {"backend_name": "landscape-package-upload", "servers": ANY},
-            {"backend_name": "landscape-hashid-databases", "servers": ANY},
-        )
-
-        for backend_stanza in backend_stanzas:
-            self.assertNotIn(backend_stanza, http["backends"])
-            self.assertIn(backend_stanza, https["backends"])
-
-    def test_configure_grpc_services(self):
-        """
-        Each hostagent-messenger receives a
-        `landscape-hostagent-messenger-<unit name>-<index> name,
-        the server_ip, the correct port, and the server options.
-
-        Counts are based on `worker_count`.
-
-        landscape-hostagent-messenger is set as a server on the gRPC service.
-        """
-
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=1,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = [
-            (
-                f"landscape-hostagent-messenger-{unit_name}-0",
-                server_ip,
-                self.service_ports["hostagent-messenger"],
-                self.server_options
-                + self.haproxy_config["grpc_service"]["server_options"],
-            )
-        ]
-
-        self.assertEqual(expected, grpc["servers"])
-
-    def test_configure_appservers(self):
-        """
-        Each appserver receives a `landscape-appserver-<unit name>-<index> name,
-        the server_ip, the correct port, and the server options.
-
-        Counts are based on `worker_count`.
-
-        Appservers are served over HTTP and HTTPs.
-        """
-
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=1,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = [
-            (
-                f"landscape-appserver-{unit_name}-0",
-                server_ip,
-                self.service_ports["appserver"],
-                self.server_options,
-            )
-        ]
-
-        self.assertEqual(expected, http["servers"])
-        self.assertEqual(expected, https["servers"])
-
-    def test_configure_pingservers(self):
-        """
-        Each pingserver receives a `landscape-pingserver-<unit name>-<index> name,
-        the server_ip, the correct port, and the global server options.
-
-        Counts are based on `worker_count`.
-        """
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-        worker_counts = 3
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-ping",
-            "servers": [
-                (
-                    f"landscape-pingserver-{unit_name}-{i}",
-                    server_ip,
-                    self.service_ports["pingserver"] + i,
-                    self.server_options,
-                )
-                for i in range(worker_counts)
-            ],
-        }
-
-        self.assertIn(expected, http["backends"])
-        self.assertNotIn(expected, https["backends"])
-
-    def test_configure_message_servers(self):
-        """
-        Each message server receives a `landscape-message-server-<unit name>-<index> name,
-        the server_ip, the correct port, and the global server options.
-
-        Counts are based on `worker_count`.
-        """
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-        worker_counts = 3
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-message",
-            "servers": [
-                (
-                    f"landscape-message-server-{unit_name}-{i}",
-                    server_ip,
-                    self.service_ports["message-server"] + i,
-                    self.server_options,
-                )
-                for i in range(worker_counts)
-            ],
-        }
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-    def test_configure_api_servers(self):
-        """
-        Each API server receives a `landscape-api-<unit name>-<index> name,
-        the server_ip, the correct port assigned, the global server options.
-
-        Counts are based on `worker_count`.
-        """
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-        worker_counts = 3
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-api",
-            "servers": [
-                (
-                    f"landscape-api-{unit_name}-{i}",
-                    server_ip,
-                    self.service_ports["api"] + i,
-                    self.server_options,
-                )
-                for i in range(worker_counts)
-            ],
-        }
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-    def test_configure_package_upload_server(self):
-        """
-        There is only one package upload server.
-
-        It receives a `landscape-package-upload-<unit name>-0 name, the server_ip,
-        the assigned port, and the global server options.
-
-        Package upload only has servers if the unit is the leader. Non-leaders
-        declare the backend but do not receive a `servers` configuration.
-        """
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-        worker_counts = 3
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=True,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-package-upload",
-            "servers": [
-                (
-                    f"landscape-package-upload-{unit_name}-0",
-                    server_ip,
-                    self.service_ports["package-upload"],
-                    self.server_options,
-                )
-            ],
-        }
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-package-upload",
-            "servers": [],
-        }
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-    def test_hashid_databases_backend(self):
-        """
-        Only the leader receives a server for the `landscape-hashid-databases backend.
-        The `landscape-hashids-databases` backend reuses the `appservers` configuration.
-
-        Non-leaders declare the backend but do not have a server.
-        """
-        server_ip = "10.194.61.5"
-        unit_name = "0"
-        worker_counts = 3
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=True,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {
-            "backend_name": "landscape-hashid-databases",
-            "servers": [
-                (
-                    f"landscape-appserver-{unit_name}-{i}",
-                    server_ip,
-                    self.service_ports["appserver"] + i,
-                    self.server_options,
-                )
-                for i in range(worker_counts)
-            ],
-        }
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-        http, https, grpc = _create_haproxy_services(
-            http_service=self.http_service,
-            https_service=self.https_service,
-            grpc_service=self.grpc_service,
-            ssl_cert="",
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=worker_counts,
-            is_leader=False,
-            error_files=(),
-            service_ports=self.service_ports,
-            server_options=self.server_options,
-        )
-
-        expected = {"backend_name": "landscape-hashid-databases", "servers": []}
-
-        self.assertIn(expected, https["backends"])
-        self.assertNotIn(expected, http["backends"])
-
-
 # TODO fix from broken commit.
 @unittest.skip("Broken in `de29548e2b09c71db3a55f606ab318b5ea25550d`")
 class TestBootstrapAccount(unittest.TestCase):
@@ -2166,8 +1775,8 @@ class TestBootstrapAccount(unittest.TestCase):
                 "root_url": "https://www.landscape.com",
             }
         )
-        for call in self.log_info_mock.call_args_list:
-            self.assertNotIn("secret123", str(call.args))
+        for mock_call in self.log_info_mock.call_args_list:
+            self.assertNotIn("secret123", str(mock_call.args))
 
     @patch("charm.update_service_conf")
     def test_bootstrap_account_doesnt_run_with_missing_rooturl(self, _):
