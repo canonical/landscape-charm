@@ -241,13 +241,17 @@ class LandscapeServerCharm(CharmBase):
 
         # Relations
         self.database = DatabaseRequires(
-            self, relation_name="database", database_name="database"
+            self,
+            relation_name="database",
+            database_name="landscape",
+            # See https://github.com/canonical/postgresql-operator/blob/9ca92070e8944dc879b108fc85d1ee80b8388153/src/charm.py#L2154C16-L2163C59
+            extra_user_roles="SUPERUSER",
         )
         self.framework.observe(
-            self.database.on.database_created, self._on_database_created
+            self.database.on.database_created, self._database_relation_changed
         )
         self.framework.observe(
-            self.database.on.endpoints_changed, self._on_database_endpoints_changed
+            self.database.on.endpoints_changed, self._database_relation_changed
         )
 
         # Inbound vhost
@@ -480,11 +484,13 @@ class LandscapeServerCharm(CharmBase):
         if landscape_password:
             db_kargs["password"] = landscape_password
         if db_kargs:
+            logger.info("kargs: %s", db_kargs)
             update_db_conf(**db_kargs)
             if self._migrate_schema_bootstrap():
                 self.unit.status = WaitingStatus("Waiting on relations")
                 self._stored.ready["database"] = True
             else:
+                logger.info("migrating schema failed")
                 return
 
         self._bootstrap_account()
@@ -729,11 +735,12 @@ class LandscapeServerCharm(CharmBase):
     def _database_relation_changed(
         self, event: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
-        logger.debug("Database relation changed: %s", event)
+        logger.info("Database relation changed: %s", event.database)
+        logger.info("'Model' unit: %s", getattr(self.model, "unit", None))
         database_relation_data = self.fetch_postgres_relation_data()
-        logger.debug("unit data: %s", database_relation_data)
+        logger.info("unit data: %s", database_relation_data)
 
-        required_relation_data = ["user", "password", "port", "host"]
+        required_relation_data = ["username", "password", "port", "host"]
         missing_relation_data = [
             i for i in required_relation_data if i not in database_relation_data
         ]
@@ -747,55 +754,56 @@ class LandscapeServerCharm(CharmBase):
             self._update_ready_status()
             return
 
-        self._stored.ready["database"] = False
-        self.unit.status = MaintenanceStatus("Setting up databases")
+        if self.unit.is_leader():
+            self._stored.ready["database"] = False
+            self.unit.status = MaintenanceStatus("Setting up databases")
 
-        # Override db config if manually set in juju
-        config_host = self.model.config.get("db_host")
-        if config_host:
-            host = config_host
-        else:
-            host = database_relation_data["host"]
+            # Override db config if manually set in juju
+            config_host = self.model.config.get("db_host")
+            if config_host:
+                host = config_host
+            else:
+                host = database_relation_data["host"]
 
-        landscape_password = self.model.config.get("db_landscape_password")
-        if landscape_password:
-            password = landscape_password
-        else:
-            password = database_relation_data["password"]
+            landscape_password = self.model.config.get("db_landscape_password")
+            if landscape_password:
+                password = landscape_password
+            else:
+                password = database_relation_data["password"]
 
-        schema_password = self.model.config.get("db_schema_password")
+            schema_password = self.model.config.get("db_schema_password")
 
-        config_port = self.model.config.get("db_port")
-        if config_port:
-            port = config_port
-        else:
-            port = database_relation_data["port"]
-        if not port:
-            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
+            config_port = self.model.config.get("db_port")
+            if config_port:
+                port = config_port
+            else:
+                port = database_relation_data["port"]
+            if not port:
+                port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
-        config_user = self.model.config.get("db_schema_user")
-        if config_user:
-            user = config_user
-        else:
-            user = database_relation_data["user"]
+            config_user = self.model.config.get("db_schema_user")
+            if config_user:
+                user = config_user
+            else:
+                user = database_relation_data["username"]
 
-        update_db_conf(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            schema_password=schema_password,
-        )
+            update_db_conf(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                schema_password=schema_password,
+            )
 
-        if not self._migrate_schema_bootstrap():
-            return
+            if not self._migrate_schema_bootstrap():
+                return
 
-        if not self._update_wsl_distributions():
-            return
+            if not self._update_wsl_distributions():
+                return
 
-        self._stored.ready["database"] = True
-        self.unit.status = ActiveStatus("Unit is ready")
-        self._update_ready_status(restart_services=True)
+            self._stored.ready["database"] = True
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status(restart_services=True)
 
     @cached_property
     def _proxy_settings(self) -> List[str]:

@@ -33,6 +33,7 @@ applications:
     options:
         landscape_ppa: ppa:landscape/self-hosted-beta
         min_install: True
+      
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]
