@@ -1,0 +1,30 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+# Adapted from: https://github.com/canonical/postgresql-operator/blob/main/.github/workflows/ci.yaml
+name: Build charm
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - 'LICENSE'
+      - '**.md'
+      - '.jujuignore'
+    
+  # Triggered on push to branch "main" by .github/workflows/release.yaml
+  # TODO: Actually add this workflow for our charm.
+  workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v35.0.2
