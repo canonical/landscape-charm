@@ -84,7 +84,7 @@ it would be deployed by Juju in the `landscape-scalable` bundle:
 make deploy
 ```
 
-By default, the model name will be the `landscape-charm-build`, but it can be overridden with the `LANDSCAPE_CHARM_JUJU_MODEL_NAME` environment variable.
+The model name will be the `landscape-charm-build`.
 
 ### Run unit tests
 
