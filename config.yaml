@@ -235,4 +235,8 @@ options:
   enable_ubuntu_installer_attach:
     type: boolean
     default: false
-    description: TODO
+    description: |
+      Whether the `landscape-ubuntu-installer-attach` service should run. If true,
+      an HAProxy frontend will be created to route traffic to the Ubuntu installer
+      attach backend services. The backend services will be installed and uninstalled
+      automatically.
