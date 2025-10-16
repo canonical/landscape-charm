@@ -985,17 +985,19 @@ class LandscapeServerCharm(CharmBase):
             server_options=SERVER_OPTIONS,
         )
 
-        grpc_service = create_grpc_service(
-            grpc_service=asdict(GRPC_SERVICE),
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-        )
+        services = [http_service, https_service]
 
-        services = [http_service, https_service, grpc_service]
+        if self.model.config.get("enable_hostagent_messenger"):
+            grpc_service = create_grpc_service(
+                grpc_service=asdict(GRPC_SERVICE),
+                ssl_cert=ssl_cert,
+                server_ip=server_ip,
+                unit_name=unit_name,
+                error_files=error_files,
+                service_ports=PORTS,
+                server_options=SERVER_OPTIONS,
+            )
+            services.append(grpc_service)
 
         if self._stored.enable_ubuntu_installer_attach:
             services.append(
