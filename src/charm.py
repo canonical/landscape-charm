@@ -20,6 +20,11 @@ import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
 
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
@@ -83,11 +88,6 @@ from settings_files import (
     VHOSTS,
     write_license_file,
     write_ssl_cert,
-)
-from charms.data_platform_libs.v0.data_interfaces import (
-    DatabaseCreatedEvent,
-    DatabaseEndpointsChangedEvent,
-    DatabaseRequires,
 )
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
