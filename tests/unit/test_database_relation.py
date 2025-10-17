@@ -64,7 +64,6 @@ class TestFetchPostgresRelationData:
         assert result == DatabaseConnectionContext()
 
 
-
 class TestDatabaseRelation:
     """
     Tests for the modern `postgres_client` interface.
@@ -114,9 +113,7 @@ class TestDatabaseRelation:
     @patch("charm.update_db_conf")
     @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
     @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_missing_fields(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_missing_fields(self, _, __, update_db_conf, fetch_mock):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
         fetch_mock.return_value = DatabaseConnectionContext(
@@ -284,9 +281,7 @@ class TestDatabaseRelation:
     @patch("charm.fetch_postgres_relation_data")
     @patch("charm.update_db_conf")
     @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=False)
-    def test_database_relation_migrate_failure(
-        self, _, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_migrate_failure(self, _, update_db_conf, fetch_mock):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
         fetch_mock.return_value = DatabaseConnectionContext(

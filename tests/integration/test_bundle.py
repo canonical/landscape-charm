@@ -179,6 +179,7 @@ def get_session(
     session.mount("https://", adapter)
     return session
 
+
 def test_prefers_modern_database_relation(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     initial_relations = set(status.apps["landscape-server"].relations)
@@ -222,7 +223,12 @@ def test_no_postgres_relation_blocks_unit(juju: jubilant.Juju, bundle: None):
     juju.remove_relation("landscape-server:db", "postgresql:db-admin")
 
     juju.wait(jubilant.all_active, timeout=120, successes=1, delay=5)
-    workload = juju.status().apps["landscape-server"].units["landscape-server/0"].workload_status
+    workload = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .workload_status
+    )
 
     assert workload.current in {"waiting", "blocked"}
 

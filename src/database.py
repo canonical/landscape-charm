@@ -15,7 +15,9 @@ class DatabaseConnectionContext:
     password: str | None = None
 
 
-def fetch_postgres_relation_data(db_manager: DatabaseRequires) -> DatabaseConnectionContext:
+def fetch_postgres_relation_data(
+    db_manager: DatabaseRequires,
+) -> DatabaseConnectionContext:
     """
     Get the required data from the Postgres relation helper.
 

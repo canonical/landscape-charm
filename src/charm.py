@@ -254,14 +254,19 @@ class LandscapeServerCharm(CharmBase):
                 self.database.on.endpoints_changed, self._database_relation_changed
             )
 
-
         # Legacy Postgres relation
         elif self.model.get_relation("db") is not None:
-            logger.warning("The legacy `db` endpoint is deprecated and support will be dropped in a future release."
-                            "Please rename the relation endpoint to 'database'.")
-            self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
-            self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
-
+            logger.warning(
+                "The legacy `db` endpoint is deprecated and support will be "
+                "dropped in a future release. Please rename the relation "
+                "endpoint to 'database'."
+            )
+            self.framework.observe(
+                self.on.db_relation_joined, self._db_relation_changed
+            )
+            self.framework.observe(
+                self.on.db_relation_changed, self._db_relation_changed
+            )
 
         # Inbound vhost
         self.framework.observe(
@@ -797,7 +802,9 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status(restart_services=True)
 
-    def _database_relation_changed(self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent) -> None:
+    def _database_relation_changed(
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
         """
         Handle the modern Postgres charm interface (`database` relation).
         """
@@ -807,12 +814,16 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = ActiveStatus("Unit is ready")
             return
 
-        db_ctx: DatabaseConnectionContext = fetch_postgres_relation_data(db_manager=self.database)
+        db_ctx: DatabaseConnectionContext = fetch_postgres_relation_data(
+            db_manager=self.database
+        )
 
         required_fields = ["username", "password", "port", "host"]
         missing_fields = [f for f in required_fields if not asdict(db_ctx).get(f)]
         if missing_fields:
-            logger.info(f"Missing required database fields: {', '.join(missing_fields)}")
+            logger.info(
+                f"Missing required database fields: {', '.join(missing_fields)}"
+            )
 
             self._stored.ready["db"] = False
             self.unit.status = ActiveStatus("Unit is ready")
@@ -833,9 +844,7 @@ class LandscapeServerCharm(CharmBase):
         landscape_password = self.model.config.get("db_landscape_password")
         if landscape_password:
             password = landscape_password
-            logger.info(
-                "Using the password for the `landscape` user from the config."
-            )
+            logger.info("Using the password for the `landscape` user from the config.")
         else:
             password = db_ctx.password
             logger.info("Using the password from the `database` relation.")
@@ -848,14 +857,10 @@ class LandscapeServerCharm(CharmBase):
             logger.info("Using the port provided in the config: %s", port)
         else:
             port = db_ctx.port
-            logger.info(
-                "Using the port provided by the `database` relation: %s", port
-            )
+            logger.info("Using the port provided by the `database` relation: %s", port)
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
-            logger.info(
-                "Using the default Postgres port: %d", DEFAULT_POSTGRES_PORT
-            )
+            logger.info("Using the default Postgres port: %d", DEFAULT_POSTGRES_PORT)
 
         config_user = self.model.config.get("db_schema_user")
         if config_user:
@@ -865,9 +870,7 @@ class LandscapeServerCharm(CharmBase):
             user = db_ctx.username
             logger.info("Using the usernaming provided by the relation.")
 
-        logger.info(
-            "Updating the `stores` and `schema` sections in `service.conf`..."
-        )
+        logger.info("Updating the `stores` and `schema` sections in `service.conf`...")
 
         update_db_conf(
             host=host,
