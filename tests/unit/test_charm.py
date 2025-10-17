@@ -424,10 +424,11 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             self.harness.charm._stored.ready,
             {
-                "db": False,
+                "database": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
                 "haproxy": False,
+                "db": False,
             },
         )
 

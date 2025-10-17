@@ -247,7 +247,6 @@ class LandscapeServerCharm(CharmBase):
             self,
             relation_name="database",
             database_name="landscape",
-            # See https://github.com/canonical/postgresql-operator/blob/9ca92070e8944dc879b108fc85d1ee80b8388153/src/charm.py#L2154C16-L2163C59
             extra_user_roles="SUPERUSER",
         )
         self.framework.observe(
@@ -326,6 +325,7 @@ class LandscapeServerCharm(CharmBase):
         # State
         self._stored.set_default(
             ready={
+                "db": False,
                 "database": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
@@ -471,6 +471,7 @@ class LandscapeServerCharm(CharmBase):
             if self._migrate_schema_bootstrap():
                 self.unit.status = WaitingStatus("Waiting on relations")
                 self._stored.ready["database"] = True
+                self._stored.ready["db"] = True
             else:
                 logger.info("migrating schema failed")
                 return
@@ -713,11 +714,22 @@ class LandscapeServerCharm(CharmBase):
             logger.error("Starting services failed with output: %s", e.output)
             self.unit.status = BlockedStatus("Failed to start services")
             return False
-    
-    def _db_relation_changed(self, event: RelationChangedEvent) -> None:
+
+    def _database_relation_changed(
+        self,
+        event: (
+            RelationChangedEvent | DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+        ),
+    ) -> None:
         """
-        Handle the legacy Postgres charm interface (`db` relation).
+        Handle the legacy Postgres charm interface (`db` relation) and the
+        modern `database` relation endpoint.
+
+        If using the modern charm, the event is ignored and the data is fetched
+        using `fetch_postgres_relation_data()`.
         """
+
+    def _handle_legacy_postgres_charm(self, event: RelationChangedEvent):
         unit_data = event.relation.data[event.unit]
 
         required_relation_data = ["master", "allowed-units", "port", "user"]
@@ -794,13 +806,13 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status(restart_services=True)
 
-    def _database_relation_changed(
+    def _handle_modern_postgres_relation(
         self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
         """
         Handle the modern Postgres charm interface (`database` relation).
         """
-        database_relation_data = self.fetch_postgres_relation_data()
+        database_relation_data = self._fetch_postgres_relation_data()
 
         required_relation_data = ["username", "password", "port", "host"]
         missing_relation_data = [
@@ -817,6 +829,7 @@ class LandscapeServerCharm(CharmBase):
             return
 
         if self.unit.is_leader():
+            logger.debug("Setting up leader Postgres unit...")
             self._stored.ready["database"] = False
             self.unit.status = MaintenanceStatus("Setting up databases")
 
@@ -824,30 +837,49 @@ class LandscapeServerCharm(CharmBase):
             config_host = self.model.config.get("db_host")
             if config_host:
                 host = config_host
+                logger.debug("Using the host from the config: %s", host)
             else:
                 host = database_relation_data["host"]
+                logger.debug("Using the `host` from the `database` relation: %s", host)
 
             landscape_password = self.model.config.get("db_landscape_password")
             if landscape_password:
                 password = landscape_password
+                logger.debug(
+                    "Using the password for the `landscape` user from the config."
+                )
             else:
                 password = database_relation_data["password"]
+                logger.debug("Using the password from the `database` relation.")
 
             schema_password = self.model.config.get("db_schema_password")
 
             config_port = self.model.config.get("db_port")
             if config_port:
                 port = config_port
+                logger.debug("Using the port provided in the config: %d", port)
             else:
                 port = database_relation_data["port"]
+                logger.debug(
+                    "Using the port provided by the `database` relation: %d", port
+                )
             if not port:
                 port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
+                logger.debug(
+                    "Using the default Postgres port: %d", DEFAULT_POSTGRES_PORT
+                )
 
             config_user = self.model.config.get("db_schema_user")
             if config_user:
                 user = config_user
+                logger.debug("Using the username provided in the config.")
             else:
                 user = database_relation_data["username"]
+                logger.debug("Using the usernaming provided by the relation.")
+
+            logger.debug(
+                "Updating the `stores` and `schema` sections in `service.conf`..."
+            )
 
             update_db_conf(
                 host=host,
@@ -858,41 +890,21 @@ class LandscapeServerCharm(CharmBase):
             )
 
             if not self._migrate_schema_bootstrap():
+                logger.info(
+                    "Migrating schema failed trying to update the `database` relation!"
+                )
                 return
 
             if not self._update_wsl_distributions():
+                logger.info(
+                    "Updating WSL distributions failed trying to update the `database` "
+                    "relation!"
+                )
                 return
 
             self._stored.ready["database"] = True
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status(restart_services=True)
-
-    def fetch_postgres_relation_data(self) -> dict[str, str]:
-        """
-        Get the required data from the Postgres relation helper.
-
-        NOTE: Despite being named endpoint**s**, it's just one string
-        of db_host:port.
-        """
-        relation_data = self.database.fetch_relation_data()
-        logger.debug(
-            "Got following data from the `database` relation: %s", relation_data
-        )
-        for data in relation_data.values():
-            if not data:
-                continue
-
-            logger.info("New database endpoint is %s", data["endpoints"])
-            host, port = data["endpoints"].split(":")
-            db_data = {
-                "host": host,
-                "port": port,
-                "username": data["username"],
-                "password": data["password"],
-            }
-            return db_data
-
-        return {}
 
     @cached_property
     def _proxy_settings(self) -> List[str]:
