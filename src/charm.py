@@ -58,6 +58,7 @@ from ops.model import (
 )
 import yaml
 
+from database import fetch_postgres_relation_data
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -89,7 +90,6 @@ from settings_files import (
     write_license_file,
     write_ssl_cert,
 )
-from database import fetch_postgres_relation_data
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"

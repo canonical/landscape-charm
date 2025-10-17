@@ -464,7 +464,7 @@ class TestCharm(unittest.TestCase):
         self.assertIsInstance(status, WaitingStatus)
         self.assertEqual(
             status.message,
-            "Waiting on relations: db, inbound-amqp, outbound-amqp, haproxy",
+            "Waiting on relations: db, database, inbound-amqp, outbound-amqp, haproxy",
         )
 
     def test_install_package_not_found_error(self):
