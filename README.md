@@ -65,12 +65,26 @@ Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
 on enhancements to this charm following best practice guidelines, and
 `CONTRIBUTING.md` for developer guidance.
 
-When developing the charm, here's a quick way to test out changes as
-they would be deployed by `landscape-scalable`:
+When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. Make sure you have [`pipx`](https://github.com/pypa/pipx) installed:
+
+```sh
+sudo apt install -y pipx
+```
+
+Then, install `charmcraftcache` (which can be used by its alias, `ccc`):
+
+```sh
+pipx install charmcraftcache
+```
+
+Use the following command to test the charm as
+it would be deployed by Juju in the `landscape-scalable` bundle:
 
 ```bash
-make build
+make deploy
 ```
+
+The model name will be the `landscape-charm-build`.
 
 ### Run unit tests
 

@@ -20,5 +20,6 @@ output "requires" {
   value = merge({
     application_dashboard = "application-dashboard"
     db                    = "db"
+    database              = "database"
   }, local.amqp_relations)
 }

@@ -1,11 +1,14 @@
 DIRNAME = $(notdir $(shell pwd))
 DIRNAME := $(addsuffix -build, $(DIRNAME))
 
-build: clean
-	charmcraft pack
+build:
+	ccc pack --platform ubuntu@22.04:amd64
+
+deploy: clean build
 	juju add-model $(DIRNAME)
-	juju deploy ./bundle-examples/bundle.yaml
+	juju deploy -m $(DIRNAME) ./bundle-examples/bundle.yaml
 
 clean:
-	-rm *.charm
-	-juju destroy-model --no-prompt $(DIRNAME) --force
+	-rm -f *.charm
+	-juju destroy-model --no-prompt $(DIRNAME) \
+		--force --no-wait --destroy-storage
