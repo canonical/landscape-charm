@@ -240,6 +240,9 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.update_status, self._update_status)
 
         # Relations
+        self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
+        self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
+
         self.database = DatabaseRequires(
             self,
             relation_name="database",
@@ -349,27 +352,6 @@ class LandscapeServerCharm(CharmBase):
                 self.on.upgrade_charm,
             ],
         )
-
-    def fetch_postgres_relation_data(self) -> dict[str, str]:
-        relation_data = self.database.fetch_relation_data()
-        logger.debug(
-            "Got following data from the `database` relation: %s", relation_data
-        )
-        for data in relation_data.values():
-            if not data:
-                continue
-
-            logger.info("New database endpoint is %s", data["endpoints"])
-            host, port = data["endpoints"].split(":")
-            db_data = {
-                "host": host,
-                "port": port,
-                "username": data["username"],
-                "password": data["password"],
-            }
-            return db_data
-
-        return {}
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -731,14 +713,94 @@ class LandscapeServerCharm(CharmBase):
             logger.error("Starting services failed with output: %s", e.output)
             self.unit.status = BlockedStatus("Failed to start services")
             return False
+    
+    def _db_relation_changed(self, event: RelationChangedEvent) -> None:
+        """
+        Handle the legacy Postgres charm interface (`db` relation).
+        """
+        unit_data = event.relation.data[event.unit]
+
+        required_relation_data = ["master", "allowed-units", "port", "user"]
+        missing_relation_data = [
+            i for i in required_relation_data if i not in unit_data
+        ]
+        if missing_relation_data:
+            logger.info(
+                "db relation not yet ready. Missing keys: {}".format(
+                    missing_relation_data
+                )
+            )
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status()
+            return
+
+        allowed_units = unit_data["allowed-units"].split()
+        if self.unit.name not in allowed_units:
+            logger.info(f"{self.unit.name} not in allowed_units")
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status()
+            return
+
+        self._stored.ready["db"] = False
+        self.unit.status = MaintenanceStatus("Setting up databases")
+
+        # We can't use unit_data["host"] because it can return the IP of the secondary
+        master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
+
+        # Override db config if manually set in juju
+        config_host = self.model.config.get("db_host")
+        if config_host:
+            host = config_host
+        else:
+            host = master["host"]
+
+        landscape_password = self.model.config.get("db_landscape_password")
+        if landscape_password:
+            password = landscape_password
+        else:
+            password = master["password"]
+
+        schema_password = self.model.config.get("db_schema_password")
+
+        config_port = self.model.config.get("db_port")
+        if config_port:
+            port = config_port
+        else:
+            port = unit_data["port"]
+        if not port:
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
+
+        config_user = self.model.config.get("db_schema_user")
+        if config_user:
+            user = config_user
+        else:
+            user = unit_data["user"]
+
+        update_db_conf(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            schema_password=schema_password,
+        )
+
+        if not self._migrate_schema_bootstrap():
+            return
+
+        if not self._update_wsl_distributions():
+            return
+
+        self._stored.ready["db"] = True
+        self.unit.status = ActiveStatus("Unit is ready")
+        self._update_ready_status(restart_services=True)
 
     def _database_relation_changed(
-        self, event: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
     ) -> None:
-        logger.info("Database relation changed: %s", event.database)
-        logger.info("'Model' unit: %s", getattr(self.model, "unit", None))
+        """
+        Handle the modern Postgres charm interface (`database` relation).
+        """
         database_relation_data = self.fetch_postgres_relation_data()
-        logger.info("unit data: %s", database_relation_data)
 
         required_relation_data = ["username", "password", "port", "host"]
         missing_relation_data = [
@@ -804,6 +866,33 @@ class LandscapeServerCharm(CharmBase):
             self._stored.ready["database"] = True
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status(restart_services=True)
+
+    def fetch_postgres_relation_data(self) -> dict[str, str]:
+        """
+        Get the required data from the Postgres relation helper.
+
+        NOTE: Despite being named endpoint**s**, it's just one string
+        of db_host:port.
+        """
+        relation_data = self.database.fetch_relation_data()
+        logger.debug(
+            "Got following data from the `database` relation: %s", relation_data
+        )
+        for data in relation_data.values():
+            if not data:
+                continue
+
+            logger.info("New database endpoint is %s", data["endpoints"])
+            host, port = data["endpoints"].split(":")
+            db_data = {
+                "host": host,
+                "port": port,
+                "username": data["username"],
+                "password": data["password"],
+            }
+            return db_data
+
+        return {}
 
     @cached_property
     def _proxy_settings(self) -> List[str]:
