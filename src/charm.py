@@ -89,6 +89,7 @@ from settings_files import (
     write_license_file,
     write_ssl_cert,
 )
+from database import fetch_postgres_relation_data
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
@@ -728,6 +729,12 @@ class LandscapeServerCharm(CharmBase):
         If using the modern charm, the event is ignored and the data is fetched
         using `fetch_postgres_relation_data()`.
         """
+        if isinstance(event, DatabaseCreatedEvent) or isinstance(
+            event, DatabaseEndpointsChangedEvent
+        ):
+            self._handle_modern_postgres_relation()
+        else:
+            self._handle_legacy_postgres_charm(event)
 
     def _handle_legacy_postgres_charm(self, event: RelationChangedEvent):
         unit_data = event.relation.data[event.unit]
@@ -806,13 +813,11 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status(restart_services=True)
 
-    def _handle_modern_postgres_relation(
-        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
-    ) -> None:
+    def _handle_modern_postgres_relation(self) -> None:
         """
         Handle the modern Postgres charm interface (`database` relation).
         """
-        database_relation_data = self._fetch_postgres_relation_data()
+        database_relation_data = fetch_postgres_relation_data(db_manager=self.database)
 
         required_relation_data = ["username", "password", "port", "host"]
         missing_relation_data = [
