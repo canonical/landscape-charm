@@ -244,6 +244,9 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
         self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
 
+        logger.info("db: %s", self.model.get_relation("db"))
+        logger.info("database: %s", self.model.get_relation("database"))
+
         self.database = DatabaseRequires(
             self,
             relation_name="database",
@@ -251,10 +254,10 @@ class LandscapeServerCharm(CharmBase):
             extra_user_roles="SUPERUSER",
         )
         self.framework.observe(
-            self.database.on.database_created, self._database_relation_changed
+            self.database.on.database_created, self._db_relation_changed
         )
         self.framework.observe(
-            self.database.on.endpoints_changed, self._database_relation_changed
+            self.database.on.endpoints_changed, self._db_relation_changed
         )
 
         # Inbound vhost
@@ -716,7 +719,7 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus("Failed to start services")
             return False
 
-    def _database_relation_changed(
+    def _db_relation_changed(
         self,
         event: (
             RelationChangedEvent | DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
