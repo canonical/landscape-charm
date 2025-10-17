@@ -8,14 +8,14 @@ from helpers import logger
 
 
 @dataclass
-class DatabaseConnection:
+class DatabaseConnectionContext:
     host: str | None = None
     port: int | None = None
     username: str | None = None
     password: str | None = None
 
 
-def fetch_postgres_relation_data(db_manager: DatabaseRequires) -> DatabaseConnection:
+def fetch_postgres_relation_data(db_manager: DatabaseRequires) -> DatabaseConnectionContext:
     """
     Get the required data from the Postgres relation helper.
 
@@ -30,11 +30,11 @@ def fetch_postgres_relation_data(db_manager: DatabaseRequires) -> DatabaseConnec
         logger.info("New database endpoint is %s", data["endpoints"])
         host, port = data["endpoints"].split(":")
 
-        return DatabaseConnection(
+        return DatabaseConnectionContext(
             host=host,
             port=port,
             username=data["username"],
             password=data["password"],
         )
 
-    return DatabaseConnection()
+    return DatabaseConnectionContext()

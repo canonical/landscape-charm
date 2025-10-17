@@ -178,3 +178,68 @@ def get_session(
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session
+
+def test_prefers_modern_database_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    initial_relations = set(status.apps["landscape-server"].relations)
+
+    if "database" not in initial_relations:
+        juju.integrate("landscape-server:database", "postgresql:database")
+    if "db" not in initial_relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+
+    juju.wait(jubilant.all_active, timeout=120)
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    assert "database" in relations
+    assert "db" in relations
+
+    _restore_relations(juju, initial_relations)
+
+
+def test_falls_back_to_legacy_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    initial_relations = set(status.apps["landscape-server"].relations)
+
+    if "database" in initial_relations:
+        juju.remove_relation("landscape-server:database", "postgresql:database")
+    if "db" not in initial_relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+
+    juju.wait(jubilant.all_active, timeout=120)
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    assert "db" in relations
+
+    _restore_relations(juju, initial_relations)
+
+
+def test_no_postgres_relation_blocks_unit(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    initial_relations = set(status.apps["landscape-server"].relations)
+
+    juju.remove_relation("landscape-server:database", "postgresql:database")
+    juju.remove_relation("landscape-server:db", "postgresql:db-admin")
+
+    juju.wait(jubilant.all_active, timeout=120, successes=1, delay=5)
+    workload = juju.status().apps["landscape-server"].units["landscape-server/0"].workload_status
+
+    assert workload.current in {"waiting", "blocked"}
+
+    _restore_relations(juju, initial_relations)
+
+
+def _restore_relations(juju: jubilant.Juju, expected: set[str]) -> None:
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    if "database" in expected and "database" not in relations:
+        juju.integrate("landscape-server:database", "postgresql:database")
+    if "database" not in expected and "database" in relations:
+        juju.remove_relation("landscape-server:database", "postgresql:database")
+
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    if "db" in expected and "db" not in relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+    if "db" not in expected and "db" in relations:
+        juju.remove_relation("landscape-server:db", "postgresql:db-admin")
