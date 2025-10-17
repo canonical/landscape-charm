@@ -12,7 +12,7 @@ from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import ANY, call, DEFAULT, Mock, patch
+from unittest.mock import ANY, DEFAULT, Mock, patch
 
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
@@ -31,7 +31,6 @@ from charm import (
     METRIC_INSTRUMENTED_SERVICE_PORTS,
     NRPE_D_DIR,
     SCHEMA_SCRIPT,
-    UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
 from haproxy import GRPC_SERVICE
 from settings_files import AMQP_USERNAME, VHOSTS

@@ -1,14 +1,12 @@
-import unittest
 from subprocess import CalledProcessError
 import unittest
 from unittest import mock
 from unittest.mock import ANY, call, Mock, patch
 
+from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Context, Harness, Relation, State, StoredState
 
-
-from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent
 from charm import (
     LandscapeServerCharm,
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,

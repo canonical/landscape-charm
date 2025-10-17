@@ -58,7 +58,7 @@ from ops.model import (
 )
 import yaml
 
-from database import fetch_postgres_relation_data, DatabaseConnectionContext
+from database import DatabaseConnectionContext, fetch_postgres_relation_data
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -818,7 +818,7 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = ActiveStatus("Unit is ready")
             self._update_ready_status()
             return
-                
+
         self._stored.ready["db"] = False
         self.unit.status = MaintenanceStatus("Setting up databases")
 
