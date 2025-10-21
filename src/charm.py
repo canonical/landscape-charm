@@ -13,12 +13,12 @@ develop a new k8s charm using the Operator Framework:
 """
 
 from base64 import b64decode, b64encode, binascii
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from functools import cached_property
 import os
 import subprocess
 from subprocess import CalledProcessError, check_call
-from typing import Iterable, List, Mapping
+from typing import List
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
@@ -53,6 +53,21 @@ from ops.model import (
 )
 import yaml
 
+from haproxy import (
+    create_grpc_service,
+    create_http_service,
+    create_https_service,
+    create_ubuntu_installer_attach_service,
+    ERROR_FILES,
+    get_haproxy_error_files,
+    GRPC_SERVICE,
+    HTTP_SERVICE,
+    HTTPS_SERVICE,
+    PORTS,
+    RedirectHTTPS,
+    SERVER_OPTIONS,
+    UBUNTU_INSTALLER_ATTACH_SERVICE,
+)
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -72,7 +87,6 @@ from settings_files import (
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
-HAPROXY_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "haproxy-config.yaml")
 LSCTL = "/usr/bin/lsctl"
 NRPE_D_DIR = "/etc/nagios/nrpe.d"
 POSTFIX_CF = "/etc/postfix/main.cf"
@@ -88,6 +102,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-client",
     "landscape-common",
 )
+LANDSCAPE_UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
 
 DEFAULT_SERVICES = (
     "landscape-api",
@@ -145,8 +160,10 @@ METRICS_RULES_DIR = os.path.join(os.path.dirname(__file__), "prometheus_alert_ru
 
 def get_args_with_secrets_removed(args, arg_names):
     """
-    We log args passed in the command line. But we want to remove secrets. Returns a copy
-    of the args passed in with secrets associated with arg_names redacted
+    We log args passed in the command line. But we want to remove secrets.
+
+    Returns a copy of the args passed in with secrets associated with arg_names
+    redacted.
     """
     args = args.copy()
     for arg_name in arg_names:
@@ -179,174 +196,22 @@ def _get_ssl_cert(ssl_cert, ssl_key):
     return ssl_cert
 
 
-def _create_haproxy_services(
-    http_service: dict,
-    https_service: dict,
-    grpc_service: dict,
-    ubuntu_installer_attach_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    worker_counts: int,
-    is_leader: bool,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-):
+class InvalidRedirectHTTPS(Exception):
     """
-    Create the Landscape `services` configurations for HAProxy.
-
-    See https://charmhub.io/haproxy/configurations#services for details on the format.
-    This is roughly a combination of HAProxy `frontend` and `backend` stanzas from a
-    traditional HAProxy configuration file.
+    Raised when an invalid `redirect_https` configuration is provided.
     """
 
-    https_service["crts"] = [ssl_cert]
-    grpc_service["crts"] = [ssl_cert]
 
-    (appservers, pingservers, message_servers, api_servers) = [
-        [
-            (
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                service_ports[name] + i,
-                server_options,
-            )
-            for i in range(worker_counts)
-        ]
-        for name in ("appserver", "pingserver", "message-server", "api")
-    ]
-
-    # There should only ever be one package-upload-server service.
-    package_upload_servers = [
-        (
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            service_ports["package-upload"],
-            server_options,
-        )
-    ]
-
-    http_service["servers"] = appservers
-    http_service["backends"] = [
-        {
-            "backend_name": "landscape-ping",
-            "servers": pingservers,
-        }
-    ]
-    https_service["servers"] = appservers
-    https_service["backends"] = [
-        {
-            "backend_name": "landscape-message",
-            "servers": message_servers,
-        },
-        {
-            "backend_name": "landscape-api",
-            "servers": api_servers,
-        },
-        # Only the leader should have servers for the landscape-package-upload
-        # and landscape-hashid-databases backends. However, when the leader
-        # is lost, haproxy will fail as the service options will reference
-        # a (no longer) existing backend. To prevent that, all units should
-        # declare all backends, even if a unit should not have any servers on
-        # a specific backend.
-        {
-            "backend_name": "landscape-package-upload",
-            "servers": package_upload_servers if is_leader else [],
-        },
-        {
-            "backend_name": "landscape-hashid-databases",
-            "servers": appservers if is_leader else [],
-        },
-    ]
-
-    hostagent_messengers = [
-        (
-            f"landscape-hostagent-messenger-{unit_name}-{i}",
-            server_ip,
-            service_ports["hostagent-messenger"] + i,
-            server_options + grpc_service["server_options"],
-        )
-        for i in range(worker_counts)
-    ]
-    grpc_service["servers"] = hostagent_messengers
-
-    ubuntu_installer_attach_server = [
-        (
-            f"landscape-ubuntu-installer-attach-{unit_name}-0",
-            server_ip,
-            service_ports["ubuntu-installer-attach"],
-            server_options + ubuntu_installer_attach_service["server_options"],
-        )
-    ]
-
-    ubuntu_installer_attach_service["servers"] = ubuntu_installer_attach_server
-
-    http_service["error_files"] = [asdict(ef) for ef in error_files]
-    https_service["error_files"] = [asdict(ef) for ef in error_files]
-    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
-    ubuntu_installer_attach_service["error_files"] = [asdict(ef) for ef in error_files]
-
-    return http_service, https_service, grpc_service, ubuntu_installer_attach_service
-
-
-@dataclass
-class HAProxyErrorFile:
+def _get_redirect_https(redirect_https: str) -> RedirectHTTPS:
     """
-    Configuration for HAProxy error files
+    Validate and return the `redirect_https` configuration parameter.
+
+    Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
     """
-
-    http_status: int
-    """The status code the error file should handle."""
-    content: bytes
-    """The b64-encoded content of the error file."""
-
-
-def _get_haproxy_error_files(haproxy_config: dict) -> list[HAProxyErrorFile]:
-    error_files_location = haproxy_config["error_files"]["location"]
-    error_files = []
-    for code, filename in haproxy_config["error_files"]["files"].items():
-        error_file_path = os.path.join(error_files_location, filename)
-        with open(error_file_path, "rb") as error_file:
-            error_files.append(
-                HAProxyErrorFile(
-                    http_status=code,
-                    content=b64encode(error_file.read()),
-                )
-            )
-
-    return error_files
-
-
-HAProxyServicePorts = Mapping[str, int]
-"""
-Configuration for the ports that Landscape services run on.
-
-Expects the following keys:
-- appserver
-- pingserver
-- message-server
-- api
-- package-upload
-- hostagent-messenger
-- ubuntu-installer-attach
-
-Each value is the port that service runs on.
-"""
-
-
-def _get_haproxy_service_ports(haproxy_config: dict) -> HAProxyServicePorts:
-    return haproxy_config["ports"]
-
-
-HAProxyServerOptions = list[str]
-"""
-Additional configuration for a `server` stanza in an HAProxy configuration.
-"""
-
-
-def _get_haproxy_server_options(haproxy_config: dict) -> HAProxyServerOptions:
-    return haproxy_config["server_options"]
+    try:
+        return RedirectHTTPS(redirect_https)
+    except ValueError:
+        raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
 
 
 class SSLConfigurationError(Exception):
@@ -430,6 +295,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
+        self.framework.observe(
+            self.on.enable_ubuntu_installer_attach_action,
+            self._enable_ubuntu_installer_attach,
+        )
+        self.framework.observe(
+            self.on.disable_ubuntu_installer_attach_action,
+            self._disable_ubuntu_installer_attach,
+        )
 
         # State
         self._stored.set_default(
@@ -447,6 +320,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(account_bootstrapped=False)
         self._stored.set_default(secret_token=None)
         self._stored.set_default(cookie_encryption_key=None)
+        self._stored.set_default(enable_ubuntu_installer_attach=False)
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -479,7 +353,20 @@ class LandscapeServerCharm(CharmBase):
         ]
 
     def _on_config_changed(self, _) -> None:
+        """
+        Handle configuration changes.
+        """
         prev_status = self.unit.status
+
+        try:
+            # Validate the config
+            raw_redirect_https = str(self.model.config["redirect_https"])
+            _get_redirect_https(raw_redirect_https)
+        except InvalidRedirectHTTPS as e:
+            # TODO Should be "blocked" eventually, but this causes the charm to be
+            # stuck in the "blocked" state permanently.
+            self.unit.status = MaintenanceStatus(str(e))
+            return
 
         # Update additional configuration
         deployment_mode = self.model.config.get("deployment_mode")
@@ -661,14 +548,15 @@ class LandscapeServerCharm(CharmBase):
 
             # Add the Landscape Server PPA and install via apt.
             # add-apt-repository doesn't use the proxy configuration from apt or juju
-            # let's make sure to use the http(s) proxy settings from the charm or at least
-            # any juju_proxy setting, add the classic http(s)_proxy to the env that will be
-            # used only for add-apt-repository call
+            # let's make sure to use the http(s) proxy settings from the charm or at
+            # least any juju_proxy setting, add the classic http(s)_proxy to the env
+            # that will be used only for add-apt-repository call
             add_apt_repository_env = os.environ.copy()
             for proxy_var in ["http_proxy", "https_proxy"]:
                 juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
 
-                # if the charm has a proxy conf configured, override juju_http(s) configuration
+                # if the charm has a proxy conf configured, override juju_http(s)
+                # configuration
                 if proxy_var in self.model.config:
                     add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
                 elif juju_proxy_var in add_apt_repository_env:
@@ -856,7 +744,7 @@ class LandscapeServerCharm(CharmBase):
         else:
             port = unit_data["port"]
         if not port:
-            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port if still not set
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
         config_user = self.model.config.get("db_schema_user")
         if config_user:
@@ -1025,50 +913,74 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(str(e))
             return
 
-        with open(HAPROXY_CONFIG_FILE) as haproxy_config_file:
-            haproxy_config = yaml.safe_load(haproxy_config_file)
-
-        error_files = _get_haproxy_error_files(haproxy_config)
-        service_ports = _get_haproxy_service_ports(haproxy_config)
-        server_options = _get_haproxy_server_options(haproxy_config)
-
-        http = haproxy_config["http_service"]
-        https = haproxy_config["https_service"]
-        grpc = haproxy_config["grpc_service"]
-        ubuntu_installer_attach = haproxy_config["ubuntu_installer_attach_service"]
-
-        http_service, https_service, grpc_service, ubuntu_installer_attach_service = (
-            _create_haproxy_services(
-                http_service=http,
-                https_service=https,
-                grpc_service=grpc,
-                ubuntu_installer_attach_service=ubuntu_installer_attach,
-                ssl_cert=ssl_cert,
-                server_ip=relation.data[self.unit]["private-address"],
-                unit_name=self.unit.name.replace("/", "-"),
-                worker_counts=int(self.model.config["worker_counts"]),
-                is_leader=self.unit.is_leader(),
-                error_files=error_files,
-                service_ports=service_ports,
-                server_options=server_options,
+        try:
+            redirect_https = _get_redirect_https(
+                str(self.model.config["redirect_https"])
             )
+        except InvalidRedirectHTTPS as e:
+            self.unit.status = BlockedStatus(str(e))
+            return
+
+        error_files = get_haproxy_error_files(ERROR_FILES)
+        server_ip = relation.data[self.unit]["private-address"]
+        unit_name = self.unit.name.replace("/", "-")
+        worker_counts = int(self.model.config["worker_counts"])
+
+        http_service = create_http_service(
+            http_service=asdict(HTTP_SERVICE),
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=self.unit.is_leader(),
+            error_files=error_files,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
+            redirect_https=redirect_https,
         )
 
-        relation.data[self.unit].update(
-            {
-                "services": yaml.safe_dump(
-                    [
-                        http_service,
-                        https_service,
-                        grpc_service,
-                        ubuntu_installer_attach_service,
-                    ]
-                ),
-            }
+        https_service = create_https_service(
+            https_service=asdict(HTTPS_SERVICE),
+            ssl_cert=ssl_cert,
+            server_ip=server_ip,
+            unit_name=unit_name,
+            worker_counts=worker_counts,
+            is_leader=self.unit.is_leader(),
+            error_files=error_files,
+            service_ports=PORTS,
+            server_options=SERVER_OPTIONS,
         )
 
+        services = [http_service, https_service]
+
+        if self.model.config.get("enable_hostagent_messenger"):
+            grpc_service = create_grpc_service(
+                grpc_service=asdict(GRPC_SERVICE),
+                ssl_cert=ssl_cert,
+                server_ip=server_ip,
+                unit_name=unit_name,
+                error_files=error_files,
+                service_ports=PORTS,
+                server_options=SERVER_OPTIONS,
+            )
+            services.append(grpc_service)
+
+        if self._stored.enable_ubuntu_installer_attach:
+            services.append(
+                create_ubuntu_installer_attach_service(
+                    ubuntu_installer_attach_service=asdict(
+                        UBUNTU_INSTALLER_ATTACH_SERVICE
+                    ),
+                    ssl_cert=ssl_cert,
+                    server_ip=server_ip,
+                    unit_name=unit_name,
+                    error_files=error_files,
+                    service_ports=PORTS,
+                    server_options=SERVER_OPTIONS,
+                )
+            )
+
+        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
         self._stored.ready["haproxy"] = True
-
         self.unit.status = WaitingStatus("")
 
     def _website_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -1613,6 +1525,22 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
     def _migrate_service_conf(self, event: ActionEvent) -> None:
         migrate_service_conf()
+
+    def _enable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Install the Ubuntu installer attach and create the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = True
+        apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+        self._on_config_changed(None)
+
+    def _disable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+        """
+        Uninstall the Ubuntu installer attach service and remove the HAProxy frontend.
+        """
+        self._stored.enable_ubuntu_installer_attach = False
+        apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+        self._on_config_changed(None)
 
 
 if __name__ == "__main__":  # pragma: no cover
