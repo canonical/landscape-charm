@@ -14,11 +14,11 @@ from charm import (
 )
 from database import (
     DatabaseConnectionContext,
-    PostgresRoles,
     execute_psql,
     fetch_postgres_relation_data,
     get_postgres_owner_role_from_version,
     grant_role,
+    PostgresRoles,
 )
 
 

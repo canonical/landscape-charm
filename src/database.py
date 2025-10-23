@@ -14,11 +14,13 @@ class DatabaseConnectionContext:
     password: str | None = None
     version: str | None = None
 
+
 @dataclass
 class PostgresRoles:
     """
     Names of the relevant PostgreSQL roles for Landscape.
     """
+
     relation: str
     """
     The role created by the relation. Stored in `schema.store_user`.
@@ -31,7 +33,7 @@ class PostgresRoles:
     """
     owner: str
     """
-    The role that owns the databases. This depends on the version of 
+    The role that owns the databases. This depends on the version of
     Charmed Postgres. On 14 and below, it is `postgres`. On 16+, it is
     `charmed_dba`.
     """

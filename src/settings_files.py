@@ -15,8 +15,8 @@ from string import ascii_letters, digits
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from helpers import migrate_service_conf
 from database import get_postgres_owner_role_from_version, PostgresRoles
+from helpers import migrate_service_conf
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
 
