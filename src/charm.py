@@ -61,8 +61,7 @@ import yaml
 from database import (
     DatabaseConnectionContext,
     fetch_postgres_relation_data,
-    get_postgres_owner_role_from_version,
-    grant_charmed_role,
+    grant_role,
 )
 from haproxy import (
     create_grpc_service,
@@ -86,7 +85,7 @@ from settings_files import (
     DEFAULT_POSTGRES_PORT,
     generate_cookie_encryption_key,
     generate_secret_token,
-    get_db_application_user,
+    get_postgres_roles,
     merge_service_conf,
     prepend_default_settings,
     update_db_conf,
@@ -851,31 +850,34 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready["db"] = False
         self.unit.status = MaintenanceStatus("Setting up databases")
 
+        relation_username = db_ctx.username
+        relation_password = db_ctx.password
+
         config_host = self.model.config.get("db_host")
         if config_host:
             host = config_host
-            logger.info("Using the host from the config: %s", host)
+            logger.debug("Using the host from the config: %s", host)
         else:
             host = db_ctx.host
-            logger.info("Using the `host` from the `database` relation: %s", host)
+            logger.debug("Using the `host` from the `database` relation: %s", host)
 
         landscape_password = self.model.config.get("db_landscape_password")
         if landscape_password:
             password = landscape_password
-            logger.info("Using the password for the `landscape` user from the config.")
+            logger.debug("Using the password from the config.")
         else:
             password = db_ctx.password
-            logger.info("Using the password from the `database` relation.")
+            logger.debug("Using the password from the `database` relation.")
 
         schema_password = self.model.config.get("db_schema_password")
 
         config_port = self.model.config.get("db_port")
         if config_port:
             port = config_port
-            logger.info("Using the port provided in the config: %s", port)
+            logger.debug("Using the port provided in the config: %s", port)
         else:
             port = db_ctx.port
-            logger.info("Using the port provided by the `database` relation: %s", port)
+            logger.debug("Using the port provided by the `database` relation: %s", port)
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
             logger.info("Using the default Postgres port: %d", DEFAULT_POSTGRES_PORT)
@@ -883,16 +885,12 @@ class LandscapeServerCharm(CharmBase):
         config_user = self.model.config.get("db_schema_user")
         if config_user:
             user = config_user
-            logger.info("Using the username provided in the config.")
+            logger.debug("Using the username provided in the config.")
         else:
             user = db_ctx.username
-            logger.info("Using the usernaming provided by the relation.")
+            logger.debug("Using the username provided by the relation.")
 
-        logger.info("Updating the `stores` and `schema` sections in `service.conf`...")
-
-        charmed_owner_role = get_postgres_owner_role_from_version(db_ctx.version)
-        relation_user = db_ctx.username
-        relation_password = db_ctx.password
+        logger.debug("Updating the `stores` and `schema` sections in `service.conf`...")
 
         update_db_conf(
             host=host,
@@ -902,22 +900,35 @@ class LandscapeServerCharm(CharmBase):
             schema_password=schema_password,
         )
 
-        if not self._migrate_schema_bootstrap(charmed_owner_role):
-            logger.info(
+        roles = get_postgres_roles(db_ctx.version)
+
+        if not self._migrate_schema_bootstrap(roles.owner):
+            logger.error(
                 "Migrating schema failed trying to update the `database` relation!"
             )
             return
 
-        db_app_user = get_db_application_user()
+        supports_charmed_roles = roles.owner == "charmed_dba"
 
-        grant_charmed_role(
-            host=host,
-            port=port,
-            relation_user=relation_user,
-            relation_password=relation_password,
-            charmed_role=charmed_owner_role,
-            db_app_user=db_app_user,
-        )
+        if supports_charmed_roles:
+            grant_role(
+                host=host,
+                port=port,
+                relation_user=relation_username,
+                relation_password=relation_password,
+                role="charmed_dml",
+                user=roles.application,
+            )
+
+            if roles.superuser:
+                grant_role(
+                    host=host,
+                    port=port,
+                    relation_user=relation_username,
+                    relation_password=relation_password,
+                    role="charmed_dba",
+                    user=roles.superuser,
+                )
 
         if not self._update_wsl_distributions():
             logger.info(
@@ -970,7 +981,7 @@ class LandscapeServerCharm(CharmBase):
         call = [SCHEMA_SCRIPT, "--bootstrap"]
 
         if owner_role:
-            call.extend(["--db-owner", owner_role])
+            call.extend(["--db-owner-role", owner_role])
 
         if self._proxy_settings:
             call.extend(self._proxy_settings)

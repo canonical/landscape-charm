@@ -14,10 +14,11 @@ from charm import (
 )
 from database import (
     DatabaseConnectionContext,
+    PostgresRoles,
     execute_psql,
     fetch_postgres_relation_data,
     get_postgres_owner_role_from_version,
-    grant_charmed_role,
+    grant_role,
 )
 
 
@@ -137,7 +138,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="relation-9",
+                    application="landscape-app",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -181,8 +191,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.get_db_application_user", return_value="landscape-app"),
-            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="landscape",
+                    application="landscape-app",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -211,14 +229,7 @@ class TestDatabaseRelation:
             schema_password=None,
         )
         migrate_mock.assert_called_once_with("postgres")
-        grant_role_mock.assert_called_once_with(
-            host="1.2.3.4",
-            port="5432",
-            relation_user="landscape",
-            relation_password="secret",
-            charmed_role="postgres",
-            db_app_user="landscape-app",
-        )
+        grant_role_mock.assert_not_called()
         update_ready.assert_called_once_with(restart_services=True)
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is True
@@ -249,8 +260,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.get_db_application_user", return_value="landscape-app"),
-            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="schemauser",
+                    application="landscape-app",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -281,14 +300,7 @@ class TestDatabaseRelation:
             schema_password=None,
         )
         migrate_mock.assert_called_once_with("postgres")
-        grant_role_mock.assert_called_once_with(
-            host="override-host",
-            port="6000",
-            relation_user="landscape",
-            relation_password="secret",
-            charmed_role="postgres",
-            db_app_user="landscape-app",
-        )
+        grant_role_mock.assert_not_called()
         update_ready.assert_called_once_with(restart_services=True)
 
     def test_database_relation_pg16_grants_roles(self):
@@ -313,8 +325,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.get_db_application_user", return_value="landscape-app"),
-            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="relation-9",
+                    application="landscape-app",
+                    owner="charmed_dba",
+                    superuser="landscape-maintenance",
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
             patch("charm.fetch_postgres_relation_data", return_value=fetch_context),
         ):
             state_in = self._state(relation=relation, leader=True)
@@ -326,14 +346,27 @@ class TestDatabaseRelation:
                 )
 
         migrate_mock.assert_called_once_with("charmed_dba")
-        grant_role_mock.assert_called_once_with(
-            host="1.2.3.4",
-            port="5432",
-            relation_user="relation-9",
-            relation_password="secret",
-            charmed_role="charmed_dba",
-            db_app_user="landscape-app",
+        grant_role_mock.assert_has_calls(
+            [
+                call(
+                    host="1.2.3.4",
+                    port="5432",
+                    relation_user="relation-9",
+                    relation_password="secret",
+                    role="charmed_dml",
+                    user="landscape-app",
+                ),
+                call(
+                    host="1.2.3.4",
+                    port="5432",
+                    relation_user="relation-9",
+                    relation_password="secret",
+                    role="charmed_dba",
+                    user="landscape-maintenance",
+                ),
+            ]
         )
+        assert grant_role_mock.call_count == 2
         update_db_conf.assert_called_once_with(
             host="1.2.3.4",
             port="5432",
@@ -362,8 +395,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.get_db_application_user", return_value="landscape-app"),
-            patch("charm.grant_charmed_role"),
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="landscape",
+                    application="landscape-app",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -387,6 +428,7 @@ class TestDatabaseRelation:
             password="secret",
             schema_password="override-schema-pass",
         )
+        grant_role_mock.assert_not_called()
 
     def test_database_relation_partial_overrides(self):
         ctx = Context(LandscapeServerCharm)
@@ -408,8 +450,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=True,
             ),
-            patch("charm.get_db_application_user", return_value="landscape-app"),
-            patch("charm.grant_charmed_role"),
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="landscape",
+                    application="landscape-app",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -433,11 +483,23 @@ class TestDatabaseRelation:
             password="secret",
             schema_password=None,
         )
+        grant_role_mock.assert_not_called()
 
+    @patch(
+        "charm.get_postgres_roles",
+        return_value=PostgresRoles(
+            relation="landscape",
+            application="landscape",
+            owner="postgres",
+            superuser=None,
+        ),
+    )
     @patch("charm.fetch_postgres_relation_data")
     @patch("charm.update_db_conf")
     @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=False)
-    def test_database_relation_migrate_failure(self, _, update_db_conf, fetch_mock):
+    def test_database_relation_migrate_failure(
+        self, _, update_db_conf, fetch_mock, get_roles_mock
+    ):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
         fetch_mock.return_value = DatabaseConnectionContext(
@@ -481,8 +543,16 @@ class TestDatabaseRelation:
                 "charm.LandscapeServerCharm._update_wsl_distributions",
                 return_value=False,
             ),
-            patch("charm.get_db_application_user", return_value="landscape"),
-            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch(
+                "charm.get_postgres_roles",
+                return_value=PostgresRoles(
+                    relation="relation-9",
+                    application="landscape",
+                    owner="postgres",
+                    superuser=None,
+                ),
+            ),
+            patch("charm.grant_role") as grant_role_mock,
         ):
             fetch_mock.return_value = DatabaseConnectionContext(
                 host="1.2.3.4",
@@ -504,14 +574,7 @@ class TestDatabaseRelation:
                     ready = dict(manager.charm._stored.ready)
 
         update_db_conf.assert_called_once()
-        grant_role_mock.assert_called_once_with(
-            host="1.2.3.4",
-            port="5432",
-            relation_user="relation-9",
-            relation_password="secret",
-            charmed_role="postgres",
-            db_app_user="landscape",
-        )
+        grant_role_mock.assert_not_called()
         update_ready.assert_not_called()
         assert isinstance(status, MaintenanceStatus)
         assert ready["db"] is False
@@ -971,14 +1034,14 @@ class TestDatabaseHelpers:
         assert args[idx + 1] == "postgres"
 
     @patch("database.execute_psql")
-    def test_grant_charmed_role_calls_execute(self, execute_psql_mock):
-        grant_charmed_role(
+    def test_grant_role_calls_execute(self, execute_psql_mock):
+        grant_role(
             host="db.internal",
             port="5432",
             relation_user="relation-user",
             relation_password="hunter2",
-            db_app_user="landscape",
-            charmed_role="charmed_dba",
+            user="landscape",
+            role="charmed_dba",
         )
 
         execute_psql_mock.assert_called_once_with(
@@ -995,15 +1058,15 @@ class TestDatabaseHelpers:
             1, ["psql", "-c", "GRANT charmed_dba TO landscape;"]
         ),
     )
-    def test_grant_charmed_role_raises_on_error(self, execute_psql_mock):
+    def test_grant_role_raises_on_error(self, execute_psql_mock):
         with patch("database.logger") as logger, pytest.raises(CalledProcessError):
-            grant_charmed_role(
+            grant_role(
                 host="db.internal",
                 port="5432",
                 relation_user="relation-user",
                 relation_password="hunter2",
-                db_app_user="landscape",
-                charmed_role="charmed_dba",
+                user="landscape",
+                role="charmed_dba",
             )
 
         execute_psql_mock.assert_called_once()

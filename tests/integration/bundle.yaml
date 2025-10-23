@@ -29,10 +29,10 @@ applications:
       ssl_cert: SELFSIGNED
       global_default_bind_options: "no-tlsv10"
   landscape-server:
-    charm: ../../landscape-server_ubuntu@22.04-amd64.charm
+    charm: ../../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
     options:
-        landscape_ppa: ppa:landscape/self-hosted-beta
+        landscape_ppa: ppa:jansdhillon/20
         min_install: True
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]

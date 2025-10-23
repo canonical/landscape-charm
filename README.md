@@ -77,6 +77,9 @@ Then, install `charmcraftcache` (which can be used by its alias, `ccc`):
 pipx install charmcraftcache
 ```
 
+> [!NOTE]
+> Make sure you add this repository (https://github.com/canonical/landscape-charm) as a remote to your fork, otherwise `ccc` will fail.
+
 Use the following command to test the charm as
 it would be deployed by Juju in the `landscape-scalable` bundle:
 
@@ -84,7 +87,13 @@ it would be deployed by Juju in the `landscape-scalable` bundle:
 make deploy
 ```
 
-The model name will be the `landscape-charm-build`.
+You can also specify the platform to build the charm for, the path to the bundle to deploy, and the name of the model. For example:
+
+```sh
+make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
+```
+
+This will create a model called `landscape-pg16`.
 
 ### Run unit tests
 

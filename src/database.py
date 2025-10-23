@@ -14,6 +14,33 @@ class DatabaseConnectionContext:
     password: str | None = None
     version: str | None = None
 
+@dataclass
+class PostgresRoles:
+    """
+    Names of the relevant PostgreSQL roles for Landscape.
+    """
+    relation: str
+    """
+    The role created by the relation. Stored in `schema.store_user`.
+    Ex. "relation-9"
+    """
+    application: str
+    """
+    The role that does application level database operations.
+    Ex. "landscape"
+    """
+    owner: str
+    """
+    The role that owns the databases. This depends on the version of 
+    Charmed Postgres. On 14 and below, it is `postgres`. On 16+, it is
+    `charmed_dba`.
+    """
+    superuser: str | None
+    """
+    The role that is escalated to become a superuser.
+    Ex. "landscape_maintenance"
+    """
+
 
 def fetch_postgres_relation_data(
     db_manager: DatabaseRequires,
@@ -102,13 +129,13 @@ def execute_psql(
         raise e
 
 
-def grant_charmed_role(
+def grant_role(
     host: str,
     port: str,
     relation_user: str,
     relation_password: str,
-    db_app_user: str,
-    charmed_role: str,
+    user: str,
+    role: str,
 ) -> None:
     """
     Because Charmed Postgres 16 now forces us to use one of the existing
@@ -120,7 +147,7 @@ def grant_charmed_role(
 
     :raises `CalledProcessError`: Granting the role failed.
     """
-    sql = f"GRANT {charmed_role} TO {db_app_user};"
+    sql = f"GRANT {role} TO {user};"
 
     try:
         execute_psql(
@@ -134,8 +161,8 @@ def grant_charmed_role(
     except CalledProcessError as e:
         logger.error(
             "Failed to grant %s to %s (exit %s): %s",
-            charmed_role,
-            db_app_user,
+            role,
+            user,
             e.returncode,
             e,
         )
