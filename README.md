@@ -95,7 +95,7 @@ tox -e unit
 Or run specific test(s):
 
 ```sh
-tox -e unit -- tests/test_charm.py::TestCharm::test_install
+tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
 ```
 
 ### Run integration tests

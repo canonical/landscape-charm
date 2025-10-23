@@ -6,12 +6,19 @@ from unittest.mock import ANY, call, Mock, patch
 from charms.data_platform_libs.v0.data_interfaces import DatabaseCreatedEvent
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Context, Harness, Relation, State, StoredState
+import pytest
 
 from charm import (
     LandscapeServerCharm,
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
-from database import DatabaseConnectionContext, fetch_postgres_relation_data
+from database import (
+    DatabaseConnectionContext,
+    execute_psql,
+    fetch_postgres_relation_data,
+    get_postgres_owner_role_from_version,
+    grant_charmed_role,
+)
 
 
 class TestFetchPostgresRelationData:
@@ -22,6 +29,7 @@ class TestFetchPostgresRelationData:
                 "endpoints": "1.2.3.4:5432",
                 "username": "landscape",
                 "password": "secret",
+                "version": "14.8",
             }
         }
         with mock.patch("src.database.logger"):
@@ -33,6 +41,7 @@ class TestFetchPostgresRelationData:
             port="5432",
             username="landscape",
             password="secret",
+            version="14.8",
         )
 
     def test_skips_empty_entries(self):
@@ -43,6 +52,7 @@ class TestFetchPostgresRelationData:
                 "endpoints": "5.6.7.8:6543",
                 "username": "reader",
                 "password": "hunter2",
+                "version": "13.3",
             },
         }
         with mock.patch("src.database.logger"):
@@ -53,6 +63,7 @@ class TestFetchPostgresRelationData:
             port="6543",
             username="reader",
             password="hunter2",
+            version="13.3",
         )
 
     def test_returns_empty_context_when_no_data(self):
@@ -109,97 +120,156 @@ class TestDatabaseRelation:
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is True
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_missing_fields(self, _, __, update_db_conf, fetch_mock):
+    def test_database_relation_missing_fields(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=None, username=None, password="secret"
-        )
 
         state_in = self._state(relation=relation, leader=True)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status") as update_ready:
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
-                status = manager.charm.unit.status
-                ready = dict(manager.charm._stored.ready)
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ),
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.grant_charmed_role") as grant_role_mock,
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port=None,
+                username=None,
+                password="secret",
+                version="14.8",
+            )
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(
+                    manager.charm, "_update_ready_status"
+                ) as update_ready:
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
+                    status = manager.charm.unit.status
+                    ready = dict(manager.charm._stored.ready)
 
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is False
         update_db_conf.assert_not_called()
+        grant_role_mock.assert_not_called()
         update_ready.assert_called_once_with()
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_uses_relation_credentials(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_uses_relation_credentials(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
-        )
 
         state_in = self._state(relation=relation, leader=True)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status") as update_ready:
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
-                status = manager.charm.unit.status
-                ready = dict(manager.charm._stored.ready)
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ) as migrate_mock,
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape-app"),
+            patch("charm.grant_charmed_role") as grant_role_mock,
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="landscape",
+                password="secret",
+                version="14.8",
+            )
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(
+                    manager.charm, "_update_ready_status"
+                ) as update_ready:
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
+                    status = manager.charm.unit.status
+                    ready = dict(manager.charm._stored.ready)
 
         update_db_conf.assert_called_once_with(
             host="1.2.3.4",
-            port=5432,
+            port="5432",
             user="landscape",
             password="secret",
             schema_password=None,
+        )
+        migrate_mock.assert_called_once_with("postgres")
+        grant_role_mock.assert_called_once_with(
+            host="1.2.3.4",
+            port="5432",
+            relation_user="landscape",
+            relation_password="secret",
+            charmed_role="postgres",
+            db_app_user="landscape-app",
         )
         update_ready.assert_called_once_with(restart_services=True)
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is True
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_manual_overrides(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_manual_overrides(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
+
+        state_in = self._state(
+            relation=relation,
+            leader=True,
+            config={
+                "db_host": "override-host",
+                "db_port": "6000",
+                "db_schema_user": "schemauser",
+                "db_landscape_password": "landscape-pass",
+            },
         )
 
-        config = {
-            "db_host": "override-host",
-            "db_port": "6000",
-            "db_schema_user": "schemauser",
-            "db_landscape_password": "landscape-pass",
-        }
-        state_in = self._state(relation=relation, leader=True, config=config)
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ) as migrate_mock,
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape-app"),
+            patch("charm.grant_charmed_role") as grant_role_mock,
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="landscape",
+                password="secret",
+                version="14.8",
+            )
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status") as update_ready:
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
-                status = manager.charm.unit.status
-                ready = dict(manager.charm._stored.ready)
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(
+                    manager.charm, "_update_ready_status"
+                ) as update_ready:
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
+                    status = manager.charm.unit.status
+                    ready = dict(manager.charm._stored.ready)
 
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is True
@@ -210,69 +280,155 @@ class TestDatabaseRelation:
             password="landscape-pass",
             schema_password=None,
         )
+        migrate_mock.assert_called_once_with("postgres")
+        grant_role_mock.assert_called_once_with(
+            host="override-host",
+            port="6000",
+            relation_user="landscape",
+            relation_password="secret",
+            charmed_role="postgres",
+            db_app_user="landscape-app",
+        )
         update_ready.assert_called_once_with(restart_services=True)
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_schema_password_override(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_pg16_grants_roles(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
+
+        fetch_context = DatabaseConnectionContext(
+            host="1.2.3.4",
+            port="5432",
+            username="relation-9",
+            password="secret",
+            version="16.9",
         )
+
+        with (
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ) as migrate_mock,
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape-app"),
+            patch("charm.grant_charmed_role") as grant_role_mock,
+            patch("charm.fetch_postgres_relation_data", return_value=fetch_context),
+        ):
+            state_in = self._state(relation=relation, leader=True)
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                manager.charm._database_relation_changed(
+                    mock.create_autospec(DatabaseCreatedEvent)
+                )
+
+        migrate_mock.assert_called_once_with("charmed_dba")
+        grant_role_mock.assert_called_once_with(
+            host="1.2.3.4",
+            port="5432",
+            relation_user="relation-9",
+            relation_password="secret",
+            charmed_role="charmed_dba",
+            db_app_user="landscape-app",
+        )
+        update_db_conf.assert_called_once_with(
+            host="1.2.3.4",
+            port="5432",
+            user="relation-9",
+            password="secret",
+            schema_password=None,
+        )
+
+    def test_database_relation_schema_password_override(self):
+        ctx = Context(LandscapeServerCharm)
+        relation = Relation("database", remote_app_name="postgresql")
 
         config = {
             "db_schema_password": "override-schema-pass",
         }
         state_in = self._state(relation=relation, leader=True, config=config)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status"):
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ),
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape-app"),
+            patch("charm.grant_charmed_role"),
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="landscape",
+                password="secret",
+                version="14.8",
+            )
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(manager.charm, "_update_ready_status"):
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
 
         update_db_conf.assert_called_once_with(
             host="1.2.3.4",
-            port=5432,
+            port="5432",
             user="landscape",
             password="secret",
             schema_password="override-schema-pass",
         )
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=True)
-    def test_database_relation_partial_overrides(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_partial_overrides(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
-        )
 
         config = {
             "db_host": "override-host",
         }
         state_in = self._state(relation=relation, leader=True, config=config)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status"):
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ),
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=True,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape-app"),
+            patch("charm.grant_charmed_role"),
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="landscape",
+                password="secret",
+                version="14.8",
+            )
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(manager.charm, "_update_ready_status"):
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
 
         update_db_conf.assert_called_once_with(
             host="override-host",
-            port=5432,
+            port="5432",
             user="landscape",
             password="secret",
             schema_password=None,
@@ -285,7 +441,11 @@ class TestDatabaseRelation:
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
         fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
+            host="1.2.3.4",
+            port="5432",
+            username="landscape",
+            password="secret",
+            version="14.8",
         )
 
         state_in = self._state(relation=relation, leader=True)
@@ -304,31 +464,54 @@ class TestDatabaseRelation:
         assert isinstance(status, MaintenanceStatus)
         assert ready["db"] is False
 
-    @patch("charm.fetch_postgres_relation_data")
-    @patch("charm.update_db_conf")
-    @patch("charm.LandscapeServerCharm._migrate_schema_bootstrap", return_value=True)
-    @patch("charm.LandscapeServerCharm._update_wsl_distributions", return_value=False)
-    def test_database_relation_update_wsl_failure(
-        self, _, __, update_db_conf, fetch_mock
-    ):
+    def test_database_relation_update_wsl_failure(self):
         ctx = Context(LandscapeServerCharm)
         relation = Relation("database", remote_app_name="postgresql")
-        fetch_mock.return_value = DatabaseConnectionContext(
-            host="1.2.3.4", port=5432, username="landscape", password="secret"
-        )
 
         state_in = self._state(relation=relation, leader=True)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm.database = Mock()
-            with patch.object(manager.charm, "_update_ready_status") as update_ready:
-                manager.charm._database_relation_changed(
-                    mock.create_autospec(DatabaseCreatedEvent)
-                )
-                status = manager.charm.unit.status
-                ready = dict(manager.charm._stored.ready)
+        with (
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+            patch("charm.update_db_conf") as update_db_conf,
+            patch(
+                "charm.LandscapeServerCharm._migrate_schema_bootstrap",
+                return_value=True,
+            ),
+            patch(
+                "charm.LandscapeServerCharm._update_wsl_distributions",
+                return_value=False,
+            ),
+            patch("charm.get_db_application_user", return_value="landscape"),
+            patch("charm.grant_charmed_role") as grant_role_mock,
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="relation-9",
+                password="secret",
+                version="14.8",
+            )
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(
+                    manager.charm, "_update_ready_status"
+                ) as update_ready:
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
+                    status = manager.charm.unit.status
+                    ready = dict(manager.charm._stored.ready)
 
         update_db_conf.assert_called_once()
+        grant_role_mock.assert_called_once_with(
+            host="1.2.3.4",
+            port="5432",
+            relation_user="relation-9",
+            relation_password="secret",
+            charmed_role="postgres",
+            db_app_user="landscape",
+        )
         update_ready.assert_not_called()
         assert isinstance(status, MaintenanceStatus)
         assert ready["db"] is False
@@ -713,3 +896,115 @@ class DbRelationTest(unittest.TestCase):
             ("Failed to update WSL distributions with return code %d", 127),
             error_calls,
         )
+
+
+class TestDatabaseHelpers:
+    def test_get_postgres_owner_role_pg16(self):
+        assert get_postgres_owner_role_from_version("16.1") == "charmed_dba"
+
+    def test_get_postgres_owner_role_falls_back(self):
+        with patch("database.logger") as logger:
+            result = get_postgres_owner_role_from_version("garbage")
+
+        assert result == "postgres"
+        logger.warning.assert_called_once()
+
+    @patch("database.get_modified_env_vars", return_value={"PATH": "/usr/bin"})
+    @patch("database.check_call")
+    def test_execute_psql_calls_check_call(self, check_call_mock, get_env):
+        execute_psql(
+            host="db.internal",
+            port="5432",
+            relation_user="relation-user",
+            relation_password="hunter2",
+            sql="SELECT 1",
+            database="landscape",
+        )
+
+        check_call_mock.assert_called_once_with(
+            [
+                "psql",
+                "-h",
+                "db.internal",
+                "-p",
+                "5432",
+                "-U",
+                "relation-user",
+                "-d",
+                "landscape",
+                "-c",
+                "SELECT 1",
+            ],
+            env={"PATH": "/usr/bin", "PGPASSWORD": "hunter2"},
+        )
+        get_env.assert_called_once_with()
+
+    @patch("database.get_modified_env_vars", return_value={})
+    @patch("database.check_call", side_effect=CalledProcessError(1, "psql"))
+    def test_execute_psql_raises_on_error(self, check_call_mock, _):
+        with patch("database.logger") as logger, pytest.raises(CalledProcessError):
+            execute_psql(
+                host="db.internal",
+                port="5432",
+                relation_user="relation-user",
+                relation_password="hunter2",
+                sql="SELECT 1",
+            )
+
+        logger.error.assert_called_once()
+        check_call_mock.assert_called_once()
+
+    @patch("database.get_modified_env_vars", return_value={})
+    @patch("database.check_call")
+    def test_execute_psql_uses_default_database(self, check_call_mock, _):
+        execute_psql(
+            host="db.internal",
+            port="5432",
+            relation_user="relation-user",
+            relation_password="hunter2",
+            sql="SELECT 1",
+        )
+
+        args = check_call_mock.call_args.args[0]
+        assert "-d" in args
+        idx = args.index("-d")
+        assert args[idx + 1] == "postgres"
+
+    @patch("database.execute_psql")
+    def test_grant_charmed_role_calls_execute(self, execute_psql_mock):
+        grant_charmed_role(
+            host="db.internal",
+            port="5432",
+            relation_user="relation-user",
+            relation_password="hunter2",
+            db_app_user="landscape",
+            charmed_role="charmed_dba",
+        )
+
+        execute_psql_mock.assert_called_once_with(
+            host="db.internal",
+            port="5432",
+            relation_user="relation-user",
+            relation_password="hunter2",
+            sql="GRANT charmed_dba TO landscape;",
+        )
+
+    @patch(
+        "database.execute_psql",
+        side_effect=CalledProcessError(
+            1, ["psql", "-c", "GRANT charmed_dba TO landscape;"]
+        ),
+    )
+    def test_grant_charmed_role_raises_on_error(self, execute_psql_mock):
+        with patch("database.logger") as logger, pytest.raises(CalledProcessError):
+            grant_charmed_role(
+                host="db.internal",
+                port="5432",
+                relation_user="relation-user",
+                relation_password="hunter2",
+                db_app_user="landscape",
+                charmed_role="charmed_dba",
+            )
+
+        execute_psql_mock.assert_called_once()
+        logger.error.assert_called_once()

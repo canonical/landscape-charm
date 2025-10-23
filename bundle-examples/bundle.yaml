@@ -1,9 +1,9 @@
 description: Landscape Scalable Dev
 applications:
   postgresql:
-    channel: 14/stable
+    channel: 16/stable
     charm: ch:postgresql
-    num_units: 1
+    num_units: 2
     options:
       plugin_plpython3u_enable: true
       plugin_ltree_enable: true
@@ -11,6 +11,7 @@ applications:
       plugin_debversion_enable: true
       plugin_pg_trgm_enable: true
       experimental_max_connections: 500
+    base: ubuntu@24.04
   rabbitmq-server:
     channel: latest/edge
     charm: ch:rabbitmq-server
@@ -28,12 +29,12 @@ applications:
       ssl_cert: SELFSIGNED
       global_default_bind_options: "no-tlsv10"
   landscape-server:
-    charm: ../landscape-server_ubuntu@22.04-amd64.charm
-    num_units: 1
+    charm: ../landscape-server_ubuntu@24.04-amd64.charm
+    num_units: 2
     options:
-        landscape_ppa: ppa:landscape/self-hosted-beta
+        landscape_ppa: ppa:jansdhillon/test18
         min_install: True
-      
+    base: ubuntu@24.04
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]

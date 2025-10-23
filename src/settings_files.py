@@ -221,3 +221,20 @@ def update_db_conf(
         to_update["schema"]["store_user"] = user
     if to_update:
         update_service_conf(to_update)
+
+
+def get_db_application_user() -> str:
+    """
+    Gets the user from the `stores` section that
+    Landscape uses to run application level operations
+    on the database.
+
+    Typically this will be `landscape`.
+    """
+    config = ConfigParser()
+    config.read(SERVICE_CONF)
+
+    # Application PG user. Not the same as the relation/schema user.
+    user = config.get("stores", "user")
+
+    return user

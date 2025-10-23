@@ -58,7 +58,12 @@ from ops.model import (
 )
 import yaml
 
-from database import DatabaseConnectionContext, fetch_postgres_relation_data
+from database import (
+    DatabaseConnectionContext,
+    fetch_postgres_relation_data,
+    get_postgres_owner_role_from_version,
+    grant_charmed_role,
+)
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -81,6 +86,7 @@ from settings_files import (
     DEFAULT_POSTGRES_PORT,
     generate_cookie_encryption_key,
     generate_secret_token,
+    get_db_application_user,
     merge_service_conf,
     prepend_default_settings,
     update_db_conf,
@@ -239,19 +245,27 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
+
+        # Modern Postgres relation
         if self.model.get_relation("database") is not None:
-            # Modern Postgres relation
             self.database = DatabaseRequires(
                 self,
                 relation_name="database",
-                database_name="landscape",
+                database_name="database",
                 extra_user_roles="SUPERUSER",
             )
             self.framework.observe(
                 self.database.on.database_created, self._database_relation_changed
             )
             self.framework.observe(
+                self.database.on.database_entity_created,
+                self._database_relation_changed,
+            )
+            self.framework.observe(
                 self.database.on.endpoints_changed, self._database_relation_changed
+            )
+            self.framework.observe(
+                self.database.on.remove, self._database_relation_removed
             )
 
         # Legacy Postgres relation
@@ -266,6 +280,12 @@ class LandscapeServerCharm(CharmBase):
             )
             self.framework.observe(
                 self.on.db_relation_changed, self._db_relation_changed
+            )
+            self.framework.observe(
+                self.on.db_relation_departed, self._db_relation_removed
+            )
+            self.framework.observe(
+                self.on.db_relation_broken, self._db_relation_removed
             )
 
         # Inbound vhost
@@ -477,13 +497,11 @@ class LandscapeServerCharm(CharmBase):
         if landscape_password:
             db_kargs["password"] = landscape_password
         if db_kargs:
-            logger.info("kargs: %s", db_kargs)
             update_db_conf(**db_kargs)
             if self._migrate_schema_bootstrap():
                 self.unit.status = WaitingStatus("Waiting on relations")
                 self._stored.ready["db"] = True
             else:
-                logger.info("migrating schema failed")
                 return
 
         self._bootstrap_account()
@@ -725,7 +743,7 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus("Failed to start services")
             return False
 
-    def _db_relation_changed(self, event: RelationChangedEvent):
+    def _db_relation_changed(self, event: RelationChangedEvent) -> None:
         unit_data = event.relation.data[event.unit]
 
         required_relation_data = ["master", "allowed-units", "port", "user"]
@@ -872,6 +890,10 @@ class LandscapeServerCharm(CharmBase):
 
         logger.info("Updating the `stores` and `schema` sections in `service.conf`...")
 
+        charmed_owner_role = get_postgres_owner_role_from_version(db_ctx.version)
+        relation_user = db_ctx.username
+        relation_password = db_ctx.password
+
         update_db_conf(
             host=host,
             port=port,
@@ -880,11 +902,22 @@ class LandscapeServerCharm(CharmBase):
             schema_password=schema_password,
         )
 
-        if not self._migrate_schema_bootstrap():
+        if not self._migrate_schema_bootstrap(charmed_owner_role):
             logger.info(
                 "Migrating schema failed trying to update the `database` relation!"
             )
             return
+
+        db_app_user = get_db_application_user()
+
+        grant_charmed_role(
+            host=host,
+            port=port,
+            relation_user=relation_user,
+            relation_password=relation_password,
+            charmed_role=charmed_owner_role,
+            db_app_user=db_app_user,
+        )
 
         if not self._update_wsl_distributions():
             logger.info(
@@ -898,6 +931,14 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
 
         self._update_ready_status(restart_services=True)
+
+    def _database_relation_removed(self, _):
+        """
+        Handle removal of the modern Postgres relation.
+        """
+        self._stored.ready["db"] = False
+        self.unit.status = WaitingStatus("Waiting on relations")
+        self._update_ready_status()
 
     @cached_property
     def _proxy_settings(self) -> List[str]:
@@ -918,7 +959,7 @@ class LandscapeServerCharm(CharmBase):
 
         return settings
 
-    def _migrate_schema_bootstrap(self):
+    def _migrate_schema_bootstrap(self, owner_role: str | None = None):
         """
         Migrates schema along with the bootstrap command which ensures that the
         databases and the landscape user exists, and that proxy settings are set.
@@ -927,6 +968,9 @@ class LandscapeServerCharm(CharmBase):
         :returns: True on success.
         """
         call = [SCHEMA_SCRIPT, "--bootstrap"]
+
+        if owner_role:
+            call.extend(["--db-owner", owner_role])
 
         if self._proxy_settings:
             call.extend(self._proxy_settings)
