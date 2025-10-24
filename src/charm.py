@@ -257,14 +257,7 @@ class LandscapeServerCharm(CharmBase):
                 self.database.on.database_created, self._database_relation_changed
             )
             self.framework.observe(
-                self.database.on.database_entity_created,
-                self._database_relation_changed,
-            )
-            self.framework.observe(
                 self.database.on.endpoints_changed, self._database_relation_changed
-            )
-            self.framework.observe(
-                self.database.on.remove, self._database_relation_removed
             )
 
         # Legacy Postgres relation
@@ -279,12 +272,6 @@ class LandscapeServerCharm(CharmBase):
             )
             self.framework.observe(
                 self.on.db_relation_changed, self._db_relation_changed
-            )
-            self.framework.observe(
-                self.on.db_relation_departed, self._db_relation_removed
-            )
-            self.framework.observe(
-                self.on.db_relation_broken, self._db_relation_removed
             )
 
         # Inbound vhost
