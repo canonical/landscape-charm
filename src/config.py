@@ -66,6 +66,8 @@ class LandscapeCharmConfiguration(BaseModel):
     prometheus_scrape_interval: str
     autoregistration: bool
     redirect_https: RedirectHTTPS
+    enable_hostagent_messenger: bool
+    enable_ubuntu_installer_attach: bool
 
     @root_validator(skip_on_failure=True)
     def openid_oidc_exclusive(cls, values):

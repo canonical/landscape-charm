@@ -369,7 +369,7 @@ class LandscapeServerCharm(CharmBase):
 
         try:
             self._configure_ubuntu_installer_attach(
-                self.model.config["enable_ubuntu_installer_attach"]
+                self.charm_config.enable_ubuntu_installer_attach
             )
         except PackageError as e:
             # TODO Should be "blocked" eventually, but this causes the charm to be
@@ -934,7 +934,7 @@ class LandscapeServerCharm(CharmBase):
 
         services = [http_service, https_service]
 
-        if self.model.config.get("enable_hostagent_messenger"):
+        if self.charm_config.enable_hostagent_messenger:
             grpc_service = create_grpc_service(
                 grpc_service=asdict(GRPC_SERVICE),
                 ssl_cert=ssl_cert,

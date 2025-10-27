@@ -63,6 +63,9 @@ def test_defaults():
     assert not config.autoregistration
     assert config.redirect_https == RedirectHTTPS.DEFAULT
 
+    assert not config.enable_hostagent_messenger
+    assert not config.enable_ubuntu_installer_attach
+
 
 @pytest.mark.parametrize(
     "openid_parameter",
