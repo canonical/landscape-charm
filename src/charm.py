@@ -296,14 +296,6 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
-        self.framework.observe(
-            self.on.enable_ubuntu_installer_attach_action,
-            self._enable_ubuntu_installer_attach,
-        )
-        self.framework.observe(
-            self.on.disable_ubuntu_installer_attach_action,
-            self._disable_ubuntu_installer_attach,
-        )
 
         # State
         self._stored.set_default(
@@ -373,6 +365,20 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
+            return
+
+        try:
+            self._configure_ubuntu_installer_attach(
+                self.model.config["enable_ubuntu_installer_attach"]
+            )
+        except PackageError as e:
+            # TODO Should be "blocked" eventually, but this causes the charm to be
+            # stuck in the "blocked" state permanently.
+            self.unit.status = MaintenanceStatus(
+                "Failed to enable `landscape-ubuntu-installer-attach`. "
+                "See `juju debug-log`."
+            )
+            logger.exception(e)
             return
 
         # Update additional configuration
@@ -926,17 +932,19 @@ class LandscapeServerCharm(CharmBase):
             server_options=SERVER_OPTIONS,
         )
 
-        grpc_service = create_grpc_service(
-            grpc_service=asdict(GRPC_SERVICE),
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-        )
+        services = [http_service, https_service]
 
-        services = [http_service, https_service, grpc_service]
+        if self.model.config.get("enable_hostagent_messenger"):
+            grpc_service = create_grpc_service(
+                grpc_service=asdict(GRPC_SERVICE),
+                ssl_cert=ssl_cert,
+                server_ip=server_ip,
+                unit_name=unit_name,
+                error_files=error_files,
+                service_ports=PORTS,
+                server_options=SERVER_OPTIONS,
+            )
+            services.append(grpc_service)
 
         if self._stored.enable_ubuntu_installer_attach:
             services.append(
@@ -1190,10 +1198,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self._leader_changed()
 
         secret_token = self._get_secret_token()
+        should_update = False
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
-            self._update_ready_status(restart_services=True)
+            should_update = True
 
         cookie_encryption_key = self._get_cookie_encryption_key()
         if (
@@ -1202,6 +1211,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         ):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
+            should_update = True
+
+        if should_update:
             self._update_ready_status(restart_services=True)
 
     def _configure_smtp(self, relay_host: str) -> None:
@@ -1468,21 +1480,24 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
     def _migrate_service_conf(self, event: ActionEvent) -> None:
         migrate_service_conf()
 
-    def _enable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+    def _configure_ubuntu_installer_attach(self, enable: bool) -> None:
         """
-        Install the Ubuntu installer attach and create the HAProxy frontend.
+        Install/uninstall the Ubuntu installer attach service. Do nothing if the
+        configuration has not changed.
         """
-        self._stored.enable_ubuntu_installer_attach = True
-        apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
-        self._on_config_changed(None)
-
-    def _disable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
-        """
-        Uninstall the Ubuntu installer attach service and remove the HAProxy frontend.
-        """
-        self._stored.enable_ubuntu_installer_attach = False
-        apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-        self._on_config_changed(None)
+        currently_enabled = self._stored.enable_ubuntu_installer_attach
+        if not currently_enabled and enable:
+            self.unit.status = MaintenanceStatus(
+                "Installing `landscape-ubuntu-installer-attach`"
+            )
+            apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+            self._stored.enable_ubuntu_installer_attach = True
+        elif currently_enabled and not enable:
+            self.unit.status = MaintenanceStatus(
+                "Removing `landscape-ubuntu-installer-attach`"
+            )
+            apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+            self._stored.enable_ubuntu_installer_attach = False
 
 
 if __name__ == "__main__":  # pragma: no cover
