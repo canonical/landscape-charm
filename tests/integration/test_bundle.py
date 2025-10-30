@@ -237,7 +237,6 @@ def _restore_relations(juju: jubilant.Juju, expected: set[str]) -> None:
     relations = set(juju.status().apps["landscape-server"].relations)
 
     if _supports_legacy_pgsql(juju):
-        relations = set(juju.status().apps["landscape-server"].relations)
         if "db" in expected and "db" not in relations:
             juju.integrate("landscape-server:db", "postgresql:db-admin")
         if "db" not in expected and "db" in relations:
