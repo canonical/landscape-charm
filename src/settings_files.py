@@ -15,6 +15,7 @@ from string import ascii_letters, digits
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from database import get_postgres_owner_role_from_version, PostgresRoles
 from helpers import migrate_service_conf
 
 CONFIGS_DIR = "/opt/canonical/landscape/configs"
@@ -221,3 +222,28 @@ def update_db_conf(
         to_update["schema"]["store_user"] = user
     if to_update:
         update_service_conf(to_update)
+
+
+def get_postgres_roles(postgresql_version: str) -> PostgresRoles:
+    """
+    Gets the PostgreSQL role names for Landscape based on the
+    version and the values written in `service.conf`.
+    """
+    config = ConfigParser()
+    config.read(SERVICE_CONF)
+
+    owner = get_postgres_owner_role_from_version(postgresql_version)
+
+    # Relation role. Note this is granted the `SUPERUSER` role upon joining.
+    relation = config.get("schema", "store_user", fallback=None)
+
+    # Application role, is granted `charmed_dml` in Charmed Postgres 16+.
+    application = config.get("stores", "user", fallback="landscape")
+
+    # If provided in the config, this role will be escalated to `SUPERUSER`, aka
+    # given the `charmed_dba` role in Charmed Postgres 16+.
+    superuser = config.get("schema", "store_superuser", fallback=None)
+
+    return PostgresRoles(
+        owner=owner, relation=relation, application=application, superuser=superuser
+    )

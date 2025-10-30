@@ -20,6 +20,11 @@ import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
 
+from charms.data_platform_libs.v0.data_interfaces import (
+    DatabaseCreatedEvent,
+    DatabaseEndpointsChangedEvent,
+    DatabaseRequires,
+)
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
@@ -55,6 +60,11 @@ from pydantic import ValidationError
 import yaml
 
 from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration, RedirectHTTPS
+from database import (
+    DatabaseConnectionContext,
+    fetch_postgres_relation_data,
+    grant_role,
+)
 from haproxy import (
     create_grpc_service,
     create_http_service,
@@ -76,6 +86,7 @@ from settings_files import (
     DEFAULT_POSTGRES_PORT,
     generate_cookie_encryption_key,
     generate_secret_token,
+    get_postgres_roles,
     merge_service_conf,
     prepend_default_settings,
     update_db_conf,
@@ -235,9 +246,34 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
 
-        # Relations
-        self.framework.observe(self.on.db_relation_joined, self._db_relation_changed)
-        self.framework.observe(self.on.db_relation_changed, self._db_relation_changed)
+        # Modern Postgres relation
+        if self.model.get_relation("database") is not None:
+            self.database = DatabaseRequires(
+                self,
+                relation_name="database",
+                database_name="database",
+                extra_user_roles="SUPERUSER",
+            )
+            self.framework.observe(
+                self.database.on.database_created, self._database_relation_changed
+            )
+            self.framework.observe(
+                self.database.on.endpoints_changed, self._database_relation_changed
+            )
+
+        # Legacy Postgres relation
+        elif self.model.get_relation("db") is not None:
+            logger.warning(
+                "The legacy `db` endpoint is deprecated and support will be "
+                "dropped in a future release. Please rename the relation "
+                "endpoint to 'database'."
+            )
+            self.framework.observe(
+                self.on.db_relation_joined, self._db_relation_changed
+            )
+            self.framework.observe(
+                self.on.db_relation_changed, self._db_relation_changed
+            )
 
         # Inbound vhost
         self.framework.observe(
@@ -761,6 +797,130 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status(restart_services=True)
 
+    def _database_relation_changed(
+        self, _: DatabaseCreatedEvent | DatabaseEndpointsChangedEvent
+    ) -> None:
+        """
+        Handle the modern Postgres charm interface (`database` relation).
+        """
+        if not self.unit.is_leader():
+            logger.info(f"{self.unit.name} is not the leader unit...")
+            self._stored.ready["db"] = True
+            self.unit.status = ActiveStatus("Unit is ready")
+            return
+
+        db_ctx: DatabaseConnectionContext = fetch_postgres_relation_data(
+            db_manager=self.database
+        )
+
+        required_fields = ["username", "password", "port", "host"]
+        missing_fields = [f for f in required_fields if not asdict(db_ctx).get(f)]
+        if missing_fields:
+            logger.info(
+                f"Missing required database fields: {', '.join(missing_fields)}"
+            )
+
+            self._stored.ready["db"] = False
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status()
+            return
+
+        self._stored.ready["db"] = False
+        self.unit.status = MaintenanceStatus("Setting up databases")
+
+        relation_username = db_ctx.username
+        relation_password = db_ctx.password
+
+        config_host = self.model.config.get("db_host")
+        if config_host:
+            host = config_host
+            logger.debug("Using the host from the config: %s", host)
+        else:
+            host = db_ctx.host
+            logger.debug("Using the `host` from the `database` relation: %s", host)
+
+        landscape_password = self.model.config.get("db_landscape_password")
+        if landscape_password:
+            password = landscape_password
+            logger.debug("Using the password from the config.")
+        else:
+            password = db_ctx.password
+            logger.debug("Using the password from the `database` relation.")
+
+        schema_password = self.model.config.get("db_schema_password")
+
+        config_port = self.model.config.get("db_port")
+        if config_port:
+            port = config_port
+            logger.debug("Using the port provided in the config: %s", port)
+        else:
+            port = db_ctx.port
+            logger.debug("Using the port provided by the `database` relation: %s", port)
+        if not port:
+            port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
+            logger.info("Using the default Postgres port: %d", DEFAULT_POSTGRES_PORT)
+
+        config_user = self.model.config.get("db_schema_user")
+        if config_user:
+            user = config_user
+            logger.debug("Using the username provided in the config.")
+        else:
+            user = db_ctx.username
+            logger.debug("Using the username provided by the relation.")
+
+        logger.debug("Updating the `stores` and `schema` sections in `service.conf`...")
+
+        update_db_conf(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            schema_password=schema_password,
+        )
+
+        roles = get_postgres_roles(db_ctx.version)
+
+        if not self._migrate_schema_bootstrap(roles.owner):
+            logger.error(
+                "Migrating schema failed trying to update the `database` relation!"
+            )
+            return
+
+        supports_charmed_roles = roles.owner == "charmed_dba"
+
+        if supports_charmed_roles:
+            grant_role(
+                host=host,
+                port=port,
+                relation_user=relation_username,
+                relation_password=relation_password,
+                role="charmed_dml",
+                user=roles.application,
+            )
+
+            if roles.superuser:
+                grant_role(
+                    host=host,
+                    port=port,
+                    relation_user=relation_username,
+                    relation_password=relation_password,
+                    role="charmed_dba",
+                    user=roles.superuser,
+                )
+
+        if not self._update_wsl_distributions():
+            logger.info(
+                "Updating WSL distributions failed trying to update the `database` "
+                "relation!"
+            )
+            return
+
+        logger.info("Set up complete!")
+        self._stored.ready["db"] = True
+        self.unit.status = ActiveStatus("Unit is ready")
+
+        self._update_ready_status(restart_services=True)
+
     @cached_property
     def _proxy_settings(self) -> List[str]:
         """Determines the current proxy settings from the juju-related environment
@@ -780,7 +940,7 @@ class LandscapeServerCharm(CharmBase):
 
         return settings
 
-    def _migrate_schema_bootstrap(self):
+    def _migrate_schema_bootstrap(self, owner_role: str | None = None):
         """
         Migrates schema along with the bootstrap command which ensures that the
         databases and the landscape user exists, and that proxy settings are set.
@@ -789,6 +949,9 @@ class LandscapeServerCharm(CharmBase):
         :returns: True on success.
         """
         call = [SCHEMA_SCRIPT, "--bootstrap"]
+
+        if owner_role:
+            call.extend(["--db-owner-role", owner_role])
 
         if self._proxy_settings:
             call.extend(self._proxy_settings)

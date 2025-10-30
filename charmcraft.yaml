@@ -8,6 +8,10 @@ platforms:
   ubuntu@24.04:amd64:
   ubuntu@24.04:arm64:
 
+charm-libs:
+  - lib: data_platform_libs.data_interfaces
+    version: "0"
+
 parts:
   charm:
     plugin: charm

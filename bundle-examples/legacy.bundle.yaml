@@ -1,4 +1,4 @@
-description: Landscape Scalable Dev
+description: Landscape Scalable Dev with legacy `pgsql` interface
 applications:
   postgresql:
     channel: 14/stable
@@ -31,7 +31,7 @@ applications:
     charm: ../landscape-server_ubuntu@22.04-amd64.charm
     num_units: 1
     options:
-        landscape_ppa: ppa:landscape/self-hosted-beta
+        landscape_ppa: ppa:landscape/self-hosted-25.10
         min_install: True
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]

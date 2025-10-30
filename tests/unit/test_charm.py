@@ -588,10 +588,10 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             self.harness.charm._stored.ready,
             {
-                "db": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
                 "haproxy": False,
+                "db": False,
             },
         )
 
@@ -677,9 +677,25 @@ class TestCharm(unittest.TestCase):
         with (
             patch("charm.check_call") as mock,
             patch("charm.update_service_conf"),
+            patch("charm.apt"),
         ):
             mock.side_effect = CalledProcessError(127, Mock())
             self.assertRaises(CalledProcessError, harness.begin_with_initial_hooks)
+
+    @patch("charm.get_modified_env_vars", return_value={"PATH": "/usr/bin"})
+    def test_migrate_schema_bootstrap_owner_role_flag(self, get_env):
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch.object(self.harness.charm, "_bootstrap_account"),
+            patch.object(self.harness.charm, "_set_autoregistration"),
+        ):
+            result = self.harness.charm._migrate_schema_bootstrap("charmed_dba")
+
+        check_call_mock.assert_called_once_with(
+            [SCHEMA_SCRIPT, "--bootstrap", "--db-owner-role", "charmed_dba"],
+            env={"PATH": "/usr/bin"},
+        )
+        self.assertTrue(result)
 
     @patch.dict(
         os.environ,

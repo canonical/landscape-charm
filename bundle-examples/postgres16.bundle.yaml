@@ -1,9 +1,8 @@
-description: Landscape scalable integration testing
+description: Landscape Scalable Dev with Charmed PostgreSQL 16
 applications:
   postgresql:
     channel: 16/stable
     charm: ch:postgresql
-    base: ubuntu@24.04
     num_units: 1
     options:
       plugin_plpython3u_enable: true
@@ -12,6 +11,7 @@ applications:
       plugin_debversion_enable: true
       plugin_pg_trgm_enable: true
       experimental_max_connections: 500
+    base: ubuntu@24.04
   rabbitmq-server:
     channel: latest/edge
     charm: ch:rabbitmq-server
@@ -29,11 +29,12 @@ applications:
       ssl_cert: SELFSIGNED
       global_default_bind_options: "no-tlsv10"
   landscape-server:
-    charm: ../../landscape-server_ubuntu@24.04-amd64.charm
+    charm: ../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
     options:
         landscape_ppa: ppa:landscape/self-hosted-25.10
         min_install: True
+    base: ubuntu@24.04
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]

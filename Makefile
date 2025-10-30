@@ -1,11 +1,19 @@
-DIRNAME = $(notdir $(shell pwd))
-DIRNAME := $(addsuffix -build, $(DIRNAME))
+DIR_NAME := $(notdir $(shell pwd))
+BUNDLE_PATH ?= ./bundle-examples/bundle.yaml
+PLATFORM ?= ubuntu@22.04:amd64
+MODEL_NAME ?= $(DIR_NAME)-build
+CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 
-build: clean
-	charmcraft pack
-	juju add-model $(DIRNAME)
-	juju deploy ./bundle-examples/bundle.yaml
+.PHONY: build deploy clean
+
+build:
+	ccc pack --platform $(PLATFORM)
+
+deploy: clean build
+	juju add-model $(MODEL_NAME)
+	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
 clean:
-	-rm *.charm
-	-juju destroy-model --no-prompt $(DIRNAME) --force
+	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
+	-juju destroy-model --no-prompt $(MODEL_NAME) \
+		--force --no-wait --destroy-storage

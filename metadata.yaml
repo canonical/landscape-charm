@@ -11,7 +11,11 @@ maintainers:
 summary: Charm for installing and using Self-Hosted Landscape Server.
 
 requires:
+  database:
+    interface: postgresql_client
   db:
+    # Provide backwards compatibility
+    # with the legacy Postgres interface
     interface: pgsql
   inbound-amqp:
     interface: rabbitmq

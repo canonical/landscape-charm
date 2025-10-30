@@ -65,12 +65,35 @@ Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
 on enhancements to this charm following best practice guidelines, and
 `CONTRIBUTING.md` for developer guidance.
 
-When developing the charm, here's a quick way to test out changes as
-they would be deployed by `landscape-scalable`:
+When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. Make sure you have [`pipx`](https://github.com/pypa/pipx) installed:
+
+```sh
+sudo apt install -y pipx
+```
+
+Then, install `charmcraftcache` (which can be used by its alias, `ccc`):
+
+```sh
+pipx install charmcraftcache
+```
+
+> [!NOTE]
+> Make sure you add this repository (https://github.com/canonical/landscape-charm) as a remote to your fork, otherwise `ccc` will fail.
+
+Use the following command to test the charm as
+it would be deployed by Juju in the `landscape-scalable` bundle:
 
 ```bash
-make build
+make deploy
 ```
+
+You can also specify the platform to build the charm for, the path to the bundle to deploy, and the name of the model. For example:
+
+```sh
+make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
+```
+
+This will create a model called `landscape-pg16`.
 
 ### Run unit tests
 
@@ -81,7 +104,7 @@ tox -e unit
 Or run specific test(s):
 
 ```sh
-tox -e unit -- tests/test_charm.py::TestCharm::test_install
+tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
 ```
 
 ### Run integration tests

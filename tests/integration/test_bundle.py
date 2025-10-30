@@ -178,3 +178,66 @@ def get_session(
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session
+
+
+def _supports_legacy_pgsql(juju: jubilant.Juju) -> bool:
+    app = juju.status().apps["postgresql"]
+    return "db-admin" in getattr(app, "relations", {})
+
+
+def test_prefers_modern_database_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    initial_relations = set(status.apps["landscape-server"].relations)
+
+    if "database" not in initial_relations:
+        juju.integrate("landscape-server:database", "postgresql:database")
+    if _supports_legacy_pgsql(juju) and "db" not in initial_relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+
+    juju.wait(jubilant.all_active, timeout=120)
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    assert "database" in relations
+    if _supports_legacy_pgsql(juju):
+        assert "db" in relations
+    else:
+        assert "db" not in relations
+
+    _restore_relations(juju, initial_relations)
+
+
+def test_falls_back_to_legacy_relation(juju: jubilant.Juju, bundle: None):
+    if not _supports_legacy_pgsql(juju):
+        pytest.skip("Legacy pgsql relation not available on this PostgreSQL charm")
+
+    status = juju.status()
+    initial_relations = set(status.apps["landscape-server"].relations)
+
+    if "database" in initial_relations:
+        juju.remove_relation("landscape-server:database", "postgresql:database")
+    if "db" not in initial_relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+
+    juju.wait(jubilant.all_active, timeout=120)
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    assert "db" in relations
+
+    _restore_relations(juju, initial_relations)
+
+
+def _restore_relations(juju: jubilant.Juju, expected: set[str]) -> None:
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    if "database" in expected and "database" not in relations:
+        juju.integrate("landscape-server:database", "postgresql:database")
+    if "database" not in expected and "database" in relations:
+        juju.remove_relation("landscape-server", "postgresql")
+
+    relations = set(juju.status().apps["landscape-server"].relations)
+
+    if _supports_legacy_pgsql(juju):
+        if "db" in expected and "db" not in relations:
+            juju.integrate("landscape-server:db", "postgresql:db-admin")
+        if "db" not in expected and "db" in relations:
+            juju.remove_relation("landscape-server:db", "postgresql:db-admin")
