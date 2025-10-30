@@ -930,14 +930,6 @@ class LandscapeServerCharm(CharmBase):
 
         self._update_ready_status(restart_services=True)
 
-    def _database_relation_removed(self, _):
-        """
-        Handle removal of the modern Postgres relation.
-        """
-        self._stored.ready["db"] = False
-        self.unit.status = WaitingStatus("Waiting on relations")
-        self._update_ready_status()
-
     @cached_property
     def _proxy_settings(self) -> List[str]:
         """Determines the current proxy settings from the juju-related environment
