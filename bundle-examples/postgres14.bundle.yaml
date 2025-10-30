@@ -31,7 +31,7 @@ applications:
     charm: ../landscape-server_ubuntu@22.04-amd64.charm
     num_units: 1
     options:
-        landscape_ppa: ppa:jansdhillon/20
+        landscape_ppa: ppa:jansdhillon/28
         min_install: True
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
