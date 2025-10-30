@@ -31,7 +31,7 @@ class TestFetchPostgresRelationData:
                 "version": "14.8",
             }
         }
-        with mock.patch("src.database.logger"):
+        with mock.patch("database.logger"):
             result = fetch_postgres_relation_data(db_manager)
 
         db_manager.fetch_relation_data.assert_called_once_with()
@@ -54,7 +54,7 @@ class TestFetchPostgresRelationData:
                 "version": "13.3",
             },
         }
-        with mock.patch("src.database.logger"):
+        with mock.patch("database.logger"):
             result = fetch_postgres_relation_data(db_manager)
 
         assert result == DatabaseConnectionContext(
@@ -68,7 +68,7 @@ class TestFetchPostgresRelationData:
     def test_returns_empty_context_when_no_data(self):
         db_manager = mock.Mock()
         db_manager.fetch_relation_data.return_value = {}
-        with mock.patch("src.database.logger"):
+        with mock.patch("database.logger"):
             result = fetch_postgres_relation_data(db_manager)
 
         assert result == DatabaseConnectionContext()
