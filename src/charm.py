@@ -56,8 +56,10 @@ from ops.model import (
     Relation,
     WaitingStatus,
 )
+from pydantic import ValidationError
 import yaml
 
+from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration, RedirectHTTPS
 from database import (
     DatabaseConnectionContext,
     fetch_postgres_relation_data,
@@ -74,7 +76,6 @@ from haproxy import (
     HTTP_SERVICE,
     HTTPS_SERVICE,
     PORTS,
-    RedirectHTTPS,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
 )
@@ -331,14 +332,6 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
-        self.framework.observe(
-            self.on.enable_ubuntu_installer_attach_action,
-            self._enable_ubuntu_installer_attach,
-        )
-        self.framework.observe(
-            self.on.disable_ubuntu_installer_attach_action,
-            self._disable_ubuntu_installer_attach,
-        )
 
         # State
         self._stored.set_default(
@@ -369,6 +362,14 @@ class LandscapeServerCharm(CharmBase):
                 self.on.upgrade_charm,
             ],
         )
+        try:
+            self.charm_config = LandscapeCharmConfiguration.validate(self.model.config)
+        except ValidationError as e:
+            logger.error(f"Invalid configuration: {e.errors()}")
+            self.charm_config = DEFAULT_CONFIGURATION
+            self.unit.status = BlockedStatus(
+                "Invalid configuration. See `juju debug-log`."
+            )
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -376,7 +377,7 @@ class LandscapeServerCharm(CharmBase):
         """
         return [
             {
-                "scrape_interval": self.model.config.get("prometheus_scrape_interval"),
+                "scrape_interval": self.charm_config.prometheus_scrape_interval,
                 "metrics_path": "/metrics",
                 "static_configs": [
                     {
@@ -392,95 +393,85 @@ class LandscapeServerCharm(CharmBase):
         """
         Handle configuration changes.
         """
-        prev_status = self.unit.status
+        try:
+            self.charm_config = LandscapeCharmConfiguration.validate(self.model.config)
+            self.unit.status = WaitingStatus("Configuration validated...")
+        except ValidationError as e:
+            logger.error(f"Invalid configuration: {e.errors()}")
+            self.unit.status = BlockedStatus(
+                "Invalid configuration. See `juju debug-log`."
+            )
+            return
 
         try:
-            # Validate the config
-            raw_redirect_https = str(self.model.config["redirect_https"])
-            _get_redirect_https(raw_redirect_https)
-        except InvalidRedirectHTTPS as e:
+            self._configure_ubuntu_installer_attach(
+                self.charm_config.enable_ubuntu_installer_attach
+            )
+        except PackageError as e:
             # TODO Should be "blocked" eventually, but this causes the charm to be
             # stuck in the "blocked" state permanently.
-            self.unit.status = MaintenanceStatus(str(e))
+            self.unit.status = MaintenanceStatus(
+                "Failed to enable `landscape-ubuntu-installer-attach`. "
+                "See `juju debug-log`."
+            )
+            logger.exception(e)
             return
 
         # Update additional configuration
-        deployment_mode = self.model.config.get("deployment_mode")
-        update_service_conf({"global": {"deployment-mode": deployment_mode}})
+        update_service_conf(
+            {"global": {"deployment-mode": self.charm_config.deployment_mode}}
+        )
+        configure_for_deployment_mode(self.charm_config.deployment_mode)
 
-        configure_for_deployment_mode(deployment_mode)
+        if self.charm_config.additional_service_config:
+            merge_service_conf(self.charm_config.additional_service_config)
 
-        additional_config = self.model.config.get("additional_service_config")
-        if additional_config:
-            merge_service_conf(additional_config)
-
-        # Write the config-provided SSL certificate, if it exists.
-        config_ssl_cert = self.model.config["ssl_cert"]
-
-        if config_ssl_cert != "DEFAULT":
+        if self.charm_config.ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(config_ssl_cert)
+            write_ssl_cert(self.charm_config.ssl_cert)
 
-        # Write the license file, if it exists.
-        license_file = self.model.config.get("license_file")
-        if license_file:
+        if self.charm_config.license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
             write_license_file(
-                license_file, user_exists("landscape").pw_uid, self.root_gid
+                self.charm_config.license_file,
+                user_exists("landscape").pw_uid,
+                self.root_gid,
             )
             self.unit.status = WaitingStatus("Waiting on relations")
 
-        smtp_relay_host = self.model.config.get("smtp_relay_host")
-        if smtp_relay_host:
+        if self.charm_config.smtp_relay_host:
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
-            self._configure_smtp(smtp_relay_host)
+            self._configure_smtp(self.charm_config.smtp_relay_host)
 
         # Update HAProxy relations, if they exist.
-        haproxy_relations = self.model.relations.get("website", [])
-        for relation in haproxy_relations:
+        for relation in self.model.relations.get("website", []):
             self._update_haproxy_connection(relation)
 
-        if any(self.model.config.get(v) for v in OPENID_CONFIG_VALS) and any(
-            self.model.config.get(v) for v in OIDC_CONFIG_VALS
-        ):
-            self.unit.status = BlockedStatus(
-                "OpenID and OIDC configurations are mutually exclusive"
-            )
-        else:
-            self._configure_openid()
-            self._configure_oidc()
-
-        # Update the service.conf
-        root_url = self.model.config.get("root_url")
-        workers = self.model.config["worker_counts"]
+        self._configure_openid()
+        self._configure_oidc()
 
         service_conf_updates = {
-            service: {"workers": str(workers)}
+            service: {"workers": str(self.charm_config.worker_counts)}
             for service in ("landscape", "api", "message-server", "pingserver")
         }
 
-        if root_url:
+        if root_url := self.charm_config.root_url:
             service_conf_updates["global"] = {"root-url": root_url}
             service_conf_updates["api"]["root-url"] = root_url
             service_conf_updates["package-upload"] = {"root-url": root_url}
 
         update_service_conf(service_conf_updates)
 
-        config_host = self.model.config.get("db_host")
-        schema_password = self.model.config.get("db_schema_password")
-        landscape_password = self.model.config.get("db_landscape_password")
-        config_port = self.model.config.get("db_port")
-        config_user = self.model.config.get("db_schema_user")
         db_kargs = {}
-        if config_host:
+        if config_host := self.charm_config.db_host:
             db_kargs["host"] = config_host
-        if schema_password:
+        if schema_password := self.charm_config.db_schema_password:
             db_kargs["schema_password"] = schema_password
-        if config_port:
+        if config_port := self.charm_config.db_port:
             db_kargs["port"] = config_port
-        if config_user:
+        if config_user := self.charm_config.db_schema_user:
             db_kargs["user"] = config_user
-        if landscape_password:
+        if landscape_password := self.charm_config.db_landscape_password:
             db_kargs["password"] = landscape_password
         if db_kargs:
             update_db_conf(**db_kargs)
@@ -523,9 +514,6 @@ class LandscapeServerCharm(CharmBase):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
 
-        if isinstance(prev_status, BlockedStatus):
-            self.unit.status = prev_status
-
         self._update_ready_status(restart_services=True)
 
     def _get_secret_token(self) -> str | None:
@@ -535,7 +523,7 @@ class LandscapeServerCharm(CharmBase):
 
         If set on neither, return `None`.
         """
-        secret_token = self.model.config.get("secret_token")
+        secret_token = self.charm_config.secret_token
         if not secret_token:
             peer_relation = self.model.get_relation("replicas")
             if peer_relation is not None:
@@ -545,7 +533,7 @@ class LandscapeServerCharm(CharmBase):
         return secret_token
 
     def _get_cookie_encryption_key(self):
-        cookie_encryption_key = self.model.config.get("cookie_encryption_key")
+        cookie_encryption_key = self.charm_config.cookie_encryption_key
         if not cookie_encryption_key:
             peer_relation = self.model.get_relation("replicas")
             if peer_relation is not None:
@@ -568,7 +556,7 @@ class LandscapeServerCharm(CharmBase):
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
 
-        landscape_ppa_key = self.model.config["landscape_ppa_key"]
+        landscape_ppa_key = self.charm_config.landscape_ppa_key
         if landscape_ppa_key != "":
             try:
                 landscape_key_file = apt.import_key(landscape_ppa_key)
@@ -576,7 +564,7 @@ class LandscapeServerCharm(CharmBase):
             except apt.GPGKeyError:
                 logger.error("Failed to import Landscape PPA key")
 
-        landscape_ppa = self.model.config["landscape_ppa"]
+        landscape_ppa = self.charm_config.landscape_ppa
 
         try:
             # This package is responsible for the hanging installs and ignores env vars
@@ -588,13 +576,16 @@ class LandscapeServerCharm(CharmBase):
             # least any juju_proxy setting, add the classic http(s)_proxy to the env
             # that will be used only for add-apt-repository call
             add_apt_repository_env = os.environ.copy()
-            for proxy_var in ["http_proxy", "https_proxy"]:
+            for proxy_var, proxy_var_value in [
+                ("http_proxy", self.charm_config.http_proxy),
+                ("https_proxy", self.charm_config.https_proxy),
+            ]:
                 juju_proxy_var = f"JUJU_CHARM_{proxy_var.upper()}"
 
                 # if the charm has a proxy conf configured, override juju_http(s)
                 # configuration
-                if proxy_var in self.model.config:
-                    add_apt_repository_env[proxy_var] = self.model.config[proxy_var]
+                if proxy_var_value:
+                    add_apt_repository_env[proxy_var] = proxy_var_value
                 elif juju_proxy_var in add_apt_repository_env:
                     add_apt_repository_env[proxy_var] = add_apt_repository_env[
                         juju_proxy_var
@@ -608,8 +599,8 @@ class LandscapeServerCharm(CharmBase):
 
             # juju_no_proxy is not perfectly compatible with Shell environment
             # let's handle only the no_proxy from the charm's configuration
-            if "no_proxy" in self.model.config:
-                add_apt_repository_env["no_proxy"] = self.model.config["no_proxy"]
+            if self.charm_config.no_proxy:
+                add_apt_repository_env["no_proxy"] = self.charm_config.no_proxy
                 logger.info(
                     f"add-apt-repository no_proxy variable set to : "
                     f"{add_apt_repository_env['no_proxy']}"
@@ -619,7 +610,7 @@ class LandscapeServerCharm(CharmBase):
                 ["add-apt-repository", "-y", landscape_ppa], env=add_apt_repository_env
             )
 
-            if self.model.config["min_install"]:
+            if self.charm_config.min_install:
                 logger.info("Not installing hashids..")
                 check_call(
                     [
@@ -642,14 +633,14 @@ class LandscapeServerCharm(CharmBase):
             raise exc  # This will trigger juju's exponential retry
 
         # Write the config-provided SSL certificate, if it exists.
-        config_ssl_cert = self.model.config["ssl_cert"]
+        config_ssl_cert = self.charm_config.ssl_cert
 
         if config_ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
             write_ssl_cert(config_ssl_cert)
 
         # Write the license file, if it exists.
-        license_file = self.model.config.get("license_file")
+        license_file = self.charm_config.license_file
 
         if license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
@@ -697,18 +688,18 @@ class LandscapeServerCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Starting services")
         is_leader = self.unit.is_leader()
-        deployment_mode = self.model.config.get("deployment_mode")
+        deployment_mode = self.charm_config.deployment_mode
         is_standalone = deployment_mode == "standalone"
 
         update_default_settings(
             {
                 "RUN_ALL": "no",
-                "RUN_APISERVER": str(self.model.config["worker_counts"]),
+                "RUN_APISERVER": str(self.charm_config.worker_counts),
                 "RUN_ASYNC_FRONTEND": "yes",
                 "RUN_JOBHANDLER": "yes",
-                "RUN_APPSERVER": str(self.model.config["worker_counts"]),
-                "RUN_MSGSERVER": str(self.model.config["worker_counts"]),
-                "RUN_PINGSERVER": str(self.model.config["worker_counts"]),
+                "RUN_APPSERVER": str(self.charm_config.worker_counts),
+                "RUN_MSGSERVER": str(self.charm_config.worker_counts),
+                "RUN_PINGSERVER": str(self.charm_config.worker_counts),
                 "RUN_CRON": "yes" if is_leader else "no",
                 "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
                 "RUN_PACKAGEUPLOADSERVER": (
@@ -760,21 +751,21 @@ class LandscapeServerCharm(CharmBase):
         master = dict(s.split("=", 1) for s in unit_data["master"].split(" "))
 
         # Override db config if manually set in juju
-        config_host = self.model.config.get("db_host")
+        config_host = self.charm_config.db_host
         if config_host:
             host = config_host
         else:
             host = master["host"]
 
-        landscape_password = self.model.config.get("db_landscape_password")
+        landscape_password = self.charm_config.db_landscape_password
         if landscape_password:
             password = landscape_password
         else:
             password = master["password"]
 
-        schema_password = self.model.config.get("db_schema_password")
+        schema_password = self.charm_config.db_schema_password
 
-        config_port = self.model.config.get("db_port")
+        config_port = self.charm_config.db_port
         if config_port:
             port = config_port
         else:
@@ -782,7 +773,7 @@ class LandscapeServerCharm(CharmBase):
         if not port:
             port = DEFAULT_POSTGRES_PORT  # Fall back to postgres default port
 
-        config_user = self.model.config.get("db_schema_user")
+        config_user = self.charm_config.db_schema_user
         if config_user:
             user = config_user
         else:
@@ -1048,7 +1039,7 @@ class LandscapeServerCharm(CharmBase):
         self._update_haproxy_connection(event.relation)
 
         # Update root_url, if not provided.
-        if not self.model.config.get("root_url"):
+        if not self.charm_config.root_url:
             url = f'https://{event.relation.data[event.unit]["public-address"]}/'
             self._stored.default_root_url = url
             update_service_conf(
@@ -1069,36 +1060,27 @@ class LandscapeServerCharm(CharmBase):
         # work just to fail here.
         try:
             ssl_cert = _get_ssl_cert(
-                ssl_cert=self.model.config["ssl_cert"],
-                ssl_key=self.model.config["ssl_key"],
+                ssl_cert=self.charm_config.ssl_cert,
+                ssl_key=self.charm_config.ssl_key,
             )
         except SSLConfigurationError as e:
-            self.unit.status = BlockedStatus(str(e))
-            return
-
-        try:
-            redirect_https = _get_redirect_https(
-                str(self.model.config["redirect_https"])
-            )
-        except InvalidRedirectHTTPS as e:
             self.unit.status = BlockedStatus(str(e))
             return
 
         error_files = get_haproxy_error_files(ERROR_FILES)
         server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
-        worker_counts = int(self.model.config["worker_counts"])
 
         http_service = create_http_service(
             http_service=asdict(HTTP_SERVICE),
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
+            worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=PORTS,
             server_options=SERVER_OPTIONS,
-            redirect_https=redirect_https,
+            redirect_https=self.charm_config.redirect_https,
         )
 
         https_service = create_https_service(
@@ -1106,7 +1088,7 @@ class LandscapeServerCharm(CharmBase):
             ssl_cert=ssl_cert,
             server_ip=server_ip,
             unit_name=unit_name,
-            worker_counts=worker_counts,
+            worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
             error_files=error_files,
             service_ports=PORTS,
@@ -1115,7 +1097,7 @@ class LandscapeServerCharm(CharmBase):
 
         services = [http_service, https_service]
 
-        if self.model.config.get("enable_hostagent_messenger"):
+        if self.charm_config.enable_hostagent_messenger:
             grpc_service = create_grpc_service(
                 grpc_service=asdict(GRPC_SERVICE),
                 ssl_cert=ssl_cert,
@@ -1151,7 +1133,7 @@ class LandscapeServerCharm(CharmBase):
         Writes the HAProxy-provided SSL certificate for
         Landscape Server, if config has not provided one.
         """
-        config_ssl_cert = self.model.config["ssl_cert"]
+        config_ssl_cert = self.charm_config.ssl_cert
 
         if config_ssl_cert != "DEFAULT":
             # No-op: cert has been provided by config.
@@ -1241,7 +1223,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if not self.unit.is_leader():
             return
 
-        root_url = self.model.config.get("root_url")
+        root_url = self.charm_config.root_url
         if not root_url:
             root_url = self._stored.default_root_url
 
@@ -1250,7 +1232,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 self.model.get_binding(event.relation).network.bind_address
             )
 
-        site_name = self.model.config.get("site_name")
+        site_name = self.charm_config.site_name
         if site_name:
             subtitle = f"[{site_name}] Systems management"
             group = f"[{site_name}] LMA"
@@ -1379,10 +1361,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         self._leader_changed()
 
         secret_token = self._get_secret_token()
+        should_update = False
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
             self._stored.secret_token = secret_token
-            self._update_ready_status(restart_services=True)
+            should_update = True
 
         cookie_encryption_key = self._get_cookie_encryption_key()
         if (
@@ -1391,6 +1374,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         ):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
+            should_update = True
+
+        if should_update:
             self._update_ready_status(restart_services=True)
 
     def _configure_smtp(self, relay_host: str) -> None:
@@ -1416,67 +1402,39 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self.unit.status = WaitingStatus("Waiting on relations")
 
     def _configure_oidc(self) -> None:
+        if not self.charm_config.oidc_issuer:  # not doing OIDC
+            return
+
         self.unit.status = MaintenanceStatus("Configuring OIDC")
 
-        oidc_issuer = self.model.config.get("oidc_issuer")
-        oidc_client_id = self.model.config.get("oidc_client_id")
-        oidc_client_secret = self.model.config.get("oidc_client_secret")
-        oidc_logout_url = self.model.config.get("oidc_logout_url")
-        oidc_vals = (oidc_issuer, oidc_client_id, oidc_client_secret, oidc_logout_url)
-        none_count = oidc_vals.count(None)
+        updates = {
+            "landscape": {
+                "oidc-issuer": self.charm_config.oidc_issuer,
+                "oidc-client-id": self.charm_config.oidc_client_id,
+                "oidc-client-secret": self.charm_config.oidc_client_secret,
+            },
+        }
+        if self.charm_config.oidc_logout_url:
+            updates["landscape"]["oidc-logout-url"] = self.charm_config.oidc_logout_url
 
-        if none_count == 0:
-            update_service_conf(
-                {
-                    "landscape": {
-                        "oidc-issuer": oidc_issuer,
-                        "oidc-client-id": oidc_client_id,
-                        "oidc-client-secret": oidc_client_secret,
-                        "oidc-logout-url": oidc_logout_url,
-                    },
-                }
-            )
-        elif none_count == 1 and oidc_logout_url is None:
-            # Only the logout url is optional.
-            update_service_conf(
-                {
-                    "landscape": {
-                        "oidc-issuer": oidc_issuer,
-                        "oidc-client-id": oidc_client_id,
-                        "oidc-client-secret": oidc_client_secret,
-                    },
-                }
-            )
-        elif none_count < 4:
-            self.unit.status = BlockedStatus(
-                "OIDC connect config requires at least 'oidc_issuer', "
-                "'oidc_client_id', and 'oidc_client_secret' values"
-            )
-            return
+        update_service_conf(updates)
 
         self.unit.status = WaitingStatus("Waiting on relations")
 
     def _configure_openid(self) -> None:
+        if not self.charm_config.openid_provider_url:  # not doing OpenID
+            return
+
         self.unit.status = MaintenanceStatus("Configuring OpenID")
-
-        openid_provider_url = self.model.config.get("openid_provider_url")
-        openid_logout_url = self.model.config.get("openid_logout_url")
-
-        if openid_provider_url and openid_logout_url:
-            update_service_conf(
-                {
-                    "landscape": {
-                        "openid-provider-url": openid_provider_url,
-                        "openid-logout-url": openid_logout_url,
-                    },
-                }
-            )
-            self.unit.status = WaitingStatus("Waiting on relations")
-        elif openid_provider_url or openid_logout_url:
-            self.unit.status = BlockedStatus(
-                "OpenID configuration requires both 'openid_provider_url' and "
-                "'openid_logout_url'"
-            )
+        update_service_conf(
+            {
+                "landscape": {
+                    "openid-provider-url": self.charm_config.openid_provider_url,
+                    "openid-logout-url": self.charm_config.openid_logout_url,
+                },
+            }
+        )
+        self.unit.status = WaitingStatus("Waiting on relations")
 
     def _bootstrap_account(self):
         """If admin account details are provided, create admin"""
@@ -1485,9 +1443,9 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         if self._stored.account_bootstrapped:  # Admin already created
             return
         karg = {}  # Keyword args for command line
-        karg["admin_email"] = self.model.config.get("admin_email")
-        karg["admin_name"] = self.model.config.get("admin_name")
-        karg["admin_password"] = self.model.config.get("admin_password")
+        karg["admin_email"] = self.charm_config.admin_email
+        karg["admin_name"] = self.charm_config.admin_name
+        karg["admin_password"] = self.charm_config.admin_password
         required_args = karg.values()
         if not any(required_args):  # Return since no args are specified
             return
@@ -1496,7 +1454,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 "Admin email, name, and password required for bootstrap account"
             )
             return
-        karg["root_url"] = self.model.config.get("root_url")
+        karg["root_url"] = self.charm_config.root_url
         if not karg["root_url"]:
             default_root_url = self._stored.default_root_url
             if default_root_url:
@@ -1504,8 +1462,8 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             else:
                 logger.error("Bootstrap account waiting on default root url..")
                 return
-        karg["registration_key"] = self.model.config.get("registration_key")
-        karg["system_email"] = self.model.config.get("system_email")
+        karg["registration_key"] = self.charm_config.registration_key
+        karg["system_email"] = self.charm_config.system_email
 
         # Collect command line arguments
         args = [BOOTSTRAP_ACCOUNT_SCRIPT]
@@ -1544,7 +1502,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         Only the leader does this to prevent unnecessary DB writes.
         We can only do this after the initial account is bootstrapped.
         """
-        on = "on" if self.model.config["autoregistration"] else "off"
+        on = "on" if self.charm_config.autoregistration else "off"
 
         if not self.unit.is_leader():
             return
@@ -1685,21 +1643,24 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
     def _migrate_service_conf(self, event: ActionEvent) -> None:
         migrate_service_conf()
 
-    def _enable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
+    def _configure_ubuntu_installer_attach(self, enable: bool) -> None:
         """
-        Install the Ubuntu installer attach and create the HAProxy frontend.
+        Install/uninstall the Ubuntu installer attach service. Do nothing if the
+        configuration has not changed.
         """
-        self._stored.enable_ubuntu_installer_attach = True
-        apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
-        self._on_config_changed(None)
-
-    def _disable_ubuntu_installer_attach(self, event: ActionEvent) -> None:
-        """
-        Uninstall the Ubuntu installer attach service and remove the HAProxy frontend.
-        """
-        self._stored.enable_ubuntu_installer_attach = False
-        apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-        self._on_config_changed(None)
+        currently_enabled = self._stored.enable_ubuntu_installer_attach
+        if not currently_enabled and enable:
+            self.unit.status = MaintenanceStatus(
+                "Installing `landscape-ubuntu-installer-attach`"
+            )
+            apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+            self._stored.enable_ubuntu_installer_attach = True
+        elif currently_enabled and not enable:
+            self.unit.status = MaintenanceStatus(
+                "Removing `landscape-ubuntu-installer-attach`"
+            )
+            apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+            self._stored.enable_ubuntu_installer_attach = False
 
 
 if __name__ == "__main__":  # pragma: no cover

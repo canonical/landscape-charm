@@ -51,6 +51,7 @@ options:
     description: OpenID-Connect client secret.
   oidc_logout_url:
     type: string
+    default:
     description: |
       OpenID-Connect issuer URL to use to log out of Landscape Servers is.
   root_url:
@@ -232,3 +233,11 @@ options:
       By default, those frontends will not be configured. Note that the hostagent
       services still need to be configured in the Landscape Server settings for
       the services to function.
+  enable_ubuntu_installer_attach:
+    type: boolean
+    default: false
+    description: |
+      Whether the `landscape-ubuntu-installer-attach` service should run. If true,
+      an HAProxy frontend will be created to route traffic to the Ubuntu installer
+      attach backend services. The backend services will be installed and uninstalled
+      automatically.

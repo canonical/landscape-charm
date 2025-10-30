@@ -8,6 +8,8 @@ from enum import Enum
 import os
 from typing import Iterable, Mapping
 
+from config import RedirectHTTPS
+
 
 class ACL(str, Enum):
     """
@@ -50,16 +52,6 @@ class HTTPSBackend(str, Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class RedirectHTTPS(str, Enum):
-    """
-    Keywords to specify which HTTP routes should be redirected to HTTPS.
-    """
-
-    ALL = "all"
-    NONE = "none"
-    DEFAULT = "default"
 
 
 @dataclass(frozen=True)

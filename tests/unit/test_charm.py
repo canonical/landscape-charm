@@ -12,27 +12,37 @@ from pwd import struct_passwd
 from subprocess import CalledProcessError
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import ANY, DEFAULT, Mock, patch
+from unittest.mock import ANY, call, DEFAULT, Mock, patch
 
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from ops.charm import ActionEvent
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-from ops.testing import Context, Harness, PeerRelation, Relation, State
+from ops.testing import (
+    Context,
+    Harness,
+    MaintenanceStatus,
+    PeerRelation,
+    Relation,
+    State,
+    StoredState,
+)
 
 from charm import (
     DEFAULT_SERVICES,
     get_modified_env_vars,
     HASH_ID_DATABASES,
     LANDSCAPE_PACKAGES,
+    LANDSCAPE_UBUNTU_INSTALLER_ATTACH,
     LandscapeServerCharm,
     LEADER_SERVICES,
     LSCTL,
     METRIC_INSTRUMENTED_SERVICE_PORTS,
     NRPE_D_DIR,
     SCHEMA_SCRIPT,
+    UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
-from haproxy import GRPC_SERVICE
+from haproxy import GRPC_SERVICE, UBUNTU_INSTALLER_ATTACH_SERVICE
 from settings_files import AMQP_USERNAME, VHOSTS
 from tests.unit.helpers import get_haproxy_services
 
@@ -193,6 +203,161 @@ class TestOnConfigChanged:
         services = get_haproxy_services(state_out, relation)
         service_names = (service["service_name"] for service in services)
         assert GRPC_SERVICE.service_name in service_names
+
+
+class TestOnConfigChangedEnableUbuntuInstallerAttach:
+    """
+    Tests for `on.config_changed` events that relate to the
+    `enable_ubuntu_installer_attach` configuration option.
+    """
+
+    @patch("src.charm.apt.add_package")
+    def test_enable(self, add_package):
+        """
+        If the `enable_ubuntu_installer_attach` parameter moves from `False` to `True`,
+        then install the service and configure the HAProxy frontend.
+
+        Update the apt cache to ensure the package can be found.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"enable_ubuntu_installer_attach": True},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": False},
+                )
+            ],
+        )
+
+        state_out = context.run(context.on.config_changed(), state_in)
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+
+        assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name in service_names
+        add_package.assert_called_once_with(
+            LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True
+        )
+
+    @patch("src.charm.apt.remove_package")
+    def test_disable(self, remove_package):
+        """
+        If the `enable_ubuntu_installer_attach` parameter moves from `True` to `False`,
+        then uninstall the service and remove the HAProxy frontend.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"enable_ubuntu_installer_attach": False},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": True},
+                )
+            ],
+        )
+
+        state_out = context.run(context.on.config_changed(), state_in)
+        services = get_haproxy_services(state_out, relation)
+        service_names = (service["service_name"] for service in services)
+
+        assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name not in service_names
+        remove_package.assert_called_once_with(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+
+    @patch("src.charm.apt.add_package")
+    def test_idempotent_enable(self, add_package):
+        """
+        If the `enable_ubuntu_installer_attach` parameter was already set to `True`,
+        then do nothing. Do not attempt to install the package again.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"enable_ubuntu_installer_attach": True},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": True},
+                )
+            ],
+        )
+
+        for _ in range(3):
+            state_out = context.run(context.on.config_changed(), state_in)
+            services = get_haproxy_services(state_out, relation)
+            service_names = (service["service_name"] for service in services)
+
+            assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name in service_names
+            add_package.assert_not_called()
+
+            state_in = state_out
+
+    @patch("src.charm.apt.remove_package")
+    def test_idempotent_disable(self, remove_package):
+        """
+        If the `enable_ubuntu_installer_attach` parameter was already set to `False`,
+        then do nothing. Do not attempt to remove the package again.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"enable_ubuntu_installer_attach": False},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": False},
+                )
+            ],
+        )
+
+        for _ in range(3):
+            state_out = context.run(context.on.config_changed(), state_in)
+            services = get_haproxy_services(state_out, relation)
+            service_names = (service["service_name"] for service in services)
+
+            assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name not in service_names
+            remove_package.assert_not_called()
+
+            state_in = state_out
+
+    @patch("src.charm.apt.add_package")
+    def test_failed_to_enable(self, add_package):
+        """
+        If the `enable_ubuntu_installer_attach` is set to `True` but the service
+        cannot be installed, then the unit enters `MaintenanceStatus`. Do not store
+        `enable_ubuntu_installer_attach=True` to ensure the operation can be retried.
+        """
+        context = Context(LandscapeServerCharm)
+        relation = Relation("website")
+        state_in = State(
+            config={"enable_ubuntu_installer_attach": True},
+            relations=[relation],
+            stored_states=[
+                StoredState(
+                    owner_path="LandscapeServerCharm",
+                    content={"enable_ubuntu_installer_attach": False},
+                )
+            ],
+        )
+
+        add_package.side_effect = PackageError
+
+        state_out = context.run(context.on.config_changed(), state_in)
+        assert isinstance(state_out.unit_status, MaintenanceStatus)
+        assert (
+            "Failed to enable `landscape-ubuntu-installer-attach`"
+            in state_out.unit_status.message
+        )
+
+        enabled = state_out.get_stored_state(
+            "_stored", owner_path="LandscapeServerCharm"
+        ).content.get("enable_ubuntu_installer_attach")
+        assert not enabled
 
 
 class TestGetSecretToken:
@@ -698,6 +863,213 @@ class TestCharm(unittest.TestCase):
         mock_args = mocks["update_default_settings"].mock_calls[0].args[0]
         self.assertEqual(mock_args["RUN_APPSERVER"], "2")
 
+    def test_db_relation_changed_no_master(self):
+        mock_event = Mock()
+        mock_event.relation.data = {mock_event.unit: {}}
+
+        self.harness.charm._db_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, WaitingStatus)
+        self.assertFalse(self.harness.charm._stored.ready["db"])
+
+    def test_db_relation_changed_not_allowed_unit(self):
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": "",
+                "master": True,
+            },
+        }
+
+        self.harness.charm._db_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, WaitingStatus)
+        self.assertFalse(self.harness.charm._stored.ready["db"])
+
+    def test_db_relation_changed_called_process_error(self):
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf") as update_service_conf_mock,
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.charm._db_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, BlockedStatus)
+        self.assertFalse(self.harness.charm._stored.ready["db"])
+
+        update_service_conf_mock.assert_called_once_with(
+            {
+                "stores": {
+                    "host": "1.2.3.4:5678",
+                    "password": "testpass",
+                },
+                "schema": {
+                    "store_user": "testuser",
+                    "store_password": "testpass",
+                },
+            }
+        )
+
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change(self, _):
+        """
+        Test that the manual db settings are reflected if a config change happens later
+        """
+
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+        peer_relation_id = self.harness.add_relation("replicas", "landscape-server")
+        self.harness.update_relation_data(
+            peer_relation_id, "landscape-server", {"leader-ip": "test"}
+        )
+
+        with (
+            patch("charm.check_call"),
+            patch(
+                "settings_files.update_service_conf",
+            ) as update_service_conf_mock,
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        self.assertEqual(update_service_conf_mock.call_count, 2)
+        self.assertEqual(
+            update_service_conf_mock.call_args_list[1],
+            call(
+                {
+                    "stores": {
+                        "host": "hello:world",
+                    },
+                }
+            ),
+        )
+
+    @patch("charm.update_service_conf")
+    def test_on_manual_db_config_change_block_if_error(self, _):
+        """
+        If the schema migration doesn't go through on a manual config change,
+        then block unit status
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
+
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            check_call_mock.side_effect = CalledProcessError(127, "ouch")
+            self.harness.update_config({"db_host": "hello", "db_port": "world"})
+
+        status = self.harness.charm.unit.status
+        self.assertIsInstance(status, BlockedStatus)
+
+    @patch("charm.update_service_conf")
+    def test_on_db_relation_changed_update_wsl_distribution(self, _):
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            self.harness.charm._db_relation_changed(mock_event)
+
+        check_call_mock.assert_called_with([UPDATE_WSL_DISTRIBUTIONS_SCRIPT], env=ANY)
+
+    @patch("charm.update_service_conf")
+    def test_on_db_relation_update_wsl_distributions_fail(self, _):
+        """
+        If the `update_wsl_distributions` script fails,
+        it will not result in a `BlockedStatus`.
+        """
+        mock_event = Mock()
+        mock_event.relation.data = {
+            mock_event.unit: {
+                "allowed-units": self.harness.charm.unit.name,
+                "master": "host=1.2.3.4 password=testpass",
+                "host": "1.2.3.4",
+                "port": "5678",
+                "user": "testuser",
+                "password": "testpass",
+            },
+        }
+
+        with (
+            patch("charm.check_call") as check_call_mock,
+            patch("settings_files.update_service_conf"),
+        ):
+            # Let bootstrap account go through
+            check_call_mock.side_effect = [None, CalledProcessError(127, "ouch")]
+            self.harness.charm._db_relation_changed(mock_event)
+
+        status = self.harness.charm.unit.status
+        self.assertNotIsInstance(status, BlockedStatus)
+
+        info_calls = [call.args for call in self.log_info_mock.call_args_list]
+        error_calls = [call.args for call in self.log_error_mock.call_args_list]
+
+        self.assertIn(("Updating WSL distributions...",), info_calls)
+        self.assertIn(
+            (
+                "Try updating the stock WSL distributions again later by running '%s'.",
+                f"{UPDATE_WSL_DISTRIBUTIONS_SCRIPT}",
+            ),
+            info_calls,
+        )
+
+        self.assertIn(
+            ("Failed to update WSL distributions with return code %d", 127),
+            error_calls,
+        )
+
     def test_inbound_amqp_relation_joined(self):
         """
         The inbound vhost is created.
@@ -828,58 +1200,6 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-    def test_website_relation_joined_cert_no_key(self):
-        mock_event = Mock()
-        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
-        self.harness.disable_hooks()
-        self.harness.update_config({"ssl_cert": "NOTDEFAULT", "ssl_key": ""})
-
-        with patch("charm.update_service_conf"):
-            self.harness.charm._website_relation_joined(mock_event)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(
-            status.message, "`ssl_cert` is specified but `ssl_key` is missing"
-        )
-
-    def test_website_relation_joined_cert_not_DEFAULT_not_b64(self):
-        mock_event = Mock()
-        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
-        self.harness.disable_hooks()
-        self.harness.update_config({"ssl_cert": "NOTDEFAULT", "ssl_key": "a"})
-
-        with patch("charm.update_service_conf"):
-            self.harness.charm._website_relation_joined(mock_event)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(
-            status.message,
-            "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded",
-        )
-
-    def test_website_relation_joined_cert_not_DEFAULT_key_not_b64(self):
-        mock_event = Mock()
-        mock_event.relation.data = {mock_event.unit: {"public-address": "8.8.8.8"}}
-        self.harness.disable_hooks()
-        self.harness.update_config(
-            {
-                "ssl_cert": "Tk9UREVGQVVMVA==",
-                "ssl_key": "NOTBASE64OHNO",
-            }
-        )
-
-        with patch("charm.update_service_conf"):
-            self.harness.charm._website_relation_joined(mock_event)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, BlockedStatus)
-        self.assertEqual(
-            status.message,
-            "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded",
-        )
-
     def test_website_relation_joined_cert_not_DEFAULT(self):
         mock_event = Mock()
         mock_event.relation.data = {
@@ -920,18 +1240,6 @@ class TestCharm(unittest.TestCase):
         self.assertIn("services", relation_data)
         self.assertIsInstance(status, WaitingStatus)
         self.assertTrue(self.harness.charm._stored.ready["haproxy"])
-
-    def test_website_relation_changed_cert_not_DEFAULT(self):
-        mock_event = Mock()
-        self.harness.disable_hooks()
-        self.harness.update_config({"ssl_cert": "NOTDEFAULT"})
-        initial_status = self.harness.charm.unit.status
-
-        with patch("charm.write_ssl_cert") as write_cert_mock:
-            self.harness.charm._website_relation_changed(mock_event)
-
-        self.assertEqual(initial_status, self.harness.charm.unit.status)
-        write_cert_mock.assert_not_called()
 
     def test_website_relation_changed_no_new_cert(self):
         mock_event = Mock()
