@@ -1,9 +1,7 @@
 # © 2025 Canonical Ltd.
-# See LICENSE file for licensing details.
 
 resource "juju_application" "landscape_server" {
-  name  = var.app_name
-  model = var.model
+  name = var.app_name
 
   charm {
     name     = "landscape-server"
@@ -16,4 +14,5 @@ resource "juju_application" "landscape_server" {
   constraints = var.constraints
   units       = var.units
   trust       = true
+  model_uuid  = var.model_uuid
 }
