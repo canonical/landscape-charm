@@ -7,7 +7,7 @@ module "landscape_server" {
   source     = "../."
   model_uuid = juju_model.test_model.uuid
 
-  depends_on = [ juju_model.test_model ]
+  depends_on = [juju_model.test_model]
 }
 
 resource "terraform_data" "refresh_local_charm" {
@@ -24,5 +24,5 @@ resource "terraform_data" "refresh_local_charm" {
     EOT
   }
 
-  depends_on = [terraform_data.build_charm]
+  depends_on = [module.landscape_server]
 }
