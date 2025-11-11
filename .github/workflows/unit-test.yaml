@@ -38,3 +38,5 @@ jobs:
           pipx install tox
       - name: Run tests
         run: tox run -e unit
+      - name: Run Terraform tests
+        run: make terraform-test

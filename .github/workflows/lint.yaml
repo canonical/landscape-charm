@@ -30,3 +30,5 @@ jobs:
         run: pipx install tox
       - name: Run lint
         run: tox run -e lint
+      - name: Terraform format check
+        run: make terraform-test
