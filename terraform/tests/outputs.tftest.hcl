@@ -1,5 +1,7 @@
 # © 2025 Canonical Ltd.
 
+mock_provider "juju" {}
+
 run "modern_amqp_relations" {
   command = plan
 
