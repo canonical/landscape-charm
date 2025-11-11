@@ -93,6 +93,8 @@ You can also specify the platform to build the charm for, the path to the bundle
 make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
 ```
 
+The cleaning and building steps can be skipped by passing `SKIP_CLEAN=true` and `SKIP_BUILD=true`, respectively.
+
 This will create a model called `landscape-pg16`.
 
 ### Run unit tests

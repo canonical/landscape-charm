@@ -1,7 +1,7 @@
 # © 2025 Canonical Ltd.
 
 locals {
-  charm_name = "landcape_server"
+  charm_name = "landcape-server"
 }
 
 resource "juju_application" "landscape_server" {

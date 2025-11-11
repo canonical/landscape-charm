@@ -5,6 +5,6 @@ variable "model_name" {
 
 variable "platform" {
   type        = string
-  default     = "ubuntu@22.04:amd64"
+  default     = "ubuntu@24.04:amd64"
   description = "The platform to pack the local charm for."
 }
