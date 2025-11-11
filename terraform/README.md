@@ -53,8 +53,8 @@ resource "juju_integration" "landscape_server_haproxy" {
 
 The complete list of available integrations can be found on [Charmhub][integrations].
 
-[Landscape Server charm]: https://charmhub.io/landscape-server?channel=latest-stable/edge
-[Integrations]: https://charmhub.io/landscape-server/integrations?channel=latest-stable/edge
+[Landscape Server charm]: https://charmhub.io/landscape-server
+[Integrations]: https://charmhub.io/landscape-server/integrations
 [Juju]: https://juju.is
 [Terraform]: https://developer.hashicorp.com/terraform
 [Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest

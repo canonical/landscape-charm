@@ -1,7 +1,7 @@
 # © 2025 Canonical Ltd.
 
 variable "app_name" {
-  description = "Name of the application (charm) in the Juju model."
+  description = "Name of the application in the Juju model."
   type        = string
   default     = "landscape-server"
 }
@@ -36,14 +36,15 @@ variable "model" {
 }
 
 variable "revision" {
-  description = "Revision number of this charm."
+  description = "Revision number of the charm."
   type        = number
-  # latest
-  default     = null
+  # i.e., latest revision available for the channel
+  default  = null
+  nullable = true
 }
 
 variable "units" {
-  description = "Number of units to deploy for this charm."
+  description = "Number of units to deploy."
   type        = number
   default     = 1
 }

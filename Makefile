@@ -7,7 +7,7 @@ SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
 
-.PHONY: build deploy clean terraform-dev
+.PHONY: build deploy clean
 
 build:
 	ccc pack --platform $(PLATFORM)
@@ -22,17 +22,3 @@ clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
 	-juju destroy-model --no-prompt $(MODEL_NAME) \
 		--force --no-wait --destroy-storage
-
-# NOTE: we don't destroy the state with Terraform because
-# the local charm dev will break the state anyways. 
-	-cd terraform && rm -f terraform.tfstate* && \
-		cd example && rm -f terraform.tfstate* && \
-		cd ../..
-
-# Unforunately, the Terraform provider for Juju does not support local charm dev, so this 
-# is just using it as a data source.
-# TODO: Update when the Terraform provider for Juju supports local charm dev (like bundles).
-terraform-dev: deploy
-	cd terraform/data && \
-	terraform init && \
-	terraform apply -auto-approve -var="model_name=$(MODEL_NAME)"

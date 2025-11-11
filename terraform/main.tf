@@ -1,14 +1,11 @@
 # © 2025 Canonical Ltd.
 
-locals {
-  charm_name = "landcape-server"
-}
-
 resource "juju_application" "landscape_server" {
-  name = var.app_name
+  name  = var.app_name
+  model = var.model
 
   charm {
-    name     = local.charm_name
+    name     = "landscape-server"
     channel  = var.channel
     revision = var.revision
     base     = var.base
@@ -18,5 +15,4 @@ resource "juju_application" "landscape_server" {
   constraints = var.constraints
   units       = var.units
   trust       = true
-  model  = var.model
 }
