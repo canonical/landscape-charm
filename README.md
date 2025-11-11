@@ -109,6 +109,12 @@ Or run specific test(s):
 tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
 ```
 
+Run the Terraform tests:
+
+```sh
+make terraform-test
+```
+
 ### Run integration tests
 
 ```sh
@@ -131,4 +137,5 @@ tox -e lint
 
 ```sh
 tox -e fmt
+make terraform-fmt
 ```

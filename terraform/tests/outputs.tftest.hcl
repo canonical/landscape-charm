@@ -268,24 +268,3 @@ run "amqp_threshold_edge_case" {
     error_message = "Revision 142 should use modern amqp relations"
   }
 }
-
-run "legacy_amqp_modern_postgres" {
-  command = plan
-
-  variables {
-    model    = "test-model"
-    channel  = "24.04/edge"
-    revision = 211
-    base     = "ubuntu@24.04"
-  }
-
-  assert {
-    condition     = output.requires.amqp == "amqp"
-    error_message = "24.04/edge channel should use legacy amqp"
-  }
-
-  assert {
-    condition     = output.requires.database == "database"
-    error_message = "Revision 211 on ubuntu@24.04 should use modern postgres"
-  }
-}

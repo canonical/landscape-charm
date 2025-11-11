@@ -6,6 +6,39 @@ It uses the [Terraform Juju provider][Terraform Juju provider] to model the char
 
 While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules.
 
+## API
+
+### Inputs
+
+The module offers the following configurable inputs:
+
+| Name | Type | Description | Required | Default |
+| - | - | - | - | - |
+| `app_name` | string | Name of the application in the Juju model | False | `landscape-server` |
+| `base` | string | The operating system on which to deploy | False | `ubuntu@22.04` |
+| `channel` | string | The channel to use when deploying the charm | False | `25.10/edge` |
+| `config` | map(string) | Application config. Details at [Charmhub][configurations] | False | `{}` |
+| `constraints` | string | Juju constraints to apply for this application | False | `arch=amd64` |
+| `model` | string | Reference to a `juju_model` | True | - |
+| `revision` | number | Revision number of the charm | False | `null` (latest) |
+| `units` | number | Number of units to deploy | False | `1` |
+
+### Outputs
+
+Upon being applied, the module exports the following outputs:
+
+| Name | Description |
+| - | - |
+| `app_name` | Name of the deployed application |
+| `provides` | Map of integration endpoints this charm provides (cos-agent, data, hosted, nrpe-external-master, website) |
+| `requires` | Map of integration endpoints this charm requires (application-dashboard, db/database, amqp/inbound-amqp/outbound-amqp) |
+
+> [!NOTE]
+> The `requires` output dynamically adjusts based on the charm revision and channel:
+>
+> - AMQP relations: `amqp` (legacy, ≤ rev 141 or specific channels) or `inbound-amqp` + `outbound-amqp` (modern)
+> - Database relations: `db` only (legacy) or `db` + `database` (modern, rev ≥ 210/211 depending on base)
+
 ## Module structure
 
 - **main.tf** - Defines the Juju application to be deployed.
@@ -54,6 +87,7 @@ resource "juju_integration" "landscape_server_haproxy" {
 The complete list of available integrations can be found on [Charmhub][integrations].
 
 [Landscape Server charm]: https://charmhub.io/landscape-server
+[configurations]: https://charmhub.io/landscape-server/configurations
 [Integrations]: https://charmhub.io/landscape-server/integrations
 [Juju]: https://juju.is
 [Terraform]: https://developer.hashicorp.com/terraform
