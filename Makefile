@@ -37,6 +37,7 @@ terraform-dev:
 	@if [ "$(SKIP_BUILD)" != "true" ]; then $(MAKE) build; else echo "skipping build..."; fi
 	cd terraform/example && \
 	terraform init && \
+	juju add-model $(MODEL_NAME) && \
 	terraform apply -auto-approve \
 		-var="model_name=$(MODEL_NAME)" \
 		-var="platform=$(PLATFORM)"

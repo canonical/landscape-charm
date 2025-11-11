@@ -1,29 +1,38 @@
 
-resource "juju_model" "test_model" {
+data "juju_model" "test_model" {
   name = var.model_name
+}
+
+data "juju_application" "landscape_server_data" {
+  name  = "landscape-server"
+  model = var.model_name
+
+  depends_on = [terraform_data.refresh_local_charm]
+}
+
+data "juju_application" "haproxy_data" {
+  name  = "haproxy"
+  model = var.model_name
+
+  depends_on = [terraform_data.refresh_local_charm]
+}
+
+data "juju_application" "postgresql_data" {
+  name  = "postgresql"
+  model = var.model_name
+
+  depends_on = [terraform_data.refresh_local_charm]
+}
+
+data "juju_application" "rabbitmq_server_data" {
+  name  = "rabbitmq_server"
+  model = var.model_name
+
+  depends_on = [terraform_data.refresh_local_charm]
 }
 
 locals {
   base = split(":", var.platform)[0]
-}
-
-
-module "landscape_server" {
-  source = "git::https://github.com/jansdhillon/terraform-juju-landscape-server.git//modules/landscape-scalable?ref=update-pg-interface"
-  model  = juju_model.test_model.name
-
-  landscape_server = {
-    revision = 212
-    base     = local.base
-  }
-  postgresql = {
-    channel  = "16/stable"
-    base     = "ubuntu@24.04"
-  }
-  haproxy         = {}
-  rabbitmq_server = {}
-
-  depends_on = [juju_model.test_model]
 }
 
 resource "terraform_data" "refresh_local_charm" {
@@ -40,5 +49,6 @@ resource "terraform_data" "refresh_local_charm" {
     EOT
   }
 
-  depends_on = [module.landscape_server]
+  depends_on = [data.juju_model.test_model]
+
 }
