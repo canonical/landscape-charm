@@ -30,18 +30,16 @@ variable "constraints" {
   default     = "arch=amd64"
 }
 
-# FKA `model`
-variable "model_uuid" {
-  description = "Reference to a `juju_model` by UUID."
+variable "model" {
+  description = "Reference to a `juju_model`."
   type        = string
 }
 
 variable "revision" {
   description = "Revision number of this charm."
   type        = number
-  # i.e., latest revision available for the channel
+  # latest
   default     = null
-  nullable    = true
 }
 
 variable "units" {

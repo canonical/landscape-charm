@@ -18,5 +18,5 @@ resource "juju_application" "landscape_server" {
   constraints = var.constraints
   units       = var.units
   trust       = true
-  model_uuid  = var.model_uuid
+  model  = var.model
 }

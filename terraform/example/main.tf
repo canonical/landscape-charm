@@ -5,7 +5,7 @@ resource "juju_model" "test_model" {
 
 module "landscape_server" {
   source     = "git::https://github.com/canonical/terraform-juju-landscape-server.git//modules/landscape-scalable?ref=v1.0.3"
-  model_uuid = juju_model.test_model.uuid
+  model = juju_model.test_model.name
 
   depends_on = [juju_model.test_model]
 }

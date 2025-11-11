@@ -1,3 +1,6 @@
+# Other charm modules do not commit the lock file
+.terraform.lock.hcl
+
 # The following is based on
 # https://github.com/github/gitignore/blob/main/Terraform.gitignore
 
