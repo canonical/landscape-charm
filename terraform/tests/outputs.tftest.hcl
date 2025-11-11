@@ -54,6 +54,30 @@ run "legacy_amqp_relations_by_revision" {
   }
 }
 
+run "modern_amqp_relations_null_revision" {
+  command = plan
+
+  variables {
+    model    = "test-model"
+    revision = null
+  }
+
+  assert {
+    condition     = !can(output.requires.amqp)
+    error_message = "Null revision should not use legacy amqp relation"
+  }
+
+  assert {
+    condition     = can(output.requires.inbound_amqp)
+    error_message = "Null revision should have inbound-amqp relation"
+  }
+
+  assert {
+    condition     = can(output.requires.outbound_amqp)
+    error_message = "Null revision should have outbound-amqp relation"
+  }
+}
+
 run "legacy_amqp_relations_by_channel" {
   command = plan
 

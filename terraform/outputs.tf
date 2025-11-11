@@ -25,14 +25,15 @@ locals {
 
   # Needed since the relations changed to support the hostagent services
   legacy_amqp_rel_channels = ["latest/stable", "latest/beta", "latest/edge", "24.04/edge"]
-  using_legacy_amqp_rel    = contains(local.legacy_amqp_rel_channels, juju_application.landscape_server.charm[0].channel) || (juju_application.landscape_server.charm[0].revision < 142)
-  amqp_relations           = local.using_legacy_amqp_rel ? { amqp = "amqp" } : { inbound_amqp = "inbound-amqp", outbound_amqp = "outbound-amqp" }
+  amqp_rels_updated_rev    = 142
+  has_modern_amqp_rels     = !contains(local.legacy_amqp_rel_channels, var.channel) && (var.revision != null ? var.revision >= local.amqp_rels_updated_rev : true)
+  amqp_relations           = local.has_modern_amqp_rels ? { inbound_amqp = "inbound-amqp", outbound_amqp = "outbound-amqp" } : { amqp = "amqp" }
 
   # Map bases to the revision when they were updated to use the modern Postgres charm interface
   pg_interface_updated_base_rev_map = { "ubuntu@24.04" : 211, "ubuntu@22.04" : 210 }
   default_pg_interface_updated_rev  = 211
-  pg_interface_updated_rev          = lookup(local.pg_interface_updated_base_rev_map, juju_application.landscape_server.charm[0].base, local.default_pg_interface_updated_rev)
-  has_modern_pg_interface           = juju_application.landscape_server.charm[0].revision >= local.pg_interface_updated_rev
+  pg_interface_updated_rev          = lookup(local.pg_interface_updated_base_rev_map, var.base, local.default_pg_interface_updated_rev)
+  has_modern_pg_interface           = var.revision != null ? var.revision >= local.pg_interface_updated_rev : true
   database_relations                = local.has_modern_pg_interface ? { db = "db", database = "database" } : { db = "db" }
 }
 
