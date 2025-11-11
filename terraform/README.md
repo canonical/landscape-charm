@@ -12,7 +12,6 @@ While it is possible to deploy this module in isolation, it should serve as a bu
 - **variables.tf** - Provides customizable deployment inputs. This includes options such as the Juju model name, channel, and application name, as well as charm-specific configuration parameters.
 - **output.tf** - Exposes values needed by other Terraform modules, such as the application name and integration endpoints (e.g., charm relations).
 - **versions.tf** - Defines the required Terraform and provider versions.
-- **locals.tf** - Values computed at deploy time based on the variables provided.
 
 ## Using the module in higher level modules
 
