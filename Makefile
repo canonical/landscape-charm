@@ -29,12 +29,10 @@ clean:
 		cd example && rm -f terraform.tfstate* && \
 		cd ../..
 
-# Unforunately, the Terraform provider for Juju does not support local charm dev...
-# To avoid having to publish to test the charm module, this make recipe makes ends meet.
-# TODO: Remove when The Terraform provider for Juju supports local charm dev (like bundles).
+# Unforunately, the Terraform provider for Juju does not support local charm dev, so this 
+# is just using it as a data source.
+# TODO: Update when the Terraform provider for Juju supports local charm dev (like bundles).
 terraform-dev: deploy
-	cd terraform/example && \
+	cd terraform/data && \
 	terraform init && \
-	terraform apply -auto-approve \
-		-var="model_name=$(MODEL_NAME)" \
-		-var="platform=$(PLATFORM)"
+	terraform apply -auto-approve -var="model_name=$(MODEL_NAME)"
