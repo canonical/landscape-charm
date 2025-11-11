@@ -1,12 +1,6 @@
 variable "model_name" {
   type        = string
-  description = "Name for the new model."
-}
-
-variable "app_name" {
-  type        = string
-  default     = "landscape-server"
-  description = "Name of the application to refresh with the local charm."
+  description = "Name for the new model (resource)."
 }
 
 variable "platform" {

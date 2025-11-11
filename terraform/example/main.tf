@@ -4,7 +4,7 @@ resource "juju_model" "test_model" {
 }
 
 module "landscape_server" {
-  source     = "../."
+  source     = "git::https://github.com/canonical/terraform-juju-landscape-server.git//modules/landscape-scalable?ref=v1.0.3"
   model_uuid = juju_model.test_model.uuid
 
   depends_on = [juju_model.test_model]
@@ -16,11 +16,11 @@ resource "terraform_data" "refresh_local_charm" {
 
     environment = {
       "MODEL_NAME" = var.model_name
-      "APP_NAME"   = var.app_name
     }
 
     command = <<-EOT
-        juju refresh -m $MODEL_NAME $APP_NAME --path=./landscape-server_${replace(var.platform, ":", "-")}.charm
+        juju wait-for application landscape-server -m $MODEL_NAME --query='status=="active"' && \
+          juju refresh -m $MODEL_NAME landscape-server --path=./landscape-server_${replace(var.platform, ":", "-")}.charm
     EOT
   }
 

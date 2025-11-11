@@ -1,10 +1,14 @@
 # © 2025 Canonical Ltd.
 
+locals {
+  charm_name = "landcape_server"
+}
+
 resource "juju_application" "landscape_server" {
   name = var.app_name
 
   charm {
-    name     = "landscape-server"
+    name     = local.charm_name
     channel  = var.channel
     revision = var.revision
     base     = var.base
