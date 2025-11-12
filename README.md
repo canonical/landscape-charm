@@ -111,6 +111,13 @@ tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
 
 Run the Terraform tests:
 
+> [!IMPORTANT]
+> Make sure you have `terraform` installed:
+>
+> ````sh
+> sudo snap install terraform --classic
+> ````
+
 ```sh
 make terraform-test
 ```
@@ -129,14 +136,34 @@ LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 
 ### Lint code
 
+Run the following to lint the Python code:
+
 ```sh
 tox -e lint
+```
+
+To lint the Terraform module, make sure you have `tflint` installed:
+
+```sh
+sudo snap install tflint
+```
+
+Then, use the following Make recipe:
+
+```sh
 make tflint-fix
 ```
 
 ### Format code
 
+Format the Python code:
+
 ```sh
 tox -e fmt
+```
+
+Format the Terraform module:
+
+```sh
 make fmt-fix
 ```
