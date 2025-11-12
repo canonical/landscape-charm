@@ -7,7 +7,7 @@ SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
 
-.PHONY: build deploy clean terraform-test terraform-fmt
+.PHONY: build deploy clean terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
 build:
 	ccc pack --platform $(PLATFORM)
@@ -21,12 +21,23 @@ deploy:
 terraform-test:
 	cd terraform && \
 	terraform init -backend=false && \
-	terraform fmt -check -recursive && \
-	terraform validate && \
 	terraform test
 
-terraform-fmt:
+fmt-check:
+	cd terraform && terraform fmt -check -recursive
+
+tflint-check:
+	cd terraform && tflint --init && tflint --recursive
+
+terraform-check: fmt-check tflint-check
+
+fmt-fix:
 	cd terraform && terraform fmt -recursive
+
+tflint-fix:
+	cd terraform && tflint --init && tflint --recursive --fix
+
+terraform-fix: fmt-fix tflint-fix
 
 clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm

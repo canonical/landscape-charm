@@ -131,11 +131,12 @@ LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 
 ```sh
 tox -e lint
+make tflint-fix
 ```
 
 ### Format code
 
 ```sh
 tox -e fmt
-make terraform-fmt
+make fmt-fix
 ```
