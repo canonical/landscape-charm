@@ -30,7 +30,7 @@ locals {
   amqp_relations           = local.has_modern_amqp_rels ? { inbound_amqp = "inbound-amqp", outbound_amqp = "outbound-amqp" } : { amqp = "amqp" }
 
   # Map bases to the revision when they were updated to use the modern Postgres charm interface
-  pg_interface_updated_base_rev_map = { "ubuntu@24.04" : 211, "ubuntu@22.04" : 210 }
+  pg_interface_updated_base_rev_map = { "ubuntu@22.04" : 210 }
   default_pg_interface_updated_rev  = 211
   pg_interface_updated_rev          = lookup(local.pg_interface_updated_base_rev_map, var.base, local.default_pg_interface_updated_rev)
   has_modern_pg_interface           = var.revision != null ? var.revision >= local.pg_interface_updated_rev : true

@@ -4,47 +4,38 @@ This directory contains a base [Terraform][Terraform] module for the [Landscape 
 
 It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
 
-While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules.
+While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules. For example, it's used in the [Landscape Scalable product module][Landscape Scalable Product Module].
 
-## API
-
-### Inputs
+## Inputs
 
 The module offers the following configurable inputs:
 
-| Name | Type | Description | Required | Default |
-| - | - | - | - | - |
-| `app_name` | string | Name of the application in the Juju model | False | `landscape-server` |
-| `base` | string | The operating system on which to deploy | False | `ubuntu@22.04` |
-| `channel` | string | The channel to use when deploying the charm | False | `25.10/edge` |
-| `config` | map(string) | Application config. Details at [Charmhub][configurations] | False | `{}` |
-| `constraints` | string | Juju constraints to apply for this application | False | `arch=amd64` |
-| `model` | string | Reference to a `juju_model` | True | - |
-| `revision` | number | Revision number of the charm | False | `null` (latest) |
-| `units` | number | Number of units to deploy | False | `1` |
+| Name          | Type        | Description                                                                                                                           | Required | Default            |
+| ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ |
+| `app_name`    | string      | Name of the application in the Juju model                                                                                             | False    | `landscape-server` |
+| `base`        | string      | The operating system on which to deploy                                                                                               | False    | `ubuntu@22.04`     |
+| `channel`     | string      | The channel to use when deploying the charm                                                                                           | False    | `25.10/edge`       |
+| `config`      | map(string) | Application config. The full configuration details for a given revision, base, and channel can be found on [Charmhub][Configurations] | False    | `{}`               |
+| `constraints` | string      | Juju constraints to apply for this application                                                                                        | False    | `arch=amd64`       |
+| `model`       | string      | The name of a Juju model.                                                                                                             | True     | -                  |
+| `revision`    | number      | Revision number of the charm                                                                                                          | False    | `null` (latest)    |
+| `units`       | number      | Number of units to deploy                                                                                                             | False    | `1`                |
 
-### Outputs
+## Outputs
 
 Upon being applied, the module exports the following outputs:
 
-| Name | Description |
-| - | - |
-| `app_name` | Name of the deployed application |
-| `provides` | Map of integration endpoints this charm provides (cos-agent, data, hosted, nrpe-external-master, website) |
-| `requires` | Map of integration endpoints this charm requires (application-dashboard, db/database, amqp/inbound-amqp/outbound-amqp) |
+| Name       | Description                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `app_name` | Name of the deployed application                                                                                                      |
+| `provides` | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`)                   |
+| `requires` | Map of integration endpoints this charm requires (`application-dashboard`, `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`) |
 
-> [!NOTE]
-> The `requires` output dynamically adjusts based on the charm revision and channel:
->
-> - AMQP relations: `amqp` (legacy, ≤ rev 141 or specific channels) or `inbound-amqp` + `outbound-amqp` (modern)
-> - Database relations: `db` only (legacy) or `db` + `database` (modern, rev ≥ 210 for ubuntu@22.04, ≥ 211 for ubuntu@24.04)
-
-## Module structure
-
-- **main.tf** - Defines the Juju application to be deployed.
-- **variables.tf** - Provides customizable deployment inputs. This includes options such as the Juju model name, channel, and application name, as well as charm-specific configuration parameters.
-- **output.tf** - Exposes values needed by other Terraform modules, such as the application name and integration endpoints (e.g., charm relations).
-- **versions.tf** - Defines the required Terraform and provider versions.
+```{note}
+The `requires` output dynamically adjusts based on the charm revision and channel:
+- AMQP relations: `amqp` (legacy, charm revision ≤ 141 or using specific channels), or `inbound-amqp` and `outbound-amqp` (modern)
+- Database relations: `db` only (legacy), or `db` and `database` (modern, charm revision ≥ 210 with a base of `ubuntu@22.04` or ≥ 211 otherwise )
+```
 
 ## Using the module in higher level modules
 
@@ -84,10 +75,11 @@ resource "juju_integration" "landscape_server_haproxy" {
 }
 ```
 
-The complete list of available integrations can be found on [Charmhub][integrations].
+The complete list of available integrations can be found on [Charmhub][Integrations].
 
 [Landscape Server charm]: https://charmhub.io/landscape-server
-[configurations]: https://charmhub.io/landscape-server/configurations
+[Landscape Scalable Product Module]: https://github.com/canonical/terraform-juju-landscape/blob/main/modules/landscape-scalable
+[Configurations]: https://charmhub.io/landscape-server/configurations
 [Integrations]: https://charmhub.io/landscape-server/integrations
 [Juju]: https://juju.is
 [Terraform]: https://developer.hashicorp.com/terraform

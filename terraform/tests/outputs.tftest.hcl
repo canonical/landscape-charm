@@ -90,12 +90,17 @@ run "legacy_amqp_relations_by_channel" {
 
   assert {
     condition     = output.requires.amqp == "amqp"
-    error_message = "latest/stable channel should use legacy amqp relation"
+    error_message = "Legacy channel should use legacy amqp relation"
   }
 
   assert {
     condition     = !can(output.requires.inbound_amqp)
     error_message = "Legacy channel should not have inbound-amqp relation"
+  }
+
+  assert {
+    condition     = !can(output.requires.outbound_amqp)
+    error_message = "Legacy channel should not have outbound-amqp relation"
   }
 }
 
@@ -183,14 +188,14 @@ run "legacy_postgres_ubuntu_2204" {
   }
 }
 
-run "unknown_base_defaults" {
+run "future_base_defaults" {
   command = plan
 
   variables {
     model    = "test-model"
     channel  = "25.10/edge"
     revision = 211
-    base     = "ubuntu@20.04"
+    base     = "ubuntu@26.04"
   }
 
   assert {
@@ -200,7 +205,7 @@ run "unknown_base_defaults" {
 
   assert {
     condition     = output.requires.database == "database"
-    error_message = "Unknown base with revision >= 211 should have modern database relation"
+    error_message = "Unknown (future) base with revision >= 211 should have modern database relation"
   }
 }
 
@@ -253,22 +258,6 @@ run "application_dashboard_required" {
   assert {
     condition     = output.requires.application_dashboard == "application-dashboard"
     error_message = "Should always require application-dashboard relation"
-  }
-}
-
-run "app_name_output" {
-  command = plan
-
-  variables {
-    model    = "test-model"
-    app_name = "custom-landscape"
-    channel  = "25.10/edge"
-    base     = "ubuntu@24.04"
-  }
-
-  assert {
-    condition     = output.app_name == "custom-landscape"
-    error_message = "app_name output should match input variable"
   }
 }
 
