@@ -34,7 +34,7 @@ Upon being applied, the module exports the following outputs:
 ```{note}
 The `requires` output dynamically adjusts based on the charm revision and channel:
 - AMQP relations: `amqp` (legacy, charm revision ≤ 141 or using specific channels), or `inbound-amqp` and `outbound-amqp` (modern)
-- Database relations: `db` only (legacy), or `db` and `database` (modern, charm revision ≥ 210 with a base of `ubuntu@22.04` or ≥ 211 otherwise )
+- Database relations: `db` only (legacy), or `db` and `database` (modern, charm revision ≥ 210 with a base of `ubuntu@22.04` or ≥ 211 otherwise)
 ```
 
 ## Using the module in higher level modules
