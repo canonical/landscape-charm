@@ -1,6 +1,6 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-# Adapted from: https://github.com/canonical/postgresql-operator/blob/main/.github/workflows/ci.yaml 
+# Adapted from: https://github.com/canonical/postgresql-operator/blob/main/.github/workflows/ci.yaml
 name: Unit test charm
 
 concurrency:
@@ -10,10 +10,10 @@ concurrency:
 on:
   pull_request:
     paths-ignore:
-      - '.gitignore'
-      - 'LICENSE'
-      - '**.md'
-      - '.jujuignore'
+      - ".gitignore"
+      - "LICENSE"
+      - "**.md"
+      - ".jujuignore"
 
 jobs:
   unit-test:
@@ -37,4 +37,5 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.10"
+
       - run: make terraform-test

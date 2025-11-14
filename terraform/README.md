@@ -1,10 +1,12 @@
-# Landscape Server charm Terraform module
+# Landscape Server Charm Module
 
 This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
 It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
 
 While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules. For example, it's used in the [Landscape Scalable product module][Landscape Scalable Product Module].
+
+<!-- TODO: Just link to public Landscape docs (once published) rather than duplicate here. -->
 
 ## Inputs
 
