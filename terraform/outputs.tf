@@ -9,6 +9,7 @@ output "app_name" {
 }
 
 output "provides" {
+  description = " Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`)."
   value = {
     cos_agent            = "cos-agent"
     data                 = "data"
@@ -38,6 +39,7 @@ locals {
 }
 
 output "requires" {
+  description = "Map of integration endpoints this charm requires (`application-dashboard`, `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`)."
   value = merge({
     application_dashboard = "application-dashboard"
   }, local.database_relations, local.amqp_relations)
