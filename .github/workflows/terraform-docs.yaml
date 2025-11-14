@@ -1,0 +1,17 @@
+name: Update Terraform documentation
+
+on:
+    workflow_dispatch:
+    pull_request:
+    push:
+        branches:
+            - main
+
+jobs:
+    terraform-docs:
+        name: Update Terraform documentation
+
+        uses: canonical/operator-workflows/.github/workflows/generate_terraform_docs.yaml@main
+        secrets: inherit
+        with:
+            terraform-directory: terraform

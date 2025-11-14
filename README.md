@@ -93,6 +93,8 @@ You can also specify the platform to build the charm for, the path to the bundle
 make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
 ```
 
+The cleaning and building steps can be skipped by passing `SKIP_CLEAN=true` and `SKIP_BUILD=true`, respectively.
+
 This will create a model called `landscape-pg16`.
 
 ### Run unit tests
@@ -105,6 +107,19 @@ Or run specific test(s):
 
 ```sh
 tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
+```
+
+Run the Terraform tests:
+
+> [!IMPORTANT]
+> Make sure you have `terraform` installed:
+>
+> ````sh
+> sudo snap install terraform --classic
+> ````
+
+```sh
+make terraform-test
 ```
 
 ### Run integration tests
@@ -121,12 +136,34 @@ LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 
 ### Lint code
 
+Run the following to lint the Python code:
+
 ```sh
 tox -e lint
 ```
 
+To lint the Terraform module, make sure you have `tflint` installed:
+
+```sh
+sudo snap install tflint
+```
+
+Then, use the following Make recipe:
+
+```sh
+make tflint-fix
+```
+
 ### Format code
+
+Format the Python code:
 
 ```sh
 tox -e fmt
+```
+
+Format the Terraform module:
+
+```sh
+make fmt-fix
 ```

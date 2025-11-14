@@ -19,3 +19,14 @@ jobs:
   lint:
     name: Lint
     uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v35.0.2
+  
+  terraform-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+          
+      - uses: terraform-linters/setup-tflint@v4
+      - run: make terraform-check
