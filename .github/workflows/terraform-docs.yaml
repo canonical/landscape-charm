@@ -13,4 +13,4 @@ jobs:
     uses: canonical/operator-workflows/.github/workflows/generate_terraform_docs.yaml@main
     secrets: inherit
     with:
-      terraform-directory: modules
+      terraform-directory: terraform
