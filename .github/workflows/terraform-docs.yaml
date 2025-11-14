@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - update-tf-module
 
 jobs:
   terraform-docs:
