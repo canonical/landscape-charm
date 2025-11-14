@@ -24,7 +24,9 @@ terraform-test:
 	terraform test
 
 fmt-check:
-	cd terraform && terraform fmt -check -recursive
+	cd terraform && \
+	terraform init -backend=false && \
+	terraform fmt -check -recursive
 
 tflint-check:
 	cd terraform && tflint --init && tflint --recursive
@@ -32,7 +34,9 @@ tflint-check:
 terraform-check: fmt-check tflint-check
 
 fmt-fix:
-	cd terraform && terraform fmt -recursive
+	cd terraform && \
+	terraform init -backend=false && \
+	terraform fmt -recursive
 
 tflint-fix:
 	cd terraform && tflint --init && tflint --recursive --fix
