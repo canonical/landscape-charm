@@ -6,39 +6,6 @@ It uses the [Terraform Juju provider][Terraform Juju provider] to model the char
 
 While it is possible to deploy this module in isolation, it should serve as a building block for higher-level Terraform modules. For example, it's used in the [Landscape Scalable product module][Landscape Scalable Product Module].
 
-<!-- TODO: Just link to public Landscape docs (once published) rather than duplicate here. -->
-
-## Inputs
-
-The module offers the following configurable inputs:
-
-| Name          | Type        | Description                                                                                                                           | Required | Default            |
-| ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------------ |
-| `app_name`    | string      | Name of the application in the Juju model                                                                                             | False    | `landscape-server` |
-| `base`        | string      | The operating system on which to deploy                                                                                               | False    | `ubuntu@22.04`     |
-| `channel`     | string      | The channel to use when deploying the charm                                                                                           | False    | `25.10/edge`       |
-| `config`      | map(string) | Application config. The full configuration details for a given revision, base, and channel can be found on [Charmhub][Configurations] | False    | `{}`               |
-| `constraints` | string      | Juju constraints to apply for this application                                                                                        | False    | `arch=amd64`       |
-| `model`       | string      | The name of a Juju model.                                                                                                             | True     | -                  |
-| `revision`    | number      | Revision number of the charm                                                                                                          | False    | `null` (latest)    |
-| `units`       | number      | Number of units to deploy                                                                                                             | False    | `1`                |
-
-## Outputs
-
-Upon being applied, the module exports the following outputs:
-
-| Name       | Description                                                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `app_name` | Name of the deployed application                                                                                                      |
-| `provides` | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`)                   |
-| `requires` | Map of integration endpoints this charm requires (`application-dashboard`, `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`) |
-
-```{note}
-The `requires` output dynamically adjusts based on the charm revision and channel:
-- AMQP relations: `amqp` (legacy, charm revision ≤ 141 or using specific channels), or `inbound-amqp` and `outbound-amqp` (modern)
-- Database relations: `db` only (legacy), or `db` and `database` (modern, charm revision ≥ 210 with a base of `ubuntu@22.04` or ≥ 211 otherwise)
-```
-
 ## Using the module in higher level modules
 
 To use this in your Terraform module, import it like this:
@@ -81,25 +48,25 @@ The complete list of available integrations can be found on [Charmhub][Integrati
 
 [Landscape Server charm]: https://charmhub.io/landscape-server
 [Landscape Scalable Product Module]: https://github.com/canonical/terraform-juju-landscape/blob/main/modules/landscape-scalable
-[Configurations]: https://charmhub.io/landscape-server/configurations
 [Integrations]: https://charmhub.io/landscape-server/integrations
 [Juju]: https://juju.is
 [Terraform]: https://developer.hashicorp.com/terraform
 [Terraform Juju provider]: https://registry.terraform.io/providers/juju/juju/latest
 
 <!-- BEGIN_TF_DOCS -->
+
 ## Requirements
 
-| Name | Version |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10 |
-| <a name="requirement_juju"></a> [juju](#requirement\_juju) | < 1.0.0 |
+| Name                                                                     | Version |
+| ------------------------------------------------------------------------ | ------- |
+| <a name="requirement_terraform"></a> [terraform](#requirement_terraform) | >= 1.10 |
+| <a name="requirement_juju"></a> [juju](#requirement_juju)                | < 1.0.0 |
 
 ## Providers
 
-| Name | Version |
-|------|---------|
-| <a name="provider_juju"></a> [juju](#provider\_juju) | < 1.0.0 |
+| Name                                                | Version |
+| --------------------------------------------------- | ------- |
+| <a name="provider_juju"></a> [juju](#provider_juju) | < 1.0.0 |
 
 ## Modules
 
@@ -107,28 +74,29 @@ No modules.
 
 ## Resources
 
-| Name | Type |
-|------|------|
+| Name                                                                                                                     | Type     |
+| ------------------------------------------------------------------------------------------------------------------------ | -------- |
 | [juju_application.landscape_server](https://registry.terraform.io/providers/juju/juju/latest/docs/resources/application) | resource |
 
 ## Inputs
 
-| Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_app_name"></a> [app\_name](#input\_app\_name) | Name of the application in the Juju model. | `string` | `"landscape-server"` | no |
-| <a name="input_base"></a> [base](#input\_base) | The operating system on which to deploy. | `string` | `"ubuntu@22.04"` | no |
-| <a name="input_channel"></a> [channel](#input\_channel) | The channel to use when deploying a charm. | `string` | `"25.10/edge"` | no |
-| <a name="input_config"></a> [config](#input\_config) | Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations. | `map(string)` | `{}` | no |
-| <a name="input_constraints"></a> [constraints](#input\_constraints) | Juju constraints to apply for this application. | `string` | `"arch=amd64"` | no |
-| <a name="input_model"></a> [model](#input\_model) | Reference to a `juju_model`. | `string` | n/a | yes |
-| <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm. | `number` | `null` | no |
-| <a name="input_units"></a> [units](#input\_units) | Number of units to deploy. | `number` | `1` | no |
+| Name                                                               | Description                                                                                                              | Type          | Default              | Required |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------- | -------------------- | :------: |
+| <a name="input_app_name"></a> [app_name](#input_app_name)          | Name of the application in the Juju model.                                                                               | `string`      | `"landscape-server"` |    no    |
+| <a name="input_base"></a> [base](#input_base)                      | The operating system on which to deploy.                                                                                 | `string`      | `"ubuntu@22.04"`     |    no    |
+| <a name="input_channel"></a> [channel](#input_channel)             | The channel to use when deploying a charm.                                                                               | `string`      | `"25.10/edge"`       |    no    |
+| <a name="input_config"></a> [config](#input_config)                | Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations. | `map(string)` | `{}`                 |    no    |
+| <a name="input_constraints"></a> [constraints](#input_constraints) | Juju constraints to apply for this application.                                                                          | `string`      | `"arch=amd64"`       |    no    |
+| <a name="input_model"></a> [model](#input_model)                   | Reference to a `juju_model`.                                                                                             | `string`      | n/a                  |   yes    |
+| <a name="input_revision"></a> [revision](#input_revision)          | Revision number of the charm.                                                                                            | `number`      | `null`               |    no    |
+| <a name="input_units"></a> [units](#input_units)                   | Number of units to deploy.                                                                                               | `number`      | `1`                  |    no    |
 
 ## Outputs
 
-| Name | Description |
-|------|-------------|
-| <a name="output_app_name"></a> [app\_name](#output\_app\_name) | Name of the deployed application. |
-| <a name="output_provides"></a> [provides](#output\_provides) | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`). |
-| <a name="output_requires"></a> [requires](#output\_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
+| Name                                                        | Description                                                                                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| <a name="output_app_name"></a> [app_name](#output_app_name) | Name of the deployed application.                                                                                                      |
+| <a name="output_provides"></a> [provides](#output_provides) | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`).                   |
+| <a name="output_requires"></a> [requires](#output_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
+
 <!-- END_TF_DOCS -->
