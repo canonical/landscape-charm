@@ -1,5 +1,5 @@
 DIR_NAME := $(notdir $(shell pwd))
-BUNDLE_PATH ?= ./bundle-examples/bundle.yaml
+BUNDLE_PATH ?= ./bundle-examples/postgres14.bundle.yaml
 PLATFORM ?= ubuntu@22.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
