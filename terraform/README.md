@@ -1,5 +1,8 @@
 # Landscape Server Charm Module
 
+> [!CAUTION]
+> This module is not currently compatible with Charmed PostgreSQL 16. You cannot relate it to the `16/stable`, `16/candidate`, `16/edge`, or `16/beta` channels of the `postgresql` charm.
+
 This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
 It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
