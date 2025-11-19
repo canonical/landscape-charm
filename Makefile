@@ -7,8 +7,31 @@ SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
 
-.PHONY: build deploy clean terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
+.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
+# Python testing and linting
+test:
+	poetry run pytest --tb native tests/unit
+
+integration-test:
+	poetry run pytest -v --tb native tests/integration
+
+coverage:
+	poetry run coverage run --branch --source=src -m pytest -v --tb native tests/unit
+	poetry run coverage report -m
+
+lint:
+	poetry run flake8 src tests
+	poetry run isort --check-only src tests
+	poetry run black --check src tests
+	poetry run ruff check src tests
+
+fmt:
+	poetry run isort src tests
+	poetry run black src tests
+	poetry run ruff check --fix src tests
+
+# Charm building and deployment
 build:
 	ccc pack --platform $(PLATFORM)
 

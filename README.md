@@ -76,25 +76,31 @@ poetry install --with dev
 ### Run unit tests
 
 ```sh
-poetry run tox -e unit
+make test
 ```
 
 Or run specific test(s):
 
 ```sh
-poetry run -- tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
+poetry run pytest tests/unit/test_charm.py::TestCharm::test_install
+```
+
+Run with coverage:
+
+```sh
+make coverage
 ```
 
 ### Run integration tests
 
 ```sh
-poetry run tox -e integration
+make integration-test
 ```
 
 The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
 
 ```sh
-LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 make integration-test
 ```
 
 ### Lint and format code
@@ -102,13 +108,13 @@ LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
 Run the following to lint the Python code:
 
 ```sh
-poetry run tox -e lint
+make lint
 ```
 
 Run the following to format the Python code:
 
 ```sh
-poetry run tox -e fmt
+make fmt
 ```
 
 ### Build the charm
