@@ -1,11 +1,12 @@
 # © 2025 Canonical Ltd.
-# See LICENSE file for licensing details.
 
 terraform {
+  required_version = ">= 1.10"
   required_providers {
     juju = {
-      source  = "juju/juju"
-      version = ">= 0.14.0"
+      source = "juju/juju"
+      # NOTE: contains breaking changes
+      version = "< 1.0.0"
     }
   }
 }

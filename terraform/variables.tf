@@ -1,5 +1,4 @@
 # © 2025 Canonical Ltd.
-# See LICENSE file for licensing details.
 
 variable "app_name" {
   description = "Name of the application in the Juju model."
@@ -8,7 +7,7 @@ variable "app_name" {
 }
 
 variable "base" {
-  description = "The operating system on which to deploy"
+  description = "The operating system on which to deploy."
   type        = string
   default     = "ubuntu@22.04"
 }
@@ -20,7 +19,7 @@ variable "channel" {
 }
 
 variable "config" {
-  description = "Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations?channel=latest-stable/edge."
+  description = "Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations."
   type        = map(string)
   default     = {}
 }
@@ -34,19 +33,18 @@ variable "constraints" {
 variable "model" {
   description = "Reference to a `juju_model`."
   type        = string
-  default     = ""
 }
 
 variable "revision" {
-  description = "Revision number of the charm"
+  description = "Revision number of the charm."
   type        = number
   # i.e., latest revision available for the channel
-  default     = null
-  nullable    = true
+  default  = null
+  nullable = true
 }
 
 variable "units" {
-  description = "Number of units to deploy"
+  description = "Number of units to deploy."
   type        = number
   default     = 1
 }

@@ -1,5 +1,4 @@
 # © 2025 Canonical Ltd.
-# See LICENSE file for licensing details.
 
 resource "juju_application" "landscape_server" {
   name  = var.app_name
