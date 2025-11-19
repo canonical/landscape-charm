@@ -17,14 +17,7 @@ for more details.
 
 ## Usage
 
-Typically, Landscape deployment is done using a Juju bundle. This charm
-is not useful without a deployed bundle of services.
-
-Please use one of the following bundle types, depending on your needs:
-
-- [landscape-scalable](https://charmhub.io/landscape-scalable)
-- [landscape-dense-maas](https://charmhub.io/landscape-dense-maas)
-- [landscape-dense](https://charmhub.io/landscape-dense)
+Typically, Landscape deployment is done using a Juju bundle. This charm is not useful without a deployed bundle of services. The [landscape-scalable](https://charmhub.io/landscape-scalable) bundle is the recommended setup.
 
 ## Relations
 
@@ -65,12 +58,13 @@ Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
 on enhancements to this charm following best practice guidelines, and
 `CONTRIBUTING.md` for developer guidance.
 
-### Development Setup
+### Development setup
 
-This project uses [Poetry](https://python-poetry.org/) for dependency management. Make sure you have Poetry installed:
+This project uses [pipx](https://github.com/pypa/pipx) and [poetry](https://python-poetry.org/) for dependency management. Make sure you have both installed:
 
 ```sh
-apt install python3-poetry
+sudo apt install -y pipx
+pipx install python3-poetry
 ```
 
 Then, install the project dependencies:
@@ -79,13 +73,47 @@ Then, install the project dependencies:
 poetry install --with dev
 ```
 
-When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. Make sure you have [`pipx`](https://github.com/pypa/pipx) installed:
+### Run unit tests
 
 ```sh
-sudo apt install -y pipx
+poetry run tox -e unit
 ```
 
-Then, install `charmcraftcache` (which can be used by its alias, `ccc`):
+Or run specific test(s):
+
+```sh
+poetry run -- tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
+```
+
+### Run integration tests
+
+```sh
+poetry run tox -e integration
+```
+
+The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
+
+```sh
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
+```
+
+### Lint and format code
+
+Run the following to lint the Python code:
+
+```sh
+poetry run tox -e lint
+```
+
+Run the following to format the Python code:
+
+```sh
+poetry run tox -e fmt
+```
+
+### Build the charm
+
+When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. This command comes from `charmcraftcache`:
 
 ```sh
 pipx install charmcraftcache
@@ -94,8 +122,7 @@ pipx install charmcraftcache
 > [!NOTE]
 > Make sure you add this repository (https://github.com/canonical/landscape-charm) as a remote to your fork, otherwise `ccc` will fail.
 
-Use the following command to test the charm as
-it would be deployed by Juju in the `landscape-scalable` bundle:
+Use the following command to test the charm as it would be deployed by Juju in the `landscape-scalable` bundle:
 
 ```bash
 make deploy
@@ -107,21 +134,13 @@ You can also specify the platform to build the charm for, the path to the bundle
 make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
 ```
 
-The cleaning and building steps can be skipped by passing `SKIP_CLEAN=true` and `SKIP_BUILD=true`, respectively.
+The cleaning and building steps can be skipped by passing `SKIP_CLEAN=true` and `SKIP_BUILD=true`, respectively. This will create a model called `landscape-pg16`.
 
-This will create a model called `landscape-pg16`.
+### Develop with Terraform
 
-### Run unit tests
+The Landscape charm integrates with Terraform modules.
 
-```sh
-tox -e unit
-```
-
-Or run specific test(s):
-
-```sh
-tox -e unit -- tests/unit/test_charm.py::TestCharm::test_install
-```
+#### Run tests
 
 Run the Terraform tests:
 
@@ -136,25 +155,7 @@ Run the Terraform tests:
 make terraform-test
 ```
 
-### Run integration tests
-
-```sh
-tox -e integration
-```
-
-The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
-
-```sh
-LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 tox -e integration
-```
-
-### Lint code
-
-Run the following to lint the Python code:
-
-```sh
-tox -e lint
-```
+#### Lint and format
 
 To lint the Terraform module, make sure you have `tflint` installed:
 
@@ -166,14 +167,6 @@ Then, use the following Make recipe:
 
 ```sh
 make tflint-fix
-```
-
-### Format code
-
-Format the Python code:
-
-```sh
-tox -e fmt
 ```
 
 Format the Terraform module:

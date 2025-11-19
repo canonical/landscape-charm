@@ -18,6 +18,7 @@ ops = {extras = ["testing"], version = "~=2.19"}
 black = "*"
 isort = "*"
 ruff = "*"
+tox = ">=4"
 
 [tool.poetry.group.integration.dependencies]
 jubilant = "~=1.0"
