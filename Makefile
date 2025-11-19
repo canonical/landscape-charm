@@ -1,6 +1,6 @@
 DIR_NAME := $(notdir $(shell pwd))
 BUNDLE_PATH ?= ./bundle-examples/postgres16.bundle.yaml
-PLATFORM ?= ubuntu@22.04:amd64
+PLATFORM ?= ubuntu@24.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
