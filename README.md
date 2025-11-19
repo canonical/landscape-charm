@@ -65,6 +65,20 @@ Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines
 on enhancements to this charm following best practice guidelines, and
 `CONTRIBUTING.md` for developer guidance.
 
+### Development Setup
+
+This project uses [Poetry](https://python-poetry.org/) for dependency management. Make sure you have Poetry installed:
+
+```sh
+apt install python3-poetry
+```
+
+Then, install the project dependencies:
+
+```sh
+poetry install --with dev
+```
+
 When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. Make sure you have [`pipx`](https://github.com/pypa/pipx) installed:
 
 ```sh
