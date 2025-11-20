@@ -1,34 +1,124 @@
-# landscape-charm-charmcraft
+# Contributing
 
-## Developing
+## Development setup
 
-Create and activate a virtualenv with the development requirements:
+This project uses [pipx](https://github.com/pypa/pipx) and [poetry](https://python-poetry.org/) for dependency management. Make sure you have both installed:
 
-    virtualenv -p python3 venv
-    source venv/bin/activate
-    pip install -r requirements-dev.txt
+```sh
+sudo apt install -y pipx
+pipx install poetry
+```
 
-## Code overview
+Then, install the project dependencies:
 
-TEMPLATE-TODO:
-One of the most important things a consumer of your charm (or library)
-needs to know is what set of functionality it provides. Which categories
-does it fit into? Which events do you listen to? Which libraries do you
-consume? Which ones do you export and how are they used?
+```sh
+poetry install --with dev
+```
 
-## Intended use case
+### Run unit tests
 
-TEMPLATE-TODO:
-Why were these decisions made? What's the scope of your charm?
+```sh
+make test
+```
 
-## Roadmap
+Or run specific test(s):
 
-If this Charm doesn't fulfill all of the initial functionality you were
-hoping for or planning on, please add a Roadmap or TODO here
+```sh
+poetry run pytest tests/unit/test_charm.py::TestCharm::test_install
+```
 
-## Testing
+Run with coverage:
 
-The Python operator framework includes a very nice harness for testing
-operator behaviour without full deployment. Just `run_tests`:
+```sh
+make coverage
+```
 
-    ./run_tests
+### Run integration tests
+
+```sh
+make integration-test
+```
+
+The integration tests can take a while to set up. If you already have an active Juju deployment for a Landscape server bundle that you want to run the integration tests against, you can use it by settting `LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1`:
+
+```sh
+LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 make integration-test
+```
+
+### Lint and format code
+
+Run the following to lint the Python code:
+
+```sh
+make lint
+```
+
+Run the following to format the Python code:
+
+```sh
+make fmt
+```
+
+### Build the charm
+
+When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. This command comes from `charmcraftcache`:
+
+```sh
+pipx install charmcraftcache
+```
+
+> [!NOTE]
+> Make sure you add this repository (https://github.com/canonical/landscape-charm) as a remote to your fork, otherwise `ccc` will fail.
+
+Use the following command to test the charm as it would be deployed by Juju in the `landscape-scalable` bundle:
+
+```bash
+make deploy
+```
+
+You can also specify the platform to build the charm for, the path to the bundle to deploy, and the name of the model. For example:
+
+```sh
+make PLATFORM=ubuntu@24.04:amd64 BUNDLE_PATH=./bundle-examples/postgres16.bundle.yaml MODEL_NAME=landscape-pg16 deploy
+```
+
+The cleaning and building steps can be skipped by passing `SKIP_CLEAN=true` and `SKIP_BUILD=true`, respectively. This will create a model called `landscape-pg16`.
+
+## Terraform development
+
+The Landscape charm integrates with Terraform modules.
+
+### Run tests
+
+Run the Terraform tests:
+
+> [!IMPORTANT]
+> Make sure you have `terraform` installed:
+>
+> ````sh
+> sudo snap install terraform --classic
+> ````
+
+```sh
+make terraform-test
+```
+
+### Lint and format
+
+To lint the Terraform module, make sure you have `tflint` installed:
+
+```sh
+sudo snap install tflint
+```
+
+Then, use the following Make recipe:
+
+```sh
+make tflint-fix
+```
+
+Format the Terraform module:
+
+```sh
+make fmt-fix
+```
