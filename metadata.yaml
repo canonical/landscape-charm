@@ -24,7 +24,7 @@ requires:
   application-dashboard:
     interface: register-application
   landscape-ping:
-    interace: ingress
+    interface: ingress
     limit: 1
 
 provides:
