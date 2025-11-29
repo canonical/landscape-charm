@@ -96,6 +96,8 @@ from settings_files import (
     write_license_file,
     write_ssl_cert,
 )
+from charms.traefik_k8s.v2.ingress import (IngressPerAppRequirer,
+  IngressPerAppReadyEvent, IngressPerAppRevokedEvent)
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
 DPKG_RECONFIGURE = "/usr/sbin/dpkg-reconfigure"
@@ -370,6 +372,20 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
+
+        self.ingress = IngressPerAppRequirer(self, port=PORTS["pingserver"])
+        self.framework.observe(
+            self.ingress.on.ready, self._on_ingress_ready
+        )
+        self.framework.observe(
+            self.ingress.on.revoked, self._on_ingress_revoked
+        )
+
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        logger.info("This app's ingress URL: %s", event.url)
+
+    def _on_ingress_revoked(self, event: IngressPerAppRevokedEvent):
+        logger.info("This app no longer has ingress")
 
     def _generate_scrape_configs(self) -> list[dict]:
         """

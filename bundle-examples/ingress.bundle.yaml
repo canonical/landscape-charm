@@ -1,0 +1,53 @@
+description: Landscape Scalable Dev with Charmed Postgres 14
+applications:
+  postgresql:
+    channel: 14/stable
+    charm: ch:postgresql
+    num_units: 1
+    options:
+      plugin_plpython3u_enable: true
+      plugin_ltree_enable: true
+      plugin_intarray_enable: true
+      plugin_debversion_enable: true
+      plugin_pg_trgm_enable: true
+      experimental_max_connections: 500
+  rabbitmq-server:
+    channel: latest/edge
+    charm: ch:rabbitmq-server
+    num_units: 1
+    options:
+      consumer-timeout: 259200000
+  haproxy:
+    channel: edge
+    charm: ch:haproxy
+    num_units: 1
+    expose: true
+    options:
+      default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
+      services: ""
+      ssl_cert: SELFSIGNED
+      global_default_bind_options: "no-tlsv10"
+  landscape-server:
+    charm: ../landscape-server_ubuntu@24.04-amd64.charm
+    num_units: 1
+    options:
+        landscape_ppa: ppa:landscape/self-hosted-beta
+        min_install: true
+        enable_hostagent_messenger: true
+        enable_ubuntu_installer_attach: true
+  ingress:
+    charm: ch:ingress-configurator
+    channel: "latest/edge"
+    options:
+      allow_http: true
+      paths: "/ping"
+      backend-ports: "8070"
+
+
+    base: ubuntu@24.04
+
+relations:
+  - [landscape-server:inbound-amqp, rabbitmq-server]
+  - [landscape-server:outbound-amqp, rabbitmq-server]
+  - [landscape-server, haproxy]
+  - [landscape-server:database, postgresql:database]
