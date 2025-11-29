@@ -46,4 +46,4 @@ relations:
   - [landscape-server:outbound-amqp, rabbitmq-server]
   - [landscape-server:database, postgresql:database]
   - [landscape-server:landscape-ping, ingress-configurator:ingress]
-  - [haproxy:ingress, ingress-configurator:haproxy-route]
+  - [haproxy, ingress-configurator:haproxy-route]
