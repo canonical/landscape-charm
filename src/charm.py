@@ -293,6 +293,16 @@ class LandscapeServerCharm(CharmBase):
             self.on.outbound_amqp_relation_changed, self._amqp_relation_changed
         )
 
+        self.ingress = IngressPerAppRequirer(
+            self, relation_name="landscape-ping", port=PORTS["pingserver"]
+        )
+        self.framework.observe(
+            self.ingress.on.ready, self._on_ingress_ready
+        )
+        self.framework.observe(
+            self.ingress.on.revoked, self._on_ingress_revoked
+        )
+
         self.framework.observe(
             self.on.website_relation_joined, self._website_relation_joined
         )
@@ -372,14 +382,6 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
-
-        self.ingress = IngressPerAppRequirer(self, port=PORTS["pingserver"])
-        self.framework.observe(
-            self.ingress.on.ready, self._on_ingress_ready
-        )
-        self.framework.observe(
-            self.ingress.on.revoked, self._on_ingress_revoked
-        )
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         logger.info("This app's ingress URL: %s", event.url)

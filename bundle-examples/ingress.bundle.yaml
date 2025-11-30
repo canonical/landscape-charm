@@ -22,6 +22,8 @@ applications:
     charm: ch:haproxy
     num_units: 1
     expose: true
+    options:
+      external-hostname: "localhost"
   landscape-server:
     charm: ../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
