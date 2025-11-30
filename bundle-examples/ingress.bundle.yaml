@@ -39,9 +39,10 @@ applications:
       allow-http: true
       paths: /ping
       backend-ports: "8070"
-
-
     base: ubuntu@24.04
+
+  self-signed-certificates:
+    charm: ch:self-signed-certificates
 
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
@@ -49,3 +50,4 @@ relations:
   - [landscape-server:database, postgresql:database]
   - [landscape-server:landscape-ping, ingress-configurator:ingress]
   - [haproxy, ingress-configurator:haproxy-route]
+  - [haproxy:certificates, self-signed-certificates:certificates]
