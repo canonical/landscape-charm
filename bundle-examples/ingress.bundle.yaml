@@ -23,23 +23,27 @@ applications:
     num_units: 1
     expose: true
     options:
-      external-hostname: "localhost"
+      external-hostname: haproxy.internal
   landscape-server:
     charm: ../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
     options:
-        landscape_ppa: ppa:landscape/self-hosted-beta
+        landscape_ppa: ppa:landscape/self-hosted-25.10
         min_install: true
         enable_hostagent_messenger: true
         enable_ubuntu_installer_attach: true
   ingress-configurator:
     charm: ch:ingress-configurator
     channel: latest/edge
+    base: ubuntu@24.04
     options:
       allow-http: true
       paths: /ping
-      backend-ports: "8070"
-    base: ubuntu@24.04
+      hostname: haproxy.internal
+      backend-protocol: http
+    machines:
+      - 0
+
 
   self-signed-certificates:
     charm: ch:self-signed-certificates

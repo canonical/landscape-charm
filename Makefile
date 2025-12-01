@@ -4,8 +4,8 @@ PLATFORM ?= ubuntu@24.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
+SKIP_DESTROY ?= false
 SKIP_CLEAN ?= false
-
 
 .PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
@@ -68,5 +68,4 @@ terraform-fix: fmt-fix tflint-fix
 
 clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
-	-juju destroy-model --no-prompt $(MODEL_NAME) \
-		--force --no-wait --destroy-storage
+	-@if [ "$(SKIP_DESTROY)" != "true" ]; then juju destroy-model --no-prompt $(MODEL_NAME) --force --no-wait --destroy-storage; fi
