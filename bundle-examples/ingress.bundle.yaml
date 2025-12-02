@@ -10,7 +10,6 @@ applications:
     expose: true
     options:
       external-hostname: haproxy.internal
-
     constraints: arch=amd64
   ping:
     charm: ingress-configurator
@@ -108,7 +107,7 @@ applications:
     revision: 317
     num_units: 1
     to:
-    - "4"
+    - "0"
     constraints: arch=amd64
 machines:
   "0":
@@ -120,24 +119,18 @@ machines:
     base: ubuntu@22.04/stable
   "3":
     constraints: arch=amd64
-  "4":
-    constraints: arch=amd64
 relations:
-- - landscape-server:inbound-amqp
-  - rabbitmq-server:amqp
-- - landscape-server:outbound-amqp
-  - rabbitmq-server:amqp
-- - landscape-server:database
-  - postgresql:database
-- - landscape-server:landscape-ping
-  - ping:ingress
-- - landscape-server:landscape-appserver
-  - appserver:ingress
-- - landscape-server:landscape-message-server
-  - message-server:ingress
-- - landscape-server:landscape-api
-  - api:ingress
-- - landscape-server:landscape-package-upload
-  - package-upload:ingress
-- - haproxy:certificates
-  - self-signed-certificates:certificates
+- [landscape-server:inbound-amqp, rabbitmq-server:amqp]
+- [landscape-server:outbound-amqp, rabbitmq-server:amqp]
+- [landscape-server:database, postgresql:database]
+- [landscape-server:landscape-ping, ping:ingress]
+- [ping:haproxy-route, haproxy]
+- [landscape-server:landscape-appserver, appserver:ingress]
+- [appserver:haproxy-route, haproxy]
+- [landscape-server:landscape-message-server, message-server:ingress]
+- [message-server:haproxy-route, haproxy]
+- [landscape-server:landscape-api, api:ingress]
+- [api:haproxy-route, haproxy]
+- [landscape-server:landscape-package-upload, package-upload:ingress]
+- [package-upload:haproxy-route, haproxy]
+- [haproxy:certificates, self-signed-certificates:certificates]
