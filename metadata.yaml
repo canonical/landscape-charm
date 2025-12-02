@@ -26,14 +26,24 @@ requires:
   landscape-ping:
     interface: ingress
     limit: 1
+  landscape-appserver:
+    interface: ingress
+    limit: 1
+  landscape-message-server:
+    interface: ingress
+    limit: 1
+  landscape-api:
+    interface: ingress
+    limit: 1
+  landscape-package-upload:
+    interface: ingress
+    limit: 1
 
 provides:
   data:
     interface: block-storage
     scope: container
     optional: true
-  website:
-    interface: http
   hosted:
     interface: landscape-hosted
     scope: container

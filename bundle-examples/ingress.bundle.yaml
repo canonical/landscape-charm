@@ -1,57 +1,143 @@
-description: Landscape Scalable Dev with Charmed Postgres 14
+default-base: ubuntu@24.04/stable
 applications:
-  postgresql:
-    channel: 14/stable
-    charm: ch:postgresql
-    num_units: 1
-    options:
-      plugin_plpython3u_enable: true
-      plugin_ltree_enable: true
-      plugin_intarray_enable: true
-      plugin_debversion_enable: true
-      plugin_pg_trgm_enable: true
-      experimental_max_connections: 500
-  rabbitmq-server:
-    channel: latest/edge
-    charm: ch:rabbitmq-server
-    num_units: 1
-    options:
-      consumer-timeout: 259200000
   haproxy:
+    charm: haproxy
     channel: 2.8/edge
-    charm: ch:haproxy
+    revision: 274
     num_units: 1
+    to:
+    - "0"
     expose: true
     options:
       external-hostname: haproxy.internal
+
+    constraints: arch=amd64
+  ping:
+    charm: ingress-configurator
+    channel: latest/edge
+    revision: 34
+    num_units: 1
+    to:
+    - "1"
+    constraints: arch=amd64
+    options:
+      allow-http: true
+      paths: ping
+  appserver:
+    charm: ingress-configurator
+    channel: latest/edge
+    revision: 34
+    num_units: 1
+    to:
+    - "1"
+    constraints: arch=amd64
+    options:
+      paths: /,hash-id-databases
+  message-server:
+    charm: ingress-configurator
+    channel: latest/edge
+    revision: 34
+    num_units: 1
+    to:
+    - "1"
+    constraints: arch=amd64
+    options:
+      paths: message-system,attachment
+  api:
+    charm: ingress-configurator
+    channel: latest/edge
+    revision: 34
+    num_units: 1
+    to:
+    - "1"
+    constraints: arch=amd64
+    options:
+      paths: api
+  package-upload:
+    charm: ingress-configurator
+    channel: latest/edge
+    revision: 34
+    num_units: 1
+    to:
+    - "1"
+    constraints: arch=amd64
+    options:
+      paths: upload
   landscape-server:
     charm: ../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
+    to:
+    - "1"
     options:
-        landscape_ppa: ppa:landscape/self-hosted-25.10
-        min_install: true
-        enable_hostagent_messenger: true
-        enable_ubuntu_installer_attach: true
-  ingress-configurator:
-    charm: ch:ingress-configurator
+      enable_hostagent_messenger: true
+      enable_ubuntu_installer_attach: true
+      landscape_ppa: ppa:landscape/self-hosted-25.10
+      min_install: true
+    constraints: arch=amd64
+  postgresql:
+    charm: postgresql
+    channel: 14/stable
+    revision: 936
+    base: ubuntu@22.04/stable
+    num_units: 1
+    to:
+    - "2"
+    options:
+      experimental_max_connections: 500
+      plugin_debversion_enable: true
+      plugin_intarray_enable: true
+      plugin_ltree_enable: true
+      plugin_pg_trgm_enable: true
+      plugin_plpython3u_enable: true
+    constraints: arch=amd64
+    storage:
+      pgdata: rootfs,1,1024M
+  rabbitmq-server:
+    charm: rabbitmq-server
     channel: latest/edge
-    base: ubuntu@24.04
+    revision: 250
+    num_units: 1
+    to:
+    - "3"
     options:
-      allow-http: true
-      paths: /ping
-      hostname: haproxy.internal
-      backend-protocol: http
-    machines:
-      - 0
-
-
+      consumer-timeout: 259200000
+    constraints: arch=amd64
   self-signed-certificates:
-    charm: ch:self-signed-certificates
-
+    charm: self-signed-certificates
+    channel: 1/stable
+    revision: 317
+    num_units: 1
+    to:
+    - "4"
+    constraints: arch=amd64
+machines:
+  "0":
+    constraints: arch=amd64
+  "1":
+    constraints: arch=amd64
+  "2":
+    constraints: arch=amd64
+    base: ubuntu@22.04/stable
+  "3":
+    constraints: arch=amd64
+  "4":
+    constraints: arch=amd64
 relations:
-  - [landscape-server:inbound-amqp, rabbitmq-server]
-  - [landscape-server:outbound-amqp, rabbitmq-server]
-  - [landscape-server:database, postgresql:database]
-  - [landscape-server:landscape-ping, ingress-configurator:ingress]
-  - [haproxy, ingress-configurator:haproxy-route]
-  - [haproxy:certificates, self-signed-certificates:certificates]
+- - landscape-server:inbound-amqp
+  - rabbitmq-server:amqp
+- - landscape-server:outbound-amqp
+  - rabbitmq-server:amqp
+- - landscape-server:database
+  - postgresql:database
+- - landscape-server:landscape-ping
+  - ping:ingress
+- - landscape-server:landscape-appserver
+  - appserver:ingress
+- - landscape-server:landscape-message-server
+  - message-server:ingress
+- - landscape-server:landscape-api
+  - api:ingress
+- - landscape-server:landscape-package-upload
+  - package-upload:ingress
+- - haproxy:certificates
+  - self-signed-certificates:certificates
