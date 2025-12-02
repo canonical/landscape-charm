@@ -395,15 +395,6 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(cookie_encryption_key=None)
         self._stored.set_default(enable_ubuntu_installer_attach=False)
 
-        for relation_name in (
-            "landscape-ping",
-            "landscape-appserver",
-            "landscape-message-server",
-            "landscape-api",
-            "landscape-package-upload",
-        ):
-            self._stored.ready.setdefault(relation_name, True)
-
         self.root_gid = group_exists("root").gr_gid
 
         self._grafana_agent = COSAgentProvider(
