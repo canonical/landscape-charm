@@ -36,6 +36,13 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+
+# from charms.tls_certificates_interface.v4.tls_certificates import (
+#     CertificateAvailableEvent,
+#     CertificateRequestAttributes,
+#     Mode,
+#     TLSCertificatesRequiresV4,
+# )
 from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
@@ -415,6 +422,19 @@ class LandscapeServerCharm(CharmBase):
                 "Invalid configuration. See `juju debug-log`."
             )
 
+    #     self.certificates = TLSCertificatesRequiresV4(
+    #         charm=self,
+    #         relationship_name="certificates",
+    #         certificate_requests=[self._get_certificate_request_attributes()],
+    #         mode=Mode.UNIT,
+    #     )
+    #     self.framework.observe(
+    #         self.certificates.on.certificate_available, self._configure
+    #     )
+
+    # def _get_certificate_request_attributes(self) -> CertificateRequestAttributes:
+    #     return CertificateRequestAttributes(common_name="example.com")
+
     def _set_ingress_ready(self, relation_name: str, ready: bool) -> None:
         self._stored.ready[relation_name] = ready
         self._update_ready_status()
@@ -437,7 +457,7 @@ class LandscapeServerCharm(CharmBase):
                 "package-upload": {"root-url": url},
             })
 
-    def _on_appserver_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_appserver_revoked(self, _: IngressPerAppRevokedEvent):
         logger.info("appserver ingress revoked")
         self._set_ingress_ready("landscape-appserver", False)
 
@@ -445,7 +465,7 @@ class LandscapeServerCharm(CharmBase):
         self._set_ingress_ready("landscape-ping", True)
         logger.info("ping ingress URL: %s", event.url)
 
-    def _on_ping_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_ping_revoked(self, _: IngressPerAppRevokedEvent):
         logger.info("ping ingress revoked")
         self._set_ingress_ready("landscape-ping", False)
 
@@ -453,7 +473,7 @@ class LandscapeServerCharm(CharmBase):
         self._set_ingress_ready("landscape-message-server", True)
         logger.info("message-server ingress URL: %s", event.url)
 
-    def _on_message_server_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_message_server_revoked(self, _: IngressPerAppRevokedEvent):
         logger.info("message-server ingress revoked")
         self._set_ingress_ready("landscape-message-server", False)
 
@@ -461,7 +481,7 @@ class LandscapeServerCharm(CharmBase):
         self._set_ingress_ready("landscape-appserver", True)
         logger.info("api ingress URL: %s", event.url)
 
-    def _on_api_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_api_revoked(self, _: IngressPerAppRevokedEvent):
         logger.info("api ingress revoked")
         self._set_ingress_ready("landscape-api", False)
 
@@ -469,7 +489,7 @@ class LandscapeServerCharm(CharmBase):
         self._set_ingress_ready("landscape-package-upload", True)
         logger.info("package-upload ingress URL: %s", event.url)
 
-    def _on_package_upload_revoked(self, event: IngressPerAppRevokedEvent):
+    def _on_package_upload_revoked(self, _: IngressPerAppRevokedEvent):
         logger.info("package-upload ingress revoked")
         self._set_ingress_ready("landscape-package-upload", False)
 

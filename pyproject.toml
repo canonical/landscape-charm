@@ -18,6 +18,8 @@ ops = {extras = ["testing"], version = "~=2.19"}
 black = "*"
 isort = "*"
 ruff = "*"
+cryptography = "45.0.3"
+pydantic = "2.11.5"
 
 [tool.poetry.group.integration.dependencies]
 jubilant = "~=1.0"

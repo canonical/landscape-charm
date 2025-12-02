@@ -13,6 +13,9 @@ summary: Charm for installing and using Self-Hosted Landscape Server.
 requires:
   database:
     interface: postgresql_client
+  certificates:
+    interface: tls-certificates
+    limit: 1
   db:
     # Provide backwards compatibility
     # with the legacy Postgres interface
