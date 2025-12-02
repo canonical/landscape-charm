@@ -7,6 +7,7 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.10"
 ops = ">=1.4.0"
+cryptography = "45.0.3"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "*"
@@ -18,8 +19,6 @@ ops = {extras = ["testing"], version = "~=2.19"}
 black = "*"
 isort = "*"
 ruff = "*"
-cryptography = "45.0.3"
-pydantic = "2.11.5"
 
 [tool.poetry.group.integration.dependencies]
 jubilant = "~=1.0"

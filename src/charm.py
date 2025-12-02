@@ -304,6 +304,7 @@ class LandscapeServerCharm(CharmBase):
             relation_name="landscape-appserver",
             port=PORTS["appserver"],
             scheme="https",
+            redirect_https=True,
         )
 
         self.framework.observe(self.appserver.on.ready, self._on_appserver_ready)
@@ -314,6 +315,7 @@ class LandscapeServerCharm(CharmBase):
             relation_name="landscape-message-server",
             port=PORTS["message-server"],
             scheme="https",
+            redirect_https=True,
         )
 
         self.framework.observe(
@@ -328,6 +330,7 @@ class LandscapeServerCharm(CharmBase):
             relation_name="landscape-api",
             port=PORTS["api"],
             scheme="https",
+            redirect_https=True,
         )
 
         self.framework.observe(self.api.on.ready, self._on_api_ready)
@@ -339,6 +342,7 @@ class LandscapeServerCharm(CharmBase):
             port=PORTS["package-upload"],
             scheme="https",
             strip_prefix=True,
+            redirect_https=True,
         )
 
         self.framework.observe(
