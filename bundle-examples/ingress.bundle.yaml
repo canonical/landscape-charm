@@ -22,6 +22,7 @@ applications:
     options:
       allow-http: true
       paths: ping
+      hostname: haproxy.internal
   appserver:
     charm: ingress-configurator
     channel: latest/edge
@@ -31,7 +32,8 @@ applications:
     - "1"
     constraints: arch=amd64
     options:
-      paths: /,hash-id-databases
+      paths: " ,hash-id-databases,repository"
+      hostname: haproxy.internal
   message-server:
     charm: ingress-configurator
     channel: latest/edge
@@ -52,6 +54,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: api
+      hostname: haproxy.internal
   package-upload:
     charm: ingress-configurator
     channel: latest/edge
@@ -62,6 +65,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: upload
+      hostname: haproxy.internal
   landscape-server:
     charm: ../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1

@@ -445,25 +445,11 @@ class LandscapeServerCharm(CharmBase):
 
     def _on_api_ready(self, event: IngressPerAppReadyEvent):
         self._set_ingress_ready("landscape-api", True)
+        logger.info("api ingress URL: %s", event.url)
 
-        if not event.url:
-            logger.warning("api ingress ready without URL")
-            return
-
-        url = event.url if event.url.endswith("/") else f"{event.url}/"
-        logger.info("api ingress URL: %s", url)
-
-        if not self.charm_config.root_url:
-            self._stored.default_root_url = url
-            update_service_conf({
-                "global": {"root-url": url},
-                "api": {"root-url": url},
-                "package-upload": {"root-url": url},
-            })
-
-    def _on_appserver_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("appserver ingress revoked")
-        self._set_ingress_ready("landscape-appserver", False)
+    def _on_api_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("api ingress revoked")
+        self._set_ingress_ready("landscape-api", False)
 
     def _on_ping_ready(self, event: IngressPerAppReadyEvent):
         self._set_ingress_ready("landscape-ping", True)
@@ -482,12 +468,29 @@ class LandscapeServerCharm(CharmBase):
         self._set_ingress_ready("landscape-message-server", False)
 
     def _on_appserver_ready(self, event: IngressPerAppReadyEvent):
+        logger.info(f"event: {event}")
         self._set_ingress_ready("landscape-appserver", True)
-        logger.info("api ingress URL: %s", event.url)
 
-    def _on_api_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("api ingress revoked")
-        self._set_ingress_ready("landscape-api", False)
+        if not event.url:
+            logger.warning("appserver ingress ready without URL")
+            return
+
+        url = event.url if event.url.endswith("/") else f"{event.url}/"
+        logger.info("appserver ingress URL: %s", url)
+
+        if not self.charm_config.root_url:
+            self._stored.default_root_url = url
+            update_service_conf({
+                "global": {"root-url": url},
+                "api": {"root-url": url},
+                "package-upload": {"root-url": url},
+            })
+        self._set_ingress_ready("landscape-appserver", True)
+        logger.info("appserver ingress URL: %s", event.url)
+
+    def _on_appserver_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("appserver ingress revoked")
+        self._set_ingress_ready("landscape-appserver", False)
 
     def _on_package_upload_ready(self, event: IngressPerAppReadyEvent):
         self._set_ingress_ready("landscape-package-upload", True)
