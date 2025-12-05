@@ -36,6 +36,18 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+
+# from charms.tls_certificates_interface.v4.tls_certificates import (
+#     CertificateAvailableEvent,
+#     CertificateRequestAttributes,
+#     Mode,
+#     TLSCertificatesRequiresV4,
+# )
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+    IngressPerAppRevokedEvent,
+)
 from ops import main
 from ops.charm import (
     ActionEvent,
@@ -44,7 +56,6 @@ from ops.charm import (
     LeaderElectedEvent,
     LeaderSettingsChangedEvent,
     RelationChangedEvent,
-    RelationDepartedEvent,
     RelationJoinedEvent,
     UpdateStatusEvent,
 )
@@ -65,20 +76,7 @@ from database import (
     fetch_postgres_relation_data,
     grant_role,
 )
-from haproxy import (
-    create_grpc_service,
-    create_http_service,
-    create_https_service,
-    create_ubuntu_installer_attach_service,
-    ERROR_FILES,
-    get_haproxy_error_files,
-    GRPC_SERVICE,
-    HTTP_SERVICE,
-    HTTPS_SERVICE,
-    PORTS,
-    SERVER_OPTIONS,
-    UBUNTU_INSTALLER_ATTACH_SERVICE,
-)
+from haproxy import PORTS
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -291,14 +289,67 @@ class LandscapeServerCharm(CharmBase):
             self.on.outbound_amqp_relation_changed, self._amqp_relation_changed
         )
 
+        self.ping = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-ping",
+            port=PORTS["pingserver"],
+            scheme="http",
+        )
+
+        self.framework.observe(self.ping.on.ready, self._on_ping_ready)
+        self.framework.observe(self.ping.on.revoked, self._on_ping_revoked)
+
+        self.appserver = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-appserver",
+            port=PORTS["appserver"],
+            scheme="https",
+            redirect_https=True,
+        )
+
+        self.framework.observe(self.appserver.on.ready, self._on_appserver_ready)
+        self.framework.observe(self.appserver.on.revoked, self._on_appserver_revoked)
+
+        self.message_server = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-message-server",
+            port=PORTS["message-server"],
+            scheme="https",
+            redirect_https=True,
+        )
+
         self.framework.observe(
-            self.on.website_relation_joined, self._website_relation_joined
+            self.message_server.on.ready, self._on_message_server_ready
         )
         self.framework.observe(
-            self.on.website_relation_changed, self._website_relation_changed
+            self.message_server.on.revoked, self._on_message_server_revoked
+        )
+
+        self.api = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-api",
+            port=PORTS["api"],
+            scheme="https",
+            redirect_https=True,
+        )
+
+        self.framework.observe(self.api.on.ready, self._on_api_ready)
+        self.framework.observe(self.api.on.revoked, self._on_api_revoked)
+
+        self.package_upload = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-package-upload",
+            port=PORTS["package-upload"],
+            scheme="https",
+            strip_prefix=True,
+            redirect_https=True,
+        )
+
+        self.framework.observe(
+            self.package_upload.on.ready, self._on_package_upload_ready
         )
         self.framework.observe(
-            self.on.website_relation_departed, self._website_relation_departed
+            self.package_upload.on.revoked, self._on_package_upload_revoked
         )
         self.framework.observe(
             self.on.nrpe_external_master_relation_joined,
@@ -339,7 +390,11 @@ class LandscapeServerCharm(CharmBase):
                 "db": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
-                "haproxy": False,
+                "landscape-ping": False,
+                "landscape-appserver": False,
+                "landscape-message-server": False,
+                "landscape-api": False,
+                "landscape-package-upload": False,
             }
         )
         self._stored.set_default(leader_ip="")
@@ -370,6 +425,80 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
+
+    #     self.certificates = TLSCertificatesRequiresV4(
+    #         charm=self,
+    #         relationship_name="certificates",
+    #         certificate_requests=[self._get_certificate_request_attributes()],
+    #         mode=Mode.UNIT,
+    #     )
+    #     self.framework.observe(
+    #         self.certificates.on.certificate_available, self._configure
+    #     )
+
+    # def _get_certificate_request_attributes(self) -> CertificateRequestAttributes:
+    #     return CertificateRequestAttributes(common_name="example.com")
+
+    def _set_ingress_ready(self, relation_name: str, ready: bool) -> None:
+        self._stored.ready[relation_name] = ready
+        self._update_ready_status()
+
+    def _on_api_ready(self, event: IngressPerAppReadyEvent):
+        self._set_ingress_ready("landscape-api", True)
+        logger.info("api ingress URL: %s", event.url)
+
+    def _on_api_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("api ingress revoked")
+        self._set_ingress_ready("landscape-api", False)
+
+    def _on_ping_ready(self, event: IngressPerAppReadyEvent):
+        self._set_ingress_ready("landscape-ping", True)
+        logger.info("ping ingress URL: %s", event.url)
+
+    def _on_ping_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("ping ingress revoked")
+        self._set_ingress_ready("landscape-ping", False)
+
+    def _on_message_server_ready(self, event: IngressPerAppReadyEvent):
+        self._set_ingress_ready("landscape-message-server", True)
+        logger.info("message-server ingress URL: %s", event.url)
+
+    def _on_message_server_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("message-server ingress revoked")
+        self._set_ingress_ready("landscape-message-server", False)
+
+    def _on_appserver_ready(self, event: IngressPerAppReadyEvent):
+        logger.info(f"event: {event}")
+        self._set_ingress_ready("landscape-appserver", True)
+
+        if not event.url:
+            logger.warning("appserver ingress ready without URL")
+            return
+
+        url = event.url if event.url.endswith("/") else f"{event.url}/"
+        logger.info("appserver ingress URL: %s", url)
+
+        if not self.charm_config.root_url:
+            self._stored.default_root_url = url
+            update_service_conf({
+                "global": {"root-url": url},
+                "api": {"root-url": url},
+                "package-upload": {"root-url": url},
+            })
+        self._set_ingress_ready("landscape-appserver", True)
+        logger.info("appserver ingress URL: %s", event.url)
+
+    def _on_appserver_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("appserver ingress revoked")
+        self._set_ingress_ready("landscape-appserver", False)
+
+    def _on_package_upload_ready(self, event: IngressPerAppReadyEvent):
+        self._set_ingress_ready("landscape-package-upload", True)
+        logger.info("package-upload ingress URL: %s", event.url)
+
+    def _on_package_upload_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("package-upload ingress revoked")
+        self._set_ingress_ready("landscape-package-upload", False)
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -418,9 +547,9 @@ class LandscapeServerCharm(CharmBase):
             return
 
         # Update additional configuration
-        update_service_conf(
-            {"global": {"deployment-mode": self.charm_config.deployment_mode}}
-        )
+        update_service_conf({
+            "global": {"deployment-mode": self.charm_config.deployment_mode}
+        })
         configure_for_deployment_mode(self.charm_config.deployment_mode)
 
         if self.charm_config.additional_service_config:
@@ -442,10 +571,6 @@ class LandscapeServerCharm(CharmBase):
         if self.charm_config.smtp_relay_host:
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(self.charm_config.smtp_relay_host)
-
-        # Update HAProxy relations, if they exist.
-        for relation in self.model.relations.get("website", []):
-            self._update_haproxy_connection(relation)
 
         self._configure_openid()
         self._configure_oidc()
@@ -500,9 +625,9 @@ class LandscapeServerCharm(CharmBase):
                 logger.info("Generating new random cookie encryption key")
                 cookie_encryption_key = generate_cookie_encryption_key()
                 peer_relation = self.model.get_relation("replicas")
-                peer_relation.data[self.app].update(
-                    {"cookie-encryption-key": cookie_encryption_key}
-                )
+                peer_relation.data[self.app].update({
+                    "cookie-encryption-key": cookie_encryption_key
+                })
 
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
@@ -612,15 +737,13 @@ class LandscapeServerCharm(CharmBase):
 
             if self.charm_config.min_install:
                 logger.info("Not installing hashids..")
-                check_call(
-                    [
-                        "apt",
-                        "install",
-                        LANDSCAPE_SERVER,
-                        "--no-install-recommends",
-                        "-y",
-                    ]
-                )
+                check_call([
+                    "apt",
+                    "install",
+                    LANDSCAPE_SERVER,
+                    "--no-install-recommends",
+                    "-y",
+                ])
             else:
                 # Explicitly ensure cache is up-to-date after adding the PPA.
                 apt.add_package(
@@ -691,23 +814,19 @@ class LandscapeServerCharm(CharmBase):
         deployment_mode = self.charm_config.deployment_mode
         is_standalone = deployment_mode == "standalone"
 
-        update_default_settings(
-            {
-                "RUN_ALL": "no",
-                "RUN_APISERVER": str(self.charm_config.worker_counts),
-                "RUN_ASYNC_FRONTEND": "yes",
-                "RUN_JOBHANDLER": "yes",
-                "RUN_APPSERVER": str(self.charm_config.worker_counts),
-                "RUN_MSGSERVER": str(self.charm_config.worker_counts),
-                "RUN_PINGSERVER": str(self.charm_config.worker_counts),
-                "RUN_CRON": "yes" if is_leader else "no",
-                "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-                "RUN_PACKAGEUPLOADSERVER": (
-                    "yes" if is_leader and is_standalone else "no"
-                ),
-                "RUN_PPPA_PROXY": "no",
-            }
-        )
+        update_default_settings({
+            "RUN_ALL": "no",
+            "RUN_APISERVER": str(self.charm_config.worker_counts),
+            "RUN_ASYNC_FRONTEND": "yes",
+            "RUN_JOBHANDLER": "yes",
+            "RUN_APPSERVER": str(self.charm_config.worker_counts),
+            "RUN_MSGSERVER": str(self.charm_config.worker_counts),
+            "RUN_PINGSERVER": str(self.charm_config.worker_counts),
+            "RUN_CRON": "yes" if is_leader else "no",
+            "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
+            "RUN_PACKAGEUPLOADSERVER": ("yes" if is_leader and is_standalone else "no"),
+            "RUN_PPPA_PROXY": "no",
+        })
 
         logger.info("Starting services")
 
@@ -991,12 +1110,10 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready[relation_name] = False
         self.unit.status = MaintenanceStatus(f"Setting up {relation_name} connection")
 
-        event.relation.data[self.unit].update(
-            {
-                "username": AMQP_USERNAME,
-                "vhost": VHOSTS[relation_name],
-            }
-        )
+        event.relation.data[self.unit].update({
+            "username": AMQP_USERNAME,
+            "vhost": VHOSTS[relation_name],
+        })
 
     def _amqp_relation_changed(self, event):
         unit_data = event.relation.data[event.unit]
@@ -1023,144 +1140,15 @@ class LandscapeServerCharm(CharmBase):
             )
             return
 
-        update_service_conf(
-            {
-                "broker": {
-                    "host": hostname,
-                    "password": password,
-                }
+        update_service_conf({
+            "broker": {
+                "host": hostname,
+                "password": password,
             }
-        )
+        })
 
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
-
-    def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
-        self._update_haproxy_connection(event.relation)
-
-        # Update root_url, if not provided.
-        if not self.charm_config.root_url:
-            url = f'https://{event.relation.data[event.unit]["public-address"]}/'
-            self._stored.default_root_url = url
-            update_service_conf(
-                {
-                    "global": {"root-url": url},
-                    "api": {"root-url": url},
-                    "package-upload": {"root-url": url},
-                }
-            )
-
-        self._update_ready_status()
-
-    def _update_haproxy_connection(self, relation: Relation) -> None:
-        self._stored.ready["haproxy"] = False
-        self.unit.status = MaintenanceStatus("Setting up haproxy connection")
-
-        # Check the SSL cert stuff first. No sense doing all the other
-        # work just to fail here.
-        try:
-            ssl_cert = _get_ssl_cert(
-                ssl_cert=self.charm_config.ssl_cert,
-                ssl_key=self.charm_config.ssl_key,
-            )
-        except SSLConfigurationError as e:
-            self.unit.status = BlockedStatus(str(e))
-            return
-
-        error_files = get_haproxy_error_files(ERROR_FILES)
-        server_ip = relation.data[self.unit]["private-address"]
-        unit_name = self.unit.name.replace("/", "-")
-
-        http_service = create_http_service(
-            http_service=asdict(HTTP_SERVICE),
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=self.charm_config.worker_counts,
-            is_leader=self.unit.is_leader(),
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-            redirect_https=self.charm_config.redirect_https,
-        )
-
-        https_service = create_https_service(
-            https_service=asdict(HTTPS_SERVICE),
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=self.charm_config.worker_counts,
-            is_leader=self.unit.is_leader(),
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-        )
-
-        services = [http_service, https_service]
-
-        if self.charm_config.enable_hostagent_messenger:
-            grpc_service = create_grpc_service(
-                grpc_service=asdict(GRPC_SERVICE),
-                ssl_cert=ssl_cert,
-                server_ip=server_ip,
-                unit_name=unit_name,
-                error_files=error_files,
-                service_ports=PORTS,
-                server_options=SERVER_OPTIONS,
-            )
-            services.append(grpc_service)
-
-        if self._stored.enable_ubuntu_installer_attach:
-            services.append(
-                create_ubuntu_installer_attach_service(
-                    ubuntu_installer_attach_service=asdict(
-                        UBUNTU_INSTALLER_ATTACH_SERVICE
-                    ),
-                    ssl_cert=ssl_cert,
-                    server_ip=server_ip,
-                    unit_name=unit_name,
-                    error_files=error_files,
-                    service_ports=PORTS,
-                    server_options=SERVER_OPTIONS,
-                )
-            )
-
-        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
-        self._stored.ready["haproxy"] = True
-        self.unit.status = WaitingStatus("")
-
-    def _website_relation_changed(self, event: RelationChangedEvent) -> None:
-        """
-        Writes the HAProxy-provided SSL certificate for
-        Landscape Server, if config has not provided one.
-        """
-        config_ssl_cert = self.charm_config.ssl_cert
-
-        if config_ssl_cert != "DEFAULT":
-            # No-op: cert has been provided by config.
-            return
-
-        if "ssl_cert" not in event.relation.data[event.unit]:
-            return
-
-        self.unit.status = MaintenanceStatus("Configuring HAProxy")
-        haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
-
-        # Sometimes the data has not been encoded properly in the HA charm
-        if haproxy_ssl_cert.startswith("b'"):
-            haproxy_ssl_cert = haproxy_ssl_cert.strip("b").strip("'")
-
-        if haproxy_ssl_cert != "DEFAULT":
-            # If DEFAULT, cert is being managed by a third party,
-            # possibly a subordinate charm.
-            write_ssl_cert(haproxy_ssl_cert)
-
-        self.unit.status = ActiveStatus("Unit is ready")
-        self._update_haproxy_connection(event.relation)
-
-        self._update_ready_status()
-
-    def _website_relation_departed(self, event: RelationDepartedEvent) -> None:
-        event.relation.data[self.unit].update({"services": ""})
 
     def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_nrpe_checks(event.relation)
@@ -1183,11 +1171,9 @@ class LandscapeServerCharm(CharmBase):
             },
         }
 
-        relation.data[self.unit].update(
-            {
-                "monitors": yaml.safe_dump(monitors),
-            }
-        )
+        relation.data[self.unit].update({
+            "monitors": yaml.safe_dump(monitors),
+        })
 
         if not os.path.exists(NRPE_D_DIR):
             logger.debug("NRPE directories not ready")
@@ -1247,15 +1233,13 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             icon_data = None
 
-        event.relation.data[self.app].update(
-            {
-                "name": "Landscape",
-                "url": root_url,
-                "subtitle": subtitle,
-                "group": group,
-                "icon": icon_data,
-            }
-        )
+        event.relation.data[self.app].update({
+            "name": "Landscape",
+            "url": root_url,
+            "subtitle": subtitle,
+            "group": group,
+            "icon": icon_data,
+        })
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
         # Just because we received this event does not mean we are
@@ -1268,13 +1252,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             ip = str(self.model.get_binding(peer_relation).network.bind_address)
             peer_relation.data[self.app].update({"leader-ip": ip})
 
-            update_service_conf(
-                {
-                    "package-search": {
-                        "host": "localhost",
-                    },
-                }
-            )
+            update_service_conf({
+                "package-search": {
+                    "host": "localhost",
+                },
+            })
 
         self._leader_changed()
 
@@ -1291,13 +1273,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             leader_ip = peer_relation.data[self.app].get("leader-ip")
 
             if leader_ip:
-                update_service_conf(
-                    {
-                        "package-search": {
-                            "host": leader_ip,
-                        },
-                    }
-                )
+                update_service_conf({
+                    "package-search": {
+                        "host": leader_ip,
+                    },
+                })
 
         self._leader_changed()
 
@@ -1313,10 +1293,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self._update_nrpe_checks(relation)
 
         if self.unit.is_leader():
-            haproxy_relations = self.model.relations.get("website", [])
-            for relation in haproxy_relations:
-                self._update_haproxy_connection(relation)
-
             # Enable leader services on this unit.
             paused_services = (s for s in LEADER_SERVICES if not service_running(s))
             for service in paused_services:
@@ -1350,13 +1326,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         if not self.unit.is_leader():
             if leader_ip_value:
-                update_service_conf(
-                    {
-                        "package-search": {
-                            "host": leader_ip_value,
-                        },
-                    }
-                )
+                update_service_conf({
+                    "package-search": {
+                        "host": leader_ip_value,
+                    },
+                })
 
         self._leader_changed()
 
@@ -1426,14 +1400,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             return
 
         self.unit.status = MaintenanceStatus("Configuring OpenID")
-        update_service_conf(
-            {
-                "landscape": {
-                    "openid-provider-url": self.charm_config.openid_provider_url,
-                    "openid-logout-url": self.charm_config.openid_logout_url,
-                },
-            }
-        )
+        update_service_conf({
+            "landscape": {
+                "openid-provider-url": self.charm_config.openid_provider_url,
+                "openid-logout-url": self.charm_config.openid_logout_url,
+            },
+        })
         self.unit.status = WaitingStatus("Waiting on relations")
 
     def _bootstrap_account(self):
