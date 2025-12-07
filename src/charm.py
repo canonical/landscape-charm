@@ -12,7 +12,6 @@ develop a new k8s charm using the Operator Framework:
     https://discourse.charmhub.io/t/4208
 """
 
-from base64 import b64decode, b64encode, binascii
 from dataclasses import asdict
 from functools import cached_property
 import os
@@ -36,13 +35,6 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
-
-# from charms.tls_certificates_interface.v4.tls_certificates import (
-#     CertificateAvailableEvent,
-#     CertificateRequestAttributes,
-#     Mode,
-#     TLSCertificatesRequiresV4,
-# )
 from charms.traefik_k8s.v2.ingress import (
     IngressPerAppReadyEvent,
     IngressPerAppRequirer,
@@ -185,27 +177,6 @@ def get_args_with_secrets_removed(args, arg_names):
     return args
 
 
-def _get_ssl_cert(ssl_cert, ssl_key):
-    """
-    Create an SSL certificate from the `ssl_cert` and `ssl_key` configuration
-    options.
-    """
-    if ssl_cert != "DEFAULT" and ssl_key == "":
-        # We have a cert but no key, this is an error.
-        raise SSLConfigurationError("`ssl_cert` is specified but `ssl_key` is missing")
-
-    if ssl_cert != "DEFAULT":
-        try:
-            ssl_cert = b64decode(ssl_cert)
-            ssl_key = b64decode(ssl_key)
-            ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
-        except binascii.Error:
-            raise SSLConfigurationError(
-                "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
-            )
-    return ssl_cert
-
-
 class InvalidRedirectHTTPS(Exception):
     """
     Raised when an invalid `redirect_https` configuration is provided.
@@ -293,11 +264,19 @@ class LandscapeServerCharm(CharmBase):
             charm=self,
             relation_name="landscape-ping",
             port=PORTS["pingserver"],
-            scheme="http",
         )
 
         self.framework.observe(self.ping.on.ready, self._on_ping_ready)
         self.framework.observe(self.ping.on.revoked, self._on_ping_revoked)
+
+        self.repository = IngressPerAppRequirer(
+            charm=self,
+            relation_name="landscape-repository",
+            port=PORTS["appserver"],
+        )
+
+        self.framework.observe(self.repository.on.ready, self._on_repository_ready)
+        self.framework.observe(self.repository.on.revoked, self._on_repository_revoked)
 
         self.appserver = IngressPerAppRequirer(
             charm=self,
@@ -341,7 +320,6 @@ class LandscapeServerCharm(CharmBase):
             relation_name="landscape-package-upload",
             port=PORTS["package-upload"],
             scheme="https",
-            strip_prefix=True,
             redirect_https=True,
         )
 
@@ -426,19 +404,6 @@ class LandscapeServerCharm(CharmBase):
                 "Invalid configuration. See `juju debug-log`."
             )
 
-    #     self.certificates = TLSCertificatesRequiresV4(
-    #         charm=self,
-    #         relationship_name="certificates",
-    #         certificate_requests=[self._get_certificate_request_attributes()],
-    #         mode=Mode.UNIT,
-    #     )
-    #     self.framework.observe(
-    #         self.certificates.on.certificate_available, self._configure
-    #     )
-
-    # def _get_certificate_request_attributes(self) -> CertificateRequestAttributes:
-    #     return CertificateRequestAttributes(common_name="example.com")
-
     def _set_ingress_ready(self, relation_name: str, ready: bool) -> None:
         self._stored.ready[relation_name] = ready
         self._update_ready_status()
@@ -459,6 +424,14 @@ class LandscapeServerCharm(CharmBase):
         logger.info("ping ingress revoked")
         self._set_ingress_ready("landscape-ping", False)
 
+    def _on_repository_ready(self, event: IngressPerAppReadyEvent):
+        self._set_ingress_ready("landscape-repository", True)
+        logger.info("repository ingress URL: %s", event.url)
+
+    def _on_repository_revoked(self, _: IngressPerAppRevokedEvent):
+        logger.info("repository ingress revoked")
+        self._set_ingress_ready("landscape-repository", False)
+
     def _on_message_server_ready(self, event: IngressPerAppReadyEvent):
         self._set_ingress_ready("landscape-message-server", True)
         logger.info("message-server ingress URL: %s", event.url)
@@ -475,7 +448,7 @@ class LandscapeServerCharm(CharmBase):
             logger.warning("appserver ingress ready without URL")
             return
 
-        url = event.url if event.url.endswith("/") else f"{event.url}/"
+        url = event.url.rstrip("/") + "/"
         logger.info("appserver ingress URL: %s", url)
 
         if not self.charm_config.root_url:
