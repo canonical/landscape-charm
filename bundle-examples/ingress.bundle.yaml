@@ -44,6 +44,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: /message-system,/attachment
+      hostname: haproxy.internal
   api:
     charm: ingress-configurator
     channel: latest/edge
@@ -142,12 +143,12 @@ relations:
 - [ping:haproxy-route, haproxy]
 - [landscape-server:landscape-repository, repository:ingress]
 - [repository:haproxy-route, haproxy]
-- [landscape-server:landscape-appserver, appserver:ingress]
-- [appserver:haproxy-route, haproxy]
 - [landscape-server:landscape-message-server, message-server:ingress]
 - [message-server:haproxy-route, haproxy]
 - [landscape-server:landscape-api, api:ingress]
 - [api:haproxy-route, haproxy]
 - [landscape-server:landscape-package-upload, package-upload:ingress]
 - [package-upload:haproxy-route, haproxy]
+- [landscape-server:landscape-appserver, appserver:ingress]
+- [appserver:haproxy-route, haproxy]
 - [haproxy:certificates, self-signed-certificates:certificates]

@@ -18,6 +18,7 @@ import os
 import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
+from urllib.parse import urlparse
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
@@ -448,15 +449,21 @@ class LandscapeServerCharm(CharmBase):
             logger.warning("appserver ingress ready without URL")
             return
 
-        url = event.url.rstrip("/") + "/"
-        logger.info("appserver ingress URL: %s", url)
+        hostname = urlparse(event.url).hostname
+        if not hostname:
+            logger.warning("appserver didn't send hostname...")
+            return
+
+        root_url = f"https://{hostname}/"
+
+        logger.info("root URL: %s", root_url)
 
         if not self.charm_config.root_url:
-            self._stored.default_root_url = url
+            self._stored.default_root_url = root_url
             update_service_conf({
-                "global": {"root-url": url},
-                "api": {"root-url": url},
-                "package-upload": {"root-url": url},
+                "global": {"root-url": root_url},
+                "api": {"root-url": root_url},
+                "package-upload": {"root-url": root_url},
             })
         self._set_ingress_ready("landscape-appserver", True)
         logger.info("appserver ingress URL: %s", event.url)
