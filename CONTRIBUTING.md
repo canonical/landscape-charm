@@ -61,11 +61,7 @@ make fmt
 
 ### Build the charm
 
-When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally. This command comes from `charmcraftcache`:
-
-```sh
-pipx install charmcraftcache
-```
+When developing the charm, you can use the [`ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally.
 
 > [!NOTE]
 > Make sure you add this repository (https://github.com/canonical/landscape-charm) as a remote to your fork, otherwise `ccc` will fail.
