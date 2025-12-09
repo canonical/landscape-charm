@@ -18,7 +18,6 @@ import os
 import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
-from urllib.parse import urlparse
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
@@ -35,11 +34,6 @@ from charms.operator_libs_linux.v1.systemd import (
     service_resume,
     service_running,
     SystemdError,
-)
-from charms.traefik_k8s.v2.ingress import (
-    IngressPerAppReadyEvent,
-    IngressPerAppRequirer,
-    IngressPerAppRevokedEvent,
 )
 from ops import main
 from ops.charm import (
@@ -63,13 +57,12 @@ from ops.model import (
 from pydantic import ValidationError
 import yaml
 
-from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration, RedirectHTTPS
+from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration
 from database import (
     DatabaseConnectionContext,
     fetch_postgres_relation_data,
     grant_role,
 )
-from haproxy import PORTS
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -178,30 +171,6 @@ def get_args_with_secrets_removed(args, arg_names):
     return args
 
 
-class InvalidRedirectHTTPS(Exception):
-    """
-    Raised when an invalid `redirect_https` configuration is provided.
-    """
-
-
-def _get_redirect_https(redirect_https: str) -> RedirectHTTPS:
-    """
-    Validate and return the `redirect_https` configuration parameter.
-
-    Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
-    """
-    try:
-        return RedirectHTTPS(redirect_https)
-    except ValueError:
-        raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
-
-
-class SSLConfigurationError(Exception):
-    """
-    Invalid SSL configuration.
-    """
-
-
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
 
@@ -261,84 +230,6 @@ class LandscapeServerCharm(CharmBase):
             self.on.outbound_amqp_relation_changed, self._amqp_relation_changed
         )
 
-        self.ping = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-ping",
-            port=PORTS["pingserver"],
-        )
-
-        self.framework.observe(self.ping.on.ready, self._on_ping_ready)
-        self.framework.observe(self.ping.on.revoked, self._on_ping_revoked)
-
-        self.repository = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-repository",
-            port=PORTS["appserver"],
-        )
-
-        self.framework.observe(self.repository.on.ready, self._on_repository_ready)
-        self.framework.observe(self.repository.on.revoked, self._on_repository_revoked)
-
-        self.appserver = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-appserver",
-            port=PORTS["appserver"],
-            scheme="https",
-            redirect_https=True,
-        )
-
-        self.framework.observe(self.appserver.on.ready, self._on_appserver_ready)
-        self.framework.observe(self.appserver.on.revoked, self._on_appserver_revoked)
-
-        self.message_server = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-message-server",
-            port=PORTS["message-server"],
-            scheme="https",
-            redirect_https=True,
-        )
-
-        self.framework.observe(
-            self.message_server.on.ready, self._on_message_server_ready
-        )
-        self.framework.observe(
-            self.message_server.on.revoked, self._on_message_server_revoked
-        )
-
-        self.api = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-api",
-            port=PORTS["api"],
-            scheme="https",
-            redirect_https=True,
-        )
-
-        self.framework.observe(self.api.on.ready, self._on_api_ready)
-        self.framework.observe(self.api.on.revoked, self._on_api_revoked)
-
-        self.package_upload = IngressPerAppRequirer(
-            charm=self,
-            relation_name="landscape-package-upload",
-            port=PORTS["package-upload"],
-            scheme="https",
-            redirect_https=True,
-        )
-
-        self.framework.observe(
-            self.package_upload.on.ready, self._on_package_upload_ready
-        )
-        self.framework.observe(
-            self.package_upload.on.revoked, self._on_package_upload_revoked
-        )
-        self.framework.observe(
-            self.on.nrpe_external_master_relation_joined,
-            self._nrpe_external_master_relation_joined,
-        )
-        self.framework.observe(
-            self.on.application_dashboard_relation_joined,
-            self._application_dashboard_relation_joined,
-        )
-
         # Leadership/peering
         self.framework.observe(self.on.leader_elected, self._leader_elected)
         self.framework.observe(
@@ -369,11 +260,6 @@ class LandscapeServerCharm(CharmBase):
                 "db": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
-                "landscape-ping": False,
-                "landscape-appserver": False,
-                "landscape-message-server": False,
-                "landscape-api": False,
-                "landscape-package-upload": False,
             }
         )
         self._stored.set_default(leader_ip="")
@@ -404,81 +290,6 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
-
-    def _set_ingress_ready(self, relation_name: str, ready: bool) -> None:
-        self._stored.ready[relation_name] = ready
-        self._update_ready_status()
-
-    def _on_api_ready(self, event: IngressPerAppReadyEvent):
-        self._set_ingress_ready("landscape-api", True)
-        logger.info("api ingress URL: %s", event.url)
-
-    def _on_api_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("api ingress revoked")
-        self._set_ingress_ready("landscape-api", False)
-
-    def _on_ping_ready(self, event: IngressPerAppReadyEvent):
-        self._set_ingress_ready("landscape-ping", True)
-        logger.info("ping ingress URL: %s", event.url)
-
-    def _on_ping_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("ping ingress revoked")
-        self._set_ingress_ready("landscape-ping", False)
-
-    def _on_repository_ready(self, event: IngressPerAppReadyEvent):
-        self._set_ingress_ready("landscape-repository", True)
-        logger.info("repository ingress URL: %s", event.url)
-
-    def _on_repository_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("repository ingress revoked")
-        self._set_ingress_ready("landscape-repository", False)
-
-    def _on_message_server_ready(self, event: IngressPerAppReadyEvent):
-        self._set_ingress_ready("landscape-message-server", True)
-        logger.info("message-server ingress URL: %s", event.url)
-
-    def _on_message_server_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("message-server ingress revoked")
-        self._set_ingress_ready("landscape-message-server", False)
-
-    def _on_appserver_ready(self, event: IngressPerAppReadyEvent):
-        logger.info(f"event: {event}")
-        self._set_ingress_ready("landscape-appserver", True)
-
-        if not event.url:
-            logger.warning("appserver ingress ready without URL")
-            return
-
-        hostname = urlparse(event.url).hostname
-        if not hostname:
-            logger.warning("appserver didn't send hostname...")
-            return
-
-        root_url = f"https://{hostname}/"
-
-        logger.info("root URL: %s", root_url)
-
-        if not self.charm_config.root_url:
-            self._stored.default_root_url = root_url
-            update_service_conf({
-                "global": {"root-url": root_url},
-                "api": {"root-url": root_url},
-                "package-upload": {"root-url": root_url},
-            })
-        self._set_ingress_ready("landscape-appserver", True)
-        logger.info("appserver ingress URL: %s", event.url)
-
-    def _on_appserver_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("appserver ingress revoked")
-        self._set_ingress_ready("landscape-appserver", False)
-
-    def _on_package_upload_ready(self, event: IngressPerAppReadyEvent):
-        self._set_ingress_ready("landscape-package-upload", True)
-        logger.info("package-upload ingress URL: %s", event.url)
-
-    def _on_package_upload_revoked(self, _: IngressPerAppRevokedEvent):
-        logger.info("package-upload ingress revoked")
-        self._set_ingress_ready("landscape-package-upload", False)
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
