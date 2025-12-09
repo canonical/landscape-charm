@@ -15,6 +15,7 @@ cosl = ">=1.0.0"
 coverage = "*"
 flake8 = "*"
 isort = "*"
+jq = "*"
 ops = {extras = ["testing"], version = "~=2.19"}
 pydantic = "<2"
 pytest = "*"

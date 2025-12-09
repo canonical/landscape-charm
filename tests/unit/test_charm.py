@@ -1002,114 +1002,6 @@ class TestCharm(unittest.TestCase):
             }
         )
 
-    def test_website_relation_joined_cert_not_DEFAULT(self):
-        mock_event = Mock()
-        mock_event.relation.data = {
-            self.harness.charm.unit: {
-                "private-address": "192.168.0.1",
-            },
-            mock_event.unit: {"public-address": "8.8.8.8"},
-        }
-        self.harness.disable_hooks()
-        self.harness.update_config(
-            {
-                "ssl_cert": "VEhJUyBJUyBBIENFUlQ=",
-                "ssl_key": "VEhJUyBJUyBBIEtFWQ==",
-            }
-        )
-
-        with patch.multiple("charm", update_service_conf=DEFAULT):
-            self.harness.charm._website_relation_joined(mock_event)
-
-        relation_data = mock_event.relation.data[self.harness.charm.unit]
-        status = self.harness.charm.unit.status
-        self.assertIn("services", relation_data)
-        self.assertIsInstance(status, WaitingStatus)
-        self.assertTrue(self.harness.charm._stored.ready["haproxy"])
-
-    def test_website_relation_joined(self):
-        mock_event = Mock()
-        mock_event.relation.data = {
-            self.harness.charm.unit: {"private-address": "192.168.0.1"},
-            mock_event.unit: {"public-address": "8.8.8.8"},
-        }
-
-        with patch.multiple("charm", update_service_conf=DEFAULT):
-            self.harness.charm._website_relation_joined(mock_event)
-
-        relation_data = mock_event.relation.data[self.harness.charm.unit]
-        status = self.harness.charm.unit.status
-        self.assertIn("services", relation_data)
-        self.assertIsInstance(status, WaitingStatus)
-        self.assertTrue(self.harness.charm._stored.ready["haproxy"])
-
-    def test_website_relation_changed_no_new_cert(self):
-        mock_event = Mock()
-        mock_event.relation.data = {mock_event.unit: {}}
-        initial_status = self.harness.charm.unit.status
-
-        with patch("charm.write_ssl_cert") as write_cert_mock:
-            self.harness.charm._website_relation_changed(mock_event)
-
-        self.assertEqual(initial_status, self.harness.charm.unit.status)
-        write_cert_mock.assert_not_called()
-
-    def test_website_relation_changed(self):
-        mock_event = Mock()
-        mock_event.relation.data = {
-            mock_event.unit: {"ssl_cert": "FANCYNEWCERT"},
-            self.harness.charm.unit: {
-                "private-address": "test",
-                "public-address": "test2",
-            },
-        }
-
-        old_open = open
-
-        def open_error_file(path, *args, **kwargs):
-            if "offline" in path:
-                return BytesIO(b"")
-
-            return old_open(path, *args, **kwargs)
-
-        with patch.multiple(
-            "charm",
-            write_ssl_cert=DEFAULT,
-            update_service_conf=DEFAULT,
-        ) as mocks:
-            write_cert_mock = mocks["write_ssl_cert"]
-
-            with patch("builtins.open") as open_mock:
-                open_mock.side_effect = open_error_file
-                self.harness.charm._website_relation_changed(mock_event)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, WaitingStatus)
-        write_cert_mock.assert_called_once_with("FANCYNEWCERT")
-
-    def test_website_relation_changed_strip_b_char(self):
-        self.harness.charm._update_haproxy_connection = Mock()
-        mock_event = Mock()
-        mock_event.relation.data = {
-            mock_event.unit: {"ssl_cert": "b'FANCYNEWCERT'"},
-            self.harness.charm.unit: {
-                "private-address": "test",
-                "public-address": "test2",
-            },
-        }
-
-        with patch.multiple(
-            "charm",
-            write_ssl_cert=DEFAULT,
-            update_service_conf=DEFAULT,
-        ) as mocks:
-            write_cert_mock = mocks["write_ssl_cert"]
-            self.harness.charm._website_relation_changed(mock_event)
-
-        status = self.harness.charm.unit.status
-        self.assertIsInstance(status, WaitingStatus)
-        write_cert_mock.assert_called_once_with("FANCYNEWCERT")
-
     @patch("charm.update_service_conf")
     def test_on_config_changed_no_smtp_change(self, _):
         self.harness.charm._update_ready_status = Mock()
@@ -1453,7 +1345,6 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_haproxy_connection = Mock()
         self.harness.hooks_disabled()
         self.harness.add_relation("nrpe-external-master", "nrpe")
-        self.harness.add_relation("website", "haproxy")
         relation_id = self.harness.add_relation("replicas", "landscape-server")
 
         with patch("charm.update_service_conf") as mock_update_conf:
@@ -1481,7 +1372,6 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._update_haproxy_connection = Mock()
         self.harness.hooks_disabled()
         self.harness.add_relation("nrpe-external-master", "nrpe")
-        self.harness.add_relation("website", "haproxy")
         relation_id = self.harness.add_relation("replicas", "landscape-server")
 
         with patch("charm.update_service_conf") as mock_update_conf:
