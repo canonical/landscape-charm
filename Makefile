@@ -6,8 +6,9 @@ CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_DESTROY ?= false
 SKIP_CLEAN ?= false
+MODEL_UUID := $$(juju show-model $(MODEL_NAME) --format=yaml | yq '.$(MODEL_NAME).model-uuid')
 
-.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
+.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix deploy-ingress destroy-ingress
 
 # Python testing and linting
 test:
@@ -69,3 +70,15 @@ terraform-fix: fmt-fix tflint-fix
 clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
 	-@if [ "$(SKIP_DESTROY)" != "true" ]; then juju destroy-model --no-prompt $(MODEL_NAME) --force --no-wait --destroy-storage; fi
+
+deploy-ingress: destroy-ingress
+	$(MAKE) BUNDLE_PATH=./bundle-examples/ingress/ingress.bundle.yaml deploy
+	cd bundle-examples/ingress && \
+	terraform init && \
+	terraform apply -auto-approve -var model_uuid=$(MODEL_UUID)
+
+destroy-ingress: clean
+	cd bundle-examples/ingress && \
+	rm -rf .terraform && \
+	rm -f terraform.tfstate* && \
+	rm -f .terraform.lock.hcl

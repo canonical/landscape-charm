@@ -11,75 +11,8 @@ applications:
     options:
       external-hostname: haproxy.internal
     constraints: arch=amd64
-  ping:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      allow-http: true
-      paths: /ping
-      hostname: haproxy.internal
-  repository:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      paths: /repository
-      hostname: haproxy.internal
-  message-server:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      paths: /message-system,/attachment
-      hostname: haproxy.internal
-  api:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      paths: /api
-      hostname: haproxy.internal
-  package-upload:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      paths: /upload
-      hostname: haproxy.internal
-  appserver:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 34
-    num_units: 1
-    to:
-    - "1"
-    constraints: arch=amd64
-    options:
-      paths: /,/hash-id-databases
-      hostname: haproxy.internal
   landscape-server:
-    charm: ../landscape-server_ubuntu@24.04-amd64.charm
+    charm: ../../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 1
     to:
     - "1"
@@ -139,10 +72,4 @@ relations:
 - [landscape-server:inbound-amqp, rabbitmq-server:amqp]
 - [landscape-server:outbound-amqp, rabbitmq-server:amqp]
 - [landscape-server:database, postgresql:database]
-- [ping:haproxy-route, haproxy]
-- [repository:haproxy-route, haproxy]
-- [message-server:haproxy-route, haproxy]
-- [api:haproxy-route, haproxy]
-- [package-upload:haproxy-route, haproxy]
-- [appserver:haproxy-route, haproxy]
 - [haproxy:certificates, self-signed-certificates:certificates]
