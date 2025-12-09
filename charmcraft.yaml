@@ -11,10 +11,6 @@ platforms:
 charm-libs:
   - lib: data_platform_libs.data_interfaces
     version: "0"
-  - lib: traefik_k8s.ingress
-    version: "2"
-  - lib: tls_certificates_interface.tls_certificates
-    version: "4"
 
 parts:
   charm:

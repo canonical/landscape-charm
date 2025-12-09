@@ -12,66 +12,43 @@ data "juju_application" "landscape" {
   name       = "landscape-server"
 }
 
-resource "terraform_data" "wait_for_machine" {
-  provisioner "local-exec" {
-    command = <<-EOT
-    juju wait-for machine -m $MODEL_NAME $MACHINE_ID --query='(status=="started")'
-    EOT
-
-    environment = {
-      MODEL_NAME = data.juju_model.landscape_charm_build.name
-      MACHINE_ID = var.machine
-    }
-  }
-}
-
-data "external" "landscape_machine" {
+data "external" "landscape_machine_info" {
   program = [
     "bash",
     "-c",
     <<-EOT
     MODEL_NAME=$(jq -r '.model_name')
+
     MACHINE=$(juju status -m "$MODEL_NAME" --format=json landscape-server/leader | jq -c '.machines')
-    printf '{"machines":%s}' "$MACHINE"
+
+    MACHINE_ID=$(printf '%s' "$MACHINE" | jq -r 'keys[0]')
+
+    IP=$(printf '%s' "$MACHINE" | jq -r --arg MID "$MACHINE_ID" '.[$MID]["ip-addresses"][0]')
+
+    printf '{"machine_id":"%s","ip":"%s"}' "$MACHINE_ID" "$IP"
     EOT
   ]
 
   query = {
     model_name = data.juju_model.landscape_charm_build.name
   }
+
+  depends_on = [ terraform_data.wait_for_landscape ]
 }
 
-
-data "external" "landscape_machine_id" {
-  program = [
-    "bash",
-    "-c",
-    <<-EOT
-    MACHINE_ID=$(jq -r '.machines | keys[0]')
-    printf '{"machine_id":"%s"}' "$MACHINE_ID"
+resource "terraform_data" "wait_for_landscape" {
+  provisioner "local-exec" {
+    command = <<-EOT
+    juju wait-for application landscape-server -m $MODEL_NAME --query='(status=="active")'
     EOT
-  ]
 
-  query = {
-    machines = data.external.landscape_machine.result.machines
+    environment = {
+      MODEL_NAME = data.juju_model.landscape_charm_build.name
+    }
   }
+
 }
 
-
-data "external" "landscape_machine_ip" {
-  program = [
-    "bash",
-    "-c",
-    <<-EOT
-    IP=$(jq -r '.machines | .[keys[0]]."ip-addresses"[0]')
-    printf '{"ip":"%s"}' "$IP"
-    EOT
-  ]
-
-  query = {
-    machines = data.external.landscape_machine.result.machines
-  }
-}
 
 
 locals {
@@ -82,7 +59,8 @@ locals {
   api_server_port     = 9080
   package_upload_port = 9100
 
-  landscape_server_ip = data.external.landscape_machine_ip.result.ip
+  landscape_server_ip  = data.external.landscape_machine_info.result.ip
+  landscape_machine_id = data.external.landscape_machine_info.result.machine_id
 
   appserver_backend_ports      = join(",", [for i in range(var.twisted_workers) : tostring(local.appserver_port + i)])
   pingserver_backend_ports     = join(",", [for i in range(var.twisted_workers) : tostring(local.pingserver_port + i)])
@@ -142,11 +120,16 @@ resource "juju_application" "appserver" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
+
+  constraints = "arch=amd64"
 
   config = local.appserver_config
 
-  machines = [var.machine]
+  machines = [local.landscape_machine_id]
+
+  depends_on = [data.external.landscape_machine_info]
 
 }
 
@@ -173,11 +156,14 @@ resource "juju_application" "pingserver" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
+
+  constraints = "arch=amd64"
 
   config = local.pingserver_config
 
-  machines = [var.machine]
+  machines = [local.landscape_machine_id]
 }
 
 resource "juju_integration" "pingserver_haproxy" {
@@ -201,11 +187,16 @@ resource "juju_application" "api" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
+
+  constraints = "arch=amd64"
 
   config = local.api_config
 
-  machines = [var.machine]
+  machines = [local.landscape_machine_id]
+
+  depends_on = [data.external.landscape_machine_info]
 }
 
 resource "juju_integration" "api_haproxy" {
@@ -229,11 +220,16 @@ resource "juju_application" "repository" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
 
   config = local.repository_config
 
-  machines = [var.machine]
+  constraints = "arch=amd64"
+
+  machines = [local.landscape_machine_id]
+
+  depends_on = [data.external.landscape_machine_info]
 }
 
 resource "juju_integration" "repository_haproxy" {
@@ -257,11 +253,17 @@ resource "juju_application" "message_server" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
+
+  constraints = "arch=amd64"
 
   config = local.message_server_config
 
-  machines = [var.machine]
+  machines = [local.landscape_machine_id]
+
+  depends_on = [data.external.landscape_machine_info]
+
 }
 
 resource "juju_integration" "message_server_haproxy" {
@@ -285,11 +287,16 @@ resource "juju_application" "package_upload" {
   charm {
     name    = "ingress-configurator"
     channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
 
   config = local.package_upload_config
 
-  machines = [var.machine]
+  constraints = "arch=amd64"
+
+  machines = [local.landscape_machine_id]
+
+  depends_on = [data.external.landscape_machine_info]
 }
 
 resource "juju_integration" "package_upload_haproxy" {

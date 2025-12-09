@@ -2,23 +2,11 @@
 Configuration for the Landscape charm.
 """
 
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, root_validator
 import yaml
-
-
-class RedirectHTTPS(str, Enum):
-    """
-    Keywords to specify which HTTP routes should be redirected to HTTPS.
-    """
-
-    ALL = "all"
-    NONE = "none"
-    DEFAULT = "default"
-
 
 # NOTE: the charm currently uses Pydantic 1.10
 
@@ -65,9 +53,6 @@ class LandscapeCharmConfiguration(BaseModel):
     min_install: bool
     prometheus_scrape_interval: str
     autoregistration: bool
-    redirect_https: RedirectHTTPS
-    enable_hostagent_messenger: bool
-    enable_ubuntu_installer_attach: bool
 
     @root_validator(skip_on_failure=True)
     def openid_oidc_exclusive(cls, values):

@@ -21,11 +21,9 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import (
     Context,
     Harness,
-    MaintenanceStatus,
     PeerRelation,
     Relation,
     State,
-    StoredState,
 )
 
 from charm import (
@@ -33,7 +31,6 @@ from charm import (
     get_modified_env_vars,
     HASH_ID_DATABASES,
     LANDSCAPE_PACKAGES,
-    LANDSCAPE_UBUNTU_INSTALLER_ATTACH,
     LandscapeServerCharm,
     LEADER_SERVICES,
     LSCTL,
@@ -42,9 +39,7 @@ from charm import (
     SCHEMA_SCRIPT,
     UPDATE_WSL_DISTRIBUTIONS_SCRIPT,
 )
-from haproxy import GRPC_SERVICE, UBUNTU_INSTALLER_ATTACH_SERVICE
 from settings_files import AMQP_USERNAME, VHOSTS
-from tests.unit.helpers import get_haproxy_services
 
 IS_CI = os.getenv("GITHUB_ACTIONS", None) is not None
 """
@@ -53,7 +48,6 @@ GitHub actions will set `GITHUB_ACTIONS` during runs.
 
 
 class TestGrafanaMachineAgentRelation(unittest.TestCase):
-
     def _get_cos_agent_relation_config(self, state: State) -> dict:
         """
         Extract the cos-agent relation configuration.
@@ -166,198 +160,6 @@ class TestOnConfigChanged:
         assert config["api"]["workers"] == str(workers)
         assert config["message-server"]["workers"] == str(workers)
         assert config["pingserver"]["workers"] == str(workers)
-
-    def test_hostagent_services_default(self):
-        relation = Relation("website")
-        state_in = State(relations=[relation], config={})
-        context = Context(LandscapeServerCharm)
-
-        state_out = context.run(context.on.config_changed(), state_in)
-
-        services = get_haproxy_services(state_out, relation)
-        service_names = (service["service_name"] for service in services)
-        assert GRPC_SERVICE.service_name not in service_names
-
-    def test_hostagent_services_when_disabled(self):
-        relation = Relation("website")
-        state_in = State(
-            relations=[relation], config={"enable_hostagent_messenger": False}
-        )
-        context = Context(LandscapeServerCharm)
-
-        state_out = context.run(context.on.config_changed(), state_in)
-
-        services = get_haproxy_services(state_out, relation)
-        service_names = (service["service_name"] for service in services)
-        assert GRPC_SERVICE.service_name not in service_names
-
-    def test_hostagent_services_when_enabled(self):
-        relation = Relation("website")
-        state_in = State(
-            relations=[relation], config={"enable_hostagent_messenger": True}
-        )
-        context = Context(LandscapeServerCharm)
-
-        state_out = context.run(context.on.config_changed(), state_in)
-
-        services = get_haproxy_services(state_out, relation)
-        service_names = (service["service_name"] for service in services)
-        assert GRPC_SERVICE.service_name in service_names
-
-
-class TestOnConfigChangedEnableUbuntuInstallerAttach:
-    """
-    Tests for `on.config_changed` events that relate to the
-    `enable_ubuntu_installer_attach` configuration option.
-    """
-
-    @patch("src.charm.apt.add_package")
-    def test_enable(self, add_package):
-        """
-        If the `enable_ubuntu_installer_attach` parameter moves from `False` to `True`,
-        then install the service and configure the HAProxy frontend.
-
-        Update the apt cache to ensure the package can be found.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation("website")
-        state_in = State(
-            config={"enable_ubuntu_installer_attach": True},
-            relations=[relation],
-            stored_states=[
-                StoredState(
-                    owner_path="LandscapeServerCharm",
-                    content={"enable_ubuntu_installer_attach": False},
-                )
-            ],
-        )
-
-        state_out = context.run(context.on.config_changed(), state_in)
-        services = get_haproxy_services(state_out, relation)
-        service_names = (service["service_name"] for service in services)
-
-        assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name in service_names
-        add_package.assert_called_once_with(
-            LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True
-        )
-
-    @patch("src.charm.apt.remove_package")
-    def test_disable(self, remove_package):
-        """
-        If the `enable_ubuntu_installer_attach` parameter moves from `True` to `False`,
-        then uninstall the service and remove the HAProxy frontend.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation("website")
-        state_in = State(
-            config={"enable_ubuntu_installer_attach": False},
-            relations=[relation],
-            stored_states=[
-                StoredState(
-                    owner_path="LandscapeServerCharm",
-                    content={"enable_ubuntu_installer_attach": True},
-                )
-            ],
-        )
-
-        state_out = context.run(context.on.config_changed(), state_in)
-        services = get_haproxy_services(state_out, relation)
-        service_names = (service["service_name"] for service in services)
-
-        assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name not in service_names
-        remove_package.assert_called_once_with(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-
-    @patch("src.charm.apt.add_package")
-    def test_idempotent_enable(self, add_package):
-        """
-        If the `enable_ubuntu_installer_attach` parameter was already set to `True`,
-        then do nothing. Do not attempt to install the package again.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation("website")
-        state_in = State(
-            config={"enable_ubuntu_installer_attach": True},
-            relations=[relation],
-            stored_states=[
-                StoredState(
-                    owner_path="LandscapeServerCharm",
-                    content={"enable_ubuntu_installer_attach": True},
-                )
-            ],
-        )
-
-        for _ in range(3):
-            state_out = context.run(context.on.config_changed(), state_in)
-            services = get_haproxy_services(state_out, relation)
-            service_names = (service["service_name"] for service in services)
-
-            assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name in service_names
-            add_package.assert_not_called()
-
-            state_in = state_out
-
-    @patch("src.charm.apt.remove_package")
-    def test_idempotent_disable(self, remove_package):
-        """
-        If the `enable_ubuntu_installer_attach` parameter was already set to `False`,
-        then do nothing. Do not attempt to remove the package again.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation("website")
-        state_in = State(
-            config={"enable_ubuntu_installer_attach": False},
-            relations=[relation],
-            stored_states=[
-                StoredState(
-                    owner_path="LandscapeServerCharm",
-                    content={"enable_ubuntu_installer_attach": False},
-                )
-            ],
-        )
-
-        for _ in range(3):
-            state_out = context.run(context.on.config_changed(), state_in)
-            services = get_haproxy_services(state_out, relation)
-            service_names = (service["service_name"] for service in services)
-
-            assert UBUNTU_INSTALLER_ATTACH_SERVICE.service_name not in service_names
-            remove_package.assert_not_called()
-
-            state_in = state_out
-
-    @patch("src.charm.apt.add_package")
-    def test_failed_to_enable(self, add_package):
-        """
-        If the `enable_ubuntu_installer_attach` is set to `True` but the service
-        cannot be installed, then the unit enters `MaintenanceStatus`. Do not store
-        `enable_ubuntu_installer_attach=True` to ensure the operation can be retried.
-        """
-        context = Context(LandscapeServerCharm)
-        relation = Relation("website")
-        state_in = State(
-            config={"enable_ubuntu_installer_attach": True},
-            relations=[relation],
-            stored_states=[
-                StoredState(
-                    owner_path="LandscapeServerCharm",
-                    content={"enable_ubuntu_installer_attach": False},
-                )
-            ],
-        )
-
-        add_package.side_effect = PackageError
-
-        state_out = context.run(context.on.config_changed(), state_in)
-        assert isinstance(state_out.unit_status, MaintenanceStatus)
-        assert (
-            "Failed to enable `landscape-ubuntu-installer-attach`"
-            in state_out.unit_status.message
-        )
-
-        enabled = state_out.get_stored_state(
-            "_stored", owner_path="LandscapeServerCharm"
-        ).content.get("enable_ubuntu_installer_attach")
-        assert not enabled
 
 
 class TestGetSecretToken:
@@ -1353,7 +1155,7 @@ class TestCharm(unittest.TestCase):
         mocks["service_reload"].assert_called_once_with("postfix")
         with open(mock_postfix_cf) as mock_postfix_cf_file:
             self.assertEqual(
-                "relayhost = smtp.example.com\n" "othersetting = nada\n",
+                "relayhost = smtp.example.com\nothersetting = nada\n",
                 mock_postfix_cf_file.read(),
             )
 
@@ -1375,7 +1177,7 @@ class TestCharm(unittest.TestCase):
         mocks["service_reload"].assert_called_once_with("postfix")
         with open(mock_postfix_cf) as mock_postfix_cf_file:
             self.assertEqual(
-                "relayhost = smtp.example.com\n" "othersetting = nada\n",
+                "relayhost = smtp.example.com\nothersetting = nada\n",
                 mock_postfix_cf_file.read(),
             )
         self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
@@ -1730,7 +1532,10 @@ class TestBootstrapAccount(unittest.TestCase):
     @patch("charm.update_service_conf")
     def test_bootstrap_account_doesnt_run_with_missing_configs(self, _):
         self.harness.update_config(
-            {"admin_email": "hello@ubuntu.com", "admin_name": "Hello Ubuntu"}
+            {
+                "admin_email": "hello@ubuntu.com",
+                "admin_name": "Hello Ubuntu",
+            }
         )
         self.assertIn("password required", self.log_mock.call_args.args[0])
         self.process_mock.assert_not_called()
