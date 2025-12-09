@@ -5,19 +5,19 @@ authors = ["Canonical"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.10"
 ops = ">=1.4.0"
-cryptography = "45.0.3"
+python = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
+black = "*"
+charmcraftcache = "*"
+cosl = ">=1.0.0"
 coverage = "*"
 flake8 = "*"
-pytest = "*"
-cosl = ">=1.0.0"
-pydantic = "<2"
-ops = {extras = ["testing"], version = "~=2.19"}
-black = "*"
 isort = "*"
+ops = {extras = ["testing"], version = "~=2.19"}
+pydantic = "<2"
+pytest = "*"
 ruff = "*"
 
 [tool.poetry.group.integration.dependencies]
