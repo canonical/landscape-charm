@@ -216,28 +216,9 @@ options:
     description: |
       Bypassed Landscape administrator registration approval for clients that
       register using the registration password.
-  redirect_https:
-    type: string
-    default: default
-    description: |
-      Redirect HTTP requests to HTTPS. May be one of {default|all|none}. The 'default'
-      option will redirect all HTTP traffic except for /ping and /repository. If an
-      invalid value is provided, the charm will remain in the maintenance status
-      until a valid value is given.
-  enable_hostagent_messenger:
-    type: boolean
-    default: false
-    description: |
-      Whether or not the hostagent services should run. If true, HAProxy frontends
-      will be created to route traffic to the landscape-hostagent-messenger services.
-      By default, those frontends will not be configured. Note that the hostagent
-      services still need to be configured in the Landscape Server settings for
-      the services to function.
   enable_ubuntu_installer_attach:
     type: boolean
     default: false
     description: |
-      Whether the `landscape-ubuntu-installer-attach` service should run. If true,
-      an HAProxy frontend will be created to route traffic to the Ubuntu installer
-      attach backend services. The backend services will be installed and uninstalled
-      automatically.
+      Whether the `landscape-ubuntu-installer-attach` service should run.
+      The service will be installed and uninstalled automatically.

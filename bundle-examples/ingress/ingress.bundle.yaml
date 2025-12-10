@@ -17,10 +17,10 @@ applications:
     to:
     - "1"
     options:
-      enable_hostagent_messenger: true
       enable_ubuntu_installer_attach: true
       landscape_ppa: ppa:landscape/self-hosted-25.10
       min_install: true
+      root_url: https://haproxy.internal/
     constraints: arch=amd64
   postgresql:
     charm: postgresql

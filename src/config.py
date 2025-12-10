@@ -52,6 +52,7 @@ class LandscapeCharmConfiguration(BaseModel):
     cookie_encryption_key: str | None = None
     min_install: bool
     prometheus_scrape_interval: str
+    enable_ubuntu_installer_attach: bool
     autoregistration: bool
 
     @root_validator(skip_on_failure=True)
