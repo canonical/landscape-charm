@@ -73,6 +73,7 @@ clean:
 
 deploy-ingress: destroy-ingress
 	$(MAKE) BUNDLE_PATH=./bundle-examples/ingress/ingress.bundle.yaml deploy
+	juju add-unit landscape-server -m $(MODEL_NAME) -n 2
 	cd bundle-examples/ingress && \
 	terraform init && \
 	terraform apply -auto-approve -var model_uuid=$(MODEL_UUID)

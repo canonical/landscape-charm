@@ -12,20 +12,31 @@ data "juju_application" "landscape" {
   name       = "landscape-server"
 }
 
-data "external" "landscape_machine_info" {
+data "external" "landscape_info" {
   program = [
     "bash",
     "-c",
     <<-EOT
-    MODEL_NAME=$(jq -r '.model_name')
+    MODEL=$(jq -r '.model_name')
+    STATUS=$(juju status -m "$MODEL" --format=json)
 
-    MACHINE=$(juju status -m "$MODEL_NAME" --format=json landscape-server/leader | jq -c '.machines')
+    printf '%s' "$STATUS" | jq -c '
+      .applications["landscape-server"].units
+      | to_entries
+      | {
+          leader_ip: (
+            map(select(.value.leader == true))[0].value["public-address"]
+          ),
+          machine_id: (
+            map(select(.value.leader == true))[0].value.machine
+          ),
+          all_unit_ips: (
+            map(.value["public-address"])
+            | join(",")
+          )
+        }
+    '
 
-    MACHINE_ID=$(printf '%s' "$MACHINE" | jq -r 'keys[0]')
-
-    IP=$(printf '%s' "$MACHINE" | jq -r --arg MID "$MACHINE_ID" '.[$MID]["ip-addresses"][0]')
-
-    printf '{"machine_id":"%s","ip":"%s"}' "$MACHINE_ID" "$IP"
     EOT
   ]
 
@@ -33,7 +44,7 @@ data "external" "landscape_machine_info" {
     model_name = data.juju_model.landscape_charm_build.name
   }
 
-  depends_on = [ terraform_data.wait_for_landscape ]
+  depends_on = [terraform_data.wait_for_landscape]
 }
 
 resource "terraform_data" "wait_for_landscape" {
@@ -59,8 +70,8 @@ locals {
   api_server_port     = 9080
   package_upload_port = 9100
 
-  landscape_server_ip  = data.external.landscape_machine_info.result.ip
-  landscape_machine_id = data.external.landscape_machine_info.result.machine_id
+  backend_addresses      = data.external.landscape_info.result.all_unit_ips
+  leader_backend_address = data.external.landscape_info.result.leader_ip
 
   appserver_backend_ports      = join(",", [for i in range(var.twisted_workers) : tostring(local.appserver_port + i)])
   pingserver_backend_ports     = join(",", [for i in range(var.twisted_workers) : tostring(local.pingserver_port + i)])
@@ -70,14 +81,14 @@ locals {
 
   appserver_config = {
     "backend-ports"     = local.appserver_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.backend_addresses
     "paths"             = "/,/hash-id-databases"
     "hostname"          = var.haproxy_hostname
   }
 
   pingserver_config = {
     "backend-ports"     = local.pingserver_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.backend_addresses
     "paths"             = "/ping"
     "hostname"          = var.haproxy_hostname
     "allow-http"        = "true"
@@ -85,28 +96,29 @@ locals {
 
   repository_config = {
     "backend-ports"     = local.appserver_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.backend_addresses
     "paths"             = "/repository"
     "hostname"          = var.haproxy_hostname
+    "allow-http"        = "true"
   }
 
   message_server_config = {
     "backend-ports"     = local.message_server_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.backend_addresses
     "paths"             = "/message-system,/attachment"
     "hostname"          = var.haproxy_hostname
   }
 
   api_config = {
     "backend-ports"     = local.api_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.backend_addresses
     "paths"             = "/api"
     "hostname"          = var.haproxy_hostname
   }
 
   package_upload_config = {
     "backend-ports"     = local.package_upload_backend_ports
-    "backend-addresses" = local.landscape_server_ip
+    "backend-addresses" = local.leader_backend_address
     "paths"             = "/upload"
     "hostname"          = var.haproxy_hostname
   }
@@ -127,9 +139,9 @@ resource "juju_application" "appserver" {
 
   config = local.appserver_config
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 
-  depends_on = [data.external.landscape_machine_info]
+  depends_on = [data.external.landscape_info]
 
 }
 
@@ -163,7 +175,7 @@ resource "juju_application" "pingserver" {
 
   config = local.pingserver_config
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 }
 
 resource "juju_integration" "pingserver_haproxy" {
@@ -194,9 +206,9 @@ resource "juju_application" "api" {
 
   config = local.api_config
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 
-  depends_on = [data.external.landscape_machine_info]
+  depends_on = [data.external.landscape_info]
 }
 
 resource "juju_integration" "api_haproxy" {
@@ -227,9 +239,9 @@ resource "juju_application" "repository" {
 
   constraints = "arch=amd64"
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 
-  depends_on = [data.external.landscape_machine_info]
+  depends_on = [data.external.landscape_info]
 }
 
 resource "juju_integration" "repository_haproxy" {
@@ -260,9 +272,9 @@ resource "juju_application" "message_server" {
 
   config = local.message_server_config
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 
-  depends_on = [data.external.landscape_machine_info]
+  depends_on = [data.external.landscape_info]
 
 }
 
@@ -294,9 +306,9 @@ resource "juju_application" "package_upload" {
 
   constraints = "arch=amd64"
 
-  machines = [local.landscape_machine_id]
+  machines = [data.external.landscape_info.result.machine_id]
 
-  depends_on = [data.external.landscape_machine_info]
+  depends_on = [data.external.landscape_info]
 }
 
 resource "juju_integration" "package_upload_haproxy" {
