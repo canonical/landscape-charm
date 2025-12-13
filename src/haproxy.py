@@ -29,7 +29,6 @@ class ACL(str, Enum):
 
 
 class HTTPBackend(str, Enum):
-
     API = "landscape-http-api"
     HASHIDS = "landscape-http-hashid-databases"
     MESSAGE = "landscape-http-message"
@@ -42,7 +41,6 @@ class HTTPBackend(str, Enum):
 
 
 class HTTPSBackend(str, Enum):
-
     API = "landscape-https-api"
     HASHIDS = "landscape-https-hashid-databases"
     MESSAGE = "landscape-https-message"
@@ -238,7 +236,6 @@ Additional configuration for a `server` stanza in an HAProxy configuration.
 
 def create_http_service(
     http_service: dict,
-    server_ip: str,
     unit_name: str,
     worker_counts: int,
     is_leader: bool,
@@ -260,7 +257,7 @@ def create_http_service(
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
+                "localhost",
                 service_ports[name] + i,
                 server_options,
             )
@@ -272,7 +269,7 @@ def create_http_service(
     package_upload_servers = [
         (
             f"landscape-package-upload-{unit_name}-0",
-            server_ip,
+            "localhost",
             service_ports["package-upload"],
             server_options,
         )

@@ -44,10 +44,10 @@ from ops.charm import (
     LeaderElectedEvent,
     LeaderSettingsChangedEvent,
     RelationChangedEvent,
-    RelationDepartedEvent,
     RelationJoinedEvent,
     UpdateStatusEvent,
 )
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from ops.framework import StoredState
 from ops.model import (
     ActiveStatus,
@@ -115,7 +115,8 @@ LANDSCAPE_PACKAGES = (
     "landscape-common",
 )
 LANDSCAPE_UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
-
+HAPROXY = "haproxy"
+HAPROXY_CONFIG = "haproxy.cfg.j2"
 DEFAULT_SERVICES = (
     "landscape-api",
     "landscape-appserver",
@@ -339,7 +340,6 @@ class LandscapeServerCharm(CharmBase):
                 "db": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
-                "haproxy": False,
             }
         )
         self._stored.set_default(leader_ip="")
@@ -443,9 +443,7 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(self.charm_config.smtp_relay_host)
 
-        # Update HAProxy relations, if they exist.
-        for relation in self.model.relations.get("website", []):
-            self._update_haproxy_connection(relation)
+        self._update_haproxy_connection()
 
         self._configure_openid()
         self._configure_oidc()
@@ -647,6 +645,13 @@ class LandscapeServerCharm(CharmBase):
             write_license_file(
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
+        try:
+            self.unit.status = MaintenanceStatus("Installing HAProxy...")
+            apt.add_package(HAPROXY, update_cache=True)
+
+        except PackageError as e:
+            logger.error("Failed to install %s", HAPROXY)
+            raise e
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1035,25 +1040,7 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
-    def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
-        self._update_haproxy_connection(event.relation)
-
-        # Update root_url, if not provided.
-        if not self.charm_config.root_url:
-            url = f'https://{event.relation.data[event.unit]["public-address"]}/'
-            self._stored.default_root_url = url
-            update_service_conf(
-                {
-                    "global": {"root-url": url},
-                    "api": {"root-url": url},
-                    "package-upload": {"root-url": url},
-                }
-            )
-
-        self._update_ready_status()
-
-    def _update_haproxy_connection(self, relation: Relation) -> None:
-        self._stored.ready["haproxy"] = False
+    def _update_haproxy_connection(self) -> None:
         self.unit.status = MaintenanceStatus("Setting up haproxy connection")
 
         # Check the SSL cert stuff first. No sense doing all the other
@@ -1068,12 +1055,10 @@ class LandscapeServerCharm(CharmBase):
             return
 
         error_files = get_haproxy_error_files(ERROR_FILES)
-        server_ip = relation.data[self.unit]["private-address"]
         unit_name = self.unit.name.replace("/", "-")
 
         http_service = create_http_service(
             http_service=asdict(HTTP_SERVICE),
-            server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
@@ -1086,7 +1071,6 @@ class LandscapeServerCharm(CharmBase):
         https_service = create_https_service(
             https_service=asdict(HTTPS_SERVICE),
             ssl_cert=ssl_cert,
-            server_ip=server_ip,
             unit_name=unit_name,
             worker_counts=self.charm_config.worker_counts,
             is_leader=self.unit.is_leader(),
@@ -1101,7 +1085,6 @@ class LandscapeServerCharm(CharmBase):
             grpc_service = create_grpc_service(
                 grpc_service=asdict(GRPC_SERVICE),
                 ssl_cert=ssl_cert,
-                server_ip=server_ip,
                 unit_name=unit_name,
                 error_files=error_files,
                 service_ports=PORTS,
@@ -1116,7 +1099,6 @@ class LandscapeServerCharm(CharmBase):
                         UBUNTU_INSTALLER_ATTACH_SERVICE
                     ),
                     ssl_cert=ssl_cert,
-                    server_ip=server_ip,
                     unit_name=unit_name,
                     error_files=error_files,
                     service_ports=PORTS,
@@ -1124,43 +1106,17 @@ class LandscapeServerCharm(CharmBase):
                 )
             )
 
-        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
-        self._stored.ready["haproxy"] = True
-        self.unit.status = WaitingStatus("")
+        template_context = {
+            "services": services,
+        }
 
-    def _website_relation_changed(self, event: RelationChangedEvent) -> None:
-        """
-        Writes the HAProxy-provided SSL certificate for
-        Landscape Server, if config has not provided one.
-        """
-        config_ssl_cert = self.charm_config.ssl_cert
-
-        if config_ssl_cert != "DEFAULT":
-            # No-op: cert has been provided by config.
-            return
-
-        if "ssl_cert" not in event.relation.data[event.unit]:
-            return
-
-        self.unit.status = MaintenanceStatus("Configuring HAProxy")
-        haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
-
-        # Sometimes the data has not been encoded properly in the HA charm
-        if haproxy_ssl_cert.startswith("b'"):
-            haproxy_ssl_cert = haproxy_ssl_cert.strip("b").strip("'")
-
-        if haproxy_ssl_cert != "DEFAULT":
-            # If DEFAULT, cert is being managed by a third party,
-            # possibly a subordinate charm.
-            write_ssl_cert(haproxy_ssl_cert)
-
-        self.unit.status = ActiveStatus("Unit is ready")
-        self._update_haproxy_connection(event.relation)
-
-        self._update_ready_status()
-
-    def _website_relation_departed(self, event: RelationDepartedEvent) -> None:
-        event.relation.data[self.unit].update({"services": ""})
+        try:
+            check_call(["systemctl", "restart", "haproxy"])
+        except CalledProcessError as e:
+            logger.error("Restarting HAProxy failed with return code %d", e.returncode)
+            self.unit.status = BlockedStatus("Failed to restart HAProxy")
+        else:
+            self.unit.status = WaitingStatus("")
 
     def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_nrpe_checks(event.relation)
