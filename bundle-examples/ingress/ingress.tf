@@ -7,11 +7,6 @@ data "juju_application" "haproxy" {
   name       = "haproxy"
 }
 
-data "juju_application" "landscape" {
-  model_uuid = var.model_uuid
-  name       = "landscape-server"
-}
-
 data "external" "landscape_info" {
   program = [
     "bash",
@@ -145,21 +140,6 @@ resource "juju_application" "appserver" {
 
 }
 
-resource "juju_integration" "appserver_haproxy" {
-  model_uuid = var.model_uuid
-
-  application {
-    name     = juju_application.appserver.name
-    endpoint = "haproxy-route"
-  }
-
-  application {
-    name = data.juju_application.haproxy.name
-  }
-
-  depends_on = [juju_integration.api_haproxy, juju_integration.pingserver_haproxy, juju_integration.message_server_haproxy, juju_integration.package_upload_haproxy, juju_integration.repository_haproxy]
-}
-
 resource "juju_application" "pingserver" {
   name = "pingserver"
 
@@ -183,11 +163,11 @@ resource "juju_integration" "pingserver_haproxy" {
 
   application {
     name     = juju_application.pingserver.name
-    endpoint = "haproxy-route"
   }
 
   application {
     name = data.juju_application.haproxy.name
+    endpoint = "ingress"
   }
 }
 
@@ -211,19 +191,6 @@ resource "juju_application" "api" {
   depends_on = [data.external.landscape_info]
 }
 
-resource "juju_integration" "api_haproxy" {
-  model_uuid = var.model_uuid
-
-  application {
-    name     = juju_application.api.name
-    endpoint = "haproxy-route"
-  }
-
-  application {
-    name = data.juju_application.haproxy.name
-  }
-}
-
 resource "juju_application" "repository" {
   name = "repository"
 
@@ -242,19 +209,6 @@ resource "juju_application" "repository" {
   machines = [data.external.landscape_info.result.machine_id]
 
   depends_on = [data.external.landscape_info]
-}
-
-resource "juju_integration" "repository_haproxy" {
-  model_uuid = var.model_uuid
-
-  application {
-    name     = juju_application.repository.name
-    endpoint = "haproxy-route"
-  }
-
-  application {
-    name = data.juju_application.haproxy.name
-  }
 }
 
 resource "juju_application" "message_server" {
@@ -278,19 +232,6 @@ resource "juju_application" "message_server" {
 
 }
 
-resource "juju_integration" "message_server_haproxy" {
-  model_uuid = var.model_uuid
-
-  application {
-    name     = juju_application.message_server.name
-    endpoint = "haproxy-route"
-  }
-
-  application {
-    name = data.juju_application.haproxy.name
-  }
-}
-
 resource "juju_application" "package_upload" {
   name = "package-upload"
 
@@ -311,15 +252,24 @@ resource "juju_application" "package_upload" {
   depends_on = [data.external.landscape_info]
 }
 
-resource "juju_integration" "package_upload_haproxy" {
+resource "juju_application" "prod_ingress" {
+  name = "prod-ingress"
+
   model_uuid = var.model_uuid
 
-  application {
-    name     = juju_application.package_upload.name
-    endpoint = "haproxy-route"
+  charm {
+    name    = "ingress-configurator"
+    channel = "latest/edge"
+    base    = "ubuntu@24.04"
   }
 
-  application {
-    name = data.juju_application.haproxy.name
+  constraints = "arch=amd64"
+
+  config = {
+    "backend-ports" = "80,443"
   }
+
+  machines = [data.external.landscape_info.result.machine_id]
+
+  depends_on = [data.external.landscape_info]
 }

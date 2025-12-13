@@ -25,6 +25,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequires,
 )
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.haproxy.v1.haproxy_route import HaproxyRouteRequirer
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from charms.operator_libs_linux.v0.passwd import group_exists, user_exists
@@ -273,6 +274,50 @@ class LandscapeServerCharm(CharmBase):
 
         self.root_gid = group_exists("root").gr_gid
 
+        self.appserver = HaproxyRouteRequirer(
+            self,
+            "appserver",
+            "appserver",
+            ports=[8080],
+            hostname="haproxy.internal",
+            paths=["/"],
+        )
+        self.pingserver = HaproxyRouteRequirer(
+            self,
+            "pingserver",
+            "pingserver",
+            ports=[8070],
+            hostname="haproxy.internal",
+            paths=["/ping"],
+        )
+        self.api = HaproxyRouteRequirer(
+            self, "api", "api", [9080], hostname="haproxy.internal", paths=["/api"]
+        )
+        self.message_server = HaproxyRouteRequirer(
+            self,
+            "message-server",
+            "message-server",
+            [8090],
+            hostname="haproxy.internal",
+            paths=["/message-system"],
+        )
+        self.package_upload = HaproxyRouteRequirer(
+            self,
+            "package-upload",
+            "package-upload",
+            [9100],
+            hostname="haproxy.internal",
+            paths=["/upload"],
+        )
+        self.repository = HaproxyRouteRequirer(
+            self,
+            "repository",
+            "repository",
+            [8080],
+            hostname="haproxy.internal",
+            paths=["/repository"],
+        )
+
         self._grafana_agent = COSAgentProvider(
             self,
             scrape_configs=self._generate_scrape_configs,
@@ -338,9 +383,9 @@ class LandscapeServerCharm(CharmBase):
             return
 
         # Update additional configuration
-        update_service_conf(
-            {"global": {"deployment-mode": self.charm_config.deployment_mode}}
-        )
+        update_service_conf({
+            "global": {"deployment-mode": self.charm_config.deployment_mode}
+        })
         configure_for_deployment_mode(self.charm_config.deployment_mode)
 
         if self.charm_config.additional_service_config:
@@ -416,9 +461,9 @@ class LandscapeServerCharm(CharmBase):
                 logger.info("Generating new random cookie encryption key")
                 cookie_encryption_key = generate_cookie_encryption_key()
                 peer_relation = self.model.get_relation("replicas")
-                peer_relation.data[self.app].update(
-                    {"cookie-encryption-key": cookie_encryption_key}
-                )
+                peer_relation.data[self.app].update({
+                    "cookie-encryption-key": cookie_encryption_key
+                })
 
         if (secret_token) and (secret_token != self._stored.secret_token):
             self._write_secret_token(secret_token)
@@ -528,15 +573,13 @@ class LandscapeServerCharm(CharmBase):
 
             if self.charm_config.min_install:
                 logger.info("Not installing hashids..")
-                check_call(
-                    [
-                        "apt",
-                        "install",
-                        LANDSCAPE_SERVER,
-                        "--no-install-recommends",
-                        "-y",
-                    ]
-                )
+                check_call([
+                    "apt",
+                    "install",
+                    LANDSCAPE_SERVER,
+                    "--no-install-recommends",
+                    "-y",
+                ])
             else:
                 # Explicitly ensure cache is up-to-date after adding the PPA.
                 apt.add_package(
@@ -607,23 +650,19 @@ class LandscapeServerCharm(CharmBase):
         deployment_mode = self.charm_config.deployment_mode
         is_standalone = deployment_mode == "standalone"
 
-        update_default_settings(
-            {
-                "RUN_ALL": "no",
-                "RUN_APISERVER": str(self.charm_config.worker_counts),
-                "RUN_ASYNC_FRONTEND": "yes",
-                "RUN_JOBHANDLER": "yes",
-                "RUN_APPSERVER": str(self.charm_config.worker_counts),
-                "RUN_MSGSERVER": str(self.charm_config.worker_counts),
-                "RUN_PINGSERVER": str(self.charm_config.worker_counts),
-                "RUN_CRON": "yes" if is_leader else "no",
-                "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
-                "RUN_PACKAGEUPLOADSERVER": (
-                    "yes" if is_leader and is_standalone else "no"
-                ),
-                "RUN_PPPA_PROXY": "no",
-            }
-        )
+        update_default_settings({
+            "RUN_ALL": "no",
+            "RUN_APISERVER": str(self.charm_config.worker_counts),
+            "RUN_ASYNC_FRONTEND": "yes",
+            "RUN_JOBHANDLER": "yes",
+            "RUN_APPSERVER": str(self.charm_config.worker_counts),
+            "RUN_MSGSERVER": str(self.charm_config.worker_counts),
+            "RUN_PINGSERVER": str(self.charm_config.worker_counts),
+            "RUN_CRON": "yes" if is_leader else "no",
+            "RUN_PACKAGESEARCH": "yes" if is_leader else "no",
+            "RUN_PACKAGEUPLOADSERVER": ("yes" if is_leader and is_standalone else "no"),
+            "RUN_PPPA_PROXY": "no",
+        })
 
         logger.info("Starting services")
 
@@ -907,12 +946,10 @@ class LandscapeServerCharm(CharmBase):
         self._stored.ready[relation_name] = False
         self.unit.status = MaintenanceStatus(f"Setting up {relation_name} connection")
 
-        event.relation.data[self.unit].update(
-            {
-                "username": AMQP_USERNAME,
-                "vhost": VHOSTS[relation_name],
-            }
-        )
+        event.relation.data[self.unit].update({
+            "username": AMQP_USERNAME,
+            "vhost": VHOSTS[relation_name],
+        })
 
     def _amqp_relation_changed(self, event):
         unit_data = event.relation.data[event.unit]
@@ -939,14 +976,12 @@ class LandscapeServerCharm(CharmBase):
             )
             return
 
-        update_service_conf(
-            {
-                "broker": {
-                    "host": hostname,
-                    "password": password,
-                }
+        update_service_conf({
+            "broker": {
+                "host": hostname,
+                "password": password,
             }
-        )
+        })
 
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
@@ -972,11 +1007,9 @@ class LandscapeServerCharm(CharmBase):
             },
         }
 
-        relation.data[self.unit].update(
-            {
-                "monitors": yaml.safe_dump(monitors),
-            }
-        )
+        relation.data[self.unit].update({
+            "monitors": yaml.safe_dump(monitors),
+        })
 
         if not os.path.exists(NRPE_D_DIR):
             logger.debug("NRPE directories not ready")
@@ -1036,15 +1069,13 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         else:
             icon_data = None
 
-        event.relation.data[self.app].update(
-            {
-                "name": "Landscape",
-                "url": root_url,
-                "subtitle": subtitle,
-                "group": group,
-                "icon": icon_data,
-            }
-        )
+        event.relation.data[self.app].update({
+            "name": "Landscape",
+            "url": root_url,
+            "subtitle": subtitle,
+            "group": group,
+            "icon": icon_data,
+        })
 
     def _leader_elected(self, event: LeaderElectedEvent) -> None:
         # Just because we received this event does not mean we are
@@ -1057,13 +1088,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             ip = str(self.model.get_binding(peer_relation).network.bind_address)
             peer_relation.data[self.app].update({"leader-ip": ip})
 
-            update_service_conf(
-                {
-                    "package-search": {
-                        "host": "localhost",
-                    },
-                }
-            )
+            update_service_conf({
+                "package-search": {
+                    "host": "localhost",
+                },
+            })
 
         self._leader_changed()
 
@@ -1080,13 +1109,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             leader_ip = peer_relation.data[self.app].get("leader-ip")
 
             if leader_ip:
-                update_service_conf(
-                    {
-                        "package-search": {
-                            "host": leader_ip,
-                        },
-                    }
-                )
+                update_service_conf({
+                    "package-search": {
+                        "host": leader_ip,
+                    },
+                })
 
         self._leader_changed()
 
@@ -1135,13 +1162,11 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
 
         if not self.unit.is_leader():
             if leader_ip_value:
-                update_service_conf(
-                    {
-                        "package-search": {
-                            "host": leader_ip_value,
-                        },
-                    }
-                )
+                update_service_conf({
+                    "package-search": {
+                        "host": leader_ip_value,
+                    },
+                })
 
         self._leader_changed()
 
@@ -1211,14 +1236,12 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             return
 
         self.unit.status = MaintenanceStatus("Configuring OpenID")
-        update_service_conf(
-            {
-                "landscape": {
-                    "openid-provider-url": self.charm_config.openid_provider_url,
-                    "openid-logout-url": self.charm_config.openid_logout_url,
-                },
-            }
-        )
+        update_service_conf({
+            "landscape": {
+                "openid-provider-url": self.charm_config.openid_provider_url,
+                "openid-logout-url": self.charm_config.openid_logout_url,
+            },
+        })
         self.unit.status = WaitingStatus("Waiting on relations")
 
     def _bootstrap_account(self):

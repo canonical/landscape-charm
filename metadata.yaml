@@ -26,23 +26,23 @@ requires:
     interface: rabbitmq
   application-dashboard:
     interface: register-application
-  landscape-ping:
-    interface: ingress
+  pingserver:
+    interface: haproxy-route
     limit: 1
-  landscape-repository:
-    interface: ingress
+  repository:
+    interface: haproxy-route
     limit: 1
-  landscape-message-server:
-    interface: ingress
+  message-server:
+    interface: haproxy-route
     limit: 1
-  landscape-api:
-    interface: ingress
+  api:
+    interface: haproxy-route
     limit: 1
-  landscape-package-upload:
-    interface: ingress
+  package-upload:
+    interface: haproxy-route
     limit: 1
-  landscape-appserver:
-    interface: ingress
+  appserver:
+    interface: haproxy-route
     limit: 1
 
 provides:

@@ -5,7 +5,6 @@
 # https://documentation.ubuntu.com/ops/latest/explanation/testing/
 
 from grp import struct_group
-from io import BytesIO
 import json
 import os
 from pwd import struct_passwd
