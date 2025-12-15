@@ -6,9 +6,47 @@ from base64 import b64encode
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 import os
+from pathlib import Path
+import pwd
+import subprocess
+from subprocess import CalledProcessError
 from typing import Iterable, Mapping
 
 from config import RedirectHTTPS
+from charms.operator_libs_linux.v1 import systemd
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+# Based on: https://github.com/canonical/haproxy-operator/blob/main/haproxy-operator/src/haproxy.py
+HAPROXY_APT_PACKAGE_NAME = "haproxy"
+HAPROXY_CONFIG_DIR = Path("/etc/haproxy")
+HAPROXY_RENDERED_CONFIG_PATH = Path(HAPROXY_CONFIG_DIR / "haproxy.cfg")
+HAPROXY_USER = "haproxy"
+# Configuration used to parameterize Diffie-Hellman key exchange.
+# The base64 content of the file is hard-coded here to avoid having to fetch
+# the file from https://ssl-config.mozilla.org/ffdhe2048.txt as suggested by Mozilla.
+# As the size is 2048, it's safe to use the standard FFDHE parameters.
+# They are more compatible, and there aren't concerns about their security.
+HAPROXY_DH_PARAM = (
+    "-----BEGIN DH PARAMETERS-----\n"
+    "MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\n"
+    "+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\n"
+    "87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\n"
+    "YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\n"
+    "7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\n"
+    "ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n"
+    "-----END DH PARAMETERS-----"
+)
+HAPROXY_DHCONFIG = Path(HAPROXY_CONFIG_DIR / "ffdhe2048.txt")
+HAPROXY_SERVICE = "haproxy"
+HAPROXY_EXECUTABLE = "/usr/sbin/haproxy"
+HAPROXY_TMPL = Path("haproxy.cfg.j2")
+
+
+class HAProxyError(Exception):
+    """
+    Errors raised when interacting with the HAProxy
+    systemd service.
+    """
 
 
 class ACL(str, Enum):
@@ -479,3 +517,46 @@ def get_haproxy_error_files(error_files_config: dict) -> list[HAProxyErrorFile]:
             )
 
     return error_files
+
+
+def render_haproxy_config(
+    services: list[dict],
+) -> None:
+    env = Environment(
+        loader=FileSystemLoader("templates"),
+        autoescape=select_autoescape(),
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template(HAPROXY_TMPL.as_posix())
+    rendered = template.render(
+        {
+            "services": services,
+        },
+    )
+
+    validate_haproxy_config(rendered)
+
+    HAPROXY_RENDERED_CONFIG_PATH.write_text(rendered, encoding="utf-8")
+    os.chmod(HAPROXY_TMPL, 0o644)
+
+    u = pwd.getpwnam(HAPROXY_USER)
+    os.chown(HAPROXY_TMPL, uid=u.pw_uid, gid=u.pw_gid)
+
+
+def restart_haproxy() -> None:
+    try:
+        systemd.service_reload(HAPROXY_SERVICE)
+    except systemd.SystemdError as e:
+        raise HAProxyError(f"Failed reloading the haproxy service: {str(e)}")
+
+
+def validate_haproxy_config(config: str) -> None:
+    try:
+        subprocess.run(
+            [HAPROXY_EXECUTABLE, "-c", "-f", config], capture_output=True, check=True
+        )
+
+    except CalledProcessError as e:
+        raise HAProxyError(f"Failed to validate HAProxy config: {str(e)}")

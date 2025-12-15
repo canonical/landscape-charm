@@ -20,7 +20,73 @@ defaults
     timeout client 120000
     timeout server 120000
 
-{% for service in services %}
-{{ service }}
+{% block proxy_configuration %}
+{% if backends %}
+frontend haproxy
+    mode http
+    bind [::]:80 v4v6
+    bind [::]:443 v4v6 ssl crt {{ haproxy_crt_dir }} alpn h2,http/1.1
+    # Redirect HTTP to HTTPS
+    http-request redirect scheme https unless { ssl_fc } {% for acl in acls_for_allow_http %} || {{ acl }}{% endfor %}
+{% endif %}
+
+{% for backend in backends %}
+{% if backend.path_acl_required %}
+    acl acl_path_{{ backend.backend_name }} path_beg -i {% for path in backend.application_data.paths %}{{ path }} {% endfor +%}
+{% endif %}
+    acl acl_host_{{ backend.backend_name }} req.hdr(Host) -m str {% for hostname in backend.hostname_acls%}{{hostname}} {% endfor +%}
+{% if backend.deny_path_acl_required %}
+    acl acl_deny_path_{{ backend.backend_name }} path_beg -i {% for path in backend.application_data.deny_paths %}{{ path }} {% endfor +%}
+{% endif %}
+    use_backend {{ backend.backend_name }} if {% if backend.path_acl_required %}acl_path_{{ backend.backend_name }}{% endif %} acl_host_{{ backend.backend_name }} {% if backend.deny_path_acl_required %}!acl_deny_path_{{ backend.backend_name }}{% endif +%}
 {% endfor %}
+
+    default_backend default
+
+{% for backend in backends %}
+backend {{ backend.backend_name }}
+    balance {{ backend.load_balancing_configuration }}
+{% if backend.consistent_hashing %}
+    hash-type consistent
+{% endif %}
+    timeout server {{ backend.application_data.timeout.server }}s
+    timeout connect {{ backend.application_data.timeout.connect }}s
+    timeout queue {{ backend.application_data.timeout.queue }}s
+{% if backend.application_data.retry %}
+    retries {{ backend.application_data.retry.count }}
+{% if backend.application_data.retry.redispatch %}
+    option redispatch
+{% endif %}
+{% endif %}
+
+{% if backend.application_data.http_server_close %}
+    option http-server-close
+{% endif %}
+
+    option httpchk {% if backend.application_data.check.path %}GET {{ backend.application_data.check.path }}{% endif +%}
+{% if backend.application_data.check.port %}
+    http-check connect port {{ backend.application_data.check.port }}
+{% endif %}
+    http-check send hdr Host {{ backend.hostname_acls[0] }}
+{% if backend.application_data.rate_limit %}
+    http-request track-sc0 src table  haproxy_peers/{{ backend.backend_name }}_rate_limit
+    http-request {{ backend.application_data.rate_limit.policy.value }} if { sc_http_req_rate(0,haproxy_peers/{{ backend.backend_name }}_rate_limit) gt {{ backend.application_data.rate_limit.connections_per_minute }} }
+{% endif %}
+{% if backend.application_data.bandwidth_limit.download %}
+
+    filter bwlim-out download default-limit {{ backend.application_data.bandwidth_limit.download }} default-period 1s
+    http-response set-bandwidth-limit download
+{% endif %}
+{% if backend.application_data.bandwidth_limit.upload %}
+    filter bwlim-in upload default-limit {{ backend.application_data.bandwidth_limit.upload }} default-period 1s
+    http-request set-bandwidth-limit upload
+{% endif %}
+{% for rewrite_configuration in backend.rewrite_configurations %}
+    http-request {{ rewrite_configuration }}
+{% endfor %}
+{% for server in backend.servers %}
+    server {{ server.server_name }} {{ server.address }}:{{ server.port }}{% if server.check %} check inter {{ server.check.interval }}s rise {{ server.check.rise }} fall {{ server.check.fall }}{% endif +%}{% if server.protocol == "https" %} ssl ca-file {{ haproxy_cas_file }} alpn h2,http/1.1{% endif +%}
+{% endfor %}
+{% endfor %}
+
 {% endblock %}

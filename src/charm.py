@@ -47,7 +47,6 @@ from ops.charm import (
     RelationJoinedEvent,
     UpdateStatusEvent,
 )
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 from ops.framework import StoredState
 from ops.model import (
     ActiveStatus,
@@ -66,6 +65,7 @@ from database import (
     grant_role,
 )
 from haproxy import (
+    HAPROXY_APT_PACKAGE_NAME,
     create_grpc_service,
     create_http_service,
     create_https_service,
@@ -78,6 +78,8 @@ from haproxy import (
     PORTS,
     SERVER_OPTIONS,
     UBUNTU_INSTALLER_ATTACH_SERVICE,
+    render_haproxy_config,
+    restart_haproxy,
 )
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
@@ -115,8 +117,7 @@ LANDSCAPE_PACKAGES = (
     "landscape-common",
 )
 LANDSCAPE_UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
-HAPROXY = "haproxy"
-HAPROXY_CONFIG = "haproxy.cfg.j2"
+
 DEFAULT_SERVICES = (
     "landscape-api",
     "landscape-appserver",
@@ -647,10 +648,10 @@ class LandscapeServerCharm(CharmBase):
             )
         try:
             self.unit.status = MaintenanceStatus("Installing HAProxy...")
-            apt.add_package(HAPROXY, update_cache=True)
+            apt.add_package(HAPROXY_APT_PACKAGE_NAME, update_cache=True)
 
         except PackageError as e:
-            logger.error("Failed to install %s", HAPROXY)
+            logger.error("Failed to install %s", HAPROXY_APT_PACKAGE_NAME)
             raise e
 
         self.unit.status = ActiveStatus("Unit is ready")
@@ -1106,14 +1107,16 @@ class LandscapeServerCharm(CharmBase):
                 )
             )
 
-        template_context = {
-            "services": services,
-        }
+        try:
+            render_haproxy_config(services)
+        except CalledProcessError as e:
+            logger.error("Templating HAProxy config failed with output: %s", e.output)
+            self.unit.status = BlockedStatus("Failed to update HAProxy config")
 
         try:
-            check_call(["systemctl", "restart", "haproxy"])
-        except CalledProcessError as e:
-            logger.error("Restarting HAProxy failed with return code %d", e.returncode)
+            restart_haproxy()
+        except SystemdError as e:
+            logger.error("Failed to restart HAProxy: %s", str(e))
             self.unit.status = BlockedStatus("Failed to restart HAProxy")
         else:
             self.unit.status = WaitingStatus("")
