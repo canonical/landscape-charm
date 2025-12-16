@@ -190,9 +190,7 @@ backend landscape-https-api
 backend landscape-http-package-upload
     mode http
     timeout server 300000
-    {% for i in range(worker_counts) %}
-    server package-upload-leader-{{ i }} {{ leader_address }}:{{ ports['package-upload'] + i }} {{ default_opts }}
-    {% endfor %}
+    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_opts }}
 
 backend landscape-http-hashid-databases
     mode http
@@ -204,9 +202,7 @@ backend landscape-http-hashid-databases
 backend landscape-https-package-upload
     mode http
     timeout server 300000
-    {% for i in range(worker_counts) %}
-    server package-upload-leader-{{ i }} {{ leader_address }}:{{ ports['package-upload'] + i }} {{ default_opts }}
-    {% endfor %}
+    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_opts }}
 
 backend landscape-https-hashid-databases
     mode http
