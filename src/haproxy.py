@@ -12,6 +12,8 @@ import subprocess
 from subprocess import CalledProcessError
 from typing import Iterable, Mapping
 
+from pydantic import IPvAnyAddress
+
 from config import RedirectHTTPS
 from charms.operator_libs_linux.v1 import systemd
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -19,6 +21,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 # Based on: https://github.com/canonical/haproxy-operator/blob/main/haproxy-operator/src/haproxy.py
 HAPROXY_APT_PACKAGE_NAME = "haproxy"
 HAPROXY_CONFIG_DIR = Path("/etc/haproxy")
+HAPROXY_CERTS_DIR = Path("/var/lib/haproxy/certs")
+HAPROXY_CAS_DIR = Path("/var/lib/haproxy/cas")
+HAPROXY_CAS_FILE = Path(HAPROXY_CAS_DIR / "cas.pem")
 HAPROXY_RENDERED_CONFIG_PATH = Path(HAPROXY_CONFIG_DIR / "haproxy.cfg")
 HAPROXY_USER = "haproxy"
 # Configuration used to parameterize Diffie-Hellman key exchange.
@@ -520,7 +525,10 @@ def get_haproxy_error_files(error_files_config: dict) -> list[HAProxyErrorFile]:
 
 
 def render_haproxy_config(
-    services: list[dict],
+    peer_ips: list[IPvAnyAddress],
+    leader_ip: list[IPvAnyAddress],
+    worker_count: int,
+    https_redirect: RedirectHTTPS,
 ) -> None:
     env = Environment(
         loader=FileSystemLoader("templates"),
@@ -532,8 +540,21 @@ def render_haproxy_config(
     template = env.get_template(HAPROXY_TMPL.as_posix())
     rendered = template.render(
         {
-            "services": services,
-        },
+            "peer_ips": peer_ips,
+            "leader_address": leader_ip,
+            "worker_counts": worker_count,
+            "ports": PORTS,
+            "ssl_cert_path": "/etc/haproxy/haproxy.pem",
+            "https_redirect": https_redirect.value,
+            "error_files_root": "/opt/canonical/landscape/canonical/landscape/offline",
+            "error_files": {
+                "403": "unauthorized-haproxy.html",
+                "500": "exception-haproxy.html",
+                "502": "unplanned-offline-haproxy.html",
+                "503": "unplanned-offline-haproxy.html",
+                "504": "timeout-haproxy.html",
+            },
+        }
     )
 
     validate_haproxy_config(rendered)
