@@ -23,14 +23,24 @@ requires:
     interface: rabbitmq
   application-dashboard:
     interface: register-application
+  http-ingress:
+    interface: ingress
+    limit: 1
+  https-ingress:
+    interface: ingress
+    limit: 1
+  hostagent-messenger-ingress:
+    interface: ingress
+    limit: 1
+  ubuntu-installer-attach-ingress:
+    interface: ingress
+    limit: 1
 
 provides:
   data:
     interface: block-storage
     scope: container
     optional: true
-  website:
-    interface: http
   hosted:
     interface: landscape-hosted
     scope: container

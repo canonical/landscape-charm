@@ -93,11 +93,14 @@ frontend landscape-https
 
     default_backend landscape-https-appserver
 
+{% if enable_hostagent_messenger %}
 frontend landscape-grpc
     mode http
     bind [::]:6554 v4v6 proto h2 ssl crt {{ ssl_cert_path }}
     default_backend landscape-grpc-backend
+{% endif %}
 
+{% if enable_ubuntu_installer_attach %}
 frontend landscape-ubuntu-installer-attach
     mode http
     bind [::]:50051 v4v6 proto h2 ssl crt {{ ssl_cert_path }}
@@ -108,6 +111,7 @@ frontend landscape-ubuntu-installer-attach
     http-request set-header X-FQDN %[var(req.full_fqdn)]
 
     default_backend landscape-ubuntu-installer-attach-backend
+{% endif %}
 
 {% set default_opts = "check inter 5000 rise 2 fall 5 maxconn 50" %}
 
@@ -211,14 +215,18 @@ backend landscape-https-hashid-databases
     server appserver-leader-{{ i }} {{ leader_address }}:{{ ports['appserver'] + i }} {{ default_opts }}
     {% endfor %}
 
+{% if enable_hostagent_messenger %}
 backend landscape-grpc-backend
     mode http
     {% for ip in peer_ips %}
     server hostagent-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['hostagent-messenger'] }} proto h2 {{ default_opts }}
     {% endfor %}
+{% endif %}
 
+{% if enable_ubuntu_installer_attach %}
 backend landscape-ubuntu-installer-attach-backend
     mode http
     {% for ip in peer_ips %}
     server ubuntu-installer-attach-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['ubuntu-installer-attach'] }} proto h2 {{ default_opts }}
     {% endfor %}
+{% endif %}
