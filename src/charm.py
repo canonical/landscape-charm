@@ -717,6 +717,7 @@ class LandscapeServerCharm(CharmBase):
             write_license_file(
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
+
         try:
             self.unit.status = MaintenanceStatus("Installing HAProxy...")
             apt.add_package(HAPROXY_APT_PACKAGE_NAME, update_cache=True)
@@ -738,8 +739,7 @@ class LandscapeServerCharm(CharmBase):
                         shutil.copy2(src_file, dst_file)
 
             except OSError as e:
-                logger.warning("Failed to copy error files to HAProxy: %s", e)
-                raise HAProxyError
+                raise HAProxyError("Failed to copy error files to HAProxy: %s", e)
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1145,7 +1145,7 @@ class LandscapeServerCharm(CharmBase):
 
         subject = x509.Name(
             [
-                x509.NameAttribute(NameOID.COUNTRY_NAME, "UK"),
+                x509.NameAttribute(NameOID.COUNTRY_NAME, "GB"),
                 x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "London"),
                 x509.NameAttribute(NameOID.LOCALITY_NAME, "London"),
                 x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Canonical"),
@@ -1228,6 +1228,18 @@ class LandscapeServerCharm(CharmBase):
             return
 
         self.unit.status = MaintenanceStatus("Updating HAProxy configuration...")
+
+        # Update root_url, if not provided.
+        if not self.charm_config.root_url:
+            url = f"https://{peer_ips.leader_ip}/"
+            self._stored.default_root_url = url
+            update_service_conf(
+                {
+                    "global": {"root-url": url},
+                    "api": {"root-url": url},
+                    "package-upload": {"root-url": url},
+                }
+            )
 
         try:
             ssl_cert: bytes = self._get_ssl_cert(
