@@ -14,8 +14,11 @@ develop a new k8s charm using the Operator Framework:
 
 from base64 import b64decode, binascii
 from dataclasses import asdict
+import datetime
 from functools import cached_property
+import ipaddress
 import os
+import shutil
 import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
@@ -36,6 +39,14 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppReadyEvent,
+    IngressPerAppRequirer,
+)
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 from ops import main
 from ops.charm import (
     ActionEvent,
@@ -52,10 +63,10 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     WaitingStatus,
 )
-from ops.model import ModelError
 from pydantic import BaseModel, IPvAnyAddress, ValidationError
 import yaml
 
@@ -68,8 +79,8 @@ from database import (
 from haproxy import (
     ERROR_FILES,
     HAPROXY_APT_PACKAGE_NAME,
-    PORTS,
     HAProxyError,
+    PORTS,
     render_haproxy_config,
     restart_haproxy,
     write_ssl_cert,
@@ -89,18 +100,6 @@ from settings_files import (
     update_service_conf,
     VHOSTS,
     write_license_file,
-)
-import datetime
-import ipaddress
-from cryptography import x509
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-import shutil
-from charms.traefik_k8s.v2.ingress import (
-    IngressPerAppRequirer,
-    IngressPerAppReadyEvent,
 )
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"

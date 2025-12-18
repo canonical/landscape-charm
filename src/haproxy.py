@@ -4,11 +4,11 @@ import pwd
 import subprocess
 from subprocess import CalledProcessError
 
+from charms.operator_libs_linux.v1 import systemd
+from jinja2 import Template
 from pydantic import IPvAnyAddress
 
 from config import RedirectHTTPS
-from charms.operator_libs_linux.v1 import systemd
-from jinja2 import Template
 
 # Based on: https://github.com/canonical/haproxy-operator/blob/main/haproxy-operator/src/haproxy.py
 
