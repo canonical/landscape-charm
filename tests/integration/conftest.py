@@ -48,7 +48,6 @@ def _host_juju():
     juju = jubilant.Juju()
     expected_applications = {
         "landscape-server",
-        "haproxy",
         "postgresql",
         "rabbitmq-server",
     }

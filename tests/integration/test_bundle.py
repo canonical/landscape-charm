@@ -1,9 +1,8 @@
 """
 Integration tests for the Landscape scalable bundle, using Postgres, RabbitMQ,
-and HAProxy.
+and Landscape Server.
 
-NOTE: These tests assume an IPv4 public address for HAProxy. Our HAProxy relation
-does not currently bind to IPv6.
+NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import jubilant
@@ -20,7 +19,12 @@ def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
     This includes the older `<host>/metrics` endpoint, and any newer per-service
     endpoints that end with `/metrics`, like `<host>/api/metrics`.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .public_address
+    )
 
     assert requests.get(f"http://{host}/metrics").status_code == 403
     assert requests.get(f"https://{host}/metrics", verify=False).status_code == 403
@@ -37,7 +41,12 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
     """
     If `redirect_https=all`, then redirect all HTTP requests on all routes to HTTPS.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .public_address
+    )
     juju.config("landscape-server", values={"redirect_https": "all"})
     juju.wait(jubilant.all_active, timeout=30.0)
 
@@ -65,7 +74,12 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
     If `redirect_https=none`, then do not redirect any HTTP requests on any routes
     to HTTPS.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .public_address
+    )
     juju.config("landscape-server", values={"redirect_https": "none"})
     juju.wait(jubilant.all_active, timeout=30.0)
 
@@ -93,7 +107,12 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
     If `redirect_https=default`, then redirect all HTTP requests except for those to the
     /repository and /ping routes to HTTPS.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .public_address
+    )
     juju.config("landscape-server", values={"redirect_https": "default"})
     juju.wait(jubilant.all_active, timeout=30.0)
 
@@ -128,7 +147,12 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
     """
     Services are responding over HTTPS.
     """
-    host = juju.status().apps["haproxy"].units["haproxy/0"].public_address
+    host = (
+        juju.status()
+        .apps["landscape-server"]
+        .units["landscape-server/0"]
+        .public_address
+    )
 
     response = get_session().get(f"https://{host}/{route}", verify=False)
     assert response.status_code == 200
@@ -142,7 +166,7 @@ def get_session(
     """
     Create a session that includes retries for 503 statuses.
 
-    This is useful for HAProxy tests because the HAProxy unit and the Landscape unit
+    This is useful for load balancing tests because the Landscape unit
     can report "ready" in Juju even if Landscape server is not yet ready to serve
     requests.
 
