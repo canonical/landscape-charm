@@ -221,6 +221,12 @@ class PeerIPs(BaseModel):
     leader_ip: IPvAnyAddress
 
 
+class SelfSignedCertificate(BaseModel):
+    combined_certificate: bytes
+    ca_certificate: bytes
+    private_key: bytes
+
+
 class LandscapeServerCharm(CharmBase):
     """Charm the service."""
 
@@ -311,6 +317,9 @@ class LandscapeServerCharm(CharmBase):
         )
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
+        )
+        self.framework.observe(
+            self.on.get_self_signed_ca_action, self._on_get_self_signed_ca_action
         )
 
         # State
@@ -1127,15 +1136,12 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
-    def _generate_self_signed_cert(self) -> bytes:
+    def _generate_self_signed_cert(self) -> SelfSignedCertificate:
         logger.debug("Generating self-signed certificate...")
 
         unit_ip = self.unit_ip
-
         if not unit_ip:
-            raise SSLConfigurationError(
-                "Cannot generate self-signed certificate without unit IP"
-            )
+            raise SSLConfigurationError("Cannot generate certificate without unit IP")
 
         private_key = rsa.generate_private_key(
             public_exponent=65537,
@@ -1148,7 +1154,7 @@ class LandscapeServerCharm(CharmBase):
                 x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "London"),
                 x509.NameAttribute(NameOID.LOCALITY_NAME, "London"),
                 x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Canonical"),
-                x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
+                x509.NameAttribute(NameOID.COMMON_NAME, "landscape-server"),
             ]
         )
 
@@ -1164,12 +1170,16 @@ class LandscapeServerCharm(CharmBase):
                 + datetime.timedelta(days=365)
             )
             .add_extension(
+                x509.BasicConstraints(ca=True, path_length=None),
+                critical=True,
+            )
+            .add_extension(
                 x509.SubjectAlternativeName(
                     [
                         x509.DNSName("localhost"),
                         x509.DNSName("landscape-server"),
                         x509.IPAddress(ipaddress.ip_address(unit_ip)),
-                    ],
+                    ]
                 ),
                 critical=False,
             )
@@ -1179,15 +1189,21 @@ class LandscapeServerCharm(CharmBase):
             private_key=private_key, algorithm=hashes.SHA256()
         )
 
-        combined_pem = certificate.public_bytes(
-            serialization.Encoding.PEM
-        ) + private_key.private_bytes(
+        serialized_ca_cert = certificate.public_bytes(serialization.Encoding.PEM)
+
+        serialized_private_key = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption(),
         )
 
-        return combined_pem
+        combined_pem = serialized_ca_cert + serialized_private_key
+
+        return SelfSignedCertificate(
+            combined_certificate=combined_pem,
+            ca_certificate=serialized_ca_cert,
+            private_key=serialized_private_key,
+        )
 
     def _get_ssl_cert(self, ssl_cert: str, ssl_key: str) -> bytes:
         if ssl_cert != "DEFAULT" and ssl_key == "":
@@ -1210,14 +1226,30 @@ class LandscapeServerCharm(CharmBase):
                 self._stored.self_signed_tls_cert is not None
                 and self._stored.self_signed_cert_ip == self.unit_ip
             ):
-                return self._stored.self_signed_tls_cert
+                return self._stored.self_signed_tls_cert["combined_certificate"]
 
             ssl_cert = self._generate_self_signed_cert()
 
-            self._stored.self_signed_tls_cert = ssl_cert
+            self._stored.self_signed_tls_cert = ssl_cert.model_dump()
             self._stored.self_signed_cert_ip = self.unit_ip
 
-        return ssl_cert
+        return ssl_cert.combined_certificate
+
+    def _on_get_self_signed_ca_action(self, event: ActionEvent) -> None:
+        if (
+            self._stored.self_signed_tls_cert is None
+            or self._stored.self_signed_cert_ip != self.unit_ip
+        ):
+            event.fail("No self-signed certificate found for this unit.")
+            return
+
+        event.set_results(
+            {
+                "ca-certificate": self._stored.self_signed_tls_cert[
+                    "ca_certificate"
+                ].decode()
+            }
+        )
 
     def _update_haproxy(self) -> None:
         peer_ips = self.peer_ips

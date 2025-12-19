@@ -33,3 +33,6 @@ disable-ubuntu-installer-attach:
   description: |
     Uninstall the `landscape_ubuntu_installer_attach` package and remove the
     frontend on HAProxy.
+get-self-signed-ca:
+  description: |
+    Get the self-signed CA certificate used by this unit.
