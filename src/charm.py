@@ -367,6 +367,11 @@ class LandscapeServerCharm(CharmBase):
             ],
         )
 
+        self.framework.observe(
+            self.lb_certificates.on.certificate_available,
+            self._on_certificate_available,
+        )
+
     def _get_certificate_request_attributes(
         self,
     ) -> CertificateRequestAttributes | None:
@@ -1133,6 +1138,9 @@ class LandscapeServerCharm(CharmBase):
                 ),
             }
         )
+
+    def _on_certificate_available(self, _) -> None:
+        self._update_haproxy()
 
     def _update_haproxy(self) -> None:
         peer_ips = self.peer_ips
