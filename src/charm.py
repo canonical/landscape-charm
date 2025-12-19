@@ -352,20 +352,16 @@ class LandscapeServerCharm(CharmBase):
         self.lb_certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name="load-balancer-certificates",
-            certificate_requests=[self._get_certificate_request_attributes()],
+            certificate_requests=self._get_certificate_request_attributes(),
             mode=Mode.UNIT,
-            refresh_events=[
-                self.on.replicas_relation_joined,
-                self.on.replicas_relation_changed,
-            ],
         )
 
     def _get_certificate_request_attributes(
         self,
-    ) -> CertificateRequestAttributes | None:
+    ) -> list[CertificateRequestAttributes]:
         unit_ip = self.unit_ip
         if not unit_ip:
-            return None
+            return []
 
         hostname = None
         if self.charm_config.root_url:
@@ -376,16 +372,21 @@ class LandscapeServerCharm(CharmBase):
         common_name = hostname or unit_ip
 
         if hostname:
-            return CertificateRequestAttributes(
-                common_name=common_name,
-                sans_ip=[unit_ip],
-                sans_dns=[hostname],
-            )
+            return [
+                CertificateRequestAttributes(
+                    common_name=common_name,
+                    sans_ip=[unit_ip],
+                    sans_dns=[hostname],
+                )
+            ]
+
         else:
-            return CertificateRequestAttributes(
-                common_name=unit_ip,
-                sans_ip=[unit_ip],
-            )
+            return [
+                CertificateRequestAttributes(
+                    common_name=unit_ip,
+                    sans_ip=[unit_ip],
+                )
+            ]
 
     @property
     def peer_ips(self) -> PeerIPs | None:
@@ -396,6 +397,7 @@ class LandscapeServerCharm(CharmBase):
         all_ips = [unit_ip]
         leader_ip = unit_ip
 
+        logger.warning(f"replicas: {self.model.get_relation('replicas').data}")
         if replicas := self.model.get_relation("replicas"):
             leader_ip = replicas.data[self.app].get("leader-ip", unit_ip)
 
@@ -404,22 +406,28 @@ class LandscapeServerCharm(CharmBase):
                     if peer_unit_address := replicas.data[unit].get("private-address"):
                         all_ips.append(peer_unit_address)
 
-        return PeerIPs(all_ips=all_ips, leader_ip=leader_ip)
+        peer_ips = PeerIPs(all_ips=all_ips, leader_ip=leader_ip)
+        logger.warning(f"Peer IPs: {peer_ips}")
+
+        return peer_ips
 
     @property
     def unit_ip(self) -> str | None:
         network_binding = self.model.get_binding("replicas")
         if network_binding is None:
+            logger.warning("network_binding is None!")
             return None
 
         try:
             bind_address = network_binding.network.bind_address
-        except ModelError:
-            logger.warning("No network config found for binding 'replicas'")
+        except ModelError as e:
+            logger.warning(f"No bind address found for `replics`: {str(e)}")
             return None
 
         if bind_address is not None:
             return str(bind_address)
+
+        logger.warning("bind_address is None!")
 
         return None
 
@@ -491,7 +499,6 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(self.charm_config.smtp_relay_host)
 
-        self._update_haproxy()
         self._configure_openid()
         self._configure_oidc()
 
@@ -559,6 +566,7 @@ class LandscapeServerCharm(CharmBase):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
 
+        self._update_haproxy()
         self._update_ready_status(restart_services=True)
 
     def _get_secret_token(self) -> str | None:
@@ -1104,6 +1112,8 @@ class LandscapeServerCharm(CharmBase):
             certificate_request=self._get_certificate_request_attributes()
         )
 
+        logger.warning(f"attrs: {self._get_certificate_request_attributes()}")
+
         if not provider_certificate:
             event.fail("TLS certificate not available!")
             return
@@ -1125,6 +1135,8 @@ class LandscapeServerCharm(CharmBase):
             logger.warning("Peer IPs not set, not updating HAProxy config.")
             return
 
+        self.lb_certificates.sync()
+
         provider_certificate, private_key = (
             self.lb_certificates.get_assigned_certificate(
                 certificate_request=self._get_certificate_request_attributes()
@@ -1135,13 +1147,11 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = WaitingStatus(
                 "Waiting for load balancer TLS certificate..."
             )
-
             logger.warning(
                 "Certificate or private key is not yet available! "
                 "Make sure this charm has been integrated with a "
                 "provider of the `tls-certificates` charm interface."
             )
-
             self._update_ready_status()
             return
 
@@ -1201,7 +1211,6 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus("Failed to reload HAProxy!")
             return
 
-        self.status = ActiveStatus("HAProxy configured!")
         self._update_ready_status()
 
     def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
