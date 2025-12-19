@@ -76,15 +76,7 @@ from database import (
     fetch_postgres_relation_data,
     grant_role,
 )
-from haproxy import (
-    ERROR_FILES,
-    HAPROXY_APT_PACKAGE_NAME,
-    HAProxyError,
-    PORTS,
-    render_haproxy_config,
-    restart_haproxy,
-    write_ssl_cert,
-)
+import haproxy
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -379,12 +371,12 @@ class LandscapeServerCharm(CharmBase):
             self.https_ingress.on.ready,
             self._on_https_ingress_ready,
         )
-        # TODO: Update when they add `grpc-port`
+
         if self.charm_config.enable_hostagent_messenger:
             self.hostagent_messenger_ingress = IngressPerAppRequirer(
                 self,
                 relation_name="hostagent-messenger-ingress",
-                port=PORTS["hostagent-messenger"],
+                port=haproxy.PORTS["hostagent-messenger"],
                 redirect_https=True,
             )
             self.framework.observe(
@@ -396,7 +388,7 @@ class LandscapeServerCharm(CharmBase):
             self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
                 self,
                 relation_name="ubuntu-installer-attach-ingress",
-                port=PORTS["ubuntu-installer-attach"],
+                port=haproxy.PORTS["ubuntu-installer-attach"],
                 redirect_https=True,
             )
             self.framework.observe(
@@ -509,7 +501,12 @@ class LandscapeServerCharm(CharmBase):
 
         if self.charm_config.ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(self.charm_config.ssl_cert)
+            haproxy.write_file(
+                self._get_ssl_cert(
+                    self.charm_config.ssl_cert, self.charm_config.ssl_key
+                ),
+                str(haproxy.HAPROXY_CERT_PATH),
+            )
 
         if self.charm_config.license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
@@ -715,7 +712,10 @@ class LandscapeServerCharm(CharmBase):
 
         if config_ssl_cert != "DEFAULT":
             self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(config_ssl_cert)
+            haproxy.write_file(
+                self._get_ssl_cert(config_ssl_cert, self.charm_config.ssl_key),
+                str(haproxy.HAPROXY_CERT_PATH),
+            )
 
         # Write the license file, if it exists.
         license_file = self.charm_config.license_file
@@ -728,26 +728,28 @@ class LandscapeServerCharm(CharmBase):
 
         try:
             self.unit.status = MaintenanceStatus("Installing HAProxy...")
-            apt.add_package(HAPROXY_APT_PACKAGE_NAME, update_cache=True)
+            apt.add_package(haproxy.HAPROXY_APT_PACKAGE_NAME, update_cache=True)
 
         except PackageError as e:
-            logger.error("Failed to install %s", HAPROXY_APT_PACKAGE_NAME)
+            logger.error("Failed to install %s", haproxy.HAPROXY_APT_PACKAGE_NAME)
             raise e
 
         # Copy Landscape's error files to HAProxy error dir
         error_src = "/opt/canonical/landscape/canonical/landscape/offline"
-        error_dst = ERROR_FILES["location"]
+        error_dst = haproxy.ERROR_FILES["location"]
         if os.path.exists(error_src):
             try:
                 os.makedirs(error_dst, exist_ok=True)
-                for filename in ERROR_FILES["files"].values():
+                for filename in haproxy.ERROR_FILES["files"].values():
                     src_file = os.path.join(error_src, filename)
                     dst_file = os.path.join(error_dst, filename)
                     if os.path.exists(src_file):
                         shutil.copy2(src_file, dst_file)
 
             except OSError as e:
-                raise HAProxyError("Failed to copy error files to HAProxy: %s", e)
+                raise haproxy.HAProxyError(
+                    "Failed to copy error files to HAProxy: %s", e
+                )
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1283,14 +1285,14 @@ class LandscapeServerCharm(CharmBase):
             return
 
         try:
-            write_ssl_cert(ssl_cert)
+            haproxy.write_file(ssl_cert, str(haproxy.HAPROXY_CERT_PATH))
         except Exception as e:
             logger.error("Failed to write SSL certificate: %s", str(e))
             self.unit.status = BlockedStatus("Failed to write SSL certificate")
             return
 
         try:
-            render_haproxy_config(
+            haproxy.render_config(
                 all_ips=peer_ips.all_ips,
                 leader_ip=peer_ips.leader_ip,
                 worker_counts=self.charm_config.worker_counts,
@@ -1305,7 +1307,7 @@ class LandscapeServerCharm(CharmBase):
             return
 
         try:
-            restart_haproxy()
+            haproxy.restart()
         except SystemdError as e:
             logger.error("Failed to restart HAProxy: %s", str(e))
             self.unit.status = BlockedStatus("Failed to restart HAProxy")

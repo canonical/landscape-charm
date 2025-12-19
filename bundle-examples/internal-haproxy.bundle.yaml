@@ -75,6 +75,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: /
+
 machines:
   "0":
     constraints: arch=amd64

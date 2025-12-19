@@ -14,8 +14,8 @@ from config import RedirectHTTPS
 
 HAPROXY_APT_PACKAGE_NAME = "haproxy"
 HAPROXY_CONFIG_DIR = Path("/etc/haproxy")
-HAPROXY_CERT_PATH = "/etc/haproxy/haproxy.pem"
-HAPROXY_RENDERED_CONFIG_PATH = Path(HAPROXY_CONFIG_DIR / "haproxy.cfg")
+HAPROXY_CERT_PATH = Path("/etc/haproxy/haproxy.pem")
+HAPROXY_RENDERED_CONFIG_PATH = HAPROXY_CONFIG_DIR / "haproxy.cfg"
 HAPROXY_USER = "haproxy"
 HAPROXY_SERVICE = "haproxy"
 HAPROXY_EXECUTABLE = "/usr/sbin/haproxy"
@@ -52,23 +52,30 @@ PORTS = {
 }
 
 
-def write_ssl_cert(ssl_cert: bytes) -> None:
-    os.makedirs(os.path.dirname(HAPROXY_CERT_PATH), exist_ok=True)
-    with open(HAPROXY_CERT_PATH, "wb") as ssl_cert_fp:
-        ssl_cert_fp.write(ssl_cert)
+def write_file(content: bytes, path: str, permissions=0o600) -> None:
+    if not isinstance(content, bytes):
+        raise ValueError(f"Invalid file content type: {type(content)}")
 
-    os.chmod(HAPROXY_CERT_PATH, 0o600)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(content)
+
+    os.chmod(path, permissions)
     u = pwd.getpwnam(HAPROXY_USER)
-    os.chown(HAPROXY_CERT_PATH, uid=u.pw_uid, gid=u.pw_gid)
+    os.chown(path, uid=u.pw_uid, gid=u.pw_gid)
 
 
-def render_haproxy_config(
+def render_config(
     all_ips: list[IPvAnyAddress],
     leader_ip: list[IPvAnyAddress],
     worker_counts: int,
     redirect_https: RedirectHTTPS,
     enable_hostagent_messenger: bool,
     enable_ubuntu_installer_attach: bool,
+    ssl_cert_path=HAPROXY_CERT_PATH,
+    ports=PORTS,
+    error_files_root=ERROR_FILES["location"],
+    error_files=ERROR_FILES["files"],
 ) -> None:
     template_path = os.path.join(os.path.dirname(__file__), HAPROXY_TMPL.name)
     with open(template_path) as f:
@@ -80,11 +87,11 @@ def render_haproxy_config(
             "peer_ips": all_ips,
             "leader_address": leader_ip,
             "worker_counts": worker_counts,
-            "ports": PORTS,
-            "ssl_cert_path": HAPROXY_CERT_PATH,
+            "ports": ports,
+            "ssl_cert_path": str(ssl_cert_path),
             "https_redirect": redirect_https.value,
-            "error_files_root": ERROR_FILES["location"],
-            "error_files": ERROR_FILES["files"],
+            "error_files_root": error_files_root,
+            "error_files": error_files,
             "enable_hostagent_messenger": enable_hostagent_messenger,
             "enable_ubuntu_installer_attach": enable_ubuntu_installer_attach,
         }
@@ -93,16 +100,12 @@ def render_haproxy_config(
     if not rendered.endswith("\n"):
         rendered += "\n"
 
-    HAPROXY_RENDERED_CONFIG_PATH.write_text(rendered, encoding="utf-8")
-    os.chmod(HAPROXY_RENDERED_CONFIG_PATH, 0o644)
-
-    u = pwd.getpwnam(HAPROXY_USER)
-    os.chown(HAPROXY_RENDERED_CONFIG_PATH, uid=u.pw_uid, gid=u.pw_gid)
+    write_file(rendered.encode(), str(HAPROXY_RENDERED_CONFIG_PATH), 0o644)
 
     validate_haproxy_config(str(HAPROXY_RENDERED_CONFIG_PATH))
 
 
-def restart_haproxy() -> None:
+def restart() -> None:
     try:
         systemd.service_reload(HAPROXY_SERVICE)
     except systemd.SystemdError as e:
