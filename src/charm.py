@@ -360,11 +360,6 @@ class LandscapeServerCharm(CharmBase):
             ],
         )
 
-        self.framework.observe(
-            self.lb_certificates.on.certificate_available,
-            self._on_loadbalancer_tls_certificate_available,
-        )
-
     def _get_certificate_request_attributes(
         self,
     ) -> CertificateRequestAttributes | None:
