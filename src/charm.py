@@ -1174,8 +1174,6 @@ class LandscapeServerCharm(CharmBase):
 
         self._stored.ready["load-balancer-certificates"] = True
 
-        self.unit.status = MaintenanceStatus("Updating HAProxy configuration...")
-
         # Update root_url, if not provided.
         if not self.charm_config.root_url:
             url = f"https://{peer_ips.leader_ip}/"
