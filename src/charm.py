@@ -352,16 +352,20 @@ class LandscapeServerCharm(CharmBase):
         self.lb_certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name="load-balancer-certificates",
-            certificate_requests=self._get_certificate_request_attributes(),
+            certificate_requests=(
+                [self._get_certificate_request_attributes()]
+                if self._get_certificate_request_attributes()
+                else []
+            ),
             mode=Mode.UNIT,
         )
 
     def _get_certificate_request_attributes(
         self,
-    ) -> list[CertificateRequestAttributes]:
+    ) -> CertificateRequestAttributes | None:
         unit_ip = self.unit_ip
         if not unit_ip:
-            return []
+            return None
 
         hostname = None
         if self.charm_config.root_url:
@@ -372,21 +376,17 @@ class LandscapeServerCharm(CharmBase):
         common_name = hostname or unit_ip
 
         if hostname:
-            return [
-                CertificateRequestAttributes(
-                    common_name=common_name,
-                    sans_ip=[unit_ip],
-                    sans_dns=[hostname],
-                )
-            ]
+            return CertificateRequestAttributes(
+                common_name=common_name,
+                sans_ip=[unit_ip],
+                sans_dns=[hostname],
+            )
 
         else:
-            return [
-                CertificateRequestAttributes(
-                    common_name=unit_ip,
-                    sans_ip=[unit_ip],
-                )
-            ]
+            return CertificateRequestAttributes(
+                common_name=unit_ip,
+                sans_ip=[unit_ip],
+            )
 
     @property
     def peer_ips(self) -> PeerIPs | None:
@@ -1108,15 +1108,14 @@ class LandscapeServerCharm(CharmBase):
         self._update_ready_status()
 
     def _on_get_certificates_action(self, event: ActionEvent) -> None:
-        provider_certificate, _ = self.lb_certificates.get_assigned_certificate(
-            certificate_request=self._get_certificate_request_attributes()
-        )
-
-        logger.warning(f"attrs: {self._get_certificate_request_attributes()}")
-
-        if not provider_certificate:
+        cert_attrs = self._get_certificate_request_attributes()
+        if not cert_attrs:
             event.fail("TLS certificate not available!")
             return
+
+        provider_certificate, _ = self.lb_certificates.get_assigned_certificate(
+            certificate_request=cert_attrs
+        )
 
         event.set_results(
             {
@@ -1137,9 +1136,14 @@ class LandscapeServerCharm(CharmBase):
 
         self.lb_certificates.sync()
 
+        cert_attrs = self._get_certificate_request_attributes()
+        if not cert_attrs:
+            logger.warning("Unable to generate certificate request attributes.")
+            return
+
         provider_certificate, private_key = (
             self.lb_certificates.get_assigned_certificate(
-                certificate_request=self._get_certificate_request_attributes()
+                certificate_request=cert_attrs
             )
         )
 
