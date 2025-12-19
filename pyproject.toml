@@ -7,8 +7,8 @@ package-mode = false
 [tool.poetry.dependencies]
 ops = ">=1.4.0"
 jinja2 = "*"
-cryptography = "*"
 python = "^3.10"
+charmlibs-interfaces-tls-certificates = "1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"

@@ -18,3 +18,5 @@ parts:
   charm:
     plugin: charm
     source: .
+    charm-python-packages:
+      - charmlibs-interfaces-tls-certificates

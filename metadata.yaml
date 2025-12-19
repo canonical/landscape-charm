@@ -35,6 +35,9 @@ requires:
   ubuntu-installer-attach-ingress:
     interface: ingress
     limit: 1
+  load-balancer-certificates:
+    interface: tls-certificates
+    limit: 1
 
 provides:
   data:

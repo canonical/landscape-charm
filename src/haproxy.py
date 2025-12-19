@@ -13,9 +13,8 @@ from config import RedirectHTTPS
 # Based on: https://github.com/canonical/haproxy-operator/blob/main/haproxy-operator/src/haproxy.py
 
 HAPROXY_APT_PACKAGE_NAME = "haproxy"
-HAPROXY_CONFIG_DIR = Path("/etc/haproxy")
-HAPROXY_CERT_PATH = Path("/etc/haproxy/haproxy.pem")
-HAPROXY_RENDERED_CONFIG_PATH = HAPROXY_CONFIG_DIR / "haproxy.cfg"
+HAPROXY_CERT_PATH = "/etc/haproxy/haproxy.pem"
+HAPROXY_RENDERED_CONFIG_PATH = "/etc/haproxy/haproxy.cfg"
 HAPROXY_USER = "haproxy"
 HAPROXY_SERVICE = "haproxy"
 HAPROXY_EXECUTABLE = "/usr/sbin/haproxy"
@@ -88,7 +87,7 @@ def render_config(
             "leader_address": leader_ip,
             "worker_counts": worker_counts,
             "ports": ports,
-            "ssl_cert_path": str(ssl_cert_path),
+            "ssl_cert_path": ssl_cert_path,
             "https_redirect": redirect_https.value,
             "error_files_root": error_files_root,
             "error_files": error_files,
@@ -100,19 +99,19 @@ def render_config(
     if not rendered.endswith("\n"):
         rendered += "\n"
 
-    write_file(rendered.encode(), str(HAPROXY_RENDERED_CONFIG_PATH), 0o644)
+    write_file(rendered.encode(), HAPROXY_RENDERED_CONFIG_PATH, 0o644)
 
-    validate_haproxy_config(str(HAPROXY_RENDERED_CONFIG_PATH))
+    validate_config(HAPROXY_RENDERED_CONFIG_PATH)
 
 
-def restart() -> None:
+def reload() -> None:
     try:
         systemd.service_reload(HAPROXY_SERVICE)
     except systemd.SystemdError as e:
         raise HAProxyError(f"Failed reloading the HAProxy service: {str(e)}")
 
 
-def validate_haproxy_config(config_path: str) -> None:
+def validate_config(config_path: str) -> None:
     try:
         subprocess.run(
             [HAPROXY_EXECUTABLE, "-c", "-f", config_path],

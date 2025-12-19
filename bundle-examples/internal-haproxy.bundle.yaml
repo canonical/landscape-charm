@@ -34,6 +34,7 @@ applications:
       min_install: True
       enable_hostagent_messenger: True
       enable_ubuntu_installer_attach: True
+      root_url: https://landscape.local/
     base: ubuntu@24.04
   hostagent-messenger-ingress:
     charm: ingress-configurator
@@ -45,6 +46,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: /
+      hostname: landscape.local
   http-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -55,6 +57,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: /
+      hostname: landscape.local
   https-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -65,6 +68,7 @@ applications:
     constraints: arch=amd64
     options:
       paths: /
+      hostname: landscape.local
   ubuntu-installer-attach-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -75,6 +79,14 @@ applications:
     constraints: arch=amd64
     options:
       paths: /
+      hostname: landscape.local
+  lb-certs:
+    charm: self-signed-certificates
+    channel: stable
+    num_units: 1
+    to:
+      - "0"
+    constraints: arch=amd64
 
 machines:
   "0":
@@ -102,3 +114,4 @@ relations:
       landscape-server:ubuntu-installer-attach-ingress,
       ubuntu-installer-attach-ingress:ingress,
     ]
+  - [landscape-server:load-balancer-certificates, lb-certs:certificates]
