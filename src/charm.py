@@ -1206,7 +1206,7 @@ class LandscapeServerCharm(CharmBase):
                 all_ips=peer_ips.all_ips,
                 leader_ip=peer_ips.leader_ip,
                 worker_counts=self.charm_config.worker_counts,
-                # TODO: Make service base configurable
+                # TODO: Make service base port configurable
                 ports=haproxy.PORTS,
                 ssl_cert_path=haproxy.HAPROXY_CERT_PATH,
                 redirect_https=self.charm_config.redirect_https,
