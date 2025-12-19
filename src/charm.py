@@ -358,6 +358,13 @@ class LandscapeServerCharm(CharmBase):
                 else []
             ),
             mode=Mode.UNIT,
+            refresh_events=[
+                self.on.config_changed,
+                self.on.replicas_relation_changed,
+                self.on.replicas_relation_joined,
+                self.on.leader_elected,
+                self.on.leader_settings_changed,
+            ],
         )
 
     def _get_certificate_request_attributes(
@@ -1133,8 +1140,6 @@ class LandscapeServerCharm(CharmBase):
         if not peer_ips:
             logger.warning("Peer IPs not set, not updating HAProxy config.")
             return
-
-        self.lb_certificates.sync()
 
         cert_attrs = self._get_certificate_request_attributes()
         if not cert_attrs:
