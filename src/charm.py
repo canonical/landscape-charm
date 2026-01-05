@@ -803,12 +803,6 @@ class LandscapeServerCharm(CharmBase):
         """
         Handle the modern Postgres charm interface (`database` relation).
         """
-        if not self.unit.is_leader():
-            logger.info(f"{self.unit.name} is not the leader unit...")
-            self._stored.ready["db"] = True
-            self.unit.status = ActiveStatus("Unit is ready")
-            return
-
         db_ctx: DatabaseConnectionContext = fetch_postgres_relation_data(
             db_manager=self.database
         )
@@ -877,6 +871,12 @@ class LandscapeServerCharm(CharmBase):
             password=password,
             schema_password=schema_password,
         )
+
+        if not self.unit.is_leader():
+            self._stored.ready["db"] = True
+            self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status(restart_services=True)
+            return
 
         roles = get_postgres_roles(db_ctx.version)
 
