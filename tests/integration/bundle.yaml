@@ -31,6 +31,7 @@ applications:
   landscape-server:
     charm: ../../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 2
+    base: ubuntu@24.04
     options:
       landscape_ppa: ppa:landscape/self-hosted-beta
       min_install: True

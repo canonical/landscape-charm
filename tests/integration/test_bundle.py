@@ -12,6 +12,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
+from charm import DEFAULT_SERVICES, LEADER_SERVICES
+
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
     """
@@ -249,7 +251,18 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     units = status.apps["landscape-server"].units
 
-    for name, status in units.items():
-        res = juju.ssh(name, "sudo lsctl status")
+    for name, unit_status in units.items():
+        for service in DEFAULT_SERVICES:
+            try:
+                juju.ssh(name, f"systemctl is-active {service}.service")
+            except Exception as e:
+                pytest.fail(f"Service {service} on {name} is not active! Error: {e}")
 
-        assert "×" not in res
+        if unit_status.leader:
+            for service in LEADER_SERVICES:
+                try:
+                    juju.ssh(name, f"systemctl is-active {service}.service")
+                except Exception as e:
+                    pytest.fail(
+                        f"Leader service {service} on {name} is not active! Error: {e}"
+                    )
