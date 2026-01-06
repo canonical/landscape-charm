@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
-from charm import DEFAULT_SERVICES, LEADER_SERVICES
+from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
 
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
@@ -264,7 +264,7 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
             try:
                 juju.ssh(
                     name,
-                    "systemctl is-active landscape-ubuntu-installer-attach.service",
+                    f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
                 )
             except Exception as e:
                 pytest.fail(f"Failed to run command on unit: {e}")
@@ -278,6 +278,12 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
 
 
 def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
+    """
+    NOTE: There is not an equivalent hostagent_messenger test because
+    that service will run regardless of the config, unlike Ubuntu Installer
+    Attach which will actually install/uninstall the package/service in addition
+    to creating an HAProxy backend for it.
+    """
     juju.wait(jubilant.all_active, timeout=300)
 
     status = juju.status()
@@ -290,19 +296,14 @@ def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
         )
         juju.wait(jubilant.all_active, timeout=300)
         for name in units.keys():
-            juju.ssh(name, "dpkg -l landscape-ubuntu-installer-attach")
-
             try:
                 juju.ssh(
                     name,
-                    "systemctl is-active landscape-ubuntu-installer-attach.service",
+                    f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
                 )
 
             except Exception as e:
-                pytest.fail(
-                    f"Service landscape-ubuntu-installer-attach on {name} "
-                    f"should be active when config is enabled! Error: {e}"
-                )
+                pytest.fail(f"Failed to run command on unit: {e}")
 
     finally:
         restore_val = "true" if original else "false"
