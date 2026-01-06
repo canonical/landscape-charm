@@ -251,21 +251,14 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     units = status.apps["landscape-server"].units
     config = juju.config("landscape-server")
-    enable_hostagent = config.get("enable_hostagent_messenger", False)
     enable_ubuntu_installer = config.get("enable_ubuntu_installer_attach", False)
-    services_to_check = [
-        s
-        for s in DEFAULT_SERVICES
-        if s not in ("landscape-hostagent-messenger", "landscape-hostagent-consumer")
-        or enable_hostagent
-    ]
 
     for name, unit_status in units.items():
-        for service in services_to_check:
+        for service in DEFAULT_SERVICES:
             try:
                 juju.ssh(name, f"systemctl is-active {service}.service")
             except Exception as e:
-                pytest.fail(f"Service {service} on {name} is not active! Error: {e}")
+                pytest.fail(f"Failed to run command on unit: {e}")
 
         if enable_ubuntu_installer:
             try:
@@ -274,51 +267,14 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
                     "systemctl is-active landscape-ubuntu-installer-attach.service",
                 )
             except Exception as e:
-                pytest.fail(
-                    "Service landscape-ubuntu-installer-attach on "
-                    f"{name} is not active! Error: {e}"
-                )
+                pytest.fail(f"Failed to run command on unit: {e}")
 
         if unit_status.leader:
             for service in LEADER_SERVICES:
                 try:
                     juju.ssh(name, f"systemctl is-active {service}.service")
                 except Exception as e:
-                    pytest.fail(
-                        f"Leader service {service} on {name} is not active! Error: {e}"
-                    )
-
-
-def test_hostagent_services(juju: jubilant.Juju, bundle: None):
-    juju.wait(jubilant.all_active, timeout=300)
-
-    status = juju.status()
-    units = status.apps["landscape-server"].units
-    original = juju.config("landscape-server").get("enable_hostagent_messenger")
-
-    try:
-        juju.config("landscape-server", values={"enable_hostagent_messenger": "true"})
-        juju.wait(jubilant.all_active, timeout=300)
-
-        for name in units.keys():
-            for service in (
-                "landscape-hostagent-messenger",
-                "landscape-hostagent-consumer",
-            ):
-                try:
-                    juju.ssh(name, f"systemctl is-active {service}.service")
-                except Exception as e:
-                    pytest.fail(
-                        f"Service {service} on {name} should be active when config is "
-                        f"enabled! Error: {e}"
-                    )
-
-    finally:
-        restore_val = "true" if original else "false"
-        juju.config(
-            "landscape-server", values={"enable_hostagent_messenger": restore_val}
-        )
-        juju.wait(jubilant.all_active, timeout=300)
+                    pytest.fail(f"Failed to run command on unit: {e}")
 
 
 def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
