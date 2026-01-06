@@ -275,7 +275,8 @@ def test_all_services_up(juju: jubilant.Juju, bundle: None):
                 )
             except Exception as e:
                 pytest.fail(
-                    f"Service landscape-ubuntu-installer-attach on {name} is not active! Error: {e}"
+                    "Service landscape-ubuntu-installer-attach on "
+                    f"{name} is not active! Error: {e}"
                 )
 
         if unit_status.leader:
@@ -306,7 +307,8 @@ def test_hostagent_services(juju: jubilant.Juju, bundle: None):
                 juju.ssh(name, f"systemctl is-active {service}.service")
             except Exception as e:
                 pytest.fail(
-                    f"Service {service} on {name} should be active when config is enabled! Error: {e}"
+                    f"Service {service} on {name} should be active when config is "
+                    f"enabled! Error: {e}"
                 )
 
     juju.config("landscape-server", values={"enable_hostagent_messenger": "false"})
@@ -331,7 +333,8 @@ def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
 
         except Exception as e:
             pytest.fail(
-                f"Service landscape-ubuntu-installer-attach on {name} should be active when config is enabled! Error: {e}"
+                f"Service landscape-ubuntu-installer-attach on {name} "
+                f"should be active when config is enabled! Error: {e}"
             )
 
     juju.config("landscape-server", values={"enable_ubuntu_installer_attach": "false"})
