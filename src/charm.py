@@ -321,14 +321,14 @@ class LandscapeServerCharm(CharmBase):
 
         self.http_ingress = IngressPerAppRequirer(
             self,
-            port=80,
+            port=haproxy.FrontendPort.HTTP,
             relation_name="http-ingress",
             redirect_https=True,
         )
 
         self.https_ingress = IngressPerAppRequirer(
             self,
-            port=443,
+            port=haproxy.FrontendPort.HTTPS,
             relation_name="https-ingress",
             redirect_https=True,
         )
@@ -337,7 +337,7 @@ class LandscapeServerCharm(CharmBase):
             self.hostagent_messenger_ingress = IngressPerAppRequirer(
                 self,
                 relation_name="hostagent-messenger-ingress",
-                port=haproxy.PORTS["hostagent-messenger"],
+                port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
                 redirect_https=True,
             )
 
@@ -345,7 +345,7 @@ class LandscapeServerCharm(CharmBase):
             self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
                 self,
                 relation_name="ubuntu-installer-attach-ingress",
-                port=haproxy.PORTS["ubuntu-installer-attach"],
+                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTTACH,
                 redirect_https=True,
             )
 
@@ -701,20 +701,21 @@ class LandscapeServerCharm(CharmBase):
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
 
-        try:
-            self.unit.status = MaintenanceStatus("Installing HAProxy...")
-            apt.add_package(haproxy.HAPROXY_APT_PACKAGE_NAME, update_cache=True)
+        self.unit.status = MaintenanceStatus("Installing HAProxy...")
 
-        except PackageError as e:
-            logger.error("Failed to install %s", haproxy.HAPROXY_APT_PACKAGE_NAME)
+        try:
+            haproxy.install()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to install HAProxy: %s", str(e))
             raise e
 
         # Copy Landscape's error files to HAProxy error dir
-        error_src = "/opt/canonical/landscape/canonical/landscape/offline"
+        error_src_dir = "/opt/canonical/landscape/canonical/landscape/offline"
         try:
-            haproxy.copy_error_files_from_source(error_src, haproxy.ERROR_FILES)
+            haproxy.copy_error_files_from_source(error_src_dir)
         except haproxy.HAProxyError as e:
-            raise
+            logger.error("Failed to copy error files: %s", str(e))
+            raise e
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1167,12 +1168,12 @@ class LandscapeServerCharm(CharmBase):
                 }
             )
 
-        combined_pem = str(provider_certificate.certificate) + "\n" + str(private_key)
-
         try:
-            haproxy.write_ssl_cert(combined_pem.encode())
+            haproxy.write_tls_cert(
+                provider_certificate=provider_certificate, private_key=private_key
+            )
 
-        except (OSError, ValueError) as e:
+        except haproxy.HAProxyError as e:
             logger.error("Failed to write TLS certificate for HAProxy: %s", str(e))
             self.unit.status = BlockedStatus(
                 "Failed to write TLS certificate for HAProxy!"
@@ -1190,14 +1191,21 @@ class LandscapeServerCharm(CharmBase):
                 max_connections=self.charm_config.max_global_haproxy_connections,
             )
 
-        except CalledProcessError as e:
-            logger.error("Rendering HAProxy config failed with output: %s", e.output)
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to write HAProxy config: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
+            return
+
+        try:
+            haproxy.validate_config()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to validate HAProxy config: %s", str(e))
             self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
         try:
             haproxy.reload()
-        except SystemdError as e:
+        except haproxy.HAProxyError as e:
             logger.error("Failed to reload HAProxy: %s", str(e))
             self.unit.status = BlockedStatus("Failed to reload HAProxy!")
             return
