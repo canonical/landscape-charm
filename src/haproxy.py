@@ -58,7 +58,7 @@ class HTTPBackend(str, Enum):
     MESSAGE = "landscape-http-message"
     PACKAGE_UPLOAD = "landscape-http-package-upload"
     PING = "landscape-http-ping"
-    REPOSITORY = "landscape-http-repository"
+    APPSERVER = "landscape-http-appserver"
 
     def __str__(self) -> str:
         return self.value
@@ -71,7 +71,7 @@ class HTTPSBackend(str, Enum):
     MESSAGE = "landscape-https-message"
     PACKAGE_UPLOAD = "landscape-https-package-upload"
     PING = "landscape-https-ping"
-    REPOSITORY = "landscape-https-repository"
+    APPSERVER = "landscape-https-appserver"
 
     def __str__(self) -> str:
         return self.value
@@ -396,7 +396,7 @@ def create_http_service(
     ]
 
     backends = [
-        Backend(backend_name=HTTPBackend.REPOSITORY, servers=appservers),
+        Backend(backend_name=HTTPBackend.APPSERVER, servers=appservers),
         Backend(backend_name=HTTPBackend.PING, servers=pingservers),
         Backend(backend_name=HTTPBackend.MESSAGE, servers=message_servers),
         Backend(backend_name=HTTPBackend.API, servers=api_servers),
@@ -409,7 +409,7 @@ def create_http_service(
     return Service(
         frontend=HTTP_FRONTEND,
         backends=backends,
-        default_backend=str(HTTPBackend.REPOSITORY),
+        default_backend=str(HTTPBackend.APPSERVER),
     )
 
 
@@ -460,7 +460,7 @@ def create_https_service(
     ]
 
     backends = [
-        Backend(backend_name=HTTPSBackend.REPOSITORY, servers=appservers),
+        Backend(backend_name=HTTPSBackend.APPSERVER, servers=appservers),
         Backend(backend_name=HTTPSBackend.PING, servers=pingservers),
         Backend(backend_name=HTTPSBackend.MESSAGE, servers=message_servers),
         Backend(backend_name=HTTPSBackend.API, servers=api_servers),
@@ -473,7 +473,7 @@ def create_https_service(
     return Service(
         frontend=HTTPS_FRONTEND,
         backends=backends,
-        default_backend=str(HTTPSBackend.REPOSITORY),
+        default_backend=str(HTTPSBackend.APPSERVER),
     )
 
 
