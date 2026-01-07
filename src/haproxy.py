@@ -4,6 +4,7 @@ from pathlib import Path
 import pwd
 import subprocess
 from subprocess import CalledProcessError
+from typing import Mapping
 
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
@@ -34,7 +35,9 @@ class HAProxyError(Exception):
 
 
 class ACL(str, Enum):
-    """HAProxy ACLs for Landscape service routing."""
+    """
+    HAProxy ACLs for Landscape service routing.
+    """
 
     API = "api"
     ATTACHMENT = "attachment"
@@ -49,28 +52,26 @@ class ACL(str, Enum):
 
 
 class HTTPBackend(str, Enum):
-    """HTTP backend identifiers."""
 
-    APPSERVER = "landscape-http-appserver"
     API = "landscape-http-api"
     HASHIDS = "landscape-http-hashid-databases"
     MESSAGE = "landscape-http-message"
     PACKAGE_UPLOAD = "landscape-http-package-upload"
     PING = "landscape-http-ping"
+    REPOSITORY = "landscape-http-repository"
 
     def __str__(self) -> str:
         return self.value
 
 
 class HTTPSBackend(str, Enum):
-    """HTTPS backend identifiers."""
 
-    APPSERVER = "landscape-https-appserver"
     API = "landscape-https-api"
     HASHIDS = "landscape-https-hashid-databases"
     MESSAGE = "landscape-https-message"
     PACKAGE_UPLOAD = "landscape-https-package-upload"
     PING = "landscape-https-ping"
+    REPOSITORY = "landscape-https-repository"
 
     def __str__(self) -> str:
         return self.value
@@ -81,8 +82,6 @@ UBUNTU_INSTALLER_ATTACH_BACKEND = "landscape-ubuntu-installer-attach"
 
 
 class FrontendName(str, Enum):
-    """HAProxy frontend names."""
-
     HTTP = "landscape-http"
     HTTPS = "landscape-https"
     HOSTAGENT_MESSENGER = "landscape-hostagent-messenger"
@@ -93,8 +92,6 @@ class FrontendName(str, Enum):
 
 
 class FrontendPort(int, Enum):
-    """HAProxy frontend ports."""
-
     HTTP = 80
     HTTPS = 443
     HOSTAGENT_MESSENGER = 6554
@@ -132,8 +129,14 @@ CLIENT_TIMEOUT = 300000  # ms
 SERVER_TIMEOUT = 300000  # ms
 DEFAULT_REDIRECT_SCHEME = "redirect scheme https unless ping OR repository"
 GRPC_SERVER_OPTIONS = "proto h2"
-SERVER_OPTIONS = "check inter 5000 rise 2 fall 5 maxconn 50"
+"""
+Additional configuration for a gRPC server in the HAProxy config.
+"""
 # NOTE: maxconn here is per-server, not global HAProxy maxconn (charm config).
+SERVER_OPTIONS = "check inter 5000 rise 2 fall 5 maxconn 50"
+"""
+Configuration for a `server` stanza in the HAProxy config.
+"""
 
 HTTP_FRONTEND = Frontend(
     frontend_name=FrontendName.HTTP,
@@ -141,6 +144,7 @@ HTTP_FRONTEND = Frontend(
     frontend_options=[
         "mode http",
         f"timeout client {CLIENT_TIMEOUT}",
+        f"timeout server {SERVER_TIMEOUT}",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         # ACLs
@@ -151,7 +155,7 @@ HTTP_FRONTEND = Frontend(
         f"acl {ACL.API} path_beg -i /api",
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
-        # Rewrite rules
+        # Rewrite rules:
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Backends
         f"use_backend {HTTPBackend.MESSAGE} if {ACL.MESSAGE}",
@@ -175,6 +179,7 @@ HTTPS_FRONTEND = Frontend(
     frontend_options=[
         "mode http",
         f"timeout client {CLIENT_TIMEOUT}",
+        f"timeout server {SERVER_TIMEOUT}",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
@@ -186,7 +191,7 @@ HTTPS_FRONTEND = Frontend(
         f"acl {ACL.API} path_beg -i /api",
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
-        # Rewrite rules
+        # Rewrite rules:
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Backends
         f"use_backend {HTTPSBackend.MESSAGE} if {ACL.MESSAGE}",
@@ -245,6 +250,22 @@ SERVICE_PORTS = {
     "hostagent-messenger": 50052,
     "ubuntu-installer-attach": 53354,
 }
+
+HAProxyServicePorts = Mapping[str, int]
+"""
+Configuration for the ports that Landscape services run on.
+
+Expects the following keys:
+- appserver
+- pingserver
+- message-server
+- api
+- package-upload
+- hostagent-messenger
+- ubuntu-installer-attach
+
+Each value is the port that service runs on.
+"""
 
 
 def get_redirect_directive(redirect_https: RedirectHTTPS) -> str | None:
@@ -305,7 +326,8 @@ def write_tls_cert(
 def copy_error_files_from_source(
     src_dir: str, error_files_config: dict = ERROR_FILES
 ) -> list[str]:
-    """Copy error files from a source directory into the configured
+    """
+    Copy error files from a source directory (Landscape) into the configured
     HAProxy errors location.
 
     :param src_dir: Path to source directory containing error files.
@@ -337,8 +359,8 @@ def create_http_service(
     peer_ips: list[IPvAnyAddress],
     leader_ip: IPvAnyAddress,
     worker_counts: int,
+    service_ports: "HAProxyServicePorts" = SERVICE_PORTS,
     server_options: str = SERVER_OPTIONS,
-    service_ports: dict = SERVICE_PORTS,
 ) -> Service:
     (appservers, pingservers, message_servers, api_servers) = [
         [
@@ -356,7 +378,7 @@ def create_http_service(
 
     package_upload_servers = [
         Server(
-            name=f"landscape-package-upload-{str(leader_ip).replace('.', '-')}-0",
+            name="landscape-leader-package-upload",
             ip=str(leader_ip),
             port=service_ports["package-upload"],
             options=server_options,
@@ -365,7 +387,7 @@ def create_http_service(
 
     leader_appservers = [
         Server(
-            name=f"landscape-appserver-{str(leader_ip).replace('.', '-')}-{i}",
+            name=f"landscape-leader-appserver-{i}",
             ip=str(leader_ip),
             port=service_ports["appserver"] + i,
             options=server_options,
@@ -374,7 +396,7 @@ def create_http_service(
     ]
 
     backends = [
-        Backend(backend_name=HTTPBackend.APPSERVER, servers=appservers),
+        Backend(backend_name=HTTPBackend.REPOSITORY, servers=appservers),
         Backend(backend_name=HTTPBackend.PING, servers=pingservers),
         Backend(backend_name=HTTPBackend.MESSAGE, servers=message_servers),
         Backend(backend_name=HTTPBackend.API, servers=api_servers),
@@ -387,7 +409,7 @@ def create_http_service(
     return Service(
         frontend=HTTP_FRONTEND,
         backends=backends,
-        default_backend=str(HTTPBackend.APPSERVER),
+        default_backend=str(HTTPBackend.REPOSITORY),
     )
 
 
@@ -398,6 +420,12 @@ def create_https_service(
     server_options: str = SERVER_OPTIONS,
     service_ports: dict = SERVICE_PORTS,
 ) -> Service:
+    """
+    Create the Landscape HTTPS `services` configurations for HAProxy.
+
+    NOTE: Only the leader should have servers for the package-upload and
+    hashid-databases backends.
+    """
     (appservers, pingservers, message_servers, api_servers) = [
         [
             Server(
@@ -414,7 +442,7 @@ def create_https_service(
 
     package_upload_servers = [
         Server(
-            name=f"landscape-package-upload-{str(leader_ip).replace('.', '-')}-0",
+            name="landscape-leader-package-upload",
             ip=str(leader_ip),
             port=service_ports["package-upload"],
             options=server_options,
@@ -423,7 +451,7 @@ def create_https_service(
 
     leader_appservers = [
         Server(
-            name=f"landscape-appserver-{str(leader_ip).replace('.', '-')}-{i}",
+            name=f"landscape-leader-appserver-{i}",
             ip=str(leader_ip),
             port=service_ports["appserver"] + i,
             options=server_options,
@@ -432,7 +460,7 @@ def create_https_service(
     ]
 
     backends = [
-        Backend(backend_name=HTTPSBackend.APPSERVER, servers=appservers),
+        Backend(backend_name=HTTPSBackend.REPOSITORY, servers=appservers),
         Backend(backend_name=HTTPSBackend.PING, servers=pingservers),
         Backend(backend_name=HTTPSBackend.MESSAGE, servers=message_servers),
         Backend(backend_name=HTTPSBackend.API, servers=api_servers),
@@ -445,7 +473,7 @@ def create_https_service(
     return Service(
         frontend=HTTPS_FRONTEND,
         backends=backends,
-        default_backend=str(HTTPSBackend.APPSERVER),
+        default_backend=str(HTTPSBackend.REPOSITORY),
     )
 
 
@@ -456,7 +484,7 @@ def create_hostagent_messenger_service(
 ) -> Service:
     servers = [
         Server(
-            name=f"hostagent-{str(ip).replace('.', '-')}-0",
+            name=f"landscape-hostagent-messenger-{str(ip).replace('.', '-')}",
             ip=str(ip),
             port=service_ports["hostagent-messenger"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
@@ -480,7 +508,7 @@ def create_ubuntu_installer_attach_service(
 ) -> Service:
     servers = [
         Server(
-            name=f"ubuntu-installer-attach-{str(ip).replace('.', '-')}-0",
+            name=f"landscape-ubuntu-installer-attach-{str(ip).replace('.', '-')}",
             ip=str(ip),
             port=service_ports["ubuntu-installer-attach"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
