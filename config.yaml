@@ -228,3 +228,10 @@ options:
       an HAProxy frontend will be created to route traffic to the Ubuntu installer
       attach backend services. The backend services will be installed and uninstalled
       automatically.
+  max_global_haproxy_connections:
+    type: int
+    default: 4096
+    description: |
+      Maximum number of concurrent connections HAProxy will accept globally across all
+      frontends and backends. This sets the 'maxconn' value in the global section of
+      the HAProxy configuration.

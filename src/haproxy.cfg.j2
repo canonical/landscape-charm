@@ -1,221 +1,162 @@
 global
-    log /dev/log local0
-    log /dev/log local1 notice
-    maxconn 4096
-    user haproxy
-    group haproxy
-    spread-checks 0
+{% for option in global_options %}
+    {{ option }}
+{% endfor %}
+
     tune.ssl.default-dh-param 2048
     ssl-default-bind-ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:!DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:!DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:!CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA
     ssl-default-bind-options no-tlsv10
 
 defaults
-    log global
-    mode http
-    option httplog
-    option dontlognull
-    retries 3
-    timeout queue 60000
-    timeout connect 5000
-    timeout client 120000
-    timeout server 120000
+{% for option in default_options %}
+    {{ option }}
+{% endfor %}
 
     {% for status, filename in error_files.items() %}
     errorfile {{ status }} {{ error_files_root }}/{{ filename }}
     {% endfor %}
 
 frontend landscape-http
-    bind [::]:80 v4v6
-    mode http
-    timeout client 300000
-    balance leastconn
-    option httpchk HEAD / HTTP/1.0
+    bind [::]:{{ http_service.service_port }} v4v6
+{% for option in http_service.service_options %}
+    {{ option }}
+{% endfor %}
 
-    acl ping path_beg -i /ping
-    acl repository path_beg -i /repository
-    acl message path_beg -i /message-system
-    acl attachment path_beg -i /attachment
-    acl api path_beg -i /api
-    acl hashids path_beg -i /hash-id-databases
-    acl package_upload path_beg -i /upload
-
-    acl metrics path_end /metrics
-    acl prometheus_metrics path_beg -i /metrics
-    http-request deny if metrics
-    http-request deny if prometheus_metrics
-
-    {% if https_redirect == 'all' %}
-    redirect scheme https
-    {% elif https_redirect == 'default' %}
-    redirect scheme https unless ping || repository
+    {% if redirect_directive %}
+    {{ redirect_directive }}
     {% endif %}
-
-    http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
-
-    use_backend landscape-http-message if message
-    use_backend landscape-http-message if attachment
-    use_backend landscape-http-api if api
-    use_backend landscape-http-ping if ping
-    use_backend landscape-http-hashid-databases if hashids
-    use_backend landscape-http-package-upload if package_upload
 
     default_backend landscape-http-appserver
 
 frontend landscape-https
-    bind [::]:443 v4v6 ssl crt {{ ssl_cert_path }}
-    mode http
-    timeout client 300000
-    balance leastconn
-    option httpchk HEAD / HTTP/1.0
-    http-request set-header X-Forwarded-Proto https
-
-    acl ping path_beg -i /ping
-    acl repository path_beg -i /repository
-    acl message path_beg -i /message-system
-    acl attachment path_beg -i /attachment
-    acl api path_beg -i /api
-    acl hashids path_beg -i /hash-id-databases
-    acl package_upload path_beg -i /upload
-
-    acl metrics path_end /metrics
-    acl prometheus_metrics path_beg -i /metrics
-    http-request deny if metrics
-    http-request deny if prometheus_metrics
-
-    http-request replace-path ^([^\ ]*)\ /upload/(.*) /\1
-
-    use_backend landscape-https-message if message
-    use_backend landscape-https-message if attachment
-    use_backend landscape-https-api if api
-    use_backend landscape-https-ping if ping
-    use_backend landscape-https-hashid-databases if hashids
-    use_backend landscape-https-package-upload if package_upload
+    bind [::]:{{ https_service.service_port }} v4v6 ssl crt {{ ssl_cert_path }}
+{% for option in https_service.service_options %}
+    {{ option }}
+{% endfor %}
 
     default_backend landscape-https-appserver
 
 {% if enable_hostagent_messenger %}
 frontend landscape-grpc
-    mode http
-    bind [::]:6554 v4v6 proto h2 ssl crt {{ ssl_cert_path }}
+    bind [::]:{{ grpc_service.service_port }} v4v6 proto h2 ssl crt {{ ssl_cert_path }}
+{% for option in grpc_service.service_options %}
+    {{ option }}
+{% endfor %}
+
     default_backend landscape-grpc-backend
 {% endif %}
 
 {% if enable_ubuntu_installer_attach %}
 frontend landscape-ubuntu-installer-attach
-    mode http
-    bind [::]:50051 v4v6 proto h2 ssl crt {{ ssl_cert_path }}
-
-    acl host_found hdr(host) -m found
-    http-request set-var(req.full_fqdn) hdr(authority) if !host_found
-    http-request set-var(req.full_fqdn) hdr(host) if host_found
-    http-request set-header X-FQDN %[var(req.full_fqdn)]
+    bind [::]:{{ ubuntu_installer_attach_service.service_port }} v4v6 proto h2 ssl crt {{ ssl_cert_path }}
+{% for option in ubuntu_installer_attach_service.service_options %}
+    {{ option }}
+{% endfor %}
 
     default_backend landscape-ubuntu-installer-attach-backend
 {% endif %}
 
-{% set default_opts = "check inter 5000 rise 2 fall 5 maxconn 50" %}
-
 backend landscape-http-appserver
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server appserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['appserver'] + i }} {{ default_opts }}
+    server appserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['appserver'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-http-ping
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server pingserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['pingserver'] + i }} {{ default_opts }}
+    server pingserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['pingserver'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-http-message
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server message-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['message-server'] + i }} {{ default_opts }}
+    server message-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['message-server'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-http-api
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server api-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['api'] + i }} {{ default_opts }}
+    server api-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['api'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-https-appserver
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server appserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['appserver'] + i }} {{ default_opts }}
+    server appserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['appserver'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-https-ping
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server pingserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['pingserver'] + i }} {{ default_opts }}
+    server pingserver-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['pingserver'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-https-message
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server message-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['message-server'] + i }} {{ default_opts }}
+    server message-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['message-server'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-https-api
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for ip in peer_ips %}
     {% for i in range(worker_counts) %}
-    server api-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['api'] + i }} {{ default_opts }}
+    server api-{{ ip | replace('.', '-') }}-{{ i }} {{ ip }}:{{ ports['api'] + i }} {{ default_server_options }}
     {% endfor %}
     {% endfor %}
 
 backend landscape-http-package-upload
     mode http
-    timeout server 300000
-    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_opts }}
+    timeout server {{ default_server_timeout }}
+    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_server_options }}
 
 backend landscape-http-hashid-databases
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for i in range(worker_counts) %}
-    server appserver-leader-{{ i }} {{ leader_address }}:{{ ports['appserver'] + i }} {{ default_opts }}
+    server appserver-leader-{{ i }} {{ leader_address }}:{{ ports['appserver'] + i }} {{ default_server_options }}
     {% endfor %}
 
 backend landscape-https-package-upload
     mode http
-    timeout server 300000
-    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_opts }}
+    timeout server {{ default_server_timeout }}
+    server package-upload-0 {{ leader_address }}:{{ ports['package-upload'] }} {{ default_server_options }}
 
 backend landscape-https-hashid-databases
     mode http
-    timeout server 300000
+    timeout server {{ default_server_timeout }}
     {% for i in range(worker_counts) %}
-    server appserver-leader-{{ i }} {{ leader_address }}:{{ ports['appserver'] + i }} {{ default_opts }}
+    server appserver-leader-{{ i }} {{ leader_address }}:{{ ports['appserver'] + i }} {{ default_server_options }}
     {% endfor %}
 
 {% if enable_hostagent_messenger %}
 backend landscape-grpc-backend
     mode http
     {% for ip in peer_ips %}
-    server hostagent-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['hostagent-messenger'] }} proto h2 {{ default_opts }}
+    server hostagent-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['hostagent-messenger'] }} {{ grpc_service.server_options }} {{ default_server_options }}
     {% endfor %}
 {% endif %}
 
@@ -223,6 +164,6 @@ backend landscape-grpc-backend
 backend landscape-ubuntu-installer-attach-backend
     mode http
     {% for ip in peer_ips %}
-    server ubuntu-installer-attach-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['ubuntu-installer-attach'] }} proto h2 {{ default_opts }}
+    server ubuntu-installer-attach-{{ ip | replace('.', '-') }}-0 {{ ip }}:{{ ports['ubuntu-installer-attach'] }} {{ ubuntu_installer_attach_service.server_options }} {{ default_server_options }}
     {% endfor %}
 {% endif %}

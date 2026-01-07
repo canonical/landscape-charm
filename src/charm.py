@@ -711,21 +711,10 @@ class LandscapeServerCharm(CharmBase):
 
         # Copy Landscape's error files to HAProxy error dir
         error_src = "/opt/canonical/landscape/canonical/landscape/offline"
-        error_dst = haproxy.ERROR_FILES["location"]
-        if os.path.exists(error_src):
-            try:
-                for filename in haproxy.ERROR_FILES["files"].values():
-                    src_file = os.path.join(error_src, filename)
-                    dst_file = os.path.join(error_dst, filename)
-                    if os.path.exists(src_file):
-                        with open(src_file, "rb") as f:
-                            fp = f.read()
-                            haproxy.write_file(fp, dst_file)
-
-            except (OSError, ValueError) as e:
-                raise haproxy.HAProxyError(
-                    "Failed to copy error files to HAProxy: %s", e
-                )
+        try:
+            haproxy.copy_error_files_from_source(error_src, haproxy.ERROR_FILES)
+        except haproxy.HAProxyError as e:
+            raise
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1181,10 +1170,7 @@ class LandscapeServerCharm(CharmBase):
         combined_pem = str(provider_certificate.certificate) + "\n" + str(private_key)
 
         try:
-            haproxy.write_file(
-                combined_pem.encode(),
-                haproxy.HAPROXY_CERT_PATH,
-            )
+            haproxy.write_ssl_cert(combined_pem.encode())
 
         except (OSError, ValueError) as e:
             logger.error("Failed to write TLS certificate for HAProxy: %s", str(e))
@@ -1198,12 +1184,10 @@ class LandscapeServerCharm(CharmBase):
                 all_ips=peer_ips.all_ips,
                 leader_ip=peer_ips.leader_ip,
                 worker_counts=self.charm_config.worker_counts,
-                # TODO: Make service base port configurable
-                ports=haproxy.PORTS,
-                ssl_cert_path=haproxy.HAPROXY_CERT_PATH,
                 redirect_https=self.charm_config.redirect_https,
                 enable_hostagent_messenger=self.charm_config.enable_hostagent_messenger,
                 enable_ubuntu_installer_attach=self._stored.enable_ubuntu_installer_attach,
+                max_connections=self.charm_config.max_global_haproxy_connections,
             )
 
         except CalledProcessError as e:

@@ -66,6 +66,7 @@ class LandscapeCharmConfiguration(BaseModel):
     redirect_https: RedirectHTTPS
     enable_hostagent_messenger: bool
     enable_ubuntu_installer_attach: bool
+    max_global_haproxy_connections: int
 
     @root_validator(skip_on_failure=True)
     def openid_oidc_exclusive(cls, values):
