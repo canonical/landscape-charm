@@ -182,62 +182,110 @@ def get_session(
     return session
 
 
-def _supports_legacy_pgsql(juju: jubilant.Juju) -> bool:
-    app = juju.status().apps["postgresql"]
-    return "db-admin" in app.relations
+def _has_legacy_pg(juju: jubilant.Juju) -> bool:
+    pg = juju.status().apps["postgresql"]
+    return "db-admin" in pg.relations
+
+
+def _has_modern_pg(juju: jubilant.Juju) -> bool:
+    pg = juju.status().apps["postgresql"]
+    return "database" in pg.relations
+
+
+def _supports_legacy_pg(juju: jubilant.Juju) -> bool:
+    pg = juju.status().apps["postgresql"]
+    # '14/x' and 'latest/x' tracks support legacy
+    return "14" in pg.charm_channel or "latest" in pg.charm_channel
 
 
 def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
     relations = set(juju.status().apps["landscape-server"].relations)
 
+    # Used to have modern, needs it back
     if "database" in expected and "database" not in relations:
-        juju.integrate("landscape-server:database", "postgresql:database")
-    if "database" not in expected and "database" in relations:
-        juju.remove_relation("landscape-server", "postgresql")
+        # Will error if both are integrated at the same time
+        if "db" in relations:
+            juju.remove_relation(
+                "landscape-server:db", "postgresql:db-admin", force=True
+            )
+            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
 
+        juju.integrate("landscape-server:database", "postgresql:database")
+
+    elif "database" not in expected and "database" in relations:
+        juju.remove_relation(
+            "landscape-server:database", "postgresql:database", force=True
+        )
+        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+
+    # Refresh after they might have changed
     relations = set(juju.status().apps["landscape-server"].relations)
 
-    if _supports_legacy_pgsql(juju):
+    # Supports for legacy was dropped in PG 16+
+    if _supports_legacy_pg(juju):
+        # Used to have legacy, needs it back
         if "db" in expected and "db" not in relations:
+            # Will error if both are integrated at the same time
+            if "database" in relations:
+                juju.remove_relation(
+                    "landscape-server:database", "postgresql:database", force=True
+                )
+                juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+
             juju.integrate("landscape-server:db", "postgresql:db-admin")
-        if "db" not in expected and "db" in relations:
-            juju.remove_relation("landscape-server:db", "postgresql:db-admin")
+
+        elif "db" not in expected and "db" in relations:
+            juju.remove_relation(
+                "landscape-server:db", "postgresql:db-admin", force=True
+            )
+            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
 
 
-def test_prefers_modern_database_relation(juju: jubilant.Juju, bundle: None):
+def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
+    """
+    Test the modern `database` interface.
+    """
     status = juju.status()
     initial_relations = set(status.apps["landscape-server"].relations)
 
-    if "database" not in initial_relations:
-        juju.integrate("landscape-server:database", "postgresql:database")
-    if _supports_legacy_pgsql(juju) and "db" not in initial_relations:
-        juju.integrate("landscape-server:db", "postgresql:db-admin")
+    if "db" in initial_relations:
+        juju.remove_relation("landscape-server:db", "postgresql:db-admin", force=True)
+        juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
 
-    juju.wait(jubilant.all_active, timeout=120)
+        juju.integrate("landscape-server:database", "postgresql:database")
+
+    elif "database" not in initial_relations:
+        juju.integrate("landscape-server:database", "postgresql:database")
+        juju.wait(lambda status: _has_modern_pg(juju), timeout=120)
+
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "database" in relations
-    if _supports_legacy_pgsql(juju):
-        assert "db" in relations
-    else:
-        assert "db" not in relations
 
     _restore_db_relations(juju, initial_relations)
 
 
-def test_falls_back_to_legacy_relation(juju: jubilant.Juju, bundle: None):
-    if not _supports_legacy_pgsql(juju):
+def test_legacy_db_relation(juju: jubilant.Juju, bundle: None):
+    """
+    Test the legacy `db` interface.
+    """
+    if not _supports_legacy_pg(juju):
         pytest.skip("Legacy pgsql relation not available on this PostgreSQL charm")
 
     status = juju.status()
     initial_relations = set(status.apps["landscape-server"].relations)
 
     if "database" in initial_relations:
-        juju.remove_relation("landscape-server:database", "postgresql:database")
-    if "db" not in initial_relations:
+        juju.remove_relation(
+            "landscape-server:database", "postgresql:database", force=True
+        )
+        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
         juju.integrate("landscape-server:db", "postgresql:db-admin")
 
-    juju.wait(jubilant.all_active, timeout=120)
+    elif "db" not in initial_relations:
+        juju.integrate("landscape-server:db", "postgresql:db-admin")
+        juju.wait(lambda status: _has_legacy_pg(juju), timeout=120)
+
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "db" in relations
