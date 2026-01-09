@@ -16,7 +16,7 @@ charm-libs:
 
 parts:
   charm:
-    plugin: poetry
+    plugin: charm
     source: .
     # Based on: https://github.com/canonical/mysql-operator/blob/bd8b3ddabe24d6bcb1b181c4ecedf8515cd98ce0/charmcraft.yaml#L56-L80
     build-packages:
