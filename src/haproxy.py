@@ -1,6 +1,5 @@
 from enum import Enum
 import os
-from pathlib import Path
 import pwd
 import subprocess
 from subprocess import CalledProcessError
@@ -12,7 +11,7 @@ from charmlibs.interfaces.tls_certificates import (
 )
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v1 import systemd
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, IPvAnyAddress
 
 from config import RedirectHTTPS
@@ -25,7 +24,7 @@ HAPROXY_RENDERED_CONFIG_PATH = "/etc/haproxy/haproxy.cfg"
 HAPROXY_USER = "haproxy"
 HAPROXY_SERVICE = "haproxy"
 HAPROXY_EXECUTABLE = "/usr/sbin/haproxy"
-HAPROXY_TMPL = Path("haproxy.cfg.j2")
+LOCAL_JINJA_TMPL_PATH = "haproxy.cfg.j2"
 
 
 class HAProxyError(Exception):
@@ -540,15 +539,15 @@ def render_config(
     error_files=ERROR_FILES["files"],
     server_timeout: int = SERVER_TIMEOUT,
     server_options: str = SERVER_OPTIONS,
-    template_path: Path = HAPROXY_TMPL,
+    template_path: str = LOCAL_JINJA_TMPL_PATH,
 ) -> str:
     """Render the HAProxy config with the given context.
 
     :param all_ips: A list of IP addresses of all peer units
     :param leader_ip: The IP address of the leader unit
     :param worker_counts: The number of worker processes configured
-    :param redirect_https: Whether to redirect HTTP to HTTPS
-    :param enable_hostagent_messenger: Whether to create a frontend/backend for the hostagent messenger service
+    :param redirect_https: A `RedirectHTTPS` settings to determine how to redirect HTTP to HTTPS
+    :param enable_hostagent_messenger: Whether to create a frontend/backend for the Hostagent Messenger service
     :param enable_ubuntu_installer_attach: Whether to create a frontend/backend for the Ubuntu Installer Attach service
     :param max_connections: Maximum concurrent connections for HAProxy, defaults to 4096
     :param ssl_cert_path: The path of the SSL certificate to use for the HAProxy service,
@@ -561,7 +560,7 @@ def render_config(
         `error_files_directory`, defaults to ERROR_FILES["files"]
     :param server_timeout: Timeout for backend servers in milliseconds, defaults to SERVER_TIMEOUT
     :param server_options: Options for all backend servers, defaults to SERVER_OPTIONS
-    :param template_path: Path to the Jinja2 template file, defaults to HAPROXY_TMPL
+    :param template_path: Path to the Jinja2 template file, defaults to LOCAL_JINJA_TMPL_PATH
 
     :raises HAProxyError: Failed to write the HAProxy configuration file!
 
@@ -601,11 +600,14 @@ def render_config(
             service_ports=service_ports,
         )
 
-    template_file_path = os.path.join(os.path.dirname(__file__), template_path.name)
-    with open(template_file_path) as f:
-        template_content = f.read()
+    env = Environment(
+        loader=FileSystemLoader("src"),
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
 
-    template = Template(template_content)
+    template = env.get_template(template_path)
 
     context = {
         "ssl_cert_path": ssl_cert_path,
@@ -621,9 +623,6 @@ def render_config(
     }
 
     rendered = template.render(context)
-
-    if not rendered.endswith("\n"):
-        rendered += "\n"
 
     try:
         write_file(rendered.encode(), rendered_config_path, 0o644)

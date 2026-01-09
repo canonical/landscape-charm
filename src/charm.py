@@ -101,6 +101,7 @@ BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 AUTOREGISTRATION_SCRIPT = os.path.join(os.path.dirname(__file__), "autoregistration.py")
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 UPDATE_WSL_DISTRIBUTIONS_SCRIPT = "/opt/canonical/landscape/update-wsl-distributions"
+LANDSCAPE_ERROR_FILES_DIR = "/opt/canonical/landscape/canonical/landscape/offline"
 
 LANDSCAPE_SERVER = "landscape-server"
 LANDSCAPE_PACKAGES = (
@@ -710,9 +711,8 @@ class LandscapeServerCharm(CharmBase):
             raise e
 
         # Copy Landscape's error files to HAProxy error dir
-        error_src_dir = "/opt/canonical/landscape/canonical/landscape/offline"
         try:
-            haproxy.copy_error_files_from_source(error_src_dir)
+            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
         except haproxy.HAProxyError as e:
             logger.error("Failed to copy error files: %s", str(e))
             raise e

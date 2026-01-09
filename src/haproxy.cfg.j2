@@ -81,6 +81,7 @@ backend {{ backend.backend_name }}
     {% for server in backend.servers %}
     server {{ server.name }} {{ server.ip }}:{{ server.port }} {{ server.options }}
     {% endfor %}
+{{ '\n' }}
 {% endfor %}
 
 {% for backend in https_service.backends %}
@@ -90,6 +91,7 @@ backend {{ backend.backend_name }}
     {% for server in backend.servers %}
     server {{ server.name }} {{ server.ip }}:{{ server.port }} {{ server.options }}
     {% endfor %}
+{{ '\n' }}
 {% endfor %}
 
 {% if hostagent_messenger_service %}
@@ -100,6 +102,7 @@ backend {{ backend.backend_name }}
     {% for server in backend.servers %}
     server {{ server.name }} {{ server.ip }}:{{ server.port }} {{ server.options }}
     {% endfor %}
+{{ '\n' }}
 {% endfor %}
 {% endif %}
 
@@ -111,5 +114,6 @@ backend {{ backend.backend_name }}
     {% for server in backend.servers %}
     server {{ server.name }} {{ server.ip }}:{{ server.port }} {{ server.options }}
     {% endfor %}
+{{ '\n' }}
 {% endfor %}
 {% endif %}
