@@ -8,12 +8,6 @@ import pathlib
 import jubilant
 import pytest
 
-CHARM_ARTIFACT_NAME = "landscape-server_ubuntu@22.04-amd64.charm"
-"""
-The name of the packed landscape-server charm.
-"""
-
-
 BUNDLE_NAME = "bundle.yaml"
 """
 The name of the bundle used for integration testing.

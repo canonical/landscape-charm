@@ -942,9 +942,9 @@ class LandscapeServerCharm(CharmBase):
         )
 
         if not self.unit.is_leader():
-            logger.info(f"{self.unit.name} is not the leader unit...")
             self._stored.ready["db"] = True
             self.unit.status = ActiveStatus("Unit is ready")
+            self._update_ready_status(restart_services=True)
             return
 
         roles = get_postgres_roles(db_ctx.version)
