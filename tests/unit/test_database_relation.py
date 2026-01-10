@@ -106,18 +106,39 @@ class TestDatabaseRelation:
 
     def test_database_relation_changed_not_leader(self):
         ctx = Context(LandscapeServerCharm)
-        relation = Relation("database", remote_app_name="postgresql")
+        relation = Relation(
+            "database",
+            remote_app_name="postgresql",
+        )
         state_in = self._state(relation=relation, leader=False)
 
-        with ctx(ctx.on.start(), state_in) as manager:
-            manager.charm._database_relation_changed(
-                mock.create_autospec(DatabaseCreatedEvent)
+        with (
+            patch("charm.update_db_conf") as update_db_conf,
+            patch("charm.fetch_postgres_relation_data") as fetch_mock,
+        ):
+            fetch_mock.return_value = DatabaseConnectionContext(
+                host="1.2.3.4",
+                port="5432",
+                username="landscape",
+                password="secret",
+                version="14.8",
             )
-            status = manager.charm.unit.status
-            ready = dict(manager.charm._stored.ready)
+
+            with ctx(ctx.on.start(), state_in) as manager:
+                manager.charm.database = Mock()
+                with patch.object(
+                    manager.charm, "_update_ready_status"
+                ) as update_ready:
+                    manager.charm._database_relation_changed(
+                        mock.create_autospec(DatabaseCreatedEvent)
+                    )
+                    status = manager.charm.unit.status
+                    ready = dict(manager.charm._stored.ready)
 
         assert isinstance(status, ActiveStatus)
         assert ready["db"] is True
+        update_db_conf.assert_called_once()
+        update_ready.assert_called_once_with(restart_services=True)
 
     def test_database_relation_missing_fields(self):
         ctx = Context(LandscapeServerCharm)
