@@ -11,8 +11,12 @@ platforms:
 charm-libs:
   - lib: data_platform_libs.data_interfaces
     version: "0"
+  - lib: traefik_k8s.ingress
+    version: "2"
 
 parts:
   charm:
     plugin: charm
     source: .
+    charm-python-packages:
+      - charmlibs-interfaces-tls-certificates

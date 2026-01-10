@@ -1,5 +1,4 @@
 from configparser import ConfigParser
-from unittest.mock import patch
 
 import pytest
 
@@ -33,18 +32,3 @@ def capture_service_conf(tmp_path, monkeypatch) -> ConfigReader:
     monkeypatch.setattr(settings_files, "SERVICE_CONF", str(conf_file))
 
     return ConfigReader(conf_file)
-
-
-@pytest.fixture(autouse=True)
-def get_haproxy_error_files():
-    """
-    Return empty HAProxy error files.
-
-    This is set to `autouse=True` to avoid any attempts to read the HAProxy error files
-    from their installed location in /opt/canonical/...`, which is not present in a test
-    environment.
-    """
-
-    with patch("charm.get_haproxy_error_files") as m:
-        m.return_value = ()
-        yield m

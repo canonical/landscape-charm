@@ -5,7 +5,7 @@ MODEL_NAME ?= $(DIR_NAME)-build
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
-
+SKIP_ADD_MODEL ?= false
 
 .PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
@@ -38,7 +38,7 @@ build:
 deploy:
 	@if [ "$(SKIP_CLEAN)" != "true" ]; then $(MAKE) clean; else echo "skipping clean..."; fi
 	@if [ "$(SKIP_BUILD)" != "true" ]; then $(MAKE) build; else echo "skipping build..."; fi
-	juju add-model $(MODEL_NAME)
+	@if [ "$(SKIP_ADD_MODEL)" != "true" ]; then juju add-model $(MODEL_NAME); else echo "skipping add-model..."; fi
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
 terraform-test:
