@@ -36,9 +36,6 @@ def test_defaults():
 
     assert config.smtp_relay_host == ""
 
-    assert config.ssl_cert == "DEFAULT"
-    assert config.ssl_key == ""
-
     assert config.http_proxy is None
     assert config.https_proxy is None
     assert config.no_proxy is None
@@ -65,6 +62,7 @@ def test_defaults():
 
     assert not config.enable_hostagent_messenger
     assert not config.enable_ubuntu_installer_attach
+    assert config.max_global_haproxy_connections == 4096
 
 
 @pytest.mark.parametrize(

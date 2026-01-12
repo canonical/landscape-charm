@@ -15,11 +15,9 @@ from settings_files import (
     LicenseFileReadException,
     merge_service_conf,
     prepend_default_settings,
-    SSLCertReadException,
     update_default_settings,
     update_service_conf,
     write_license_file,
-    write_ssl_cert,
 )
 
 
@@ -338,31 +336,3 @@ class WriteLicenseFileTestCase(TestCase):
             1000,
             1000,
         )
-
-
-class WriteSSLCertTestCase(TestCase):
-
-    def test_write(self):
-        """
-        Tests that we can write a b64-encoded string to the correct
-        path.
-        """
-        outfile = CapturingBytesIO()
-
-        with patch("builtins.open") as open_mock:
-            open_mock.return_value = outfile
-            write_ssl_cert(b64encode(b"SSL CERT").decode())
-
-        self.assertEqual(outfile.captured, b"SSL CERT")
-
-    def test_b64_error(self):
-        """
-        Tests that an SSLCertReadException is raised if the cert is
-        invalid b64.
-        """
-        with patch("builtins.open"):
-            self.assertRaises(
-                SSLCertReadException,
-                write_ssl_cert,
-                "notvalidb64haha",
-            )
