@@ -41,9 +41,6 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
-from charms.traefik_k8s.v2.ingress import (
-    IngressPerAppRequirer,
-)
 from ops import main
 from ops.charm import (
     ActionEvent,
@@ -278,9 +275,6 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
-        self.framework.observe(
-            self.on.get_certificates_action, self._on_get_certificates_action
-        )
 
         # State
         self._stored.set_default(
@@ -319,36 +313,6 @@ class LandscapeServerCharm(CharmBase):
             self.charm_config = DEFAULT_CONFIGURATION
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
-            )
-
-        self.http_ingress = IngressPerAppRequirer(
-            self,
-            port=haproxy.FrontendPort.HTTP,
-            relation_name="http-ingress",
-            redirect_https=True,
-        )
-
-        self.https_ingress = IngressPerAppRequirer(
-            self,
-            port=haproxy.FrontendPort.HTTPS,
-            relation_name="https-ingress",
-            redirect_https=True,
-        )
-
-        if self.charm_config.enable_hostagent_messenger:
-            self.hostagent_messenger_ingress = IngressPerAppRequirer(
-                self,
-                relation_name="hostagent-messenger-ingress",
-                port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
-                redirect_https=True,
-            )
-
-        if self.charm_config.enable_ubuntu_installer_attach:
-            self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
-                self,
-                relation_name="ubuntu-installer-attach-ingress",
-                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTTACH,
-                redirect_https=True,
             )
 
         self.lb_certificates = TLSCertificatesRequiresV4(
@@ -1103,26 +1067,6 @@ class LandscapeServerCharm(CharmBase):
 
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
-
-    def _on_get_certificates_action(self, event: ActionEvent) -> None:
-        cert_attrs = self._get_certificate_request_attributes()
-        if not cert_attrs:
-            event.fail("TLS certificate not available!")
-            return
-
-        provider_certificate, _ = self.lb_certificates.get_assigned_certificate(
-            certificate_request=cert_attrs
-        )
-
-        event.set_results(
-            {
-                "certificate": str(provider_certificate.certificate),
-                "ca": str(provider_certificate.ca),
-                "chain": "\n\n".join(
-                    [str(cert) for cert in provider_certificate.chain]
-                ),
-            }
-        )
 
     def _update_haproxy(self) -> None:
         peer_ips = self.peer_ips
