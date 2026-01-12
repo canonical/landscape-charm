@@ -157,7 +157,7 @@ options:
     type: string
     default:
     description: |
-      Password used by database admin to perform schema checks and
+      Password used by database admin to perform schema checks and 
       migrations. If not set, postgres charm value, followed by
       db_landscape_password is used.
   deployment_mode:
