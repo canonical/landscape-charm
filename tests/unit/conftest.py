@@ -151,8 +151,8 @@ def certificate_and_key_fixture(
 
 
 @pytest.fixture(autouse=True)
-def haproxy_user_fixture(mocker):
-    mocker.patch.object(pwd, "getpwnam", autospec=True)
+def haproxy_user_fixture(monkeypatch):
+    monkeypatch.setattr(pwd, "getpwnam", Mock())
 
 
 @pytest.fixture(autouse=True)
