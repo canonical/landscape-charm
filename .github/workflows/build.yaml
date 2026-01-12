@@ -10,11 +10,11 @@ concurrency:
 on:
   pull_request:
     paths-ignore:
-      - ".gitignore"
-      - "LICENSE"
-      - "**.md"
-      - ".jujuignore"
-
+      - '.gitignore'
+      - 'LICENSE'
+      - '**.md'
+      - '.jujuignore'
+    
   # Triggered on push to branch "main" by .github/workflows/release.yaml
   # TODO: Actually add this workflow for our charm.
   workflow_call:
