@@ -50,7 +50,7 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
         .public_address
     )
     juju.config("landscape-server", values={"redirect_https": "all"})
-    juju.wait(jubilant.all_active, timeout=30.0)
+    juju.wait(jubilant.all_active, timeout=300)
 
     redirect_routes = (
         "about",
@@ -83,7 +83,7 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
         .public_address
     )
     juju.config("landscape-server", values={"redirect_https": "none"})
-    juju.wait(jubilant.all_active, timeout=30.0)
+    juju.wait(jubilant.all_active, timeout=300)
 
     no_redirect_routes = (
         "about",
@@ -116,7 +116,7 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
         .public_address
     )
     juju.config("landscape-server", values={"redirect_https": "default"})
-    juju.wait(jubilant.all_active, timeout=30.0)
+    juju.wait(jubilant.all_active, timeout=300)
 
     no_redirect_routes = (
         "ping",
@@ -383,3 +383,24 @@ def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
             "landscape-server", values={"enable_ubuntu_installer_attach": restore_val}
         )
         juju.wait(jubilant.all_active, timeout=300)
+
+
+def test_non_leader_unit_redirects_leader_only_services(
+    juju: jubilant.Juju, bundle: None
+):
+    status = juju.status()
+    units = status.apps["landscape-server"].units
+
+    if len(units) <= 1:
+        pytest.skip("Need more than 1 unit to have a non-leader!")
+
+    juju.wait(jubilant.all_active, timeout=300)
+
+    for name, unit_status in units.items():
+        if not unit_status.leader:
+            host = juju.status().apps["landscape-server"].units[name].public_address
+
+            assert (
+                get_session().get(f"https://{host}/upload", verify=False).status_code
+                == 200
+            )

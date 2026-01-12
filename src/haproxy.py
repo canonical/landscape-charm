@@ -546,21 +546,30 @@ def render_config(
     :param all_ips: A list of IP addresses of all peer units
     :param leader_ip: The IP address of the leader unit
     :param worker_counts: The number of worker processes configured
-    :param redirect_https: A `RedirectHTTPS` settings to determine how to redirect HTTP to HTTPS
-    :param enable_hostagent_messenger: Whether to create a frontend/backend for the Hostagent Messenger service
-    :param enable_ubuntu_installer_attach: Whether to create a frontend/backend for the Ubuntu Installer Attach service
-    :param max_connections: Maximum concurrent connections for HAProxy, defaults to 4096
-    :param ssl_cert_path: The path of the SSL certificate to use for the HAProxy service,
-        defaults to HAPROXY_CERT_PATH
-    :param rendered_config_path: Path where the rendered config will be written, defaults to HAPROXY_RENDERED_CONFIG_PATH
-    :param service_ports: A mapping of services to their base ports, defaults to SERVICE_PORTS
-    :param error_files_directory: Directory where the Landscape error files are, defaults
-        to ERROR_FILES["location"]
-    :param error_files: A mapping of status codes (string) to the name of the error file in
-        `error_files_directory`, defaults to ERROR_FILES["files"]
-    :param server_timeout: Timeout for backend servers in milliseconds, defaults to SERVER_TIMEOUT
-    :param server_options: Options for all backend servers, defaults to SERVER_OPTIONS
-    :param template_path: Path to the Jinja2 template file, defaults to LOCAL_JINJA_TMPL_PATH
+    :param redirect_https: A `RedirectHTTPS` settings to determine how
+        to redirect HTTP to HTTPS
+    :param enable_hostagent_messenger: Whether to create a frontend/backend for the
+        Hostagent Messenger service
+    :param enable_ubuntu_installer_attach: Whether to create a frontend/backend for the
+        Ubuntu Installer Attach service
+    :param max_connections: Maximum concurrent connections for HAProxy,
+        defaults to 4096
+    :param ssl_cert_path: The path of the SSL certificate to use
+        for the HAProxy service, defaults to HAPROXY_CERT_PATH
+    :param rendered_config_path: Path where the rendered config will be written,
+        defaults to HAPROXY_RENDERED_CONFIG_PATH
+    :param service_ports: A mapping of services to their base ports,
+        defaults to SERVICE_PORTS
+    :param error_files_directory: Directory where the Landscape error files are,
+        defaults to ERROR_FILES["location"]
+    :param error_files: A mapping of status codes (string) to the name of the
+        error file in `error_files_directory`, defaults to ERROR_FILES["files"]
+    :param server_timeout: Timeout for backend servers in milliseconds,
+        defaults to SERVER_TIMEOUT
+    :param server_options: Options for all backend servers,
+        defaults to SERVER_OPTIONS
+    :param template_path: Path to the Jinja2 template file,
+        defaults to LOCAL_JINJA_TMPL_PATH
 
     :raises HAProxyError: Failed to write the HAProxy configuration file!
 
@@ -665,7 +674,8 @@ def validate_config(
 
     except CalledProcessError as e:
         raise HAProxyError(
-            f"Failed to validate HAProxy config! \nstdout: {str(e.stdout)}\nstderr: {str(e.stderr)}"
+            "Failed to validate HAProxy config!"
+            f"\nstdout: {str(e.stdout)}\nstderr: {str(e.stderr)}"
         )
 
 

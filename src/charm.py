@@ -299,6 +299,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(secret_token=None)
         self._stored.set_default(cookie_encryption_key=None)
         self._stored.set_default(enable_ubuntu_installer_attach=False)
+        self._stored.set_default(haproxy_config={})
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -405,7 +406,6 @@ class LandscapeServerCharm(CharmBase):
         all_ips = [unit_ip]
         leader_ip = unit_ip
 
-        logger.warning(f"replicas: {self.model.get_relation('replicas').data}")
         if replicas := self.model.get_relation("replicas"):
             leader_ip = replicas.data[self.app].get("leader-ip", unit_ip)
 
@@ -429,7 +429,7 @@ class LandscapeServerCharm(CharmBase):
         try:
             bind_address = network_binding.network.bind_address
         except ModelError as e:
-            logger.warning(f"No bind address found for `replics`: {str(e)}")
+            logger.warning(f"No bind address found for `replicas`: {str(e)}")
             return None
 
         if bind_address is not None:
@@ -1181,7 +1181,7 @@ class LandscapeServerCharm(CharmBase):
             return
 
         try:
-            haproxy.render_config(
+            rendered = haproxy.render_config(
                 all_ips=peer_ips.all_ips,
                 leader_ip=peer_ips.leader_ip,
                 worker_counts=self.charm_config.worker_counts,
@@ -1209,6 +1209,8 @@ class LandscapeServerCharm(CharmBase):
             logger.error("Failed to reload HAProxy: %s", str(e))
             self.unit.status = BlockedStatus("Failed to reload HAProxy!")
             return
+
+        self._stored.haproxy_config = rendered
 
         self._update_ready_status()
 
