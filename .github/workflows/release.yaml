@@ -12,6 +12,14 @@ on:
             - ".github/workflows/*.yaml"
 
 jobs:
+    tag:
+        name: Create charm refresh compatibility version git tag
+        uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v38.0.0
+        with:
+            track: "25.10"
+        permissions:
+            contents: write
+
     lint:
         name: Lint
         uses: ./.github/workflows/lint.yaml
@@ -29,13 +37,14 @@ jobs:
     release:
         name: Release charm
         needs:
+            - tag
             - lint
             - test
             - build
 
         uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v35.0.2
         with:
-            track: 25.10
+            track: "25.10"
             artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
         secrets:
             charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
