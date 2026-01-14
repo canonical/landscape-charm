@@ -1,11 +1,11 @@
 # Copyright 2026 Canonical Ltd.
-# See LICENSE file for licensing details.
 name: Release `main` to `25.10/edge` channel on Charmhub
 
 on:
     push:
         branches:
             - main
+
         paths-ignore:
             - "tests/**"
             - pyproject.toml
@@ -14,11 +14,11 @@ on:
 jobs:
     tag:
         name: Create charm refresh compatibility version git tag
-        uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v38.0.0
+        uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v40.0.2
         with:
             track: "25.10"
         permissions:
-            contents: write
+            contents: write # Needed to create git tag
 
     lint:
         name: Lint
@@ -42,11 +42,13 @@ jobs:
             - test
             - build
 
-        uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v35.0.2
+        uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v40.0.2
         with:
             track: "25.10"
             artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+
         secrets:
             charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+
         permissions:
             contents: write # Needed to create git tags
