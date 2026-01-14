@@ -1,6 +1,7 @@
 from enum import Enum
 import os
 import pwd
+import shutil
 import subprocess
 from subprocess import CalledProcessError
 from typing import Mapping
@@ -53,11 +54,11 @@ class ACL(str, Enum):
 class HTTPBackend(str, Enum):
 
     API = "landscape-http-api"
+    APPSERVER = "landscape-http-appserver"
     HASHIDS = "landscape-http-hashid-databases"
     MESSAGE = "landscape-http-message"
     PACKAGE_UPLOAD = "landscape-http-package-upload"
     PING = "landscape-http-ping"
-    APPSERVER = "landscape-http-appserver"
 
     def __str__(self) -> str:
         return self.value
@@ -66,11 +67,11 @@ class HTTPBackend(str, Enum):
 class HTTPSBackend(str, Enum):
 
     API = "landscape-https-api"
+    APPSERVER = "landscape-https-appserver"
     HASHIDS = "landscape-https-hashid-databases"
     MESSAGE = "landscape-https-message"
     PACKAGE_UPLOAD = "landscape-https-package-upload"
     PING = "landscape-https-ping"
-    APPSERVER = "landscape-https-appserver"
 
     def __str__(self) -> str:
         return self.value
@@ -81,9 +82,9 @@ UBUNTU_INSTALLER_ATTACH_BACKEND = "landscape-ubuntu-installer-attach"
 
 
 class FrontendName(str, Enum):
+    HOSTAGENT_MESSENGER = "landscape-hostagent-messenger"
     HTTP = "landscape-http"
     HTTPS = "landscape-https"
-    HOSTAGENT_MESSENGER = "landscape-hostagent-messenger"
     UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
 
     def __str__(self) -> str:
@@ -91,9 +92,9 @@ class FrontendName(str, Enum):
 
 
 class FrontendPort(int, Enum):
+    HOSTAGENT_MESSENGER = 6554
     HTTP = 80
     HTTPS = 443
-    HOSTAGENT_MESSENGER = 6554
     UBUNTU_INSTALLER_ATTTACH = 50051
 
     def __int__(self) -> int:
@@ -124,8 +125,8 @@ class Service(BaseModel):
     default_backend: str = ""
 
 
-CLIENT_TIMEOUT = 300000  # ms
-SERVER_TIMEOUT = 300000  # ms
+CLIENT_TIMEOUT = 5 * 60 * 1000  # 5 mins
+SERVER_TIMEOUT = 5 * 60 * 1000  # 5 mins
 DEFAULT_REDIRECT_SCHEME = "redirect scheme https unless ping OR repository"
 GRPC_SERVER_OPTIONS = "proto h2"
 """
@@ -284,7 +285,7 @@ def get_redirect_directive(redirect_https: RedirectHTTPS) -> str | None:
 
 def write_file(content: bytes, path: str, permissions=0o600, user=HAPROXY_USER) -> None:
     """
-    :raises ValueError: Given content is not bytes!
+    :raises ValueError: Invalid file content type!
     :raises OSError: Error reading or writing file or creating directories.
     """
     if not isinstance(content, bytes):
@@ -338,20 +339,44 @@ def copy_error_files_from_source(
     dst_dir = error_files_config.get("location", ERROR_FILES["location"])
     written_files = []
 
-    try:
-        for filename in error_files_config.get("files", {}).values():
-            src_file = os.path.join(src_dir, filename)
-            dst_file = os.path.join(dst_dir, filename)
-            if os.path.exists(src_file):
-                with open(src_file, "rb") as f:
-                    fp = f.read()
-                    write_file(fp, dst_file)
-                    written_files.append(dst_file)
+    os.makedirs(dst_dir, exist_ok=True)
+    for filename in error_files_config.get("files", {}).values():
+        src_file = os.path.join(src_dir, filename)
+        dst_file = os.path.join(dst_dir, filename)
+        if not os.path.exists(src_file):
+            continue
 
-    except OSError as e:
-        raise HAProxyError(f"Failed to copy error files to HAProxy: {e}")
+        shutil.copy2(src_file, dst_file)
+        shutil.chown(dst_file, user=HAPROXY_USER)
+        os.chmod(dst_file, 0o600)
+        written_files.append(dst_file)
 
     return written_files
+
+
+def sanitize_ip(ip: IPvAnyAddress | str) -> str:
+    """Return a dash-separated token safe for use in names from an IP.
+
+    Accepts either a string or an IPvAnyAddress-like object. For IPv6 scope
+    identifiers (e.g. 'fe80::1%eth0') the scope is appended after a dash.
+    Examples:
+      '192.0.2.1' -> '192-0-2-1'
+      '2001:db8::1' -> '2001-db8--1'
+      'fe80::1%eth0' -> 'fe80--1-eth0'
+    """
+    if not isinstance(ip, str):
+        ip = str(ip)
+
+    scope = None
+    if "%" in ip:
+        ip, scope = ip.split("%", 1)
+
+    cleaned = ip.replace(".", "-").replace(":", "-")
+
+    if scope:
+        cleaned = f"{cleaned}-{scope}"
+
+    return cleaned
 
 
 def create_http_service(
@@ -364,7 +389,7 @@ def create_http_service(
     (appservers, pingservers, message_servers, api_servers) = [
         [
             Server(
-                name=f"landscape-{name}-{str(ip).replace('.', '-')}-{i}",
+                name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
                 ip=str(ip),
                 port=service_ports[name] + i,
                 options=server_options,
@@ -422,13 +447,14 @@ def create_https_service(
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
 
-    NOTE: Only the leader should have servers for the package-upload and
-    hashid-databases backends.
+    NOTE: The servers for the package-upload and
+    hashid-databases backends are only from the leader unit but
+    exist on every unit.
     """
     (appservers, pingservers, message_servers, api_servers) = [
         [
             Server(
-                name=f"landscape-{name}-{str(ip).replace('.', '-')}-{i}",
+                name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
                 ip=str(ip),
                 port=service_ports[name] + i,
                 options=server_options,
@@ -483,7 +509,7 @@ def create_hostagent_messenger_service(
 ) -> Service:
     servers = [
         Server(
-            name=f"landscape-hostagent-messenger-{str(ip).replace('.', '-')}",
+            name=f"landscape-hostagent-messenger-{sanitize_ip(ip)}",
             ip=str(ip),
             port=service_ports["hostagent-messenger"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
@@ -507,7 +533,7 @@ def create_ubuntu_installer_attach_service(
 ) -> Service:
     servers = [
         Server(
-            name=f"landscape-ubuntu-installer-attach-{str(ip).replace('.', '-')}",
+            name=f"landscape-ubuntu-installer-attach-{sanitize_ip(ip)}",
             ip=str(ip),
             port=service_ports["ubuntu-installer-attach"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
