@@ -346,20 +346,11 @@ class LandscapeServerCharm(CharmBase):
             if parsed.hostname:
                 hostname = parsed.hostname
 
-        common_name = hostname or unit_ip
-
-        if hostname:
-            return CertificateRequestAttributes(
-                common_name=common_name,
-                sans_ip=[unit_ip],
-                sans_dns=[hostname],
-            )
-
-        else:
-            return CertificateRequestAttributes(
-                common_name=unit_ip,
-                sans_ip=[unit_ip],
-            )
+        return CertificateRequestAttributes(
+            common_name=hostname or unit_ip,
+            sans_ip=[unit_ip],
+            sans_dns=[hostname] if hostname else None,
+        )
 
     @property
     def peer_ips(self) -> PeerIPs | None:
@@ -374,12 +365,11 @@ class LandscapeServerCharm(CharmBase):
             leader_ip = replicas.data[self.app].get("leader-ip", unit_ip)
 
             for unit in replicas.units:
-                if unit != self.unit:
-                    if peer_unit_address := replicas.data[unit].get("private-address"):
-                        all_ips.append(peer_unit_address)
+                # NOTE: Replicas does not contain this unit
+                if peer_unit_address := replicas.data[unit].get("private-address"):
+                    all_ips.append(peer_unit_address)
 
         peer_ips = PeerIPs(all_ips=all_ips, leader_ip=leader_ip)
-        logger.warning(f"Peer IPs: {peer_ips}")
 
         return peer_ips
 
@@ -387,7 +377,6 @@ class LandscapeServerCharm(CharmBase):
     def unit_ip(self) -> str | None:
         network_binding = self.model.get_binding("replicas")
         if network_binding is None:
-            logger.warning("network_binding is None!")
             return None
 
         try:
@@ -396,12 +385,7 @@ class LandscapeServerCharm(CharmBase):
             logger.warning(f"No bind address found for `replicas`: {str(e)}")
             return None
 
-        if bind_address is not None:
-            return str(bind_address)
-
-        logger.warning("bind_address is None!")
-
-        return None
+        return str(bind_address) if bind_address else None
 
     def _generate_scrape_configs(self) -> list[dict]:
         """

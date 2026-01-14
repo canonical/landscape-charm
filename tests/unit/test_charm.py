@@ -635,6 +635,7 @@ class TestCharm(unittest.TestCase):
         with (
             patches as mocks,
             patch("haproxy.install"),
+            patch("haproxy.copy_error_files_from_source"),
             patch.object(LandscapeServerCharm, "_update_haproxy"),
         ):
             harness.begin_with_initial_hooks()
@@ -752,6 +753,7 @@ class TestCharm(unittest.TestCase):
         with (
             patches as mocks,
             patch("haproxy.install"),
+            patch("haproxy.copy_error_files_from_source"),
             patch.object(LandscapeServerCharm, "_update_haproxy"),
         ):
             harness.begin_with_initial_hooks()
@@ -782,6 +784,7 @@ class TestCharm(unittest.TestCase):
         with (
             patches as mocks,
             patch("haproxy.install"),
+            patch("haproxy.copy_error_files_from_source"),
             patch.object(LandscapeServerCharm, "_update_haproxy"),
         ):
             harness.begin_with_initial_hooks()
@@ -807,6 +810,7 @@ class TestCharm(unittest.TestCase):
                 write_license_file=DEFAULT,
             ) as mocks,
             patch("haproxy.install"),
+            patch("haproxy.copy_error_files_from_source"),
             patch.object(LandscapeServerCharm, "_update_haproxy"),
         ):
             harness.begin_with_initial_hooks()

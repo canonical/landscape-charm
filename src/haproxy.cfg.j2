@@ -30,15 +30,15 @@ defaults
     timeout client 120000
     timeout server 120000
 
-{% for status, filename in error_files.items() %}
+    {% for status, filename in error_files.items() %}
     errorfile {{ status }} {{ error_files_directory }}/{{ filename }}
-{% endfor %}
+    {% endfor %}
 
 frontend {{ http_service.frontend.frontend_name }}
     bind [::]:{{ http_service.frontend.frontend_port }} v4v6
-{% for option in http_service.frontend.frontend_options %}
+    {% for option in http_service.frontend.frontend_options %}
     {{ option }}
-{% endfor %}
+    {% endfor %}
 
     {% if redirect_directive %}
     {{ redirect_directive }}
@@ -48,18 +48,18 @@ frontend {{ http_service.frontend.frontend_name }}
 
 frontend {{ https_service.frontend.frontend_name }}
     bind [::]:{{ https_service.frontend.frontend_port }} v4v6 ssl crt {{ ssl_cert_path }}
-{% for option in https_service.frontend.frontend_options %}
+    {% for option in https_service.frontend.frontend_options %}
     {{ option }}
-{% endfor %}
+    {% endfor %}
 
     default_backend {{ https_service.default_backend }}
 
 {% if hostagent_messenger_service %}
 frontend {{ hostagent_messenger_service.frontend.frontend_name }}
     bind [::]:{{ hostagent_messenger_service.frontend.frontend_port }} v4v6 ssl crt {{ ssl_cert_path }} alpn h2,http/1.1
-{% for option in hostagent_messenger_service.frontend.frontend_options %}
+    {% for option in hostagent_messenger_service.frontend.frontend_options %}
     {{ option }}
-{% endfor %}
+    {% endfor %}
 
     default_backend {{ hostagent_messenger_service.default_backend }}
 {% endif %}
@@ -67,9 +67,9 @@ frontend {{ hostagent_messenger_service.frontend.frontend_name }}
 {% if ubuntu_installer_attach_service %}
 frontend {{ ubuntu_installer_attach_service.frontend.frontend_name }}
     bind [::]:{{ ubuntu_installer_attach_service.frontend.frontend_port }} v4v6 ssl crt {{ ssl_cert_path }} alpn h2,http/1.1
-{% for option in ubuntu_installer_attach_service.frontend.frontend_options %}
+    {% for option in ubuntu_installer_attach_service.frontend.frontend_options %}
     {{ option }}
-{% endfor %}
+    {% endfor %}
 
     default_backend {{ ubuntu_installer_attach_service.default_backend }}
 {% endif %}

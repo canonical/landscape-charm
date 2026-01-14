@@ -1,4 +1,4 @@
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, IPv6Address
 from subprocess import CalledProcessError
 from unittest.mock import Mock
 
@@ -8,6 +8,19 @@ import pytest
 from charm import LandscapeServerCharm
 from config import RedirectHTTPS
 import haproxy
+
+
+class TestSanitizeIP:
+    def test_sanitize_ip_for_str(self):
+        assert haproxy.sanitize_ip("192.0.2.1") == "192-0-2-1"
+        assert haproxy.sanitize_ip("2001:db8::1") == "2001-db8--1"
+
+    def test_sanitize_ip_for_name_scoped_ipv6(self):
+        assert haproxy.sanitize_ip("fe80::1%eth0") == "fe80--1-eth0"
+
+    def test_sanitize_ip_for_name_with_ipaddress_obj(self):
+        assert haproxy.sanitize_ip(IPv6Address("2001:db8::1")) == "2001-db8--1"
+        assert haproxy.sanitize_ip(IPv4Address("192.0.0.1")) == "192-0-0-1"
 
 
 class TestPeerIPs:
@@ -153,7 +166,8 @@ class TestWriteTLSCert:
 
 class TestCopyErrorFilesFromSource:
     def test_copy_error_files_success(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("os.chown", Mock())
+        monkeypatch.setattr("shutil.chown", Mock())
+        monkeypatch.setattr("os.chmod", Mock())
 
         src_dir = tmp_path / "src"
         dst_dir = tmp_path / "dst"
