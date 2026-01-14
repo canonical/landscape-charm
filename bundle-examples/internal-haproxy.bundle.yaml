@@ -30,7 +30,7 @@ applications:
       - "1"
       - "2"
     options:
-      landscape_ppa: ppa:landscape/self-hosted-beta
+      landscape_ppa: ppa:landscape/self-hosted-25.10
       min_install: True
       enable_hostagent_messenger: True
       enable_ubuntu_installer_attach: True

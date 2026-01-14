@@ -251,7 +251,7 @@ SERVICE_PORTS = {
     "ubuntu-installer-attach": 53354,
 }
 
-HAProxyServicePorts = Mapping[str, int]
+ServicePorts = Mapping[str, int]
 """
 Configuration for the ports that Landscape services run on.
 
@@ -379,18 +379,31 @@ def sanitize_ip(ip: IPvAnyAddress | str) -> str:
     return cleaned
 
 
+def format_ip_for_haproxy(ip: IPvAnyAddress | str) -> str:
+    """Format IP address for HAProxy server line (wrap IPv6 in brackets).
+    This allows us to do {ip}:{port} for IPV6.
+
+    Examples:
+      '192.0.2.1' -> '192.0.2.1'
+      '2001:db8::1' -> '[2001:db8::1]'
+      IPv6Address('2001:db8::1') -> '[2001:db8::1]'
+    """
+    ip_str = str(ip)
+    return f"[{ip_str}]" if ":" in ip_str else ip_str
+
+
 def create_http_service(
     peer_ips: list[IPvAnyAddress],
     leader_ip: IPvAnyAddress,
     worker_counts: int,
-    service_ports: "HAProxyServicePorts" = SERVICE_PORTS,
+    service_ports: "ServicePorts" = SERVICE_PORTS,
     server_options: str = SERVER_OPTIONS,
 ) -> Service:
     (appservers, pingservers, message_servers, api_servers) = [
         [
             Server(
                 name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
-                ip=str(ip),
+                ip=format_ip_for_haproxy(ip),
                 port=service_ports[name] + i,
                 options=server_options,
             )
@@ -403,7 +416,7 @@ def create_http_service(
     package_upload_servers = [
         Server(
             name="landscape-leader-package-upload",
-            ip=str(leader_ip),
+            ip=format_ip_for_haproxy(leader_ip),
             port=service_ports["package-upload"],
             options=server_options,
         )
@@ -412,7 +425,7 @@ def create_http_service(
     leader_appservers = [
         Server(
             name=f"landscape-leader-appserver-{i}",
-            ip=str(leader_ip),
+            ip=format_ip_for_haproxy(leader_ip),
             port=service_ports["appserver"] + i,
             options=server_options,
         )
@@ -442,7 +455,7 @@ def create_https_service(
     leader_ip: IPvAnyAddress,
     worker_counts: int,
     server_options: str = SERVER_OPTIONS,
-    service_ports: dict = SERVICE_PORTS,
+    service_ports: ServicePorts = SERVICE_PORTS,
 ) -> Service:
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
@@ -455,7 +468,7 @@ def create_https_service(
         [
             Server(
                 name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
-                ip=str(ip),
+                ip=format_ip_for_haproxy(ip),
                 port=service_ports[name] + i,
                 options=server_options,
             )
@@ -468,7 +481,7 @@ def create_https_service(
     package_upload_servers = [
         Server(
             name="landscape-leader-package-upload",
-            ip=str(leader_ip),
+            ip=format_ip_for_haproxy(leader_ip),
             port=service_ports["package-upload"],
             options=server_options,
         )
@@ -477,7 +490,7 @@ def create_https_service(
     leader_appservers = [
         Server(
             name=f"landscape-leader-appserver-{i}",
-            ip=str(leader_ip),
+            ip=format_ip_for_haproxy(leader_ip),
             port=service_ports["appserver"] + i,
             options=server_options,
         )
@@ -510,7 +523,7 @@ def create_hostagent_messenger_service(
     servers = [
         Server(
             name=f"landscape-hostagent-messenger-{sanitize_ip(ip)}",
-            ip=str(ip),
+            ip=format_ip_for_haproxy(ip),
             port=service_ports["hostagent-messenger"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
         )
@@ -534,7 +547,7 @@ def create_ubuntu_installer_attach_service(
     servers = [
         Server(
             name=f"landscape-ubuntu-installer-attach-{sanitize_ip(ip)}",
-            ip=str(ip),
+            ip=format_ip_for_haproxy(ip),
             port=service_ports["ubuntu-installer-attach"],
             options=f"{GRPC_SERVER_OPTIONS} {server_options}",
         )
