@@ -33,7 +33,7 @@ fmt:
 
 # Charm building and deployment
 build:
-	ccc pack --platform $(PLATFORM)
+	poetry run ccc pack --platform $(PLATFORM)
 
 deploy:
 	@if [ "$(SKIP_CLEAN)" != "true" ]; then $(MAKE) clean; else echo "skipping clean..."; fi
