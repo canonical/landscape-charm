@@ -45,8 +45,6 @@ class LandscapeCharmConfiguration(BaseModel):
     admin_password: str | None = None
     registration_key: str | None = None
     smtp_relay_host: str
-    ssl_cert: str
-    ssl_key: str
     http_proxy: str | None = None
     https_proxy: str | None = None
     no_proxy: str | None = None
@@ -68,6 +66,7 @@ class LandscapeCharmConfiguration(BaseModel):
     redirect_https: RedirectHTTPS
     enable_hostagent_messenger: bool
     enable_ubuntu_installer_attach: bool
+    max_global_haproxy_connections: int
 
     @root_validator(skip_on_failure=True)
     def openid_oidc_exclusive(cls, values):

@@ -1,9 +1,11 @@
-description: Landscape Scalable Dev with Charmed PostgreSQL 16
+description: Landscape Scalable Dev with internal HAProxy
 applications:
   postgresql:
     channel: 16/stable
     charm: ch:postgresql
     num_units: 1
+    to:
+      - "3"
     options:
       plugin_plpython3u_enable: true
       plugin_ltree_enable: true
@@ -16,16 +18,46 @@ applications:
     channel: latest/edge
     charm: ch:rabbitmq-server
     num_units: 1
+    to:
+      - "4"
     options:
       consumer-timeout: 259200000
   landscape-server:
     charm: ../landscape-server_ubuntu@24.04-amd64.charm
-    num_units: 1
+    num_units: 3
+    to:
+      - "0"
+      - "1"
+      - "2"
     options:
-        landscape_ppa: ppa:landscape/self-hosted-25.10
-        min_install: True
+      landscape_ppa: ppa:landscape/self-hosted-25.10
+      min_install: True
+      enable_hostagent_messenger: True
+      enable_ubuntu_installer_attach: True
+      root_url: https://landscape.local/
     base: ubuntu@24.04
+  lb-certs:
+    charm: self-signed-certificates
+    channel: stable
+    num_units: 1
+    to:
+      - "0"
+    constraints: arch=amd64
+
+machines:
+  "0":
+    constraints: arch=amd64
+  "1":
+    constraints: arch=amd64
+  "2":
+    constraints: arch=amd64
+  "3":
+    constraints: arch=amd64
+  "4":
+    constraints: arch=amd64
+
 relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]
   - [landscape-server:database, postgresql:database]
+  - [landscape-server:load-balancer-certificates, lb-certs:certificates]

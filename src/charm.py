@@ -12,14 +12,19 @@ develop a new k8s charm using the Operator Framework:
     https://discourse.charmhub.io/t/4208
 """
 
-from base64 import b64decode, b64encode, binascii
 from dataclasses import asdict
 from functools import cached_property
 import os
 import subprocess
 from subprocess import CalledProcessError, check_call
 from typing import List
+from urllib.parse import urlparse
 
+from charmlibs.interfaces.tls_certificates import (
+    CertificateRequestAttributes,
+    Mode,
+    TLSCertificatesRequiresV4,
+)
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
     DatabaseEndpointsChangedEvent,
@@ -44,7 +49,6 @@ from ops.charm import (
     LeaderElectedEvent,
     LeaderSettingsChangedEvent,
     RelationChangedEvent,
-    RelationDepartedEvent,
     RelationJoinedEvent,
     UpdateStatusEvent,
 )
@@ -53,32 +57,20 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     WaitingStatus,
 )
-from pydantic import ValidationError
+from pydantic import BaseModel, IPvAnyAddress, ValidationError
 import yaml
 
-from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration, RedirectHTTPS
+from config import DEFAULT_CONFIGURATION, LandscapeCharmConfiguration
 from database import (
     DatabaseConnectionContext,
     fetch_postgres_relation_data,
     grant_role,
 )
-from haproxy import (
-    create_grpc_service,
-    create_http_service,
-    create_https_service,
-    create_ubuntu_installer_attach_service,
-    ERROR_FILES,
-    get_haproxy_error_files,
-    GRPC_SERVICE,
-    HTTP_SERVICE,
-    HTTPS_SERVICE,
-    PORTS,
-    SERVER_OPTIONS,
-    UBUNTU_INSTALLER_ATTACH_SERVICE,
-)
+import haproxy
 from helpers import get_modified_env_vars, logger, migrate_service_conf
 from settings_files import (
     AMQP_USERNAME,
@@ -94,7 +86,6 @@ from settings_files import (
     update_service_conf,
     VHOSTS,
     write_license_file,
-    write_ssl_cert,
 )
 
 DEBCONF_SET_SELECTIONS = "/usr/bin/debconf-set-selections"
@@ -107,6 +98,7 @@ BOOTSTRAP_ACCOUNT_SCRIPT = "/opt/canonical/landscape/bootstrap-account"
 AUTOREGISTRATION_SCRIPT = os.path.join(os.path.dirname(__file__), "autoregistration.py")
 HASH_ID_DATABASES = "/opt/canonical/landscape/hash-id-databases-ignore-maintenance"
 UPDATE_WSL_DISTRIBUTIONS_SCRIPT = "/opt/canonical/landscape/update-wsl-distributions"
+LANDSCAPE_ERROR_FILES_DIR = "/opt/canonical/landscape/canonical/landscape/offline"
 
 LANDSCAPE_SERVER = "landscape-server"
 LANDSCAPE_PACKAGES = (
@@ -187,49 +179,9 @@ def get_args_with_secrets_removed(args, arg_names):
     return args
 
 
-def _get_ssl_cert(ssl_cert, ssl_key):
-    """
-    Create an SSL certificate from the `ssl_cert` and `ssl_key` configuration
-    options.
-    """
-    if ssl_cert != "DEFAULT" and ssl_key == "":
-        # We have a cert but no key, this is an error.
-        raise SSLConfigurationError("`ssl_cert` is specified but `ssl_key` is missing")
-
-    if ssl_cert != "DEFAULT":
-        try:
-            ssl_cert = b64decode(ssl_cert)
-            ssl_key = b64decode(ssl_key)
-            ssl_cert = b64encode(ssl_cert + b"\n" + ssl_key)
-        except binascii.Error:
-            raise SSLConfigurationError(
-                "Unable to decode `ssl_cert` or `ssl_key` - must be b64-encoded"
-            )
-    return ssl_cert
-
-
-class InvalidRedirectHTTPS(Exception):
-    """
-    Raised when an invalid `redirect_https` configuration is provided.
-    """
-
-
-def _get_redirect_https(redirect_https: str) -> RedirectHTTPS:
-    """
-    Validate and return the `redirect_https` configuration parameter.
-
-    Raises `InvalidRedirectHTTPS` if the provided value fails to validate.
-    """
-    try:
-        return RedirectHTTPS(redirect_https)
-    except ValueError:
-        raise InvalidRedirectHTTPS(f"Invalid `https_redirect`: {redirect_https}")
-
-
-class SSLConfigurationError(Exception):
-    """
-    Invalid SSL configuration.
-    """
+class PeerIPs(BaseModel):
+    all_ips: list[IPvAnyAddress]
+    leader_ip: IPvAnyAddress
 
 
 class LandscapeServerCharm(CharmBase):
@@ -292,15 +244,6 @@ class LandscapeServerCharm(CharmBase):
         )
 
         self.framework.observe(
-            self.on.website_relation_joined, self._website_relation_joined
-        )
-        self.framework.observe(
-            self.on.website_relation_changed, self._website_relation_changed
-        )
-        self.framework.observe(
-            self.on.website_relation_departed, self._website_relation_departed
-        )
-        self.framework.observe(
             self.on.nrpe_external_master_relation_joined,
             self._nrpe_external_master_relation_joined,
         )
@@ -339,7 +282,7 @@ class LandscapeServerCharm(CharmBase):
                 "db": False,
                 "inbound-amqp": False,
                 "outbound-amqp": False,
-                "haproxy": False,
+                "load-balancer-certificates": False,
             }
         )
         self._stored.set_default(leader_ip="")
@@ -350,6 +293,7 @@ class LandscapeServerCharm(CharmBase):
         self._stored.set_default(secret_token=None)
         self._stored.set_default(cookie_encryption_key=None)
         self._stored.set_default(enable_ubuntu_installer_attach=False)
+        self._stored.set_default(haproxy_config={})
 
         self.root_gid = group_exists("root").gr_gid
 
@@ -370,6 +314,78 @@ class LandscapeServerCharm(CharmBase):
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
             )
+
+        self.lb_certificates = TLSCertificatesRequiresV4(
+            charm=self,
+            relationship_name="load-balancer-certificates",
+            certificate_requests=(
+                [self._get_certificate_request_attributes()]
+                if self._get_certificate_request_attributes()
+                else []
+            ),
+            mode=Mode.UNIT,
+            refresh_events=[
+                self.on.config_changed,
+                self.on.replicas_relation_changed,
+                self.on.replicas_relation_joined,
+                self.on.leader_elected,
+                self.on.leader_settings_changed,
+            ],
+        )
+
+    def _get_certificate_request_attributes(
+        self,
+    ) -> CertificateRequestAttributes | None:
+        unit_ip = self.unit_ip
+        if not unit_ip:
+            return None
+
+        hostname = None
+        if self.charm_config.root_url:
+            parsed = urlparse(self.charm_config.root_url)
+            if parsed.hostname:
+                hostname = parsed.hostname
+
+        return CertificateRequestAttributes(
+            common_name=hostname or unit_ip,
+            sans_ip=[unit_ip],
+            sans_dns=[hostname] if hostname else None,
+        )
+
+    @property
+    def peer_ips(self) -> PeerIPs | None:
+        unit_ip = self.unit_ip
+        if not unit_ip:
+            return None
+
+        all_ips = [unit_ip]
+        leader_ip = unit_ip
+
+        if replicas := self.model.get_relation("replicas"):
+            leader_ip = replicas.data[self.app].get("leader-ip", unit_ip)
+
+            for unit in replicas.units:
+                # NOTE: Replicas does not contain this unit
+                if peer_unit_address := replicas.data[unit].get("private-address"):
+                    all_ips.append(peer_unit_address)
+
+        peer_ips = PeerIPs(all_ips=all_ips, leader_ip=leader_ip)
+
+        return peer_ips
+
+    @property
+    def unit_ip(self) -> str | None:
+        network_binding = self.model.get_binding("replicas")
+        if network_binding is None:
+            return None
+
+        try:
+            bind_address = network_binding.network.bind_address
+        except ModelError as e:
+            logger.warning(f"No bind address found for `replicas`: {str(e)}")
+            return None
+
+        return str(bind_address) if bind_address else None
 
     def _generate_scrape_configs(self) -> list[dict]:
         """
@@ -426,10 +442,6 @@ class LandscapeServerCharm(CharmBase):
         if self.charm_config.additional_service_config:
             merge_service_conf(self.charm_config.additional_service_config)
 
-        if self.charm_config.ssl_cert != "DEFAULT":
-            self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(self.charm_config.ssl_cert)
-
         if self.charm_config.license_file:
             self.unit.status = MaintenanceStatus("Writing Landscape license file")
             write_license_file(
@@ -442,10 +454,6 @@ class LandscapeServerCharm(CharmBase):
         if self.charm_config.smtp_relay_host:
             self.unit.status = MaintenanceStatus("Configuring SMTP relay host")
             self._configure_smtp(self.charm_config.smtp_relay_host)
-
-        # Update HAProxy relations, if they exist.
-        for relation in self.model.relations.get("website", []):
-            self._update_haproxy_connection(relation)
 
         self._configure_openid()
         self._configure_oidc()
@@ -514,6 +522,7 @@ class LandscapeServerCharm(CharmBase):
             self._write_cookie_encryption_key(cookie_encryption_key)
             self._stored.cookie_encryption_key = cookie_encryption_key
 
+        self._update_haproxy()
         self._update_ready_status(restart_services=True)
 
     def _get_secret_token(self) -> str | None:
@@ -632,13 +641,6 @@ class LandscapeServerCharm(CharmBase):
             logger.error("Failed to install packages")
             raise exc  # This will trigger juju's exponential retry
 
-        # Write the config-provided SSL certificate, if it exists.
-        config_ssl_cert = self.charm_config.ssl_cert
-
-        if config_ssl_cert != "DEFAULT":
-            self.unit.status = MaintenanceStatus("Installing SSL certificate")
-            write_ssl_cert(config_ssl_cert)
-
         # Write the license file, if it exists.
         license_file = self.charm_config.license_file
 
@@ -647,6 +649,21 @@ class LandscapeServerCharm(CharmBase):
             write_license_file(
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
+
+        self.unit.status = MaintenanceStatus("Installing HAProxy...")
+
+        try:
+            haproxy.install()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to install HAProxy: %s", str(e))
+            raise e
+
+        # Copy Landscape's error files to HAProxy error dir
+        try:
+            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to copy error files: %s", str(e))
+            raise e
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1035,12 +1052,41 @@ class LandscapeServerCharm(CharmBase):
         self.unit.status = ActiveStatus("Unit is ready")
         self._update_ready_status()
 
-    def _website_relation_joined(self, event: RelationJoinedEvent) -> None:
-        self._update_haproxy_connection(event.relation)
+    def _update_haproxy(self) -> None:
+        peer_ips = self.peer_ips
+
+        if not peer_ips:
+            logger.warning("Peer IPs not set, not updating HAProxy config.")
+            return
+
+        cert_attrs = self._get_certificate_request_attributes()
+        if not cert_attrs:
+            logger.warning("Unable to generate certificate request attributes.")
+            return
+
+        provider_certificate, private_key = (
+            self.lb_certificates.get_assigned_certificate(
+                certificate_request=cert_attrs
+            )
+        )
+
+        if not provider_certificate or not private_key:
+            self.unit.status = WaitingStatus(
+                "Waiting for load balancer TLS certificate..."
+            )
+            logger.warning(
+                "Certificate or private key is not yet available! "
+                "Make sure this charm has been integrated with a "
+                "provider of the `tls-certificates` charm interface."
+            )
+            self._update_ready_status()
+            return
+
+        self._stored.ready["load-balancer-certificates"] = True
 
         # Update root_url, if not provided.
         if not self.charm_config.root_url:
-            url = f'https://{event.relation.data[event.unit]["public-address"]}/'
+            url = f"https://{peer_ips.leader_ip}/"
             self._stored.default_root_url = url
             update_service_conf(
                 {
@@ -1050,117 +1096,51 @@ class LandscapeServerCharm(CharmBase):
                 }
             )
 
-        self._update_ready_status()
-
-    def _update_haproxy_connection(self, relation: Relation) -> None:
-        self._stored.ready["haproxy"] = False
-        self.unit.status = MaintenanceStatus("Setting up haproxy connection")
-
-        # Check the SSL cert stuff first. No sense doing all the other
-        # work just to fail here.
         try:
-            ssl_cert = _get_ssl_cert(
-                ssl_cert=self.charm_config.ssl_cert,
-                ssl_key=self.charm_config.ssl_key,
-            )
-        except SSLConfigurationError as e:
-            self.unit.status = BlockedStatus(str(e))
-            return
-
-        error_files = get_haproxy_error_files(ERROR_FILES)
-        server_ip = relation.data[self.unit]["private-address"]
-        unit_name = self.unit.name.replace("/", "-")
-
-        http_service = create_http_service(
-            http_service=asdict(HTTP_SERVICE),
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=self.charm_config.worker_counts,
-            is_leader=self.unit.is_leader(),
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-            redirect_https=self.charm_config.redirect_https,
-        )
-
-        https_service = create_https_service(
-            https_service=asdict(HTTPS_SERVICE),
-            ssl_cert=ssl_cert,
-            server_ip=server_ip,
-            unit_name=unit_name,
-            worker_counts=self.charm_config.worker_counts,
-            is_leader=self.unit.is_leader(),
-            error_files=error_files,
-            service_ports=PORTS,
-            server_options=SERVER_OPTIONS,
-        )
-
-        services = [http_service, https_service]
-
-        if self.charm_config.enable_hostagent_messenger:
-            grpc_service = create_grpc_service(
-                grpc_service=asdict(GRPC_SERVICE),
-                ssl_cert=ssl_cert,
-                server_ip=server_ip,
-                unit_name=unit_name,
-                error_files=error_files,
-                service_ports=PORTS,
-                server_options=SERVER_OPTIONS,
-            )
-            services.append(grpc_service)
-
-        if self._stored.enable_ubuntu_installer_attach:
-            services.append(
-                create_ubuntu_installer_attach_service(
-                    ubuntu_installer_attach_service=asdict(
-                        UBUNTU_INSTALLER_ATTACH_SERVICE
-                    ),
-                    ssl_cert=ssl_cert,
-                    server_ip=server_ip,
-                    unit_name=unit_name,
-                    error_files=error_files,
-                    service_ports=PORTS,
-                    server_options=SERVER_OPTIONS,
-                )
+            haproxy.write_tls_cert(
+                provider_certificate=provider_certificate, private_key=private_key
             )
 
-        relation.data[self.unit].update({"services": yaml.safe_dump(services)})
-        self._stored.ready["haproxy"] = True
-        self.unit.status = WaitingStatus("")
-
-    def _website_relation_changed(self, event: RelationChangedEvent) -> None:
-        """
-        Writes the HAProxy-provided SSL certificate for
-        Landscape Server, if config has not provided one.
-        """
-        config_ssl_cert = self.charm_config.ssl_cert
-
-        if config_ssl_cert != "DEFAULT":
-            # No-op: cert has been provided by config.
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to write TLS certificate for HAProxy: %s", str(e))
+            self.unit.status = BlockedStatus(
+                "Failed to write TLS certificate for HAProxy!"
+            )
             return
 
-        if "ssl_cert" not in event.relation.data[event.unit]:
+        try:
+            rendered = haproxy.render_config(
+                all_ips=peer_ips.all_ips,
+                leader_ip=peer_ips.leader_ip,
+                worker_counts=self.charm_config.worker_counts,
+                redirect_https=self.charm_config.redirect_https,
+                enable_hostagent_messenger=self.charm_config.enable_hostagent_messenger,
+                enable_ubuntu_installer_attach=self._stored.enable_ubuntu_installer_attach,
+                max_connections=self.charm_config.max_global_haproxy_connections,
+            )
+
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to write HAProxy config: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
-        self.unit.status = MaintenanceStatus("Configuring HAProxy")
-        haproxy_ssl_cert = event.relation.data[event.unit]["ssl_cert"]
+        try:
+            haproxy.validate_config()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to validate HAProxy config: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
+            return
 
-        # Sometimes the data has not been encoded properly in the HA charm
-        if haproxy_ssl_cert.startswith("b'"):
-            haproxy_ssl_cert = haproxy_ssl_cert.strip("b").strip("'")
+        try:
+            haproxy.reload()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to reload HAProxy: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to reload HAProxy!")
+            return
 
-        if haproxy_ssl_cert != "DEFAULT":
-            # If DEFAULT, cert is being managed by a third party,
-            # possibly a subordinate charm.
-            write_ssl_cert(haproxy_ssl_cert)
-
-        self.unit.status = ActiveStatus("Unit is ready")
-        self._update_haproxy_connection(event.relation)
+        self._stored.haproxy_config = rendered
 
         self._update_ready_status()
-
-    def _website_relation_departed(self, event: RelationDepartedEvent) -> None:
-        event.relation.data[self.unit].update({"services": ""})
 
     def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_nrpe_checks(event.relation)
@@ -1313,10 +1293,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
             self._update_nrpe_checks(relation)
 
         if self.unit.is_leader():
-            haproxy_relations = self.model.relations.get("website", [])
-            for relation in haproxy_relations:
-                self._update_haproxy_connection(relation)
-
             # Enable leader services on this unit.
             paused_services = (s for s in LEADER_SERVICES if not service_running(s))
             for service in paused_services:
@@ -1333,6 +1309,7 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                 except SystemdError as e:
                     logger.warn(str(e))
 
+        self._update_haproxy()
         self._update_ready_status(restart_services=True)
 
     def _on_replicas_relation_joined(self, event: RelationJoinedEvent) -> None:

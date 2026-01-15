@@ -1,14 +1,37 @@
-"""
-Configuration for the relation between Landscape and HAProxy.
-"""
-
-from base64 import b64encode
-from dataclasses import asdict, dataclass, field
 from enum import Enum
 import os
-from typing import Iterable, Mapping
+import pwd
+import shutil
+import subprocess
+from subprocess import CalledProcessError
+from typing import Mapping
+
+from charmlibs.interfaces.tls_certificates import (
+    Certificate,
+    PrivateKey,
+)
+from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v1 import systemd
+from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel, IPvAnyAddress
 
 from config import RedirectHTTPS
+
+# Based on: https://github.com/canonical/haproxy-operator/blob/main/haproxy-operator/src/haproxy.py
+
+HAPROXY_APT_PACKAGE_NAME = "haproxy"
+HAPROXY_CERT_PATH = "/etc/haproxy/haproxy.pem"
+HAPROXY_RENDERED_CONFIG_PATH = "/etc/haproxy/haproxy.cfg"
+HAPROXY_USER = "haproxy"
+HAPROXY_SERVICE = "haproxy"
+HAPROXY_EXECUTABLE = "/usr/sbin/haproxy"
+LOCAL_JINJA_TMPL_PATH = "haproxy.cfg.j2"
+
+
+class HAProxyError(Exception):
+    """
+    Errors raised when interacting with the local HAProxy service.
+    """
 
 
 class ACL(str, Enum):
@@ -31,11 +54,11 @@ class ACL(str, Enum):
 class HTTPBackend(str, Enum):
 
     API = "landscape-http-api"
+    APPSERVER = "landscape-http-appserver"
     HASHIDS = "landscape-http-hashid-databases"
     MESSAGE = "landscape-http-message"
     PACKAGE_UPLOAD = "landscape-http-package-upload"
     PING = "landscape-http-ping"
-    REPOSITORY = "landscape-http-repository"
 
     def __str__(self) -> str:
         return self.value
@@ -44,40 +67,84 @@ class HTTPBackend(str, Enum):
 class HTTPSBackend(str, Enum):
 
     API = "landscape-https-api"
+    APPSERVER = "landscape-https-appserver"
     HASHIDS = "landscape-https-hashid-databases"
     MESSAGE = "landscape-https-message"
     PACKAGE_UPLOAD = "landscape-https-package-upload"
     PING = "landscape-https-ping"
-    REPOSITORY = "landscape-https-repository"
 
     def __str__(self) -> str:
         return self.value
 
 
-@dataclass(frozen=True)
-class Service:
-    """
-    An HAProxy service configuration.
-    """
-
-    service_name: str
-    service_host: str
-    service_port: int
-    server_options: list[str] = field(default_factory=list)
-    service_options: list[str] = field(default_factory=list)
+HOSTAGENT_MESSENGER_BACKEND = "landscape-hostagent-messenger"
+UBUNTU_INSTALLER_ATTACH_BACKEND = "landscape-ubuntu-installer-attach"
 
 
+class FrontendName(str, Enum):
+    HOSTAGENT_MESSENGER = "landscape-hostagent-messenger"
+    HTTP = "landscape-http"
+    HTTPS = "landscape-https"
+    UBUNTU_INSTALLER_ATTACH = "landscape-ubuntu-installer-attach"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class FrontendPort(int, Enum):
+    HOSTAGENT_MESSENGER = 6554
+    HTTP = 80
+    HTTPS = 443
+    UBUNTU_INSTALLER_ATTTACH = 50051
+
+    def __int__(self) -> int:
+        return self.value
+
+
+class Server(BaseModel):
+    name: str
+    ip: str
+    port: int
+    options: str
+
+
+class Backend(BaseModel):
+    backend_name: str
+    servers: list[Server] = []
+
+
+class Frontend(BaseModel):
+    frontend_name: str
+    frontend_port: int
+    frontend_options: list[str] = []
+
+
+class Service(BaseModel):
+    frontend: Frontend
+    backends: list[Backend] = []
+    default_backend: str = ""
+
+
+CLIENT_TIMEOUT = 5 * 60 * 1000  # 5 mins
+SERVER_TIMEOUT = 5 * 60 * 1000  # 5 mins
 DEFAULT_REDIRECT_SCHEME = "redirect scheme https unless ping OR repository"
+GRPC_SERVER_OPTIONS = "proto h2"
+"""
+Additional configuration for a gRPC server in the HAProxy config.
+"""
+# NOTE: maxconn here is per-server, not global HAProxy maxconn (charm config).
+SERVER_OPTIONS = "check inter 5000 rise 2 fall 5 maxconn 50"
+"""
+Configuration for a `server` stanza in the HAProxy config.
+"""
 
-
-HTTP_SERVICE = Service(
-    service_name="landscape-http",
-    service_host="0.0.0.0",
-    service_port=80,
-    service_options=[
+HTTP_FRONTEND = Frontend(
+    frontend_name=FrontendName.HTTP,
+    frontend_port=FrontendPort.HTTP,
+    frontend_options=[
         "mode http",
-        "timeout client 300000",
-        "timeout server 300000",
+        f"timeout client {CLIENT_TIMEOUT}",
+        f"timeout server {SERVER_TIMEOUT}",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         # ACLs
@@ -88,8 +155,6 @@ HTTP_SERVICE = Service(
         f"acl {ACL.API} path_beg -i /api",
         f"acl {ACL.HASHIDS} path_beg -i /hash-id-databases",
         f"acl {ACL.PACKAGE_UPLOAD} path_beg -i /upload",
-        # A default for the HTTPS redirect, which is configurable.
-        DEFAULT_REDIRECT_SCHEME,
         # Rewrite rules:
         "http-request replace-path ^([^\\ ]*)\\ /upload/(.*) /\\1",
         # Backends
@@ -108,14 +173,13 @@ HTTP_SERVICE = Service(
 )
 
 
-HTTPS_SERVICE = Service(
-    service_name="landscape-https",
-    service_host="0.0.0.0",
-    service_port=443,
-    service_options=[
+HTTPS_FRONTEND = Frontend(
+    frontend_name=FrontendName.HTTPS,
+    frontend_port=FrontendPort.HTTPS,
+    frontend_options=[
         "mode http",
-        "timeout client 300000",
-        "timeout server 300000",
+        f"timeout client {CLIENT_TIMEOUT}",
+        f"timeout server {SERVER_TIMEOUT}",
         "balance leastconn",
         "option httpchk HEAD / HTTP/1.0",
         "http-request set-header X-Forwarded-Proto https",
@@ -144,20 +208,18 @@ HTTPS_SERVICE = Service(
     ],
 )
 
-GRPC_SERVICE = Service(
-    service_name="landscape-grpc",
-    service_host="0.0.0.0",
-    service_port=6554,
-    server_options=["proto h2"],
+HOSTAGENT_MESSENGER_FRONTEND = Frontend(
+    frontend_name=FrontendName.HOSTAGENT_MESSENGER,
+    frontend_port=FrontendPort.HOSTAGENT_MESSENGER,
+    frontend_options=["mode http"],
 )
 
 
-UBUNTU_INSTALLER_ATTACH_SERVICE = Service(
-    service_name="landscape-ubuntu-installer-attach",
-    service_host="0.0.0.0",
-    service_port=50051,
-    server_options=["proto h2"],
-    service_options=[
+UBUNTU_INSTALLER_ATTACH_FRONTEND = Frontend(
+    frontend_name=FrontendName.UBUNTU_INSTALLER_ATTACH,
+    frontend_port=FrontendPort.UBUNTU_INSTALLER_ATTTACH,
+    frontend_options=[
+        "mode http",
         # The X-FQDN header is required for multitenant installations
         "acl host_found hdr(host) -m found",
         "http-request set-var(req.full_fqdn) hdr(authority) if !host_found",
@@ -168,7 +230,7 @@ UBUNTU_INSTALLER_ATTACH_SERVICE = Service(
 
 
 ERROR_FILES = {
-    "location": "/opt/canonical/landscape/canonical/landscape/offline",
+    "location": "/etc/haproxy/errors",
     "files": {
         "403": "unauthorized-haproxy.html",
         "500": "exception-haproxy.html",
@@ -178,8 +240,8 @@ ERROR_FILES = {
     },
 }
 
-
-PORTS = {
+# TODO: Make service base port configurable
+SERVICE_PORTS = {
     "appserver": 8080,
     "pingserver": 8070,
     "message-server": 8090,
@@ -189,29 +251,7 @@ PORTS = {
     "ubuntu-installer-attach": 53354,
 }
 
-
-SERVER_OPTIONS = [
-    "check",
-    "inter 5000",
-    "rise 2",
-    "fall 5",
-    "maxconn 50",
-]
-
-
-@dataclass
-class HAProxyErrorFile:
-    """
-    Configuration for HAProxy error files
-    """
-
-    http_status: int
-    """The status code the error file should handle."""
-    content: bytes
-    """The b64-encoded content of the error file."""
-
-
-HAProxyServicePorts = Mapping[str, int]
+ServicePorts = Mapping[str, int]
 """
 Configuration for the ports that Landscape services run on.
 
@@ -226,259 +266,466 @@ Expects the following keys:
 
 Each value is the port that service runs on.
 """
-HAProxyServerOptions = list[str]
-"""
-Additional configuration for a `server` stanza in an HAProxy configuration.
-"""
 
 
-# NOTE: See https://charmhub.io/haproxy/configurations#services for details on
-# the format of HAProxy service configurations.
+def get_redirect_directive(redirect_https: RedirectHTTPS) -> str | None:
+    """Get the redirect directive based on the redirect_https setting.
+
+    :param redirect_https: The redirect HTTPS configuration
+    :return: The redirect directive string, or None if no redirect
+    """
+    if redirect_https == RedirectHTTPS.ALL:
+        return "redirect scheme https"
+
+    if redirect_https == RedirectHTTPS.DEFAULT:
+        return DEFAULT_REDIRECT_SCHEME
+
+    return None
+
+
+def write_file(content: bytes, path: str, permissions=0o600, user=HAPROXY_USER) -> None:
+    """
+    :raises ValueError: Invalid file content type!
+    :raises OSError: Error reading or writing file or creating directories.
+    """
+    if not isinstance(content, bytes):
+        raise ValueError(f"Invalid file content type: {type(content)}")
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(content)
+
+    os.chmod(path, permissions)
+    u = pwd.getpwnam(user)
+    os.chown(path, uid=u.pw_uid, gid=u.pw_gid)
+
+
+def write_tls_cert(
+    provider_certificate: Certificate,
+    private_key: PrivateKey,
+    cert_path=HAPROXY_CERT_PATH,
+) -> None:
+    """
+    Combines a TLS certificate and private key pair from a tls-certificates provider,
+    encodes it to bytes, and writes it to `cert_path`, where it will be used
+    for TLS connections to HAProxy.
+
+    :raises HAProxyError: Failed to write TLS certificate for HAProxy!
+    """
+    combined_pem = str(provider_certificate.certificate) + "\n" + str(private_key)
+
+    try:
+        write_file(
+            combined_pem.encode(),
+            cert_path,
+        )
+    except OSError as e:
+        raise HAProxyError(f"Failed to write TLS certificate for HAProxy: {str(e)}")
+
+
+def copy_error_files_from_source(
+    src_dir: str, error_files_config: dict = ERROR_FILES
+) -> list[str]:
+    """
+    Copy error files from a source directory (Landscape) into the configured
+    HAProxy errors location.
+
+    :param src_dir: Path to source directory containing error files.
+    :param error_files_config: Mapping with keys `location` and `files`.
+
+    :return written_files: List of destination file paths that were written.
+    :raises HAProxyError: Error while copying.
+    """
+    dst_dir = error_files_config.get("location", ERROR_FILES["location"])
+    written_files = []
+
+    os.makedirs(dst_dir, exist_ok=True)
+    for filename in error_files_config.get("files", {}).values():
+        src_file = os.path.join(src_dir, filename)
+        dst_file = os.path.join(dst_dir, filename)
+        if not os.path.exists(src_file):
+            continue
+
+        shutil.copy2(src_file, dst_file)
+        shutil.chown(dst_file, user=HAPROXY_USER)
+        os.chmod(dst_file, 0o600)
+        written_files.append(dst_file)
+
+    return written_files
+
+
+def sanitize_ip(ip: IPvAnyAddress | str) -> str:
+    """Return a dash-separated token safe for use in names from an IP.
+
+    Accepts either a string or an IPvAnyAddress-like object. For IPv6 scope
+    identifiers (e.g. 'fe80::1%eth0') the scope is appended after a dash.
+    Examples:
+      '192.0.2.1' -> '192-0-2-1'
+      '2001:db8::1' -> '2001-db8--1'
+      'fe80::1%eth0' -> 'fe80--1-eth0'
+    """
+    if not isinstance(ip, str):
+        ip = str(ip)
+
+    scope = None
+    if "%" in ip:
+        ip, scope = ip.split("%", 1)
+
+    cleaned = ip.replace(".", "-").replace(":", "-")
+
+    if scope:
+        cleaned = f"{cleaned}-{scope}"
+
+    return cleaned
+
+
+def format_ip_for_haproxy(ip: IPvAnyAddress | str) -> str:
+    """Format IP address for HAProxy server line (wrap IPv6 in brackets).
+    This allows us to do {ip}:{port} for IPV6.
+
+    Examples:
+      '192.0.2.1' -> '192.0.2.1'
+      '2001:db8::1' -> '[2001:db8::1]'
+      IPv6Address('2001:db8::1') -> '[2001:db8::1]'
+    """
+    ip_str = str(ip)
+    return f"[{ip_str}]" if ":" in ip_str else ip_str
 
 
 def create_http_service(
-    http_service: dict,
-    server_ip: str,
-    unit_name: str,
+    peer_ips: list[IPvAnyAddress],
+    leader_ip: IPvAnyAddress,
     worker_counts: int,
-    is_leader: bool,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-    redirect_https: RedirectHTTPS | None = None,
-) -> dict:
-    """
-    Create the Landscape HTTP `services` configurations for HAProxy.
-
-    NOTE: Only the leader should have servers for the package-upload and
-    hashid-databases backends. However, when the leader is lost, haproxy will fail as
-    the service options will reference a (no longer) existing backend. To prevent that,
-    all units should declare all backends, even if a unit should not have any servers on
-    a specific backend.
-    """
+    service_ports: "ServicePorts" = SERVICE_PORTS,
+    server_options: str = SERVER_OPTIONS,
+) -> Service:
     (appservers, pingservers, message_servers, api_servers) = [
         [
-            (
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                service_ports[name] + i,
-                server_options,
+            Server(
+                name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
+                ip=format_ip_for_haproxy(ip),
+                port=service_ports[name] + i,
+                options=server_options,
             )
+            for ip in peer_ips
             for i in range(worker_counts)
         ]
         for name in ("appserver", "pingserver", "message-server", "api")
     ]
 
     package_upload_servers = [
-        (
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            service_ports["package-upload"],
-            server_options,
+        Server(
+            name="landscape-leader-package-upload",
+            ip=format_ip_for_haproxy(leader_ip),
+            port=service_ports["package-upload"],
+            options=server_options,
         )
     ]
 
-    http_service["servers"] = appservers
-    http_service["backends"] = [
-        {
-            "backend_name": "landscape-http-ping",
-            "servers": pingservers,
-        },
-        {
-            "backend_name": "landscape-http-message",
-            "servers": message_servers,
-        },
-        {
-            "backend_name": "landscape-http-api",
-            "servers": api_servers,
-        },
-        {
-            "backend_name": "landscape-http-package-upload",
-            "servers": package_upload_servers if is_leader else [],
-        },
-        {
-            "backend_name": "landscape-http-hashid-databases",
-            "servers": appservers if is_leader else [],
-        },
+    leader_appservers = [
+        Server(
+            name=f"landscape-leader-appserver-{i}",
+            ip=format_ip_for_haproxy(leader_ip),
+            port=service_ports["appserver"] + i,
+            options=server_options,
+        )
+        for i in range(worker_counts)
     ]
 
-    http_service["error_files"] = [asdict(ef) for ef in error_files]
+    backends = [
+        Backend(backend_name=HTTPBackend.APPSERVER, servers=appservers),
+        Backend(backend_name=HTTPBackend.PING, servers=pingservers),
+        Backend(backend_name=HTTPBackend.MESSAGE, servers=message_servers),
+        Backend(backend_name=HTTPBackend.API, servers=api_servers),
+        Backend(
+            backend_name=HTTPBackend.PACKAGE_UPLOAD, servers=package_upload_servers
+        ),
+        Backend(backend_name=HTTPBackend.HASHIDS, servers=leader_appservers),
+    ]
 
-    if redirect_https:
-        _configure_redirect_https(http_service, redirect_https)
-
-    return http_service
-
-
-def _configure_redirect_https(
-    http_service: dict,
-    redirect_https: RedirectHTTPS,
-    marker_stanza: str = DEFAULT_REDIRECT_SCHEME,
-) -> dict:
-    """
-    Configure the HTTP routes that should redirect to HTTPS.
-
-    Requires the presence of a `marker_stanza` in the `http_service` to
-    identify the stanza to reconfigure.
-    """
-    match redirect_https:
-        case RedirectHTTPS.ALL:
-            stanza = "redirect scheme https"
-        case RedirectHTTPS.NONE:
-            stanza = "# No HTTPS redirect"  # use an HAProxy comment for 'no redirect'
-        case RedirectHTTPS.DEFAULT:
-            stanza = DEFAULT_REDIRECT_SCHEME
-
-    try:
-        index = http_service["service_options"].index(marker_stanza)
-    except ValueError:
-        raise Exception(
-            f"No '{marker_stanza}' found in service; cannot configure redirect."
-        )
-
-    http_service["service_options"][index] = stanza
-
-    return http_service
+    return Service(
+        frontend=HTTP_FRONTEND,
+        backends=backends,
+        default_backend=str(HTTPBackend.APPSERVER),
+    )
 
 
 def create_https_service(
-    https_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
+    peer_ips: list[IPvAnyAddress],
+    leader_ip: IPvAnyAddress,
     worker_counts: int,
-    is_leader: bool,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-) -> dict:
+    server_options: str = SERVER_OPTIONS,
+    service_ports: ServicePorts = SERVICE_PORTS,
+) -> Service:
     """
     Create the Landscape HTTPS `services` configurations for HAProxy.
 
-    NOTE: Only the leader should have servers for the package-upload and
-    hashid-databases backends. However, when the leader is lost, haproxy will fail as
-    the service options will reference a (no longer) existing backend. To prevent that,
-    all units should declare all backends, even if a unit should not have any servers on
-    a specific backend.
+    NOTE: The servers for the package-upload and
+    hashid-databases backends are only from the leader unit but
+    exist on every unit.
     """
     (appservers, pingservers, message_servers, api_servers) = [
         [
-            (
-                f"landscape-{name}-{unit_name}-{i}",
-                server_ip,
-                service_ports[name] + i,
-                server_options,
+            Server(
+                name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
+                ip=format_ip_for_haproxy(ip),
+                port=service_ports[name] + i,
+                options=server_options,
             )
+            for ip in peer_ips
             for i in range(worker_counts)
         ]
         for name in ("appserver", "pingserver", "message-server", "api")
     ]
 
     package_upload_servers = [
-        (
-            f"landscape-package-upload-{unit_name}-0",
-            server_ip,
-            service_ports["package-upload"],
-            server_options,
+        Server(
+            name="landscape-leader-package-upload",
+            ip=format_ip_for_haproxy(leader_ip),
+            port=service_ports["package-upload"],
+            options=server_options,
         )
     ]
 
-    https_service["servers"] = appservers
-    https_service["backends"] = [
-        {
-            "backend_name": "landscape-https-ping",
-            "servers": pingservers,
-        },
-        {
-            "backend_name": "landscape-https-message",
-            "servers": message_servers,
-        },
-        {
-            "backend_name": "landscape-https-api",
-            "servers": api_servers,
-        },
-        {
-            "backend_name": "landscape-https-package-upload",
-            "servers": package_upload_servers if is_leader else [],
-        },
-        {
-            "backend_name": "landscape-https-hashid-databases",
-            "servers": appservers if is_leader else [],
-        },
-    ]
-
-    https_service["error_files"] = [asdict(ef) for ef in error_files]
-    https_service["crts"] = [ssl_cert]
-    return https_service
-
-
-def create_grpc_service(
-    grpc_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-) -> dict:
-    """
-    Create the Landscape WSL hostagent `services` configuration for HAProxy.
-    """
-
-    grpc_service["crts"] = [ssl_cert]
-    hostagent_messenger = [
-        (
-            f"landscape-hostagent-messenger-{unit_name}-0",
-            server_ip,
-            service_ports["hostagent-messenger"],
-            server_options + grpc_service["server_options"],
+    leader_appservers = [
+        Server(
+            name=f"landscape-leader-appserver-{i}",
+            ip=format_ip_for_haproxy(leader_ip),
+            port=service_ports["appserver"] + i,
+            options=server_options,
         )
+        for i in range(worker_counts)
     ]
-    grpc_service["servers"] = hostagent_messenger
-    grpc_service["error_files"] = [asdict(ef) for ef in error_files]
 
-    return grpc_service
+    backends = [
+        Backend(backend_name=HTTPSBackend.APPSERVER, servers=appservers),
+        Backend(backend_name=HTTPSBackend.PING, servers=pingservers),
+        Backend(backend_name=HTTPSBackend.MESSAGE, servers=message_servers),
+        Backend(backend_name=HTTPSBackend.API, servers=api_servers),
+        Backend(
+            backend_name=HTTPSBackend.PACKAGE_UPLOAD, servers=package_upload_servers
+        ),
+        Backend(backend_name=HTTPSBackend.HASHIDS, servers=leader_appservers),
+    ]
+
+    return Service(
+        frontend=HTTPS_FRONTEND,
+        backends=backends,
+        default_backend=str(HTTPSBackend.APPSERVER),
+    )
+
+
+def create_hostagent_messenger_service(
+    peer_ips: list[IPvAnyAddress],
+    server_options: str = SERVER_OPTIONS,
+    service_ports: dict = SERVICE_PORTS,
+) -> Service:
+    servers = [
+        Server(
+            name=f"landscape-hostagent-messenger-{sanitize_ip(ip)}",
+            ip=format_ip_for_haproxy(ip),
+            port=service_ports["hostagent-messenger"],
+            options=f"{GRPC_SERVER_OPTIONS} {server_options}",
+        )
+        for ip in peer_ips
+    ]
+
+    backend = Backend(backend_name=HOSTAGENT_MESSENGER_BACKEND, servers=servers)
+
+    return Service(
+        frontend=HOSTAGENT_MESSENGER_FRONTEND,
+        backends=[backend],
+        default_backend=HOSTAGENT_MESSENGER_BACKEND,
+    )
 
 
 def create_ubuntu_installer_attach_service(
-    ubuntu_installer_attach_service: dict,
-    ssl_cert: bytes | str,
-    server_ip: str,
-    unit_name: str,
-    error_files: Iterable["HAProxyErrorFile"],
-    service_ports: "HAProxyServicePorts",
-    server_options: "HAProxyServerOptions",
-) -> dict:
-    """
-    Create the Landscape Ubuntu installer attach `services` configuration for HAProxy.
-    """
-
-    ubuntu_installer_attach_service["crts"] = [ssl_cert]
-    ubuntu_installer_attach_server = [
-        (
-            f"landscape-ubuntu-installer-attach-{unit_name}-0",
-            server_ip,
-            service_ports["ubuntu-installer-attach"],
-            server_options + ubuntu_installer_attach_service["server_options"],
+    peer_ips: list[IPvAnyAddress],
+    server_options: str = SERVER_OPTIONS,
+    service_ports: dict = SERVICE_PORTS,
+) -> Service:
+    servers = [
+        Server(
+            name=f"landscape-ubuntu-installer-attach-{sanitize_ip(ip)}",
+            ip=format_ip_for_haproxy(ip),
+            port=service_ports["ubuntu-installer-attach"],
+            options=f"{GRPC_SERVER_OPTIONS} {server_options}",
         )
+        for ip in peer_ips
     ]
-    ubuntu_installer_attach_service["servers"] = ubuntu_installer_attach_server
-    ubuntu_installer_attach_service["error_files"] = [asdict(ef) for ef in error_files]
 
-    return ubuntu_installer_attach_service
+    backend = Backend(backend_name=UBUNTU_INSTALLER_ATTACH_BACKEND, servers=servers)
+
+    return Service(
+        frontend=UBUNTU_INSTALLER_ATTACH_FRONTEND,
+        backends=[backend],
+        default_backend=UBUNTU_INSTALLER_ATTACH_BACKEND,
+    )
 
 
-def get_haproxy_error_files(error_files_config: dict) -> list[HAProxyErrorFile]:
-    error_files_location = error_files_config["location"]
-    error_files = []
-    for code, filename in error_files_config["files"].items():
-        error_file_path = os.path.join(error_files_location, filename)
-        with open(error_file_path, "rb") as error_file:
-            error_files.append(
-                HAProxyErrorFile(
-                    http_status=code,
-                    content=b64encode(error_file.read()),
-                )
-            )
+def render_config(
+    all_ips: list[IPvAnyAddress],
+    leader_ip: IPvAnyAddress,
+    worker_counts: int,
+    redirect_https: RedirectHTTPS,
+    enable_hostagent_messenger: bool,
+    enable_ubuntu_installer_attach: bool,
+    max_connections: int = 4096,
+    ssl_cert_path=HAPROXY_CERT_PATH,
+    rendered_config_path: str = HAPROXY_RENDERED_CONFIG_PATH,
+    service_ports: dict = SERVICE_PORTS,
+    error_files_directory=ERROR_FILES["location"],
+    error_files=ERROR_FILES["files"],
+    server_timeout: int = SERVER_TIMEOUT,
+    server_options: str = SERVER_OPTIONS,
+    template_path: str = LOCAL_JINJA_TMPL_PATH,
+) -> str:
+    """Render the HAProxy config with the given context.
 
-    return error_files
+    :param all_ips: A list of IP addresses of all peer units
+    :param leader_ip: The IP address of the leader unit
+    :param worker_counts: The number of worker processes configured
+    :param redirect_https: A `RedirectHTTPS` settings to determine how
+        to redirect HTTP to HTTPS
+    :param enable_hostagent_messenger: Whether to create a frontend/backend for the
+        Hostagent Messenger service
+    :param enable_ubuntu_installer_attach: Whether to create a frontend/backend for the
+        Ubuntu Installer Attach service
+    :param max_connections: Maximum concurrent connections for HAProxy,
+        defaults to 4096
+    :param ssl_cert_path: The path of the SSL certificate to use
+        for the HAProxy service, defaults to HAPROXY_CERT_PATH
+    :param rendered_config_path: Path where the rendered config will be written,
+        defaults to HAPROXY_RENDERED_CONFIG_PATH
+    :param service_ports: A mapping of services to their base ports,
+        defaults to SERVICE_PORTS
+    :param error_files_directory: Directory where the Landscape error files are,
+        defaults to ERROR_FILES["location"]
+    :param error_files: A mapping of status codes (string) to the name of the
+        error file in `error_files_directory`, defaults to ERROR_FILES["files"]
+    :param server_timeout: Timeout for backend servers in milliseconds,
+        defaults to SERVER_TIMEOUT
+    :param server_options: Options for all backend servers,
+        defaults to SERVER_OPTIONS
+    :param template_path: Path to the Jinja2 template file,
+        defaults to LOCAL_JINJA_TMPL_PATH
+
+    :raises HAProxyError: Failed to write the HAProxy configuration file!
+
+    :return rendered: The rendered string given the context.
+    """
+    redirect_directive = get_redirect_directive(redirect_https)
+
+    http_service = create_http_service(
+        peer_ips=all_ips,
+        leader_ip=leader_ip,
+        worker_counts=worker_counts,
+        server_options=server_options,
+        service_ports=service_ports,
+    )
+
+    https_service = create_https_service(
+        peer_ips=all_ips,
+        leader_ip=leader_ip,
+        worker_counts=worker_counts,
+        server_options=server_options,
+        service_ports=service_ports,
+    )
+
+    hostagent_messenger_service = None
+    if enable_hostagent_messenger:
+        hostagent_messenger_service = create_hostagent_messenger_service(
+            peer_ips=all_ips,
+            server_options=server_options,
+            service_ports=service_ports,
+        )
+
+    ubuntu_installer_attach_service = None
+    if enable_ubuntu_installer_attach:
+        ubuntu_installer_attach_service = create_ubuntu_installer_attach_service(
+            peer_ips=all_ips,
+            server_options=server_options,
+            service_ports=service_ports,
+        )
+
+    env = Environment(
+        loader=FileSystemLoader("src"),
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    template = env.get_template(template_path)
+
+    context = {
+        "ssl_cert_path": ssl_cert_path,
+        "redirect_directive": redirect_directive,
+        "error_files_directory": error_files_directory,
+        "error_files": error_files,
+        "global_max_connections": max_connections,
+        "server_timeout": server_timeout,
+        "http_service": http_service,
+        "https_service": https_service,
+        "hostagent_messenger_service": hostagent_messenger_service,
+        "ubuntu_installer_attach_service": ubuntu_installer_attach_service,
+    }
+
+    rendered = template.render(context)
+
+    try:
+        write_file(rendered.encode(), rendered_config_path, 0o644)
+    except OSError as e:
+        raise HAProxyError(f"Failed to write HAProxy config: {str(e)}")
+
+    return rendered
+
+
+def reload(service_name=HAPROXY_SERVICE) -> None:
+    """Reloads the HAProxy service.
+
+    :raises HAProxyError: Failed to reload the service!
+    """
+    try:
+        systemd.service_reload(service_name)
+    except systemd.SystemdError as e:
+        raise HAProxyError(f"Failed reloading the HAProxy service: {str(e)}")
+
+
+def validate_config(
+    config_path: str = HAPROXY_RENDERED_CONFIG_PATH,
+    haproxy_executable=HAPROXY_EXECUTABLE,
+    user=HAPROXY_USER,
+) -> None:
+    """Validates the HAProxy config.
+
+    :param config_path: Path to the HAProxy config to validate.
+
+    :raises HAProxyError: Failed to validate the HAProxy config!
+    """
+    try:
+        subprocess.run(
+            [haproxy_executable, "-c", "-f", config_path],
+            capture_output=True,
+            check=True,
+            user=user,
+            text=True,
+        )
+
+    except CalledProcessError as e:
+        raise HAProxyError(
+            "Failed to validate HAProxy config!"
+            f"\nstdout: {str(e.stdout)}\nstderr: {str(e.stderr)}"
+        )
+
+
+def install(package_name: str = HAPROXY_APT_PACKAGE_NAME) -> None:
+    """
+    Installs the HAProxy apt package locally.
+
+    :raises HAProxyError: Failed to install HAProxy!
+    """
+
+    try:
+        apt.add_package(package_name, update_cache=True)
+    except apt.PackageError as e:
+        raise HAProxyError(f"Failed to install HAProxy: {str(e)}")

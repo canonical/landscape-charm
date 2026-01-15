@@ -23,14 +23,15 @@ requires:
     interface: rabbitmq
   application-dashboard:
     interface: register-application
+  load-balancer-certificates:
+    interface: tls-certificates
+    limit: 1
 
 provides:
   data:
     interface: block-storage
     scope: container
     optional: true
-  website:
-    interface: http
   hosted:
     interface: landscape-hosted
     scope: container

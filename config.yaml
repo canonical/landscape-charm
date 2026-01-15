@@ -94,19 +94,6 @@ options:
     type: string
     default: ""
     description: The SMTP server used to deliver outgoing mail.
-  ssl_cert:
-    type: string
-    default: "DEFAULT"
-    description: |
-      The base64-encoded SSL certificate to use for Landscape Server.
-      It will be passed verbatim to the HAProxy charm. If not set, a
-      self-signed certificate will be used instead.
-  ssl_key:
-    type: string
-    default: ""
-    description: |
-      The base64-encoded private key for the SSL certificate. If
-      ssl-cert is not set, this will be ignored.
   http_proxy:
     type: string
     default:
@@ -241,3 +228,10 @@ options:
       an HAProxy frontend will be created to route traffic to the Ubuntu installer
       attach backend services. The backend services will be installed and uninstalled
       automatically.
+  max_global_haproxy_connections:
+    type: int
+    default: 4096
+    description: |
+      Maximum number of concurrent connections HAProxy will accept globally across all
+      frontends and backends. This sets the 'maxconn' value in the global section of
+      the HAProxy configuration.
