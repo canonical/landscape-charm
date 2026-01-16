@@ -1,8 +1,5 @@
 # Landscape Server Charm Module
 
-> [!CAUTION]
-> This module is not currently compatible with Charmed PostgreSQL 16. You cannot relate it to the `16/stable`, `16/candidate`, `16/edge`, or `16/beta` channels of the `postgresql` charm.
-
 This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
 It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
@@ -87,7 +84,7 @@ No modules.
 | <a name="input_app_name"></a> [app\_name](#input\_app\_name) | Name of the application in the Juju model. | `string` | `"landscape-server"` | no |
 | <a name="input_base"></a> [base](#input\_base) | The operating system on which to deploy. | `string` | `"ubuntu@22.04"` | no |
 | <a name="input_channel"></a> [channel](#input\_channel) | The channel to use when deploying a charm. | `string` | `"latest-stable/edge"` | no |
-| <a name="input_config"></a> [config](#input\_config) | Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations. | `map(string)` | `{}` | no |
+| <a name="input_config"></a> [config](#input\_config) | Application config. Details about available options can be found at <https://charmhub.io/landscape-server/configurations>. | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | Juju constraints to apply for this application. | `string` | `"arch=amd64"` | no |
 | <a name="input_model"></a> [model](#input\_model) | Reference to a `juju_model`. | `string` | n/a | yes |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm. | `number` | `null` | no |
@@ -99,5 +96,5 @@ No modules.
 |------|-------------|
 | <a name="output_app_name"></a> [app\_name](#output\_app\_name) | Name of the deployed application. |
 | <a name="output_provides"></a> [provides](#output\_provides) | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`). |
-| <a name="output_requires"></a> [requires](#output\_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
+| <a name="output_requires"></a> [requires](#output\_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db` or `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
 <!-- END_TF_DOCS -->
