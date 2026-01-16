@@ -47,6 +47,7 @@ applications:
     options:
       external-grpc-port: 6554
       hostname: landscape.local
+      backend-protocol: https
   http-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -58,6 +59,7 @@ applications:
       paths: /
       hostname: landscape.local
       header-rewrite-expressions: "X-Forwarded-Proto:https"
+      allow-http: true
   ubuntu-installer-attach-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -68,6 +70,7 @@ applications:
     options:
       external-grpc-port: 50051
       hostname: landscape.local
+      backend-protocol: https
   lb-certs:
     charm: self-signed-certificates
     channel: stable
