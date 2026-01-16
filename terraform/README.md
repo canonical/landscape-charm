@@ -1,8 +1,5 @@
 # Landscape Server Charm Module
 
-> [!CAUTION]
-> This module is not currently compatible with Charmed PostgreSQL 16. You cannot relate it to the `16/stable`, `16/candidate`, `16/edge`, or `16/beta` channels of the `postgresql` charm.
-
 This directory contains a base [Terraform][Terraform] module for the [Landscape Server charm][Landscape Server charm].
 
 It uses the [Terraform Juju provider][Terraform Juju provider] to model the charm deployment onto any non-Kubernetes cloud managed by [Juju][Juju].
@@ -99,5 +96,5 @@ No modules.
 |------|-------------|
 | <a name="output_app_name"></a> [app\_name](#output\_app\_name) | Name of the deployed application. |
 | <a name="output_provides"></a> [provides](#output\_provides) | Map of integration endpoints this charm provides (`cos-agent`, `data`, `hosted`, `nrpe-external-master`, `website`). |
-| <a name="output_requires"></a> [requires](#output\_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
+| <a name="output_requires"></a> [requires](#output\_requires) | Map of integration endpoints this charm requires (`application-dashboard`, `db` or `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`). |
 <!-- END_TF_DOCS -->
