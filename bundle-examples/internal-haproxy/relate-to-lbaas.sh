@@ -3,7 +3,7 @@ set -eux
 
 OFFER_NAME="${OFFER_NAME:-"admin/lbaas.haproxy"}"
 MODEL_NAME="${MODEL_NAME:-"landscape-charm-build"}"
-OFFER_APP_NAME="${OFFER_APP_NAME:-"saas-haproxy"}"
+OFFER_APP_NAME="${OFFER_APP_NAME:-"lbaas-haproxy"}"
 
 # Consume the LBaaS `haproxy-route` offer
 juju consume "${OFFER_NAME}" -m "${MODEL_NAME}" "${OFFER_APP_NAME}"

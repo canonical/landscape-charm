@@ -2,6 +2,7 @@ DIR_NAME := $(notdir $(shell pwd))
 BUNDLE_PATH ?= ./bundle-examples/internal-haproxy/internal-haproxy.bundle.yaml
 PLATFORM ?= ubuntu@24.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
+LBAAS_MODEL_NAME ?= lbaas
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
@@ -70,6 +71,10 @@ clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
 	-juju destroy-model --no-prompt $(MODEL_NAME) \
 		--force --no-wait --destroy-storage
+
+# Destroy LBaaS model
+	juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
+		--force --no-wait --destroy-storage || true
 	cd bundle-examples/internal-haproxy && \
 	rm -rf *.tfstate && \
 	cd ../..
@@ -77,6 +82,8 @@ clean:
 lbaas: deploy
 	cd bundle-examples/internal-haproxy && \
 	terraform init && \
-	terraform apply -var model_name=$(MODEL_NAME) && \
+	terraform apply -auto-approve \
+		-var model_name=$(MODEL_NAME) \
+		-var lbaas_model_name=$(LBAAS_MODEL_NAME) && \
 	MODEL_NAME=landscape-charm-build ./relate-to-lbaas.sh && \
 	cd ../..

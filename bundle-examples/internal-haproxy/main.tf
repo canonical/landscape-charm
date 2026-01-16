@@ -25,8 +25,8 @@ data "juju_model" "charm_build_model" {
   uuid = data.external.get_juju_model_uuid_by_name.result.uuid
 }
 
-resource "juju_model" "saas_model" {
-  name       = "lbaas"
+resource "juju_model" "lbaas_model" {
+  name       = var.lbaas_model_name
   depends_on = [terraform_data.wait_for_landscape]
 }
 
@@ -35,12 +35,12 @@ locals {
 }
 
 resource "juju_ssh_key" "mykey" {
-  model_uuid = juju_model.saas_model.uuid
+  model_uuid = juju_model.lbaas_model.uuid
   payload    = data.external.get_ssh_public_key.result.key
 }
 
 resource "juju_application" "haproxy" {
-  model_uuid = juju_model.saas_model.uuid
+  model_uuid = juju_model.lbaas_model.uuid
 
   charm {
     name    = "haproxy"
@@ -54,7 +54,7 @@ resource "juju_application" "haproxy" {
 }
 
 resource "juju_application" "cert" {
-  model_uuid = juju_model.saas_model.uuid
+  model_uuid = juju_model.lbaas_model.uuid
 
   charm {
     name    = "self-signed-certificates"
@@ -63,7 +63,7 @@ resource "juju_application" "cert" {
 }
 
 resource "juju_integration" "haproxy_certs" {
-  model_uuid = juju_model.saas_model.uuid
+  model_uuid = juju_model.lbaas_model.uuid
 
   application {
     name     = juju_application.haproxy.name
@@ -77,7 +77,7 @@ resource "juju_integration" "haproxy_certs" {
 }
 
 resource "juju_offer" "haproxy_route" {
-  model_uuid       = juju_model.saas_model.uuid
+  model_uuid       = juju_model.lbaas_model.uuid
   application_name = juju_application.haproxy.name
   endpoints        = ["haproxy-route"]
 }
