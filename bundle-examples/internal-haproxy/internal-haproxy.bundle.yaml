@@ -40,18 +40,16 @@ applications:
   hostagent-messenger-ingress:
     charm: ingress-configurator
     channel: latest/edge
-    revision: 36
     num_units: 1
     to:
       - "0"
     constraints: arch=amd64
     options:
-      paths: /
+      external-grpc-port: 6554
       hostname: landscape.local
   http-ingress:
     charm: ingress-configurator
     channel: latest/edge
-    revision: 36
     num_units: 1
     to:
       - "0"
@@ -59,29 +57,16 @@ applications:
     options:
       paths: /
       hostname: landscape.local
-  https-ingress:
-    charm: ingress-configurator
-    channel: latest/edge
-    revision: 36
-    num_units: 1
-    to:
-      - "0"
-    constraints: arch=amd64
-    options:
-      paths: /
-      hostname: landscape.local
-      backend-protocol: https
       header-rewrite-expressions: "X-Forwarded-Proto:https"
   ubuntu-installer-attach-ingress:
     charm: ingress-configurator
     channel: latest/edge
-    revision: 36
     num_units: 1
     to:
       - "0"
     constraints: arch=amd64
     options:
-      paths: /
+      external-grpc-port: 50051
       hostname: landscape.local
   lb-certs:
     charm: self-signed-certificates
@@ -108,7 +93,6 @@ relations:
   - [landscape-server:outbound-amqp, rabbitmq-server]
   - [landscape-server:database, postgresql:database]
   - [landscape-server:http-ingress, http-ingress:ingress]
-  - [landscape-server:https-ingress, https-ingress:ingress]
   - [
       landscape-server:hostagent-messenger-ingress,
       hostagent-messenger-ingress:ingress,

@@ -140,7 +140,7 @@ Configuration for a `server` stanza in the HAProxy config.
 
 HTTP_FRONTEND = Frontend(
     frontend_name=FrontendName.HTTP,
-    frontend_port=FrontendPort.HTTP,
+    frontend_port=int(FrontendPort.HTTP),
     frontend_options=[
         "mode http",
         f"timeout client {CLIENT_TIMEOUT}",
@@ -175,7 +175,7 @@ HTTP_FRONTEND = Frontend(
 
 HTTPS_FRONTEND = Frontend(
     frontend_name=FrontendName.HTTPS,
-    frontend_port=FrontendPort.HTTPS,
+    frontend_port=int(FrontendPort.HTTPS),
     frontend_options=[
         "mode http",
         f"timeout client {CLIENT_TIMEOUT}",
@@ -210,14 +210,14 @@ HTTPS_FRONTEND = Frontend(
 
 HOSTAGENT_MESSENGER_FRONTEND = Frontend(
     frontend_name=FrontendName.HOSTAGENT_MESSENGER,
-    frontend_port=FrontendPort.HOSTAGENT_MESSENGER,
+    frontend_port=int(FrontendPort.HOSTAGENT_MESSENGER),
     frontend_options=["mode http"],
 )
 
 
 UBUNTU_INSTALLER_ATTACH_FRONTEND = Frontend(
     frontend_name=FrontendName.UBUNTU_INSTALLER_ATTACH,
-    frontend_port=FrontendPort.UBUNTU_INSTALLER_ATTTACH,
+    frontend_port=int(FrontendPort.UBUNTU_INSTALLER_ATTTACH),
     frontend_options=[
         "mode http",
         # The X-FQDN header is required for multitenant installations

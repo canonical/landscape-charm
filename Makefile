@@ -73,9 +73,9 @@ clean:
 		--force --no-wait --destroy-storage
 
 # Destroy LBaaS model
-	juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
-		--force --no-wait --destroy-storage || true
-	cd bundle-examples/internal-haproxy && \
+	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
+		--force --no-wait --destroy-storage
+	-cd bundle-examples/internal-haproxy && \
 	rm -rf *.tfstate && \
 	cd ../..
 

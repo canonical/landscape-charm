@@ -327,13 +327,6 @@ class LandscapeServerCharm(CharmBase):
             relation_name="http-ingress",
         )
 
-        self.https_ingress = IngressPerAppRequirer(
-            self,
-            port=haproxy.FrontendPort.HTTPS,
-            relation_name="https-ingress",
-            scheme="https",
-        )
-
         if self.charm_config.enable_hostagent_messenger:
             self.hostagent_messenger_ingress = IngressPerAppRequirer(
                 self,
