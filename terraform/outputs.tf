@@ -27,9 +27,9 @@ locals {
   amqp_relations           = local.has_modern_amqp_rels ? { inbound_amqp = "inbound-amqp", outbound_amqp = "outbound-amqp" } : { amqp = "amqp" }
 
   # Add support for the modern Postgres charm interface and keep backwards compatibility
-  postgres_rels_updated_rev    = 213
-  has_modern_posgres_interface = var.revision != null ? var.revision >= local.postgres_rels_updated_rev : true
-  db_relations                 = local.has_modern_posgres_interface ? { database = "database", db = "db" } : { db = "db" }
+  postgres_rels_updated_rev     = 213
+  has_modern_postgres_interface = var.revision != null ? var.revision >= local.postgres_rels_updated_rev : true
+  db_relations                  = local.has_modern_postgres_interface ? { database = "database", db = "db" } : { db = "db" }
 }
 
 output "requires" {
