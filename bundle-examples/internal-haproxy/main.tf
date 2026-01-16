@@ -9,7 +9,6 @@ resource "terraform_data" "wait_for_landscape" {
   }
 }
 
-
 data "external" "get_juju_model_uuid_by_name" {
   program = ["bash", "${path.module}/get_juju_uuid_by_name.sh"]
   query = {
@@ -80,4 +79,17 @@ resource "juju_offer" "haproxy_route" {
   model_uuid       = juju_model.lbaas_model.uuid
   application_name = juju_application.haproxy.name
   endpoints        = ["haproxy-route"]
+}
+
+resource "terraform_data" "wait_for_lbaas" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      juju wait-for model $MODEL_NAME --timeout 3600s --query='forEach(units, unit => unit.workload-status == "active")'
+      EOT
+    environment = {
+      MODEL_NAME = var.lbaas_model_name
+    }
+  }
+
+  depends_on = [juju_offer.haproxy_route, juju_integration.haproxy_certs]
 }

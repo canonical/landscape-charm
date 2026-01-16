@@ -1,4 +1,6 @@
 #!/bin/bash
+set -eux
+
 input=$(cat)
 _model_name=$(echo "$input" | jq -r '.model_name')
 MODEL_NAME=${_model_name:-"landscape-charm-build"}

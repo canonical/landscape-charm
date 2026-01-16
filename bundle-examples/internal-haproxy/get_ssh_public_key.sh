@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eux
 
 ssh_public_keys=("${HOME}"/.ssh/id_*.pub)
 
