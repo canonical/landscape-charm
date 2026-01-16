@@ -34,6 +34,7 @@ fmt:
 
 # Charm building and deployment
 build:
+	poetry lock
 	poetry run ccc pack --platform $(PLATFORM)
 
 deploy:
