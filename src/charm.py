@@ -325,14 +325,13 @@ class LandscapeServerCharm(CharmBase):
             self,
             port=haproxy.FrontendPort.HTTP,
             relation_name="http-ingress",
-            redirect_https=True,
         )
 
         self.https_ingress = IngressPerAppRequirer(
             self,
             port=haproxy.FrontendPort.HTTPS,
             relation_name="https-ingress",
-            redirect_https=True,
+            scheme="https",
         )
 
         if self.charm_config.enable_hostagent_messenger:
@@ -340,7 +339,6 @@ class LandscapeServerCharm(CharmBase):
                 self,
                 relation_name="hostagent-messenger-ingress",
                 port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
-                redirect_https=True,
             )
 
         if self.charm_config.enable_ubuntu_installer_attach:
@@ -348,7 +346,6 @@ class LandscapeServerCharm(CharmBase):
                 self,
                 relation_name="ubuntu-installer-attach-ingress",
                 port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTTACH,
-                redirect_https=True,
             )
 
         self.lb_certificates = TLSCertificatesRequiresV4(

@@ -25,8 +25,7 @@ data "juju_model" "charm_build_model" {
 }
 
 resource "juju_model" "lbaas_model" {
-  name       = var.lbaas_model_name
-  depends_on = [terraform_data.wait_for_landscape]
+  name = var.lbaas_model_name
 }
 
 locals {
