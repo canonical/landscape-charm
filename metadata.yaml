@@ -26,9 +26,6 @@ requires:
   http-ingress:
     interface: ingress
     limit: 1
-  https-ingress:
-    interface: ingress
-    limit: 1
   hostagent-messenger-ingress:
     interface: ingress
     limit: 1
