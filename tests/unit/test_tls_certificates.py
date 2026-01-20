@@ -1,7 +1,10 @@
 from urllib.parse import urlparse
-from scenario import Context, State
-from charm import LandscapeServerCharm
+
 from charmlibs.interfaces.tls_certificates import CertificateRequestAttributes
+from ops._private.harness import ActionFailed
+from scenario import Context, State
+
+from charm import LandscapeServerCharm
 
 
 def test_get_certificate_request_attributes(lb_certs_state):
@@ -74,7 +77,6 @@ def test_haproxy_update_calls_get_cert_req_attr(
 def test_get_certificate_request_attributes_root_url_no_hostname(lb_certs_state):
     """Test with root_url that has no hostname (edge case)."""
     ctx = Context(LandscapeServerCharm)
-    # Invalid URL without hostname
     root_url = "https://"
     state = State(**lb_certs_state, config={"root_url": root_url})
 
@@ -122,7 +124,9 @@ def test_get_certificate_request_attributes_ipv6_in_url(lb_certs_state):
 def test_update_haproxy_returns_early_when_no_cert_attrs(
     lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture, monkeypatch
 ):
-    """Test that _update_haproxy returns early when cert attributes cannot be generated."""
+    """Test that _update_haproxy returns early when cert attributes
+    cannot be generated.
+    """
     ctx = Context(LandscapeServerCharm)
     state = State(**lb_certs_state)
 
@@ -155,7 +159,9 @@ def test_update_haproxy_sets_default_root_url(
 def test_update_haproxy_does_not_override_configured_root_url(
     lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
 ):
-    """Test that _update_haproxy doesn't set default_root_url when root_url is configured."""
+    """Test that _update_haproxy doesn't set default_root_url when
+    root_url is configured.
+    """
     ctx = Context(LandscapeServerCharm)
     root_url = "https://landscape.example.com/"
     state = State(**lb_certs_state, config={"root_url": root_url})
@@ -169,7 +175,9 @@ def test_update_haproxy_does_not_override_configured_root_url(
 def test_update_haproxy_marks_ready_on_success(
     lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
 ):
-    """Test that _update_haproxy marks load-balancer-certificates as ready on success."""
+    """Test that _update_haproxy marks load-balancer-certificates as ready
+    on success.
+    """
     ctx = Context(LandscapeServerCharm)
     state = State(**lb_certs_state)
 
@@ -194,3 +202,35 @@ def test_tls_certificates_refresh_events(lb_certs_state):
             cert_attrs = mgr.charm._get_certificate_request_attributes()
             assert cert_attrs is not None
             assert cert_attrs.sans_ip is not None
+
+
+def test_action_get_certificates_success(
+    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
+):
+    """Test get-certificates action returns cert data when available."""
+    ctx = Context(LandscapeServerCharm)
+    state = State(**lb_certs_state)
+
+    ctx.run(ctx.on.action("get-certificates"), state)
+
+    assert ctx.action_results is not None
+    assert "certificate" in ctx.action_results
+    assert "ca" in ctx.action_results
+    assert "chain" in ctx.action_results
+
+
+def test_action_get_certificates_no_attrs(
+    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture, monkeypatch
+):
+    """Test get-certificates action fails when cert attrs unavailable."""
+    ctx = Context(LandscapeServerCharm)
+    state = State(**lb_certs_state)
+
+    monkeypatch.setattr(
+        LandscapeServerCharm, "_get_certificate_request_attributes", lambda self: None
+    )
+    try:
+        ctx.run(ctx.on.action("get-certificates"), state)
+        assert False, "Expected ActionFailed exception"
+    except ActionFailed as e:
+        assert "TLS certificate not available" in str(e)

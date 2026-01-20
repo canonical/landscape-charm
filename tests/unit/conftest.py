@@ -130,10 +130,16 @@ def certificates_integration_fixture(
 def certificate_and_key_fixture(
     monkeypatch: pytest.MonkeyPatch,
     csr_certificate_and_key,
+    ca_certificate_and_key,
 ) -> tuple[Mock, PrivateKey]:
     _, certificate, private_key = csr_certificate_and_key
+    ca_cert, _ = ca_certificate_and_key
 
-    provider_cert_mock = Mock(certificate=certificate)
+    provider_cert_mock = Mock(
+        certificate=certificate,
+        ca=ca_cert,
+        chain=[certificate, ca_cert],
+    )
     monkeypatch.setattr(
         (
             "charmlibs.interfaces.tls_certificates"
