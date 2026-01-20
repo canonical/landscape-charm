@@ -234,3 +234,21 @@ def test_action_get_certificates_no_attrs(
         assert False, "Expected ActionFailed exception"
     except ActionFailed as e:
         assert "TLS certificate not available" in str(e)
+
+
+def test_action_get_certificates_no_provider_cert(
+    lb_certs_state, haproxy_root_fixture, monkeypatch
+):
+    """Test get-certificates action fails when provider certificate is unavailable."""
+    ctx = Context(LandscapeServerCharm)
+    state = State(**lb_certs_state)
+
+    monkeypatch.setattr(
+        "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificate",
+        lambda *args, **kwargs: (None, None),
+    )
+    try:
+        ctx.run(ctx.on.action("get-certificates"), state)
+        assert False, "Expected ActionFailed exception"
+    except ActionFailed as e:
+        assert "No assigned TLS certificate found for this unit" in str(e)

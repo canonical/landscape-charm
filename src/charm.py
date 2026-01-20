@@ -1148,12 +1148,16 @@ class LandscapeServerCharm(CharmBase):
     def _on_get_certificates_action(self, event: ActionEvent) -> None:
         cert_attrs = self._get_certificate_request_attributes()
         if not cert_attrs:
-            event.fail("TLS certificate not available!")
+            event.fail("TLS certificate not available")
             return
 
         provider_certificate, _ = self.lb_certificates.get_assigned_certificate(
             certificate_request=cert_attrs
         )
+
+        if not provider_certificate:
+            event.fail("No assigned TLS certificate found for this unit")
+            return
 
         event.set_results(
             {

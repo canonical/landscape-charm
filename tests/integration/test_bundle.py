@@ -408,13 +408,7 @@ def test_non_leader_unit_redirects_leader_only_services(
 
 def wait_for_lb_certs(status: jubilant.statustypes.Status):
     for unit_status in status.apps["landscape-server"].units.values():
-        if (
-            "Waiting for load balancer TLS certificate"
-            in unit_status.workload_status.message
-            or not unit_status.workload_status.ready.get(
-                "load-balancer-certificates", True
-            )
-        ):
+        if unit_status.is_waiting:
             return True
 
     return False
@@ -437,8 +431,9 @@ def test_charm_waits_for_lb_certs(juju: jubilant.Juju, bundle: None):
                 if any(rel.interface == "tls-certificates" for rel in rels):
                     cert_provider = app_name
                     break
+
             if cert_provider:
-                break
+                break  # We're allowed to have one
 
         assert cert_provider is not None, "Could not find TLS certificate provider"
 
@@ -470,8 +465,9 @@ def test_get_certificates_action_without_tls_relation(
                 if any(rel.interface == "tls-certificates" for rel in rels):
                     cert_provider = app_name
                     break
+
             if cert_provider:
-                break
+                break  # We're allowed to have one
 
         assert cert_provider is not None
 
