@@ -3,6 +3,7 @@ from datetime import timedelta
 import json
 import pwd
 import subprocess
+from typing import Any
 from unittest.mock import MagicMock, Mock
 
 from charmlibs.interfaces.tls_certificates import (
@@ -150,12 +151,12 @@ def certificate_and_key_fixture(
     return provider_cert_mock, private_key
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def haproxy_user_fixture(monkeypatch):
     monkeypatch.setattr(pwd, "getpwnam", Mock())
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def haproxy_paths_fixture(tmp_path, monkeypatch):
     """Mock HAProxy file paths to use tmp_path fixture."""
     monkeypatch.setattr(haproxy, "HAPROXY_CERT_PATH", str(tmp_path / "haproxy.pem"))
@@ -165,11 +166,66 @@ def haproxy_paths_fixture(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def file_operations_fixture(monkeypatch):
+def haproxy_write_tls_cert_fixture(monkeypatch) -> Mock:
+    mock_write_tls = Mock()
+    monkeypatch.setattr("haproxy.write_tls_cert", mock_write_tls)
+
+    return mock_write_tls
+
+
+@pytest.fixture()
+def haproxy_write_file_fixture(monkeypatch):
     """
     Mock HAProxy file ownership operations that require root permissions.
     """
     monkeypatch.setattr("haproxy.write_file", lambda *args, **kwargs: None)
+
+
+@pytest.fixture()
+def haproxy_root_fixture(
+    haproxy_paths_fixture,
+    haproxy_user_fixture,
+    haproxy_write_file_fixture,
+    haproxy_write_tls_cert_fixture,
+    ownership_fixture,
+) -> tuple[Any, Any, Any, Any, Any]:
+    """
+    Uses all the given fixtures
+    and return the results in order as a tuple.
+    """
+    paths_fixture_res = haproxy_paths_fixture
+    user_fixture_res = haproxy_user_fixture
+    write_file_res = haproxy_write_file_fixture
+    write_tls_res = haproxy_write_tls_cert_fixture
+    ownership_fixture_res = ownership_fixture
+
+    return (
+        paths_fixture_res,
+        user_fixture_res,
+        write_file_res,
+        write_tls_res,
+        ownership_fixture_res,
+    )
+
+
+@pytest.fixture()
+def ownership_fixture(monkeypatch) -> tuple[Mock, Mock, Mock]:
+    """
+    Mock os.chown, os.chmod, and shutil.chown
+    to avoid doing ownership operations on files in unit tests.
+
+    Returns the mocks for os.chown, os.chmod, and shutil.chown.
+    """
+    os_chown_mock = Mock()
+    monkeypatch.setattr("os.chown", os_chown_mock)
+
+    os_chmod_mock = Mock()
+    monkeypatch.setattr("os.chmod", os_chmod_mock)
+
+    shutil_chown_mock = Mock()
+    monkeypatch.setattr("shutil.chown", shutil_chown_mock)
+
+    return os_chown_mock, os_chmod_mock, shutil_chown_mock
 
 
 @pytest.fixture(autouse=True, name="subprocess_fixture")

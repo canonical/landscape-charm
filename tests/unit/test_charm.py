@@ -172,7 +172,7 @@ class TestOnConfigChanged:
         self,
         lb_certs_state,
         certificate_and_key_fixture,
-        file_operations_fixture,
+        haproxy_write_file_fixture,
         systemd_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
@@ -196,7 +196,7 @@ class TestOnConfigChanged:
         self,
         lb_certs_state,
         certificate_and_key_fixture,
-        file_operations_fixture,
+        haproxy_write_file_fixture,
         systemd_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
@@ -219,7 +219,7 @@ class TestOnConfigChangedEnableUbuntuInstallerAttach:
         apt_fixture,
         lb_certs_state,
         certificate_and_key_fixture,
-        file_operations_fixture,
+        haproxy_write_file_fixture,
     ):
         """
         If the `enable_ubuntu_installer_attach` parameter moves from `False` to `True`,
@@ -277,7 +277,7 @@ class TestOnConfigChangedEnableUbuntuInstallerAttach:
         apt_fixture,
         lb_certs_state,
         certificate_and_key_fixture,
-        file_operations_fixture,
+        haproxy_write_file_fixture,
     ):
         """
         If the `enable_ubuntu_installer_attach` parameter was already set to `True`,
@@ -311,7 +311,7 @@ class TestOnConfigChangedEnableUbuntuInstallerAttach:
         apt_fixture,
         lb_certs_state,
         certificate_and_key_fixture,
-        file_operations_fixture,
+        haproxy_write_file_fixture,
     ):
         """
         If the `enable_ubuntu_installer_attach` parameter was already set to `False`,
