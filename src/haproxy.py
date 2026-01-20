@@ -399,7 +399,7 @@ def create_http_service(
     service_ports: "ServicePorts" = SERVICE_PORTS,
     server_options: str = SERVER_OPTIONS,
 ) -> Service:
-    (appservers, pingservers, message_servers, api_servers) = [
+    appservers, pingservers, message_servers, api_servers = [
         [
             Server(
                 name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
@@ -464,7 +464,7 @@ def create_https_service(
     hashid-databases backends are only from the leader unit but
     exist on every unit.
     """
-    (appservers, pingservers, message_servers, api_servers) = [
+    appservers, pingservers, message_servers, api_servers = [
         [
             Server(
                 name=f"landscape-{name}-{sanitize_ip(ip)}-{i}",
