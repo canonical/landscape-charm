@@ -8,7 +8,7 @@ on:
 
         paths-ignore:
             - "tests/**"
-            - pyproject.toml
+            - "pyproject.toml"
             - ".github/workflows/*.yaml"
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
         with:
             track: "25.10"
         permissions:
-            contents: write # Needed to create git tag
+            contents: write # Needed to create git tags
 
     lint:
         name: Lint
