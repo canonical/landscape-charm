@@ -1,0 +1,12 @@
+model = "landscape"
+
+landscape_server = {
+  channel  = "25.10/edge"
+  revision = 209
+  base     = "ubuntu@22.04"
+  config = {
+    min_install      = "true"
+    autoregistration = "true"
+    landscape_ppa    = "ppa:landscape/self-hosted-25.10"
+  }
+}

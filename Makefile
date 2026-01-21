@@ -1,3 +1,6 @@
+include terraform/charm/Makefile
+include terraform/product/Makefile
+
 DIR_NAME := $(notdir $(shell pwd))
 BUNDLE_PATH ?= ./bundle-examples/postgres16.bundle.yaml
 PLATFORM ?= ubuntu@24.04:amd64
@@ -6,8 +9,16 @@ CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
-
-.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
+.PHONY: build \
+	deploy \
+	clean \
+	test \
+	integration-test \
+	coverage \
+	lint \
+	terraform-check-all \
+	terraform-fix-all \
+	terraform-test-all
 
 # Python testing and linting
 test:
@@ -41,32 +52,19 @@ deploy:
 	juju add-model $(MODEL_NAME)
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
-terraform-test:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform test
-
-fmt-check:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform fmt -check -recursive
-
-tflint-check:
-	cd terraform && tflint --init && tflint --recursive
-
-terraform-check: fmt-check tflint-check
-
-fmt-fix:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform fmt -recursive
-
-tflint-fix:
-	cd terraform && tflint --init && tflint --recursive --fix
-
-terraform-fix: fmt-fix tflint-fix
-
 clean:
 	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
 	-juju destroy-model --no-prompt $(MODEL_NAME) \
 		--force --no-wait --destroy-storage
+
+terraform-check-all:
+	cd terraform/charm && $(MAKE) check-charm-module
+	cd terraform/product && $(MAKE) check-product-modules
+
+terraform-fix-all:
+	cd terraform/charm && $(MAKE) fix-charm-module
+	cd terraform/product && $(MAKE) fix-product-modules
+
+terraform-test-all:
+	cd terraform/charm && $(MAKE) test-charm-module
+	cd terraform/product && $(MAKE) test-product-modules
