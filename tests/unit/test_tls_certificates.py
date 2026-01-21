@@ -34,7 +34,7 @@ def test_get_certificate_request_attributes(lb_certs_state):
 
 def test_get_certificate_request_attributes_root_url(lb_certs_state):
     ctx = Context(LandscapeServerCharm)
-    root_url = "https://helloworld.com/"
+    root_url = "https://landscape.example.com/"
     state = State(**lb_certs_state, config={"root_url": root_url})
 
     with ctx(ctx.on.start(), state) as mgr:
