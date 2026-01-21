@@ -14,17 +14,17 @@ python = "^3.10"
 [tool.poetry.group.dev.dependencies]
 black = "26.1.0"
 charmcraftcache = "0.8.0"
-coverage = "*"
-flake8 = "*"
-isort = "*"
+coverage = "7.13.1"
+flake8 = "7.3.0"
+isort = "7.0.0"
 ops = { extras = ["testing"], version = "2.23.1" }
 pydantic = "1.10.26"
-pytest = "*"
-ruff = "*"
+pytest = "9.0.2"
+ruff = "0.14.11"
 
 [tool.poetry.group.integration.dependencies]
-jubilant = "~=1.0"
-requests = "*"
+jubilant = "1.6.2"
+requests = "2.32.5"
 
 [build-system]
 requires = ["poetry-core"]
