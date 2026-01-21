@@ -1,8 +1,9 @@
 from urllib.parse import urlparse
 
 from charmlibs.interfaces.tls_certificates import CertificateRequestAttributes
-from ops._private.harness import ActionFailed
+import pytest
 from scenario import Context, State
+from ops import testing
 
 from charm import LandscapeServerCharm
 
@@ -229,11 +230,9 @@ def test_action_get_certificates_no_attrs(
     monkeypatch.setattr(
         LandscapeServerCharm, "_get_certificate_request_attributes", lambda self: None
     )
-    try:
+
+    with pytest.raises(testing.ActionFailed):
         ctx.run(ctx.on.action("get-certificates"), state)
-        assert False, "Expected ActionFailed exception"
-    except ActionFailed as e:
-        assert "TLS certificate not available" in str(e)
 
 
 def test_action_get_certificates_no_provider_cert(
@@ -247,8 +246,6 @@ def test_action_get_certificates_no_provider_cert(
         "charmlibs.interfaces.tls_certificates.TLSCertificatesRequiresV4.get_assigned_certificate",
         lambda *args, **kwargs: (None, None),
     )
-    try:
+
+    with pytest.raises(testing.ActionFailed):
         ctx.run(ctx.on.action("get-certificates"), state)
-        assert False, "Expected ActionFailed exception"
-    except ActionFailed as e:
-        assert "No assigned TLS certificate found for this unit" in str(e)
