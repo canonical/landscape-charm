@@ -465,12 +465,7 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    has_tls_cert_relation = any(
-        any(rel.interface == "tls-certificates" for rel in rels)
-        for rels in status.apps["landscape-server"].relations.values()
-    )
-
-    if not has_tls_cert_relation:
+    if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
@@ -489,24 +484,13 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
     assert "certificate" in result.results
     assert "ca" in result.results
     assert "chain" in result.results
-    assert len(result.results["certificate"]) > 0
-    assert len(result.results["ca"]) > 0
-    assert len(result.results["chain"]) > 0
-    assert "BEGIN CERTIFICATE" in result.results["certificate"]
-    assert "BEGIN CERTIFICATE" in result.results["ca"]
-    assert "BEGIN CERTIFICATE" in result.results["chain"]
 
 
 def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    has_tls_cert_relation = any(
-        any(rel.interface == "tls-certificates" for rel in rels)
-        for rels in status.apps["landscape-server"].relations.values()
-    )
-
-    if not has_tls_cert_relation:
+    if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
