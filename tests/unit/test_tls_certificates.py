@@ -1,9 +1,9 @@
 from urllib.parse import urlparse
 
 from charmlibs.interfaces.tls_certificates import CertificateRequestAttributes
+from ops import testing
 import pytest
 from scenario import Context, State
-from ops import testing
 
 from charm import LandscapeServerCharm
 
