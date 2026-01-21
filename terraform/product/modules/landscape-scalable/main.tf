@@ -2,7 +2,7 @@
 
 module "landscape_server" {
   # TODO: Pin to real release when we get one with these fixes
-  source      = "git::https://github.com/jansdhillon/landscape-charm.git//terraform?ref=update-tf-module"
+  source      = "git::https://github.com/jansdhillon/landscape-charm.git//terraform?ref=merge-product-module"
   model       = var.model
   config      = var.landscape_server.config
   app_name    = var.landscape_server.app_name
