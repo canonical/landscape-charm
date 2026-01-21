@@ -42,7 +42,7 @@ jobs:
             - test
             - build
 
-        uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v40.0.2
+        uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v35.0.2
         with:
             track: "25.10"
             artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
