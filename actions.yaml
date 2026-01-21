@@ -33,3 +33,6 @@ disable-ubuntu-installer-attach:
   description: |
     Uninstall the `landscape_ubuntu_installer_attach` package and remove the
     frontend on HAProxy.
+get-certificates:
+  description: |
+    Returns the TLS certificates used by the HAProxy service on this unit.

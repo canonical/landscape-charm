@@ -275,6 +275,9 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.migrate_service_conf_action, self._migrate_service_conf
         )
+        self.framework.observe(
+            self.on.get_certificates_action, self._on_get_certificates_action
+        )
 
         # State
         self._stored.set_default(
@@ -1141,6 +1144,30 @@ class LandscapeServerCharm(CharmBase):
         self._stored.haproxy_config = rendered
 
         self._update_ready_status()
+
+    def _on_get_certificates_action(self, event: ActionEvent) -> None:
+        cert_attrs = self._get_certificate_request_attributes()
+        if not cert_attrs:
+            event.fail("TLS certificate not available")
+            return
+
+        provider_certificate, _ = self.lb_certificates.get_assigned_certificate(
+            certificate_request=cert_attrs
+        )
+
+        if not provider_certificate:
+            event.fail("No assigned TLS certificate found for this unit")
+            return
+
+        event.set_results(
+            {
+                "certificate": str(provider_certificate.certificate),
+                "ca": str(provider_certificate.ca),
+                "chain": "\n\n".join(
+                    [str(cert) for cert in provider_certificate.chain]
+                ),
+            }
+        )
 
     def _nrpe_external_master_relation_joined(self, event: RelationJoinedEvent) -> None:
         self._update_nrpe_checks(event.relation)

@@ -404,3 +404,110 @@ def test_non_leader_unit_redirects_leader_only_services(
                 get_session().get(f"https://{host}/upload", verify=False).status_code
                 == 200
             )
+
+
+def _has_tls_certs_provider(juju: jubilant.Juju) -> bool:
+    status = juju.status()
+
+    return any(
+        any(rel.interface == "tls-certificates" for rel in rels)
+        for rels in status.apps["landscape-server"].relations.values()
+    )
+
+
+def test_get_certificates_action_without_tls_relation(
+    juju: jubilant.Juju, bundle: None
+):
+    status = juju.status()
+    juju.wait(jubilant.all_active, timeout=300)
+
+    has_tls_cert_relation = _has_tls_certs_provider(juju)
+    original_cert_provider = None
+
+    if has_tls_cert_relation:
+        cert_provider = None
+        for app_name, app_status in status.apps.items():
+            if app_name == "landscape-server":
+                continue
+            for rels in app_status.relations.values():
+                if any(rel.interface == "tls-certificates" for rel in rels):
+                    cert_provider = app_name
+                    break
+
+            if cert_provider:
+                break  # We're allowed to have one
+
+        assert cert_provider is not None
+        original_cert_provider = cert_provider
+
+        juju.remove_relation(
+            "landscape-server:load-balancer-certificates",
+            f"{cert_provider}:certificates",
+            force=True,
+        )
+        juju.wait(lambda status: not _has_tls_certs_provider(juju), timeout=120)
+
+    with pytest.raises(jubilant.TaskError) as e:
+        juju.run("landscape-server/0", "get-certificates")
+
+    assert "No assigned TLS certificate found for this unit" in e.value.task.message
+    assert e.value.task.status == "failed"
+
+    if original_cert_provider:
+        juju.integrate(
+            "landscape-server:load-balancer-certificates",
+            f"{original_cert_provider}:certificates",
+        )
+        juju.wait(lambda status: _has_tls_certs_provider(juju), timeout=120)
+
+
+def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    juju.wait(jubilant.all_active, timeout=300)
+
+    if not _has_tls_certs_provider(juju):
+        pytest.skip("No TLS certificate relation found in bundle")
+
+    juju.wait(jubilant.all_active, timeout=300)
+
+    leader_unit = None
+    for unit_name, unit_status in status.apps["landscape-server"].units.items():
+        if unit_status.leader:
+            leader_unit = unit_name
+            break
+
+    assert leader_unit is not None
+
+    result = juju.run(leader_unit, "get-certificates")
+
+    assert result.status == "completed"
+    assert "certificate" in result.results
+    assert "ca" in result.results
+    assert "chain" in result.results
+
+
+def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    juju.wait(jubilant.all_active, timeout=300)
+
+    if not _has_tls_certs_provider(juju):
+        pytest.skip("No TLS certificate relation found in bundle")
+
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = juju.status()
+    non_leader_units = [
+        unit_name
+        for unit_name, unit_status in status.apps["landscape-server"].units.items()
+        if not unit_status.leader
+    ]
+
+    if not non_leader_units:
+        pytest.skip("No non-leader units found")
+
+    result = juju.run(non_leader_units[0], "get-certificates")
+
+    assert result.status == "completed"
+    assert "certificate" in result.results
+    assert "ca" in result.results
+    assert "chain" in result.results

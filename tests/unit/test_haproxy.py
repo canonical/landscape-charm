@@ -110,9 +110,9 @@ class TestUnitIP:
 
 
 class TestWriteFile:
-    def test_write_file_creates_directory(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("os.chown", Mock())
-
+    def test_write_file_creates_directory(
+        self, tmp_path, ownership_fixture, haproxy_user_fixture
+    ):
         file_path = tmp_path / "subdir" / "test.pem"
         content = b"test content"
 
@@ -125,22 +125,25 @@ class TestWriteFile:
         with pytest.raises(ValueError):
             haproxy.write_file("not bytes", str(tmp_path / "test.pem"))
 
-    def test_write_file_sets_permissions(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("os.chown", Mock())
-
+    def test_write_file_sets_permissions(
+        self, tmp_path, ownership_fixture, haproxy_user_fixture
+    ):
+        os_chown_mock, os_chmod_mock, _ = ownership_fixture
         file_path = tmp_path / "test.pem"
         haproxy.write_file(b"content", str(file_path), permissions=0o600)
 
-        mode = file_path.stat().st_mode & 0o777
-        assert mode == 0o600
+        os_chmod_mock.assert_called_once_with(str(file_path), 0o600)
+        assert file_path.exists()
 
 
 class TestWriteTLSCert:
     def test_write_tls_cert_success(
-        self, tmp_path, monkeypatch, certificate_and_key_fixture
+        self,
+        tmp_path,
+        certificate_and_key_fixture,
+        ownership_fixture,
+        haproxy_user_fixture,
     ):
-        monkeypatch.setattr("os.chown", Mock())
-
         cert_path = tmp_path / "cert.pem"
         provider_cert, private_key = certificate_and_key_fixture
 
@@ -165,10 +168,7 @@ class TestWriteTLSCert:
 
 
 class TestCopyErrorFilesFromSource:
-    def test_copy_error_files_success(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("shutil.chown", Mock())
-        monkeypatch.setattr("os.chmod", Mock())
-
+    def test_copy_error_files_success(self, tmp_path, ownership_fixture):
         src_dir = tmp_path / "src"
         dst_dir = tmp_path / "dst"
         src_dir.mkdir()
@@ -394,9 +394,9 @@ class TestValidateConfig:
 
 
 class TestRenderConfig:
-    def test_render_config_basic(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("os.chown", Mock())
-
+    def test_render_config_basic(
+        self, tmp_path, monkeypatch, ownership_fixture, haproxy_user_fixture
+    ):
         template_content = """
 global
     maxconn {{ global_max_connections }}
@@ -431,9 +431,9 @@ backend {{ http_service.backends[0].backend_name }}
         assert "landscape-http" in rendered
         assert config_path.exists()
 
-    def test_render_config_with_hostagent_messenger(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("os.chown", Mock())
-
+    def test_render_config_with_hostagent_messenger(
+        self, tmp_path, monkeypatch, ownership_fixture, haproxy_user_fixture
+    ):
         template_content = """
 {% if hostagent_messenger_service %}
 frontend {{ hostagent_messenger_service.frontend.frontend_name }}
