@@ -1201,12 +1201,14 @@ class LandscapeServerCharm(CharmBase):
                 continue
 
             with open(cfg_filename, "w") as cfg_fp:
-                cfg_fp.write(f"""# check {service}
+                cfg_fp.write(
+                    f"""# check {service}
 # The following header was added by the landscape-server charm
 # Modifying it will affect nagios monitoring and alerting
 # servicegroups: juju
 command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service}
-""")
+"""
+                )
 
         for service in services_to_remove:
             service_cfg = service.replace("-", "_")
