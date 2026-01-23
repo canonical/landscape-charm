@@ -9,13 +9,13 @@ variable "app_name" {
 variable "base" {
   description = "The operating system on which to deploy."
   type        = string
-  default     = "ubuntu@22.04"
+  default     = "ubuntu@24.04"
 }
 
 variable "channel" {
   description = "The channel to use when deploying a charm."
   type        = string
-  default     = "latest-stable/edge"
+  default     = "25.10/edge"
 }
 
 variable "config" {

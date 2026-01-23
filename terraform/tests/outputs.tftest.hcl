@@ -176,3 +176,64 @@ run "amqp_threshold_edge_case" {
     error_message = "Revision 142 should use modern amqp relations"
   }
 }
+
+run "modern_postgres_relations" {
+  command = plan
+
+  variables {
+    model    = "test-model"
+    channel  = "25.10/edge"
+    revision = 213
+    base     = "ubuntu@24.04"
+  }
+
+  assert {
+    condition     = output.requires.database == "database"
+    error_message = "Modern revision should have database relation"
+  }
+
+  assert {
+    condition     = output.requires.db == "db"
+    error_message = "Modern revision should have db relation"
+  }
+}
+
+run "legacy_postgres_relations" {
+  command = plan
+
+  variables {
+    model    = "test-model"
+    channel  = "25.10/edge"
+    revision = 212
+    base     = "ubuntu@24.04"
+  }
+
+  assert {
+    condition     = output.requires.db == "db"
+    error_message = "Legacy revision should have db relation"
+  }
+
+  assert {
+    condition     = !can(output.requires.database)
+    error_message = "Legacy revision should not have database relation"
+  }
+}
+
+run "modern_postgres_relations_null_revision" {
+  command = plan
+
+  variables {
+    model    = "test-model"
+    revision = null
+  }
+
+  assert {
+    condition     = output.requires.database == "database"
+    error_message = "Null revision should have database relation"
+  }
+
+  assert {
+    condition     = output.requires.db == "db"
+    error_message = "Null revision should have db relation"
+  }
+}
