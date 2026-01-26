@@ -1,8 +1,5 @@
 # Landscape Terraform Product Modules
 
-> [!CAUTION]
-> This repository is **archived** and has been migrated to the [Landscape Server charm repository](https://github.com/canonical/landscape-charm). Further changes and releases will not be synced here.
-
 This directory contains [Terraform][Terraform] product modules to deploy Landscape, including the [Landscape Server charm][Charm] and other required applications.
 
 The modules use the [Terraform provider for Juju][Terraform Juju provider] to model the deployment onto any machine environment managed by [Juju][Juju].
@@ -53,13 +50,13 @@ You can use the Make recipes to check the affect of your changes on the modules.
 Lint:
 
 ```sh
-make fix
+make fix-product-modules
 ```
 
 Run tests:
 
 ```sh
-make test
+make test-product-modules
 ```
 
 [Terraform]: https://www.terraform.io/

@@ -256,7 +256,7 @@ def create_http_service(
     all units should declare all backends, even if a unit should not have any servers on
     a specific backend.
     """
-    appservers, pingservers, message_servers, api_servers = [
+    (appservers, pingservers, message_servers, api_servers) = [
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
@@ -361,7 +361,7 @@ def create_https_service(
     all units should declare all backends, even if a unit should not have any servers on
     a specific backend.
     """
-    appservers, pingservers, message_servers, api_servers = [
+    (appservers, pingservers, message_servers, api_servers) = [
         [
             (
                 f"landscape-{name}-{unit_name}-{i}",
