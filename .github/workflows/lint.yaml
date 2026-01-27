@@ -45,4 +45,4 @@ jobs:
           terraform_version: "~1.10"
 
       - uses: terraform-linters/setup-tflint@v4
-      - run: make terraform-check
+      - run: make terraform-check-all
