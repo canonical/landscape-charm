@@ -48,18 +48,6 @@ applications:
       external-grpc-port: 6554
       hostname: landscape.local
       backend-protocol: https
-  http-ingress:
-    charm: ingress-configurator
-    channel: latest/edge
-    num_units: 1
-    to:
-      - "0"
-    constraints: arch=amd64
-    options:
-      hostname: landscape.local
-      header-rewrite-expressions: "X-Forwarded-Proto:https"
-      allow-http: true
-      backend-protocol: https
   ubuntu-installer-attach-ingress:
     charm: ingress-configurator
     channel: latest/edge

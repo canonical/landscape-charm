@@ -318,6 +318,22 @@ class LandscapeServerCharm(CharmBase):
                 "Invalid configuration. See `juju debug-log`."
             )
 
+        if self.charm_config.enable_hostagent_messenger:
+            self.hostagent_messenger_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="hostagent-messenger-ingress",
+                port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
+                scheme="https",
+            )
+
+        if self.charm_config.enable_ubuntu_installer_attach:
+            self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="ubuntu-installer-attach-ingress",
+                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTTACH,
+                scheme="https",
+            )
+
         self.lb_certificates = TLSCertificatesRequiresV4(
             charm=self,
             relationship_name="load-balancer-certificates",
