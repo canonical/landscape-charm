@@ -41,6 +41,9 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppRequirer,
+)
 from ops import main
 from ops.charm import (
     ActionEvent,
