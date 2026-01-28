@@ -26,6 +26,12 @@ requires:
   load-balancer-certificates:
     interface: tls-certificates
     limit: 1
+  hostagent-messenger-ingress:
+    interface: ingress
+    limit: 1
+  ubuntu-installer-attach-ingress:
+    interface: ingress
+    limit: 1
 
 provides:
   data:

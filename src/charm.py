@@ -41,6 +41,9 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppRequirer,
+)
 from ops import main
 from ops.charm import (
     ActionEvent,
@@ -316,6 +319,22 @@ class LandscapeServerCharm(CharmBase):
             self.charm_config = DEFAULT_CONFIGURATION
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
+            )
+
+        if self.charm_config.enable_hostagent_messenger:
+            self.hostagent_messenger_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="hostagent-messenger-ingress",
+                port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
+                scheme="https",
+            )
+
+        if self.charm_config.enable_ubuntu_installer_attach:
+            self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="ubuntu-installer-attach-ingress",
+                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH,
+                scheme="https",
             )
 
         self.lb_certificates = TLSCertificatesRequiresV4(
