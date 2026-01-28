@@ -1,9 +1,0 @@
-# Copyright 2026 Canonical Ltd.
-changelog:
-  categories:
-    - title: Features
-      labels:
-        - enhancement
-    - title: Bug fixes
-      labels:
-        - bug
