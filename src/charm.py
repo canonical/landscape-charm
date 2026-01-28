@@ -333,7 +333,7 @@ class LandscapeServerCharm(CharmBase):
             self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
                 self,
                 relation_name="ubuntu-installer-attach-ingress",
-                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTTACH,
+                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH,
                 scheme="https",
             )
 
