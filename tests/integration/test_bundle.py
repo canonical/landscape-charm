@@ -536,7 +536,9 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
             "landscape-server",
             values={
                 "enable_hostagent_messenger": "true" if original_hostagent else "false",
-                "enable_ubuntu_installer_attach": "true" if original_installer else "false",
+                "enable_ubuntu_installer_attach": (
+                    "true" if original_installer else "false"
+                ),
             },
         )
         juju.wait(jubilant.all_active, timeout=300)
@@ -558,19 +560,24 @@ def test_ingress_config_disabled(juju: jubilant.Juju, bundle: None):
         juju.wait(jubilant.all_active, timeout=300)
 
         status = juju.status()
-        assert status.apps["landscape-server"].app_status.current == "active"    
+        assert status.apps["landscape-server"].app_status.current == "active"
 
         units = status.apps["landscape-server"].units
         for name in units.keys():
             with pytest.raises(Exception):
-                juju.ssh(name, f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service")
+                juju.ssh(
+                    name,
+                    f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
+                )
 
     finally:
         juju.config(
             "landscape-server",
             values={
                 "enable_hostagent_messenger": "true" if original_hostagent else "false",
-                "enable_ubuntu_installer_attach": "true" if original_installer else "false",
+                "enable_ubuntu_installer_attach": (
+                    "true" if original_installer else "false"
+                ),
             },
         )
         juju.wait(jubilant.all_active, timeout=300)
