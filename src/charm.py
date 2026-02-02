@@ -1672,19 +1672,29 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         configuration has not changed.
         """
         currently_enabled = self._stored.enable_ubuntu_installer_attach
+        if currently_enabled and enable:
+            return
         if not currently_enabled and enable:
             self.unit.status = MaintenanceStatus(
                 "Installing `landscape-ubuntu-installer-attach`"
             )
-            apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
-            self._stored.enable_ubuntu_installer_attach = True
+            try:
+                apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+                self._stored.enable_ubuntu_installer_attach = True
+            except PackageError as e:
+                logger.error(f"Failed to install ubuntu installer attach with error: {e}")
+                raise e
         elif currently_enabled and not enable:
             self.unit.status = MaintenanceStatus(
                 "Removing `landscape-ubuntu-installer-attach`"
             )
-            apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-            self._stored.enable_ubuntu_installer_attach = False
-
+            try:
+                apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+                self._stored.enable_ubuntu_installer_attach = False
+            except PackageError as e:
+                logger.error(f"Failed to remove ubuntu installer attach with error: {e}")
+                raise e
+        self.unit.status = WaitingStatus("Waiting on relations")
 
 if __name__ == "__main__":  # pragma: no cover
     main(LandscapeServerCharm)
