@@ -16,7 +16,7 @@ cosl = ">=1.0.0"
 coverage = "*"
 flake8 = "*"
 isort = "*"
-ops = { extras = ["testing"], version = "~=2.19" }
+ops = {extras = ["testing"], version = "~=2.19"}
 pydantic = "<2"
 pytest = "*"
 ruff = "*"
@@ -61,6 +61,8 @@ order-by-type = false
 case-sensitive = false
 
 [tool.pytest.ini_options]
-filterwarnings = ["once:.*Harness is deprecated.*:PendingDeprecationWarning"]
+filterwarnings = [
+    "once:.*Harness is deprecated.*:PendingDeprecationWarning"
+]
 pythonpath = [".", "lib", "src"]
 testpaths = ["tests"]
