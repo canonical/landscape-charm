@@ -415,6 +415,13 @@ def _has_tls_certs_provider(juju: jubilant.Juju) -> bool:
     )
 
 
+def _has_haproxy_route_relation(juju: jubilant.Juju, app_name: str) -> bool:
+    status = juju.status()
+    if app_name not in status.apps:
+        return False
+    return "haproxy-route" in status.apps[app_name].relations
+
+
 def test_get_certificates_action_without_tls_relation(
     juju: jubilant.Juju, bundle: None
 ):
@@ -511,3 +518,116 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "certificate" in result.results
     assert "ca" in result.results
     assert "chain" in result.results
+
+
+def test_external_haproxy_setup_lbaas_model(juju: jubilant.Juju, bundle: None):
+    landscape_model = juju.model
+    lbaas_model = "lbaas"
+
+    juju.add_model(lbaas_model)
+    lbaas_juju = jubilant.Juju(model=lbaas_model)
+
+    lbaas_juju.deploy("haproxy", channel="2.8/edge")
+    lbaas_juju.config(
+        "haproxy",
+        values={"external-hostname": "landscape.local", "enable-hsts": "false"},
+    )
+    lbaas_juju.deploy("self-signed-certificates", channel="1/stable")
+    lbaas_juju.wait(jubilant.all_active, timeout=600)
+
+    lbaas_juju.integrate(
+        "haproxy:certificates", "self-signed-certificates:certificates"
+    )
+    lbaas_juju.wait(jubilant.all_active, timeout=300)
+
+    lbaas_juju.offer("haproxy:haproxy-route")
+
+
+def test_external_haproxy_consume_offer(juju: jubilant.Juju, bundle: None):
+    lbaas_model = "lbaas"
+    offer_app_name = "lbaas-haproxy"
+
+    juju.consume(f"admin/{lbaas_model}.haproxy", offer_app_name)
+
+    juju.integrate(f"{offer_app_name}:haproxy-route", "http-ingress:haproxy-route")
+    juju.wait(
+        lambda status: _has_haproxy_route_relation(juju, "http-ingress"), timeout=300
+    )
+
+    juju.integrate(
+        f"{offer_app_name}:haproxy-route",
+        "hostagent-messenger-ingress:haproxy-route",
+    )
+    juju.wait(
+        lambda status: _has_haproxy_route_relation(juju, "hostagent-messenger-ingress"),
+        timeout=300,
+    )
+
+    juju.integrate(
+        f"{offer_app_name}:haproxy-route",
+        "ubuntu-installer-attach-ingress:haproxy-route",
+    )
+    juju.wait(
+        lambda status: _has_haproxy_route_relation(
+            juju, "ubuntu-installer-attach-ingress"
+        ),
+        timeout=300,
+    )
+
+    juju.wait(jubilant.all_active, timeout=600)
+
+
+def test_external_haproxy_http_ingress_has_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
+    if "http-ingress" not in status.apps:
+        pytest.skip("http-ingress not deployed")
+    relations = status.apps["http-ingress"].relations
+    assert "haproxy-route" in relations
+
+
+def test_external_haproxy_hostagent_messenger_ingress_has_relation(
+    juju: jubilant.Juju, bundle: None
+):
+    status = juju.status()
+    if "hostagent-messenger-ingress" not in status.apps:
+        pytest.skip("hostagent-messenger-ingress not deployed")
+    relations = status.apps["hostagent-messenger-ingress"].relations
+    assert "haproxy-route" in relations
+
+
+def test_external_haproxy_ubuntu_installer_attach_ingress_has_relation(
+    juju: jubilant.Juju, bundle: None
+):
+    status = juju.status()
+    if "ubuntu-installer-attach-ingress" not in status.apps:
+        pytest.skip("ubuntu-installer-attach-ingress not deployed")
+    relations = status.apps["ubuntu-installer-attach-ingress"].relations
+    assert "haproxy-route" in relations
+
+
+def test_external_haproxy_traffic_via_haproxy(juju: jubilant.Juju, bundle: None):
+    lbaas_juju = jubilant.Juju(model="lbaas")
+    status = lbaas_juju.status()
+
+    if "haproxy" not in status.apps:
+        pytest.skip("haproxy not deployed in lbaas model")
+
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    response = get_session().get(f"http://{host}/ping", timeout=10)
+    assert response.status_code in (200, 301, 302)
+
+
+def test_external_haproxy_metrics_forbidden(juju: jubilant.Juju, bundle: None):
+    lbaas_juju = jubilant.Juju(model="lbaas")
+    status = lbaas_juju.status()
+
+    if "haproxy" not in status.apps:
+        pytest.skip("haproxy not deployed in lbaas model")
+
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    response = get_session().get(f"http://{host}/metrics", timeout=10)
+    assert response.status_code == 403
