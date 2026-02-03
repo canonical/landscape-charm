@@ -512,6 +512,7 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "ca" in result.results
     assert "chain" in result.results
 
+
 def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that when ingress configs are enabled, the charm creates the ingress
