@@ -512,8 +512,12 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "ca" in result.results
     assert "chain" in result.results
 
-
 def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
+    """
+    Verify that when ingress configs are enabled, the charm creates the ingress
+    relations and the ingress charms are configured with the correct ports.
+    """
+    juju.wait(jubilant.all_active, timeout=300)
     config = juju.config("landscape-server")
     original_hostagent = config.get("enable_hostagent_messenger")
     original_installer = config.get("enable_ubuntu_installer_attach")
@@ -531,6 +535,12 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         assert "hostagent-messenger-ingress" in app_status.relations
         assert "ubuntu-installer-attach-ingress" in app_status.relations
 
+        hostagent_config = juju.config("hostagent-messenger-ingress")
+        assert hostagent_config.get("external-grpc-port") == 6554
+
+        installer_config = juju.config("ubuntu-installer-attach-ingress")
+        assert installer_config.get("external-grpc-port") == 50051
+
     finally:
         juju.config(
             "landscape-server",
@@ -545,6 +555,11 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
 
 
 def test_ingress_config_disabled(juju: jubilant.Juju, bundle: None):
+    """
+    Verify that when ingress configs are disabled, the Ubuntu Installer Attach
+    service is not running (hostagent-messenger always runs regardless).
+    """
+    juju.wait(jubilant.all_active, timeout=300)
     config = juju.config("landscape-server")
     original_hostagent = config.get("enable_hostagent_messenger")
     original_installer = config.get("enable_ubuntu_installer_attach")
