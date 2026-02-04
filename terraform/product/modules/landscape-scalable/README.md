@@ -50,9 +50,9 @@ This module uses the [Landscape Server charm module](https://github.com/canonica
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::<https://github.com/canonical/haproxy-operator.git//terraform/charm> | rev250 |
+| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::https://github.com/canonical/haproxy-operator.git//terraform/charm | rev250 |
 | <a name="module_landscape_server"></a> [landscape\_server](#module\_landscape\_server) | ../../../charm | n/a |
-| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::<https://github.com/canonical/postgresql-operator.git//terraform> | v16/1.135.0 |
+| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::https://github.com/canonical/postgresql-operator.git//terraform | v16/1.135.0 |
 
 ## Resources
 
@@ -85,5 +85,6 @@ This module uses the [Landscape Server charm module](https://github.com/canonica
 | <a name="output_applications"></a> [applications](#output\_applications) | The charms included in the module. |
 | <a name="output_haproxy_self_signed"></a> [haproxy\_self\_signed](#output\_haproxy\_self\_signed) | Indicates whether HAProxy is using a self-signed TLS certificate. |
 | <a name="output_has_modern_amqp_relations"></a> [has\_modern\_amqp\_relations](#output\_has\_modern\_amqp\_relations) | Indicates whether the deployment uses the modern inbound/outbound AMQP endpoints. |
+| <a name="output_has_modern_postgres_interface"></a> [has\_modern\_postgres\_interface](#output\_has\_modern\_postgres\_interface) | Indicates whether the deployment supports the modern PostgreSQL charm interface. |
 | <a name="output_registration_key"></a> [registration\_key](#output\_registration\_key) | Registration key from the Landscape Server config. |
 <!-- END_TF_DOCS -->
