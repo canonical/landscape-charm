@@ -14,8 +14,8 @@ run "validate_channel_defaults" {
   command = plan
 
   assert {
-    condition     = var.landscape_server.channel == "25.10/beta"
-    error_message = "Landscape Server channel should default to '25.10/beta'"
+    condition     = var.landscape_server.channel == "25.10/edge"
+    error_message = "Landscape Server channel should default to '25.10/edge'"
   }
 
   assert {
