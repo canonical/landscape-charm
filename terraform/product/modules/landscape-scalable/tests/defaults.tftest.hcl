@@ -91,8 +91,8 @@ run "validate_config_defaults" {
   }
 
   assert {
-    condition     = lookup(var.landscape_server.config, "landscape_ppa", null) == "ppa:landscape/self-hosted-beta"
-    error_message = "Landscape Server should default to ppa:landscape/self-hosted-beta"
+    condition     = lookup(var.landscape_server.config, "landscape_ppa", null) == "ppa:landscape/self-hosted-25.10"
+    error_message = "Landscape Server should default to ppa:landscape/self-hosted-25.10"
   }
 
   assert {
