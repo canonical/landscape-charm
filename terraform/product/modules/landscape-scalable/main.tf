@@ -1,4 +1,4 @@
-# © 2025 Canonical Ltd.
+# © 2026 Canonical Ltd.
 
 module "landscape_server" {
   source      = "../../../charm"
@@ -25,7 +25,7 @@ module "haproxy" {
 }
 
 module "postgresql" {
-  source          = "git::https://github.com/canonical/postgresql-operator.git//terraform?ref=rev935"
+  source          = "git::https://github.com/canonical/postgresql-operator.git//terraform?ref=v16/1.135.0"
   juju_model_name = var.model
   config          = var.postgresql.config
   app_name        = var.postgresql.app_name
@@ -122,14 +122,17 @@ resource "juju_integration" "landscape_server_haproxy" {
 
 }
 
-# TODO: Handle both interfaces when the Landscape Charm can integrate with the modern
-# PostgreSQL interface (postgresql_client). See the `modern-pg-interface` branch.
-resource "juju_integration" "landscape_server_postgresql" {
+locals {
+  has_modern_pg_interface = can(module.landscape_server.requires.database)
+}
+
+
+resource "juju_integration" "landscape_server_postgresql_legacy" {
   model = var.model
 
   application {
     name     = module.landscape_server.app_name
-    endpoint = "db"
+    endpoint = module.landscape_server.requires.db
   }
 
   application {
@@ -137,6 +140,27 @@ resource "juju_integration" "landscape_server_postgresql" {
     endpoint = "db-admin"
   }
 
+  count = local.has_modern_pg_interface ? 0 : 1
+
   depends_on = [module.landscape_server, module.postgresql]
+
+}
+
+resource "juju_integration" "landscape_server_postgresql_modern" {
+  model = var.model
+
+  application {
+    name     = module.landscape_server.app_name
+    endpoint = module.landscape_server.requires.database
+  }
+
+  application {
+    name     = module.postgresql.application_name
+    endpoint = module.postgresql.provides.database
+  }
+
+  depends_on = [module.landscape_server, module.postgresql]
+
+  count = local.has_modern_pg_interface ? 1 : 0
 
 }

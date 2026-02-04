@@ -1,7 +1,7 @@
-# © 2025 Canonical Ltd.
+# © 2026 Canonical Ltd.
 
-# The following outputs are meant to conform with Canonical's standards for 
-# charm modules in a Terraform ecosystem (CC006).
+# The following outputs are meant to conform with Canonical's standards for
+# charm modules in a Terraform ecosystem (CC008).
 
 output "app_name" {
   description = "Name of the deployed application."
@@ -25,12 +25,16 @@ locals {
   amqp_rels_updated_rev    = 142
   has_modern_amqp_rels     = !contains(local.legacy_amqp_rel_channels, var.channel) && (var.revision != null ? var.revision >= local.amqp_rels_updated_rev : true)
   amqp_relations           = local.has_modern_amqp_rels ? { inbound_amqp = "inbound-amqp", outbound_amqp = "outbound-amqp" } : { amqp = "amqp" }
+
+  # Add support for the modern Postgres charm interface and keep backwards compatibility
+  postgres_rels_updated_rev     = 213
+  has_modern_postgres_interface = var.revision != null ? var.revision >= local.postgres_rels_updated_rev : true
+  db_relations                  = local.has_modern_postgres_interface ? { database = "database", db = "db" } : { db = "db" }
 }
 
 output "requires" {
-  description = "Map of integration endpoints this charm requires (`application-dashboard`, `db`, `amqp` or `inbound-amqp`/`outbound-amqp`)."
+  description = "Map of integration endpoints this charm requires (`application-dashboard`, `db` or `db`/`database`, `amqp` or `inbound-amqp`/`outbound-amqp`)."
   value = merge({
     application_dashboard = "application-dashboard",
-    db                    = "db"
-  }, local.amqp_relations)
+  }, local.amqp_relations, local.db_relations)
 }

@@ -8,19 +8,9 @@ on:
             - main
 
 jobs:
-    charm-module-docs:
-        name: Update Terraform documentation (charm)
-
+    terraform-docs:
+        name: Update Terraform documentation
         uses: canonical/operator-workflows/.github/workflows/generate_terraform_docs.yaml@main
         secrets: inherit
         with:
-            terraform-directory: terraform/charm
-
-    product-module-docs:
-        name: Update Terraform documentation (product)
-        needs: charm-module-docs
-
-        uses: canonical/operator-workflows/.github/workflows/generate_terraform_docs.yaml@main
-        secrets: inherit
-        with:
-            terraform-directory: terraform/product/modules/landscape-scalable
+            terraform-directory: terraform/charm,terraform/product/modules/landscape-scalable

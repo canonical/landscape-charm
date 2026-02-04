@@ -145,8 +145,11 @@ run "validate_all_integrations_created" {
   }
 
   assert {
-    condition     = juju_integration.landscape_server_postgresql != null
-    error_message = "Landscape-PostgreSQL integration should be created"
+    condition = (
+      length(juju_integration.landscape_server_postgresql_legacy) > 0 ||
+      length(juju_integration.landscape_server_postgresql_modern) > 0
+    )
+    error_message = "At least one Postgres integration pattern should be created (legacy or modern)"
   }
 
   assert {
@@ -161,46 +164,42 @@ run "validate_all_integrations_created" {
   }
 }
 
-run "validate_no_pg16_stable_allowed" {
+run "test_modern_postgres_interfaces" {
   command = plan
-  variables {
-    postgresql = {
-      channel = "16/stable"
-    }
+
+  assert {
+    condition = (
+      local.has_modern_pg_interface == true ?
+      length(juju_integration.landscape_server_postgresql_modern) == 1 : true
+    )
+    error_message = "When has_modern_pg_interface is true, modern Postgres integration should be created"
   }
 
-  expect_failures = [var.postgresql]
+  assert {
+    condition = (
+      local.has_modern_pg_interface == true ?
+      length(juju_integration.landscape_server_postgresql_legacy) == 0 : true
+    )
+    error_message = "When has_modern_pg_interface is true, legacy Postgres integration should not be created"
+  }
 }
 
-run "validate_no_pg16_edge_allowed" {
+run "test_legacy_postgres_interface" {
   command = plan
-  variables {
-    postgresql = {
-      channel = "16/edge"
-    }
+
+  assert {
+    condition = (
+      local.has_modern_pg_interface == false ?
+      length(juju_integration.landscape_server_postgresql_legacy) == 1 : true
+    )
+    error_message = "When has_modern_pg_interface is false, legacy Postgres integration should be created"
   }
 
-  expect_failures = [var.postgresql]
-}
-
-run "validate_no_pg16_beta_allowed" {
-  command = plan
-  variables {
-    postgresql = {
-      channel = "16/beta"
-    }
+  assert {
+    condition = (
+      local.has_modern_pg_interface == false ?
+      length(juju_integration.landscape_server_postgresql_modern) == 0 : true
+    )
+    error_message = "When has_modern_pg_interface is false, modern Postgres integration should not be created"
   }
-
-  expect_failures = [var.postgresql]
-}
-
-run "validate_no_pg16_candidate_allowed" {
-  command = plan
-  variables {
-    postgresql = {
-      channel = "16/candidate"
-    }
-  }
-
-  expect_failures = [var.postgresql]
 }

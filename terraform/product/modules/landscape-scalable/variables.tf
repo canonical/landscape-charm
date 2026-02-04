@@ -1,4 +1,4 @@
-# © 2025 Canonical Ltd.
+# © 2026 Canonical Ltd.
 
 variable "model" {
   description = "The name of the Juju model to deploy Landscape Server to."
@@ -9,30 +9,26 @@ variable "landscape_server" {
   description = "Configuration for the Landscape Server charm."
   type = object({
     app_name = optional(string, "landscape-server")
-    channel  = optional(string, "25.10/beta")
+    channel  = optional(string, "25.10/edge")
     config = optional(map(string), {
       autoregistration = "true"
-      landscape_ppa    = "ppa:landscape/self-hosted-beta"
+      landscape_ppa    = "ppa:landscape/self-hosted-25.10"
     })
     constraints = optional(string, "arch=amd64")
     resources   = optional(map(string), {})
     revision    = optional(number)
-    base        = optional(string, "ubuntu@22.04")
+    base        = optional(string, "ubuntu@24.04")
     units       = optional(number, 1)
   })
 
   default = {}
 }
 
-locals {
-  unsupported_postgresql_channels = ["16/stable", "16/candidate", "16/edge", "16/beta"]
-}
-
 variable "postgresql" {
   description = "Configuration for the PostgreSQL charm."
   type = object({
     app_name = optional(string, "postgresql")
-    channel  = optional(string, "14/stable")
+    channel  = optional(string, "16/stable")
     config = optional(map(string), {
       plugin_plpython3u_enable     = "true"
       plugin_ltree_enable          = "true"
@@ -44,18 +40,12 @@ variable "postgresql" {
     constraints = optional(string, "arch=amd64")
     resources   = optional(map(string), {})
     revision    = optional(number)
-    base        = optional(string, "ubuntu@22.04")
+    base        = optional(string, "ubuntu@24.04")
     units       = optional(number, 1)
   })
 
   default = {}
 
-  validation {
-    condition     = !contains(local.unsupported_postgresql_channels, var.postgresql.channel)
-    error_message = <<-EOT
-      This module is not currently compatible with Charmed PostgreSQL 16. You cannot use the `16/stable`, `16/candidate`, `16/edge`, or `16/beta` channels of the `postgresql` charm.
-    EOT
-  }
 }
 
 variable "haproxy" {
