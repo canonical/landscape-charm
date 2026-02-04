@@ -5,6 +5,7 @@
 from unittest.mock import patch
 
 from charms.operator_libs_linux.v0.apt import PackageError
+from ops.model import MaintenanceStatus
 from ops.testing import Context, State, StoredState
 
 from charm import LandscapeServerCharm
@@ -39,6 +40,11 @@ class TestConfigureUbuntuInstallerAttach:
         stored = state_out.get_stored_state(
             "_stored", owner_path="LandscapeServerCharm"
         )
+        assert isinstance(state_out.unit_status, MaintenanceStatus)
+        assert (
+            "Failed to enable `landscape-ubuntu-installer-attach`"
+            in state_out.unit_status.message
+        )
         assert stored.content.get("enable_ubuntu_installer_attach") is True
 
     def test_enable_with_package_error(self, apt_fixture, lb_certs_state):
@@ -70,5 +76,10 @@ class TestConfigureUbuntuInstallerAttach:
 
         stored = state_out.get_stored_state(
             "_stored", owner_path="LandscapeServerCharm"
+        )
+        assert isinstance(state_out.unit_status, MaintenanceStatus)
+        assert (
+            "Failed to enable `landscape-ubuntu-installer-attach`"
+            in state_out.unit_status.message
         )
         assert stored.content.get("enable_ubuntu_installer_attach") is False

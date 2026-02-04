@@ -1679,7 +1679,6 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
                     f"Failed to remove ubuntu installer attach with error: {e}"
                 )
                 raise e
-        self.unit.status = WaitingStatus("Waiting on relations")
 
 
 if __name__ == "__main__":  # pragma: no cover
