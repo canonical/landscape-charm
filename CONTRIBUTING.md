@@ -64,7 +64,7 @@ make fmt
 When developing the charm, you can use the [`poetry run ccc pack`](https://github.com/canonical/charmcraftcache) command to build the charm locally.
 
 > [!NOTE]
-> Make sure you add this repository (<https://github.com/canonical/landscape-charm>) as a remote to your fork, otherwise `ccc` will fail.
+> Make sure you add this repository (<https://github.com/canonical/landscape-server-operator>) as a remote to your fork, otherwise `ccc` will fail.
 
 Use the following command to test the charm as it would be deployed by Juju in the `landscape-scalable` bundle:
 
