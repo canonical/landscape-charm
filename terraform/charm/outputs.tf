@@ -1,7 +1,7 @@
-# © 2025 Canonical Ltd.
+# © 2026 Canonical Ltd.
 
 # The following outputs are meant to conform with Canonical's standards for
-# charm modules in a Terraform ecosystem (CC006).
+# charm modules in a Terraform ecosystem (CC008).
 
 output "app_name" {
   description = "Name of the deployed application."

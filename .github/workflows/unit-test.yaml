@@ -14,6 +14,7 @@ on:
       - "LICENSE"
       - "**.md"
       - ".jujuignore"
+  workflow_call:
 
 jobs:
   unit-test:
@@ -29,23 +30,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
-      
+
       - name: Install Poetry
         run: |
           pipx install poetry
           poetry --version
-      
+
       - name: Install dependencies
         run: poetry install --with dev
-      
+
       - name: Run tests
         run: make test
-      
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.10"
 
-      - run: make terraform-test
+      - name: Run terraform tests
+        run: make terraform-test-all

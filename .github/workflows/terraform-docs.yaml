@@ -10,8 +10,7 @@ on:
 jobs:
     terraform-docs:
         name: Update Terraform documentation
-
         uses: canonical/operator-workflows/.github/workflows/generate_terraform_docs.yaml@main
         secrets: inherit
         with:
-            terraform-directory: terraform
+            terraform-directory: terraform/charm,terraform/product/modules/landscape-scalable
