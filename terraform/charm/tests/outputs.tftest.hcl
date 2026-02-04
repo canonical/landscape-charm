@@ -6,10 +6,10 @@ run "modern_amqp_relations" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 200
-    base     = "ubuntu@24.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 200
+    base       = "ubuntu@24.04"
   }
 
   assert {
@@ -32,10 +32,10 @@ run "legacy_amqp_relations_by_revision" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 141
-    base     = "ubuntu@22.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 141
+    base       = "ubuntu@22.04"
   }
 
   assert {
@@ -58,8 +58,8 @@ run "modern_amqp_relations_null_revision" {
   command = plan
 
   variables {
-    model    = "test-model"
-    revision = null
+    model_uuid = uuid()
+    revision   = null
   }
 
   assert {
@@ -82,10 +82,10 @@ run "legacy_amqp_relations_by_channel" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "latest/stable"
-    revision = 200
-    base     = "ubuntu@22.04"
+    model_uuid = uuid()
+    channel    = "latest/stable"
+    revision   = 200
+    base       = "ubuntu@22.04"
   }
 
   assert {
@@ -108,10 +108,10 @@ run "provides_relations" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 200
-    base     = "ubuntu@24.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 200
+    base       = "ubuntu@24.04"
   }
 
   assert {
@@ -144,10 +144,10 @@ run "application_dashboard_required" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "latest/stable"
-    revision = 100
-    base     = "ubuntu@22.04"
+    model_uuid = uuid()
+    channel    = "latest/stable"
+    revision   = 100
+    base       = "ubuntu@22.04"
   }
 
   assert {
@@ -160,10 +160,10 @@ run "amqp_threshold_edge_case" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 142
-    base     = "ubuntu@24.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 142
+    base       = "ubuntu@24.04"
   }
 
   assert {
@@ -181,10 +181,10 @@ run "modern_postgres_relations" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 213
-    base     = "ubuntu@24.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 213
+    base       = "ubuntu@24.04"
   }
 
   assert {
@@ -202,10 +202,10 @@ run "legacy_postgres_relations" {
   command = plan
 
   variables {
-    model    = "test-model"
-    channel  = "25.10/edge"
-    revision = 212
-    base     = "ubuntu@24.04"
+    model_uuid = uuid()
+    channel    = "25.10/edge"
+    revision   = 212
+    base       = "ubuntu@24.04"
   }
 
   assert {
@@ -223,8 +223,8 @@ run "modern_postgres_relations_null_revision" {
   command = plan
 
   variables {
-    model    = "test-model"
-    revision = null
+    model_uuid = uuid()
+    revision   = null
   }
 
   assert {

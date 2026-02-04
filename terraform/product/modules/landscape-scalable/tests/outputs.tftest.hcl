@@ -3,7 +3,7 @@
 mock_provider "juju" {}
 
 variables {
-  model = "test-landscape"
+  model_uuid = uuid()
   landscape_server = {
     revision = 150
   }
