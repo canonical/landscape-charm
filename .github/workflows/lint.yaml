@@ -4,7 +4,7 @@
 name: Lint charm
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: lint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
