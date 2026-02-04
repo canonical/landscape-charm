@@ -14,11 +14,26 @@ Then, create a model named `landscape`:
 juju add-model landscape
 ```
 
-Then, use `landscape` as the value for `model`:
+Then, get the UUID of the `landscape` model:
+
+```sh
+juju show-model landscape
+```
+
+Copy the value of `model-uuid`.
+
+```{tip}
+If you have `jq` installed, you can use the following:
+
+    juju show-model landscape --format=json | jq -r '.landscape["model-uuid"]'
+
+```
+
+Then, provide it when applying the plan as the `model_uuid` variable:
 
 ```sh
 terraform init
-terraform apply -var model=landscape
+terraform apply -var model_uuid=<model-uuid>
 ```
 
 After deploying the module to the model, use the `juju status` command to monitor the lifecycle:
@@ -50,9 +65,9 @@ This module uses the [Landscape Server charm module](https://github.com/canonica
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::https://github.com/canonical/haproxy-operator.git//terraform/charm/haproxy | haproxy-rev331 |
+| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::<https://github.com/canonical/haproxy-operator.git//terraform/charm/haproxy> | haproxy-rev331 |
 | <a name="module_landscape_server"></a> [landscape\_server](#module\_landscape\_server) | ../../../charm | n/a |
-| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::https://github.com/canonical/postgresql-operator.git//terraform | v16/1.165.0 |
+| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::<https://github.com/canonical/postgresql-operator.git//terraform> | v16/1.165.0 |
 
 ## Resources
 
