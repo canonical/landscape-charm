@@ -17,6 +17,7 @@ juju add-model landscape
 Then, use `landscape` as the value for `model`:
 
 ```sh
+terraform init
 terraform apply -var model=landscape
 ```
 
@@ -49,9 +50,9 @@ This module uses the [Landscape Server charm module](https://github.com/canonica
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::https://github.com/canonical/haproxy-operator.git//terraform/charm | rev250 |
+| <a name="module_haproxy"></a> [haproxy](#module\_haproxy) | git::<https://github.com/canonical/haproxy-operator.git//terraform/charm> | rev250 |
 | <a name="module_landscape_server"></a> [landscape\_server](#module\_landscape\_server) | ../../../charm | n/a |
-| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::https://github.com/canonical/postgresql-operator.git//terraform | v16/1.135.0 |
+| <a name="module_postgresql"></a> [postgresql](#module\_postgresql) | git::<https://github.com/canonical/postgresql-operator.git//terraform> | v16/1.135.0 |
 
 ## Resources
 

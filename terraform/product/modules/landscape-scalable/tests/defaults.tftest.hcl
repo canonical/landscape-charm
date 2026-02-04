@@ -19,8 +19,8 @@ run "validate_channel_defaults" {
   }
 
   assert {
-    condition     = var.postgresql.channel == "14/stable"
-    error_message = "PostgreSQL channel should default to '14/stable'"
+    condition     = var.postgresql.channel == "16/stable"
+    error_message = "PostgreSQL channel should default to '16/stable'"
   }
 
   assert {
@@ -62,13 +62,13 @@ run "validate_base_defaults" {
   command = plan
 
   assert {
-    condition     = var.landscape_server.base == "ubuntu@22.04"
-    error_message = "Landscape Server base should default to 'ubuntu@22.04'"
+    condition     = var.landscape_server.base == "ubuntu@24.04"
+    error_message = "Landscape Server base should default to 'ubuntu@24.04'"
   }
 
   assert {
-    condition     = var.postgresql.base == "ubuntu@22.04"
-    error_message = "PostgreSQL base should default to 'ubuntu@22.04'"
+    condition     = var.postgresql.base == "ubuntu@24.04"
+    error_message = "PostgreSQL base should default to 'ubuntu@24.04'"
   }
 
   assert {

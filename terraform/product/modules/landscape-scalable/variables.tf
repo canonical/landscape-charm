@@ -17,7 +17,7 @@ variable "landscape_server" {
     constraints = optional(string, "arch=amd64")
     resources   = optional(map(string), {})
     revision    = optional(number)
-    base        = optional(string, "ubuntu@22.04")
+    base        = optional(string, "ubuntu@24.04")
     units       = optional(number, 1)
   })
 
@@ -28,7 +28,7 @@ variable "postgresql" {
   description = "Configuration for the PostgreSQL charm."
   type = object({
     app_name = optional(string, "postgresql")
-    channel  = optional(string, "14/stable")
+    channel  = optional(string, "16/stable")
     config = optional(map(string), {
       plugin_plpython3u_enable     = "true"
       plugin_ltree_enable          = "true"
@@ -40,7 +40,7 @@ variable "postgresql" {
     constraints = optional(string, "arch=amd64")
     resources   = optional(map(string), {})
     revision    = optional(number)
-    base        = optional(string, "ubuntu@22.04")
+    base        = optional(string, "ubuntu@24.04")
     units       = optional(number, 1)
   })
 
