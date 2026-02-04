@@ -2,7 +2,7 @@
 
 module "landscape_server" {
   source      = "../../../charm"
-  model       = var.model
+  model_uuid  = var.model_uuid
   config      = var.landscape_server.config
   app_name    = var.landscape_server.app_name
   channel     = var.landscape_server.channel
@@ -13,8 +13,8 @@ module "landscape_server" {
 }
 
 module "haproxy" {
-  source      = "git::https://github.com/canonical/haproxy-operator.git//terraform/charm?ref=rev250"
-  model       = var.model
+  source      = "git::https://github.com/canonical/haproxy-operator.git//terraform/charm/haproxy?ref=haproxy-rev331"
+  model_uuid  = var.model_uuid
   config      = var.haproxy.config
   app_name    = var.haproxy.app_name
   channel     = var.haproxy.channel
@@ -25,21 +25,21 @@ module "haproxy" {
 }
 
 module "postgresql" {
-  source          = "git::https://github.com/canonical/postgresql-operator.git//terraform?ref=v16/1.135.0"
-  juju_model_name = var.model
-  config          = var.postgresql.config
-  app_name        = var.postgresql.app_name
-  channel         = var.postgresql.channel
-  constraints     = var.postgresql.constraints
-  revision        = var.postgresql.revision
-  base            = var.postgresql.base
-  units           = var.postgresql.units
+  source      = "git::https://github.com/canonical/postgresql-operator.git//terraform?ref=v16/1.165.0"
+  juju_model  = var.model_uuid
+  config      = var.postgresql.config
+  app_name    = var.postgresql.app_name
+  channel     = var.postgresql.channel
+  constraints = var.postgresql.constraints
+  revision    = var.postgresql.revision
+  base        = var.postgresql.base
+  units       = var.postgresql.units
 }
 
 # TODO: Replace with internal charm module if/when it's created
 resource "juju_application" "rabbitmq_server" {
   name        = var.rabbitmq_server.app_name
-  model       = var.model
+  model_uuid  = var.model_uuid
   units       = var.rabbitmq_server.units
   constraints = var.rabbitmq_server.constraints
   config      = var.rabbitmq_server.config
@@ -57,7 +57,7 @@ locals {
 }
 
 resource "juju_integration" "landscape_server_inbound_amqp" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = module.landscape_server.app_name
@@ -74,7 +74,7 @@ resource "juju_integration" "landscape_server_inbound_amqp" {
 }
 
 resource "juju_integration" "landscape_server_outbound_amqp" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = module.landscape_server.app_name
@@ -92,7 +92,7 @@ resource "juju_integration" "landscape_server_outbound_amqp" {
 
 # TODO: update when RMQ charm module exists
 resource "juju_integration" "landscape_server_rabbitmq_server" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name = module.landscape_server.app_name
@@ -108,7 +108,7 @@ resource "juju_integration" "landscape_server_rabbitmq_server" {
 }
 
 resource "juju_integration" "landscape_server_haproxy" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name = module.landscape_server.app_name
@@ -128,7 +128,7 @@ locals {
 
 
 resource "juju_integration" "landscape_server_postgresql_legacy" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = module.landscape_server.app_name
@@ -147,7 +147,7 @@ resource "juju_integration" "landscape_server_postgresql_legacy" {
 }
 
 resource "juju_integration" "landscape_server_postgresql_modern" {
-  model = var.model
+  model_uuid = var.model_uuid
 
   application {
     name     = module.landscape_server.app_name
