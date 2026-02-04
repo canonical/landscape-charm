@@ -22,12 +22,12 @@ juju show-model landscape
 
 Copy the value of `model-uuid`.
 
-> [TIP]
+> [!TIP]
 > If you have `jq` installed, you can use the following:
 >
 > ```sh
 > juju show-model landscape --format=json | jq -r '.landscape["model-uuid"]'
-> ````
+> ```
 
 Then, provide it when applying the plan as the `model_uuid` variable:
 
