@@ -60,10 +60,15 @@ class TestConfigureUbuntuInstallerAttach:
         )
 
         with patch("charm.logger") as mock_logger:
-            ctx.run(ctx.on.config_changed(), state_in)
+            state_out = ctx.run(ctx.on.config_changed(), state_in)
 
             mock_logger.error.assert_called()
             call_args = [str(call) for call in mock_logger.error.call_args_list]
             assert any(
                 "Failed to install ubuntu installer attach" in arg for arg in call_args
             )
+
+        stored = state_out.get_stored_state(
+            "_stored", owner_path="LandscapeServerCharm"
+        )
+        assert stored.content.get("enable_ubuntu_installer_attach") is False
