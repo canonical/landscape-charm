@@ -95,13 +95,13 @@ make fix-charm-module
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.10 |
-| <a name="requirement_juju"></a> [juju](#requirement\_juju) | < 1.0.0 |
+| <a name="requirement_juju"></a> [juju](#requirement\_juju) | ~> 1.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_juju"></a> [juju](#provider\_juju) | < 1.0.0 |
+| <a name="provider_juju"></a> [juju](#provider\_juju) | ~> 1.0 |
 
 ## Modules
 
@@ -122,7 +122,7 @@ No modules.
 | <a name="input_channel"></a> [channel](#input\_channel) | The channel to use when deploying a charm. | `string` | `"25.10/edge"` | no |
 | <a name="input_config"></a> [config](#input\_config) | Application config. Details about available options can be found at https://charmhub.io/landscape-server/configurations. | `map(string)` | `{}` | no |
 | <a name="input_constraints"></a> [constraints](#input\_constraints) | Juju constraints to apply for this application. | `string` | `"arch=amd64"` | no |
-| <a name="input_model"></a> [model](#input\_model) | Reference to a `juju_model`. | `string` | n/a | yes |
+| <a name="input_model_uuid"></a> [model\_uuid](#input\_model\_uuid) | UUID of the Juju model. | `string` | n/a | yes |
 | <a name="input_revision"></a> [revision](#input\_revision) | Revision number of the charm. | `number` | `null` | no |
 | <a name="input_units"></a> [units](#input\_units) | Number of units to deploy. | `number` | `1` | no |
 
