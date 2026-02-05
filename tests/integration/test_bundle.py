@@ -385,6 +385,55 @@ def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
         juju.wait(jubilant.all_active, timeout=300)
 
 
+def test_ubuntu_installer_attach_toggle_no_maintenance(
+    juju: jubilant.Juju, bundle: None
+):
+    """
+    Toggling Ubuntu Installer Attach should return to active status and
+    reflect the correct service state.
+    """
+    juju.wait(jubilant.all_active, timeout=300)
+    config = juju.config("landscape-server")
+    original_installer = config.get("enable_ubuntu_installer_attach")
+
+    try:
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "true"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+        status = juju.status()
+        assert status.apps["landscape-server"].app_status.current == "active"
+
+        for name in status.apps["landscape-server"].units.keys():
+            juju.ssh(
+                name,
+                f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
+            )
+
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "false"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+        status = juju.status()
+        assert status.apps["landscape-server"].app_status.current == "active"
+
+        for name in status.apps["landscape-server"].units.keys():
+            with pytest.raises(Exception):
+                juju.ssh(
+                    name,
+                    f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
+                )
+
+    finally:
+        restore_val = "true" if original_installer else "false"
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": restore_val}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+
 def test_non_leader_unit_redirects_leader_only_services(
     juju: jubilant.Juju, bundle: None
 ):
