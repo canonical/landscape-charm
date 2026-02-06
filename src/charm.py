@@ -51,6 +51,7 @@ from ops.charm import (
     RelationChangedEvent,
     RelationJoinedEvent,
     UpdateStatusEvent,
+    UpgradeCharmEvent,
 )
 from ops.framework import StoredState
 from ops.model import (
@@ -197,6 +198,7 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
 
         # Modern Postgres relation
         if self.model.get_relation("database") is not None:
@@ -564,6 +566,32 @@ class LandscapeServerCharm(CharmBase):
         logger.info("Writing cookie encryption key")
         update_service_conf({"api": {"cookie-encryption-key": cookie_encryption_key}})
 
+    def _ensure_haproxy_installed(self) -> None:
+        try:
+            apt.DebianPackage.from_installed_package(haproxy.HAPROXY_APT_PACKAGE_NAME)
+            logger.debug("HAProxy is already installed")
+        except PackageNotFoundError:
+            logger.info("HAProxy not installed, installing...")
+            self.unit.status = MaintenanceStatus("Installing HAProxy...")
+
+            try:
+                haproxy.install()
+            except haproxy.HAProxyError as e:
+                logger.error("Failed to install HAProxy: %s", str(e))
+                raise e
+
+        try:
+            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
+            logger.debug("HAProxy error files copied")
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to copy HAProxy error files: %s", str(e))
+            raise e
+
+    def _on_upgrade_charm(self, event: UpgradeCharmEvent) -> None:
+        logger.info("Handling charm upgrade...")
+        self._update_haproxy()
+        self._update_ready_status(restart_services=True)
+
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
@@ -653,24 +681,8 @@ class LandscapeServerCharm(CharmBase):
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
 
-        self.unit.status = MaintenanceStatus("Installing HAProxy...")
+        self._ensure_haproxy_installed()
 
-        try:
-            haproxy.install()
-        except haproxy.HAProxyError as e:
-            logger.error("Failed to install HAProxy: %s", str(e))
-            raise e
-
-        # Copy Landscape's error files to HAProxy error dir
-        try:
-            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
-        except haproxy.HAProxyError as e:
-            logger.error("Failed to copy error files: %s", str(e))
-            raise e
-
-        self.unit.status = ActiveStatus("Unit is ready")
-
-        # Indicate that this install is a charm install.
         prepend_default_settings({"DEPLOYED_FROM": "charm"})
 
         self._update_ready_status()
@@ -1087,6 +1099,8 @@ class LandscapeServerCharm(CharmBase):
 
         self._stored.ready["load-balancer-certificates"] = True
 
+        self._ensure_haproxy_installed()
+
         # Update root_url, if not provided.
         if not self.charm_config.root_url:
             url = f"https://{peer_ips.leader_ip}/"
@@ -1124,21 +1138,18 @@ class LandscapeServerCharm(CharmBase):
 
         except haproxy.HAProxyError as e:
             logger.error("Failed to write HAProxy config: %s", str(e))
-            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
         try:
             haproxy.validate_config()
         except haproxy.HAProxyError as e:
             logger.error("Failed to validate HAProxy config: %s", str(e))
-            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
         try:
             haproxy.reload()
         except haproxy.HAProxyError as e:
             logger.error("Failed to reload HAProxy: %s", str(e))
-            self.unit.status = BlockedStatus("Failed to reload HAProxy!")
             return
 
         self._stored.haproxy_config = rendered
