@@ -265,6 +265,14 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(
             self.on.replicas_relation_changed, self._on_replicas_relation_changed
         )
+        self.framework.observe(
+            self.on.load_balancer_certificates_relation_changed,
+            self._on_lb_certs_changed,
+        )
+        self.framework.observe(
+            self.on.load_balancer_certificates_relation_joined,
+            self._on_lb_certs_changed,
+        )
 
         # Actions
         self.framework.observe(self.on.pause_action, self._pause)
@@ -335,6 +343,7 @@ class LandscapeServerCharm(CharmBase):
                 self.on.replicas_relation_joined,
                 self.on.leader_elected,
                 self.on.leader_settings_changed,
+                self.on.upgrade_charm,
             ],
         )
 
@@ -580,17 +589,20 @@ class LandscapeServerCharm(CharmBase):
                 logger.error("Failed to install HAProxy: %s", str(e))
                 raise e
 
-        try:
-            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
-            logger.debug("HAProxy error files copied")
-        except haproxy.HAProxyError as e:
-            logger.error("Failed to copy HAProxy error files: %s", str(e))
-            raise e
+            try:
+                haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
+                logger.debug("HAProxy error files copied")
+            except haproxy.HAProxyError as e:
+                logger.error("Failed to copy HAProxy error files: %s", str(e))
+                raise e
 
-    def _on_upgrade_charm(self, event: UpgradeCharmEvent) -> None:
-        logger.info("Handling charm upgrade...")
+    def _on_lb_certs_changed(
+        self, _: RelationChangedEvent | RelationJoinedEvent
+    ) -> None:
         self._update_haproxy()
-        self._update_ready_status(restart_services=True)
+
+    def _on_upgrade_charm(self, _: UpgradeCharmEvent) -> None:
+        self._update_haproxy()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
@@ -1068,6 +1080,8 @@ class LandscapeServerCharm(CharmBase):
         self._update_ready_status()
 
     def _update_haproxy(self) -> None:
+        self._ensure_haproxy_installed()
+
         peer_ips = self.peer_ips
 
         if not peer_ips:
@@ -1098,8 +1112,6 @@ class LandscapeServerCharm(CharmBase):
             return
 
         self._stored.ready["load-balancer-certificates"] = True
-
-        self._ensure_haproxy_installed()
 
         # Update root_url, if not provided.
         if not self.charm_config.root_url:
