@@ -4,7 +4,7 @@
 name: Unit test charm
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: unit-test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
