@@ -194,7 +194,10 @@ def haproxy_root_fixture(
     haproxy_write_file_fixture,
     haproxy_write_tls_cert_fixture,
     ownership_fixture,
-) -> tuple[Any, Any, Any, Any, Any]:
+    check_haproxy_installed,
+    haproxy_install_fixture,
+    haproxy_copy_error_files_fixture,
+) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
     """
     Uses all the given fixtures
     and return the results in order as a tuple.
@@ -204,6 +207,9 @@ def haproxy_root_fixture(
     write_file_res = haproxy_write_file_fixture
     write_tls_res = haproxy_write_tls_cert_fixture
     ownership_fixture_res = ownership_fixture
+    check_haproxy_installed_res = check_haproxy_installed
+    haproxy_install_fixture_res = haproxy_install_fixture
+    haproxy_copy_error_files_fixture_res = haproxy_copy_error_files_fixture
 
     return (
         paths_fixture_res,
@@ -211,6 +217,9 @@ def haproxy_root_fixture(
         write_file_res,
         write_tls_res,
         ownership_fixture_res,
+        check_haproxy_installed_res,
+        haproxy_install_fixture_res,
+        haproxy_copy_error_files_fixture_res,
     )
 
 
@@ -263,6 +272,7 @@ def lb_certs_state_fixture(
     certificates_integration,
     replicas,
     replicas_networks,
+    haproxy_root_fixture,
 ) -> dict:
 
     return {
@@ -297,3 +307,25 @@ def apt_fixture(monkeypatch: pytest.MonkeyPatch):
         "charms.operator_libs_linux.v0.apt.remove_package", remove_package_mock
     )
     return add_package_mock, remove_package_mock
+
+
+@pytest.fixture(name="check_haproxy_installed")
+def check_haproxy_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(return_value=Mock(name="haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+
+    return check_mock
+
+
+@pytest.fixture(name="haproxy_install_fixture")
+def haproxy_install_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock_install = Mock()
+    monkeypatch.setattr("haproxy.install", mock_install)
+    return mock_install
+
+
+@pytest.fixture(name="haproxy_copy_error_files_fixture")
+def haproxy_copy_error_files_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    mock_copy = Mock(return_value=[])
+    monkeypatch.setattr("haproxy.copy_error_files_from_source", mock_copy)
+    return mock_copy
