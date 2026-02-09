@@ -9,6 +9,7 @@ from typing import Mapping
 from charmlibs.interfaces.tls_certificates import (
     Certificate,
     PrivateKey,
+    ProviderCertificate,
 )
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v1 import systemd
@@ -301,18 +302,29 @@ def write_file(content: bytes, path: str, permissions=0o600, user=HAPROXY_USER) 
 
 
 def write_tls_cert(
-    provider_certificate: Certificate,
+    provider_certificate: ProviderCertificate,
     private_key: PrivateKey,
     cert_path=HAPROXY_CERT_PATH,
 ) -> None:
     """
-    Combines a TLS certificate and private key pair from a tls-certificates provider,
-    encodes it to bytes, and writes it to `cert_path`, where it will be used
-    for TLS connections to HAProxy.
+    Combines a TLS certificate, certificate chain, and private key from a
+    tls-certificates provider, encodes it to bytes, and writes it to `cert_path`,
+    where it will be used for TLS connections to HAProxy.
 
+    :param provider_certificate: The provider certificate containing certificate and chain
+    :param private_key: The private key
+    :param cert_path: Path where the combined PEM file will be written
     :raises HAProxyError: Failed to write TLS certificate for HAProxy!
     """
-    combined_pem = str(provider_certificate.certificate) + "\n" + str(private_key)
+    combined_pem = "".join(
+        [
+            str(provider_certificate.certificate),
+            "\n",
+            "\n".join(str(cert) for cert in provider_certificate.chain),
+            "\n",
+            str(private_key),
+        ]
+    )
 
     try:
         write_file(
