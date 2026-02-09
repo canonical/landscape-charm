@@ -321,6 +321,12 @@ class LandscapeServerCharm(CharmBase):
                 "Invalid configuration. See `juju debug-log`."
             )
 
+        self.http_ingress = IngressPerAppRequirer(
+            self,
+            port=haproxy.FrontendPort.HTTP,
+            relation_name="http-ingress",
+        )
+        
         if self.charm_config.enable_hostagent_messenger:
             self.hostagent_messenger_ingress = IngressPerAppRequirer(
                 self,
