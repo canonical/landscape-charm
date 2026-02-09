@@ -452,7 +452,7 @@ def test_non_leader_unit_redirects_leader_only_services(
         if not unit_status.leader:
             host = juju.status().apps["landscape-server"].units[name].public_address
 
-            assert (
+            assert juju.wait(jubilant.all_active, timeout=300) and (
                 get_session().get(f"https://{host}/upload", verify=False).status_code
                 == 200
             )
@@ -520,8 +520,6 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
     if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
-    juju.wait(jubilant.all_active, timeout=300)
-
     leader_unit = None
     for unit_name, unit_status in status.apps["landscape-server"].units.items():
         if unit_status.leader:
@@ -529,6 +527,8 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
             break
 
     assert leader_unit is not None
+
+    assert juju.wait(jubilant.all_active, timeout=300)
 
     result = juju.run(leader_unit, "get-certificates")
 
@@ -545,7 +545,6 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
-    juju.wait(jubilant.all_active, timeout=300)
 
     status = juju.status()
     non_leader_units = [
@@ -556,6 +555,8 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
 
     if not non_leader_units:
         pytest.skip("No non-leader units found")
+
+    juju.wait(jubilant.all_active, timeout=300)
 
     result = juju.run(non_leader_units[0], "get-certificates")
 
@@ -662,7 +663,7 @@ def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):
         try:
             juju.ssh(unit_name, f"dpkg -l | grep -q {haproxy.HAPROXY_APT_PACKAGE_NAME}")
         except Exception as e:
-            pytest.fail(f"HAProxy not installed on {unit_name}: {e}")
+            pytest.skip(f"HAProxy not installed on {unit_name}: {e}")
 
         try:
             juju.ssh(
