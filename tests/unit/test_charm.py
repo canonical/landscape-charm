@@ -13,8 +13,6 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import ANY, call, DEFAULT, Mock, patch, PropertyMock
 
-import pytest
-
 from charms.operator_libs_linux.v0 import apt
 from charms.operator_libs_linux.v0.apt import PackageError, PackageNotFoundError
 from ops.charm import ActionEvent
@@ -28,6 +26,7 @@ from ops.testing import (
     State,
     StoredState,
 )
+import pytest
 
 from charm import (
     DEFAULT_SERVICES,
