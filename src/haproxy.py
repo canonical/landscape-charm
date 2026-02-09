@@ -7,7 +7,6 @@ from subprocess import CalledProcessError
 from typing import Mapping
 
 from charmlibs.interfaces.tls_certificates import (
-    Certificate,
     PrivateKey,
     ProviderCertificate,
 )
@@ -311,7 +310,8 @@ def write_tls_cert(
     tls-certificates provider, encodes it to bytes, and writes it to `cert_path`,
     where it will be used for TLS connections to HAProxy.
 
-    :param provider_certificate: The provider certificate containing certificate and chain
+    :param provider_certificate: The provider certificate containing certificate
+        and chain
     :param private_key: The private key
     :param cert_path: Path where the combined PEM file will be written
     :raises HAProxyError: Failed to write TLS certificate for HAProxy!
