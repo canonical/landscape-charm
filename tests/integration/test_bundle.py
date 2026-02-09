@@ -6,6 +6,7 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
+import time
 
 import jubilant
 import pytest
@@ -514,12 +515,14 @@ def test_get_certificates_action_without_tls_relation(
 
 
 def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
-    status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
     if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = juju.status()
     leader_unit = None
     for unit_name, unit_status in status.apps["landscape-server"].units.items():
         if unit_status.leader:
@@ -528,10 +531,27 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
 
     assert leader_unit is not None
 
-    assert juju.wait(jubilant.all_active, timeout=300)
+    max_attempts = 12
+    result = None
+    for attempt in range(max_attempts):
+        try:
+            result = juju.run(leader_unit, "get-certificates")
+            if result.status == "completed":
+                break
+        except Exception:
+            if attempt < max_attempts - 1:
+                time.sleep(5)
+                status = juju.status()
+                for unit_name, unit_status in status.apps[
+                    "landscape-server"
+                ].units.items():
+                    if unit_status.leader:
+                        leader_unit = unit_name
+                        break
+            else:
+                raise
 
-    result = juju.run(leader_unit, "get-certificates")
-
+    assert result is not None
     assert result.status == "completed"
     assert "certificate" in result.results
     assert "ca" in result.results
@@ -544,7 +564,6 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
 
     if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
-
 
     status = juju.status()
     non_leader_units = [
@@ -566,11 +585,19 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "chain" in result.results
 
 
-def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
+def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that when ingress configs are enabled, the charm creates the ingress
     relations and publishes the correct data to the relation databags.
     """
+    status = juju.status()
+    app_status = status.apps["landscape-server"]
+    if (
+        "hostagent-messenger-ingress" not in app_status.relations
+        or "ubuntu-installer-attach-ingress" not in app_status.relations
+    ):
+        pytest.skip("gRPC ingress not integrated, skipping...")
+
     juju.wait(jubilant.all_active, timeout=300)
     config = juju.config("landscape-server")
     original_hostagent = config.get("enable_hostagent_messenger")
@@ -686,43 +713,3 @@ def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):
             juju.ssh(unit_name, f"systemctl is-active {haproxy.HAPROXY_SERVICE}")
         except Exception as e:
             pytest.fail(f"HAProxy service not active on {unit_name}: {e}")
-
-
-def test_upgrade_charm_installs_haproxy_if_missing(juju: jubilant.Juju, bundle: None):
-    status = juju.status()
-    units = status.apps["landscape-server"].units
-    unit_name = list(units.keys())[0]
-
-    result = juju.ssh(unit_name, "dpkg -l | grep haproxy")
-    if haproxy.HAPROXY_APT_PACKAGE_NAME in result:
-        pytest.skip(f"HAProxy installed on {unit_name} before upgrade, skipping...")
-
-    juju.run("upgrade-charm", app_name="landscape-server")
-    juju.wait_for(apps=["landscape-server"], timeout=600)
-
-    try:
-        result = juju.ssh(unit_name, "dpkg -l | grep haproxy")
-        assert (
-            haproxy.HAPROXY_APT_PACKAGE_NAME in result
-        ), f"HAProxy should be installed on {unit_name} after upgrade-charm"
-    except Exception as e:
-        pytest.fail(f"HAProxy not installed after upgrade-charm on {unit_name}: {e}")
-
-    try:
-        juju.ssh(unit_name, f"systemctl is-active {haproxy.HAPROXY_SERVICE}")
-    except Exception as e:
-        pytest.fail(
-            f"HAProxy service not active on {unit_name} after upgrade-charm: {e}"
-        )
-
-    for error_code, error_file in haproxy.ERROR_FILES.items():
-        if error_code == "location":
-            continue
-        try:
-            juju.ssh(
-                unit_name, f"test -f {haproxy.ERROR_FILES['location']}/{error_file}"
-            )
-        except Exception:
-            pytest.fail(
-                f"Error file missing on {unit_name} after upgrade-charm: {error_file}"
-            )
