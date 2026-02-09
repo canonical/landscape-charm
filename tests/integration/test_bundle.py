@@ -5,6 +5,8 @@ and Landscape Server.
 NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
+import json
+
 import jubilant
 import pytest
 import requests
@@ -385,6 +387,55 @@ def test_ubuntu_installer_attach_service(juju: jubilant.Juju, bundle: None):
         juju.wait(jubilant.all_active, timeout=300)
 
 
+def test_ubuntu_installer_attach_toggle_no_maintenance(
+    juju: jubilant.Juju, bundle: None
+):
+    """
+    Toggling Ubuntu Installer Attach should return to active status and
+    reflect the correct service state.
+    """
+    juju.wait(jubilant.all_active, timeout=300)
+    config = juju.config("landscape-server")
+    original_installer = config.get("enable_ubuntu_installer_attach")
+
+    try:
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "true"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+        status = juju.status()
+        assert status.apps["landscape-server"].app_status.current == "active"
+
+        for name in status.apps["landscape-server"].units.keys():
+            juju.ssh(
+                name,
+                f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
+            )
+
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "false"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+        status = juju.status()
+        assert status.apps["landscape-server"].app_status.current == "active"
+
+        for name in status.apps["landscape-server"].units.keys():
+            with pytest.raises(Exception):
+                juju.ssh(
+                    name,
+                    f"systemctl is-active {LANDSCAPE_UBUNTU_INSTALLER_ATTACH}.service",
+                )
+
+    finally:
+        restore_val = "true" if original_installer else "false"
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": restore_val}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+
 def test_non_leader_unit_redirects_leader_only_services(
     juju: jubilant.Juju, bundle: None
 ):
@@ -511,3 +562,90 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "certificate" in result.results
     assert "ca" in result.results
     assert "chain" in result.results
+
+
+def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
+    """
+    Verify that when ingress configs are enabled, the charm creates the ingress
+    relations and publishes the correct data to the relation databags.
+    """
+    juju.wait(jubilant.all_active, timeout=300)
+    config = juju.config("landscape-server")
+    original_hostagent = config.get("enable_hostagent_messenger")
+    original_installer = config.get("enable_ubuntu_installer_attach")
+
+    try:
+        juju.config(
+            "landscape-server",
+            values={
+                "enable_hostagent_messenger": "true",
+                "enable_ubuntu_installer_attach": "true",
+            },
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+        status = juju.status()
+        app_status = status.apps["landscape-server"]
+        assert "hostagent-messenger-ingress" in app_status.relations
+        assert "ubuntu-installer-attach-ingress" in app_status.relations
+
+        leader_unit_name = None
+        for name, unit_status in app_status.units.items():
+            if unit_status.leader:
+                leader_unit_name = name
+                break
+
+        if not leader_unit_name:
+            pytest.fail("No leader unit found for landscape-server")
+
+        def get_relation_data(endpoint):
+            ids_stdout = juju.cli(
+                "exec", "--unit", leader_unit_name, "--", f"relation-ids {endpoint}"
+            )
+            ids = ids_stdout.strip().splitlines()
+            if not ids:
+                pytest.fail(f"No relation IDs found for endpoint {endpoint}")
+            rel_id = ids[0]
+            data_stdout = juju.cli(
+                "exec",
+                "--unit",
+                leader_unit_name,
+                "--",
+                f"relation-get --format=json -r {rel_id} --app - {leader_unit_name}",
+            )
+            data = json.loads(data_stdout)
+
+            return {
+                k: v.strip('"') if isinstance(v, str) else v for k, v in data.items()
+            }
+
+        hostagent_data = get_relation_data("hostagent-messenger-ingress")
+
+        assert (
+            hostagent_data.get("port") == "6554"
+        ), f"Expected port 6554, got {hostagent_data.get('port')}"
+        assert (
+            hostagent_data.get("scheme") == "https"
+        ), f"Expected scheme https, got {hostagent_data.get('scheme')}"
+        assert hostagent_data.get("name") == "landscape-server"
+
+        installer_data = get_relation_data("ubuntu-installer-attach-ingress")
+
+        assert (
+            installer_data.get("port") == "50051"
+        ), f"Expected port 50051, got {installer_data.get('port')}"
+        assert (
+            installer_data.get("scheme") == "https"
+        ), f"Expected scheme https, got {installer_data.get('scheme')}"
+        assert installer_data.get("name") == "landscape-server"
+
+    finally:
+        juju.config(
+            "landscape-server",
+            values={
+                "enable_hostagent_messenger": "true" if original_hostagent else "false",
+                "enable_ubuntu_installer_attach": (
+                    "true" if original_installer else "false"
+                ),
+            },
+        )
+        juju.wait(jubilant.all_active, timeout=300)
