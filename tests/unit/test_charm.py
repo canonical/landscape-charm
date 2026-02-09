@@ -1263,7 +1263,7 @@ class TestCharm(unittest.TestCase):
             self.harness.update_config({"smtp_relay_host": ""})
 
         self.harness.charm._configure_smtp.assert_not_called()
-        self.assertEqual(self.harness.charm._update_ready_status.call_count, 3)
+        self.assertEqual(self.harness.charm._update_ready_status.call_count, 2)
 
     @patch("charm.update_service_conf")
     def test_on_config_changed_smtp_change(self, _):
@@ -1288,7 +1288,7 @@ class TestCharm(unittest.TestCase):
             self.harness.update_config({"smtp_relay_host": "smtp.example.com"})
 
         self.harness.charm._configure_smtp.assert_called_once_with("smtp.example.com")
-        self.assertEqual(self.harness.charm._update_ready_status.call_count, 3)
+        self.assertEqual(self.harness.charm._update_ready_status.call_count, 2)
 
     def test_configure_smtp_relay_host(self):
         mock_postfix_cf = os.path.join(self.tempdir.name, "my_postfix.cf")
