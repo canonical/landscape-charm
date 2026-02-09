@@ -600,7 +600,6 @@ class LandscapeServerCharm(CharmBase):
             logger.debug("HAProxy is already installed")
         except PackageNotFoundError:
             logger.info("HAProxy not installed, installing...")
-            self.unit.status = MaintenanceStatus("Installing HAProxy...")
 
             try:
                 haproxy.install()
@@ -714,8 +713,13 @@ class LandscapeServerCharm(CharmBase):
                 license_file, user_exists("landscape").pw_uid, self.root_gid
             )
 
+        self.unit.status = MaintenanceStatus("Installing HAProxy...")
+
         self._ensure_haproxy_installed()
 
+        self.unit.status = ActiveStatus("Unit is ready")
+
+        # Indicate that this install is a charm install.
         prepend_default_settings({"DEPLOYED_FROM": "charm"})
 
         self._update_ready_status()
@@ -1171,18 +1175,21 @@ class LandscapeServerCharm(CharmBase):
 
         except haproxy.HAProxyError as e:
             logger.error("Failed to write HAProxy config: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
         try:
             haproxy.validate_config()
         except haproxy.HAProxyError as e:
             logger.error("Failed to validate HAProxy config: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to update HAProxy config!")
             return
 
         try:
             haproxy.reload()
         except haproxy.HAProxyError as e:
             logger.error("Failed to reload HAProxy: %s", str(e))
+            self.unit.status = BlockedStatus("Failed to reload HAProxy!")
             return
 
         self._stored.haproxy_config = rendered
