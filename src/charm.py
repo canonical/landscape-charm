@@ -614,6 +614,8 @@ class LandscapeServerCharm(CharmBase):
             except haproxy.HAProxyError as e:
                 logger.error("Failed to copy HAProxy error files: %s", str(e))
                 raise e
+        finally:
+            self._update_ready_status()
 
     def _on_lb_certs_changed(
         self, _: RelationChangedEvent | RelationJoinedEvent
