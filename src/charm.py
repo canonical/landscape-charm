@@ -54,6 +54,7 @@ from ops.charm import (
     RelationChangedEvent,
     RelationJoinedEvent,
     UpdateStatusEvent,
+    UpgradeCharmEvent,
 )
 from ops.framework import StoredState
 from ops.model import (
@@ -200,6 +201,7 @@ class LandscapeServerCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._update_status)
         self.framework.observe(self.on.update_status, self._update_status)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
 
         # Modern Postgres relation
         if self.model.get_relation("database") is not None:
@@ -265,6 +267,14 @@ class LandscapeServerCharm(CharmBase):
         )
         self.framework.observe(
             self.on.replicas_relation_changed, self._on_replicas_relation_changed
+        )
+        self.framework.observe(
+            self.on.load_balancer_certificates_relation_changed,
+            self._on_lb_certs_changed,
+        )
+        self.framework.observe(
+            self.on.load_balancer_certificates_relation_joined,
+            self._on_lb_certs_changed,
         )
 
         # Actions
@@ -358,6 +368,7 @@ class LandscapeServerCharm(CharmBase):
                 self.on.replicas_relation_joined,
                 self.on.leader_elected,
                 self.on.leader_settings_changed,
+                self.on.upgrade_charm,
             ],
         )
 
@@ -589,6 +600,34 @@ class LandscapeServerCharm(CharmBase):
         logger.info("Writing cookie encryption key")
         update_service_conf({"api": {"cookie-encryption-key": cookie_encryption_key}})
 
+    def _ensure_haproxy_installed(self) -> None:
+        try:
+            apt.DebianPackage.from_installed_package(haproxy.HAPROXY_APT_PACKAGE_NAME)
+            logger.debug("HAProxy is already installed")
+        except PackageNotFoundError:
+            logger.info("HAProxy not installed, installing...")
+
+            try:
+                haproxy.install()
+            except haproxy.HAProxyError as e:
+                logger.error("Failed to install HAProxy: %s", str(e))
+                raise e
+
+            try:
+                haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
+                logger.debug("HAProxy error files copied")
+            except haproxy.HAProxyError as e:
+                logger.error("Failed to copy HAProxy error files: %s", str(e))
+                raise e
+
+    def _on_lb_certs_changed(
+        self, _: RelationChangedEvent | RelationJoinedEvent
+    ) -> None:
+        self._update_haproxy()
+
+    def _on_upgrade_charm(self, _: UpgradeCharmEvent) -> None:
+        self._update_haproxy()
+
     def _on_install(self, event: InstallEvent) -> None:
         """Handle the install event."""
         self.unit.status = MaintenanceStatus("Installing apt packages")
@@ -680,18 +719,7 @@ class LandscapeServerCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("Installing HAProxy...")
 
-        try:
-            haproxy.install()
-        except haproxy.HAProxyError as e:
-            logger.error("Failed to install HAProxy: %s", str(e))
-            raise e
-
-        # Copy Landscape's error files to HAProxy error dir
-        try:
-            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
-        except haproxy.HAProxyError as e:
-            logger.error("Failed to copy error files: %s", str(e))
-            raise e
+        self._ensure_haproxy_installed()
 
         self.unit.status = ActiveStatus("Unit is ready")
 
@@ -1081,6 +1109,8 @@ class LandscapeServerCharm(CharmBase):
         self._update_ready_status()
 
     def _update_haproxy(self) -> None:
+        self._ensure_haproxy_installed()
+
         peer_ips = self.peer_ips
 
         if not peer_ips:
