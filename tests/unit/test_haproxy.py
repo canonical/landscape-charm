@@ -152,6 +152,10 @@ class TestWriteTLSCert:
         assert cert_path.exists()
         content = cert_path.read_text()
         assert len(content) > 0
+        assert str(provider_cert.certificate) in content
+        assert str(private_key) in content
+        for cert in provider_cert.chain:
+            assert str(cert) in content
 
     def test_write_tls_cert_raises_on_error(self, monkeypatch):
         monkeypatch.setattr(
@@ -160,6 +164,7 @@ class TestWriteTLSCert:
 
         mock_cert = Mock()
         mock_cert.certificate = "cert"
+        mock_cert.chain = [Mock(__str__=Mock(return_value="chain_cert"))]
         mock_key = Mock()
         mock_key.__str__ = Mock(return_value="key")
 
