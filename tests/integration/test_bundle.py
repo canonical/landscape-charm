@@ -726,9 +726,7 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
         response = session.get(f"https://{host}/{route}", verify=False, timeout=10)
         assert response.status_code in (
             200,
-            404,
-            405,
-        ), f"Expected 200 or 404 for HTTPS /{route}, got {response.status_code}"
+        ), f"Expected 200 for HTTPS /{route}, got {response.status_code}"
 
 
 def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -862,9 +860,8 @@ def test_lbaas_service_specific_routes(juju: jubilant.Juju, lbaas: jubilant.Juju
     assert response.status_code == 200, f"API service failed: {response.status_code}"
 
     response = session.get(f"https://{host}/message-system", verify=False, timeout=10)
-    assert response.status_code in (
-        200,
-        404,
+    assert (
+        response.status_code == 200
     ), f"Message-system service routing failed: {response.status_code}"
 
 

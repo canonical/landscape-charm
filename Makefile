@@ -48,13 +48,14 @@ clean:
 	-juju destroy-model --no-prompt $(MODEL_NAME) --force --no-wait --destroy-storage
 
 clean-lbaas:
-	-cd bundle-examples/internal-haproxy && terraform destroy -auto-approve \
-		-var model_name=$(MODEL_NAME) \
-		-var lbaas_model_name=$(LBAAS_MODEL_NAME)
-	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) --force --no-wait --destroy-storage
+	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
+		--force --no-wait --destroy-storage
+	-cd bundle-examples/internal-haproxy && \
+	rm -rf *.tfstate && \
+	cd ../..
 
 
-lbaas: deploy
+lbaas: clean-lbaas deploy
 	cd bundle-examples/internal-haproxy && \
 	terraform init && \
 	terraform apply -auto-approve \

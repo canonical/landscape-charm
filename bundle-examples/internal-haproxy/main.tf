@@ -2,6 +2,17 @@ data "juju_model" "landscape_model" {
   name = var.model_name
 }
 
+resource "terraform_data" "wait_for_landscape" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      juju wait-for model $MODEL_NAME --timeout 3600s --query='forEach(units, unit => unit.workload-status == "active")'
+      EOT
+    environment = {
+      MODEL_NAME = var.model_name
+    }
+  }
+}
+
 locals {
   ssh_key_files = [
     "~/.ssh/id_ed25519.pub",
@@ -112,4 +123,17 @@ resource "juju_integration" "ubuntu_installer_attach_ingress" {
     name     = "ubuntu-installer-attach-ingress"
     endpoint = "haproxy-route"
   }
+}
+
+resource "terraform_data" "wait_for_lbaas" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      juju wait-for model $MODEL_NAME --timeout 3600s --query='forEach(units, unit => unit.workload-status == "active")'
+      EOT
+    environment = {
+      MODEL_NAME = var.lbaas_model_name
+    }
+  }
+
+  depends_on = [juju_offer.haproxy_route, juju_integration.haproxy_certs]
 }
