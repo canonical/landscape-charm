@@ -95,7 +95,6 @@ relations:
   - [landscape-server:inbound-amqp, rabbitmq-server]
   - [landscape-server:outbound-amqp, rabbitmq-server]
   - [landscape-server:database, postgresql:database]
-  - [landscape-server:http-ingress, http-ingress:ingress]
   - [landscape-server:load-balancer-certificates, lb-certs:certificates]
   - [landscape-server:hostagent-messenger-ingress, hostagent-messenger-ingress:ingress]
   - [landscape-server:ubuntu-installer-attach-ingress, ubuntu-installer-attach-ingress:ingress]
