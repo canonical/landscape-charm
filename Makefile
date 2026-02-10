@@ -1,20 +1,22 @@
 DIR_NAME := $(notdir $(shell pwd))
-BUNDLE_PATH ?= ./bundle-examples/internal-haproxy.bundle.yaml
+BUNDLE_PATH ?= ./bundle-examples/internal-haproxy/internal-haproxy.bundle.yaml
 PLATFORM ?= ubuntu@24.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
+LBAAS_MODEL_NAME ?= lbaas
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
+.PHONY: build deploy lbaas clean clean-lbaas test integration-test integration-test-existing coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
-.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
-
-# Python testing and linting
 test:
 	poetry run pytest --tb native tests/unit
 
 integration-test:
 	poetry run pytest -v --tb native tests/integration
+
+integration-test-existing:
+	LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 poetry run pytest -v --tb native tests/integration
 
 coverage:
 	poetry run coverage run --branch --source=src -m pytest -v --tb native tests/unit
@@ -31,8 +33,8 @@ fmt:
 	poetry run black src tests
 	poetry run ruff check --fix src tests
 
-# Charm building and deployment
 build:
+	poetry lock
 	poetry run ccc pack --platform $(PLATFORM)
 
 deploy:
@@ -41,15 +43,30 @@ deploy:
 	juju add-model $(MODEL_NAME)
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
+clean:
+	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
+	-juju destroy-model --no-prompt $(MODEL_NAME) --force --no-wait --destroy-storage
+
+clean-lbaas:
+	-cd bundle-examples/internal-haproxy && terraform destroy -auto-approve \
+		-var model_name=$(MODEL_NAME) \
+		-var lbaas_model_name=$(LBAAS_MODEL_NAME)
+	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) --force --no-wait --destroy-storage
+
+
+lbaas: deploy
+	cd bundle-examples/internal-haproxy && \
+	terraform init && \
+	terraform apply -auto-approve \
+		-var model_name=$(MODEL_NAME) \
+		-var lbaas_model_name=$(LBAAS_MODEL_NAME)
+
+
 terraform-test:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform test
+	cd terraform && terraform init -backend=false && terraform test
 
 fmt-check:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform fmt -check -recursive
+	cd terraform && terraform init -backend=false && terraform fmt -check -recursive
 
 tflint-check:
 	cd terraform && tflint --init && tflint --recursive
@@ -57,16 +74,9 @@ tflint-check:
 terraform-check: fmt-check tflint-check
 
 fmt-fix:
-	cd terraform && \
-	terraform init -backend=false && \
-	terraform fmt -recursive
+	cd terraform && terraform init -backend=false && terraform fmt -recursive
 
 tflint-fix:
 	cd terraform && tflint --init && tflint --recursive --fix
 
 terraform-fix: fmt-fix tflint-fix
-
-clean:
-	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
-	-juju destroy-model --no-prompt $(MODEL_NAME) \
-		--force --no-wait --destroy-storage

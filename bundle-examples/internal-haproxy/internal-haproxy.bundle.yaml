@@ -23,7 +23,7 @@ applications:
     options:
       consumer-timeout: 259200000
   landscape-server:
-    charm: ../landscape-server_ubuntu@24.04-amd64.charm
+    charm: ../../landscape-server_ubuntu@24.04-amd64.charm
     num_units: 3
     to:
       - "0"
@@ -37,7 +37,6 @@ applications:
       root_url: https://landscape.local/
       redirect_https: none
     base: ubuntu@24.04
-
   hostagent-messenger-ingress:
     charm: ingress-configurator
     channel: latest/edge
@@ -47,17 +46,6 @@ applications:
     constraints: arch=amd64
     options:
       external-grpc-port: 6554
-      hostname: landscape.local
-      backend-protocol: https
-  ubuntu-installer-attach-ingress:
-    charm: ingress-configurator
-    channel: latest/edge
-    num_units: 1
-    to:
-      - "0"
-    constraints: arch=amd64
-    options:
-      external-grpc-port: 50051
       hostname: landscape.local
       backend-protocol: https
   http-ingress:
@@ -72,6 +60,17 @@ applications:
       hostname: landscape.local
       header-rewrite-expressions: "X-Forwarded-Proto:https"
       allow-http: true
+  ubuntu-installer-attach-ingress:
+    charm: ingress-configurator
+    channel: latest/edge
+    num_units: 1
+    to:
+      - "0"
+    constraints: arch=amd64
+    options:
+      external-grpc-port: 50051
+      hostname: landscape.local
+      backend-protocol: https
   lb-certs:
     charm: self-signed-certificates
     channel: stable

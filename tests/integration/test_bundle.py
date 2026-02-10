@@ -13,9 +13,18 @@ import pytest
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
+import grpc
 
 from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
 import haproxy
+from tests.integration.helpers import (
+    get_session,
+    _has_legacy_pg,
+    _has_modern_pg,
+    _supports_legacy_pg,
+    _restore_db_relations,
+    _has_haproxy_route_relation,
+)
 
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
@@ -162,111 +171,6 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
 
     response = get_session().get(f"https://{host}/{route}", verify=False)
     assert response.status_code == 200
-
-
-def get_session(
-    retries: int = 5,
-    backoff_factor: float = 0.3,
-    status_forcelist: tuple[int, ...] = (503,),
-) -> requests.Session:
-    """
-    Create a session that includes retries for 503 statuses.
-
-    This is useful for load balancing tests because the Landscape unit
-    can report "ready" in Juju even if Landscape server is not yet ready to serve
-    requests.
-
-    Copied from https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
-
-    `retries`:
-        Total number of retries to allow. Takes precedence over other counts.
-        Set to None to remove this constraint and fall back on other counts.
-        Set to 0 to fail on the first retry.
-
-    `backoff_factor`:
-        A backoff factor to apply between attempts after the second try (most errors
-        are resolved immediately by a second try without a delay). urllib3 will sleep
-        for: {backoff factor} * (2 ** ({number of previous retries})) seconds.
-
-    `status_forcelist`:
-        A set of integer HTTP status codes that we should force a retry on. A retry is
-        initiated if the request method is in allowed_methods and the response status
-        code is in status_forcelist. By default, this is disabled with None.
-
-    """
-
-    session = requests.Session()
-    strategy = Retry(
-        total=retries,
-        backoff_factor=backoff_factor,
-        status_forcelist=status_forcelist,
-        allowed_methods=("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"),
-        raise_on_status=False,
-    )
-
-    adapter = HTTPAdapter(max_retries=strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
-
-
-def _has_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    return "db-admin" in pg.relations
-
-
-def _has_modern_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    return "database" in pg.relations
-
-
-def _supports_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    # '14/x' and 'latest/x' tracks support legacy
-    return "14" in pg.charm_channel or "latest" in pg.charm_channel
-
-
-def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
-    relations = set(juju.status().apps["landscape-server"].relations)
-
-    # Used to have modern, needs it back
-    if "database" in expected and "database" not in relations:
-        # Will error if both are integrated at the same time
-        if "db" in relations:
-            juju.remove_relation(
-                "landscape-server:db", "postgresql:db-admin", force=True
-            )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
-
-        juju.integrate("landscape-server:database", "postgresql:database")
-
-    elif "database" not in expected and "database" in relations:
-        juju.remove_relation(
-            "landscape-server:database", "postgresql:database", force=True
-        )
-        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
-
-    # Refresh after they might have changed
-    relations = set(juju.status().apps["landscape-server"].relations)
-
-    # Supports for legacy was dropped in PG 16+
-    if _supports_legacy_pg(juju):
-        # Used to have legacy, needs it back
-        if "db" in expected and "db" not in relations:
-            # Will error if both are integrated at the same time
-            if "database" in relations:
-                juju.remove_relation(
-                    "landscape-server:database", "postgresql:database", force=True
-                )
-                juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
-
-            juju.integrate("landscape-server:db", "postgresql:db-admin")
-
-        elif "db" not in expected and "db" in relations:
-            juju.remove_relation(
-                "landscape-server:db", "postgresql:db-admin", force=True
-            )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
 
 
 def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
@@ -466,13 +370,6 @@ def _has_tls_certs_provider(juju: jubilant.Juju) -> bool:
         any(rel.interface == "tls-certificates" for rel in rels)
         for rels in status.apps["landscape-server"].relations.values()
     )
-
-
-def _has_haproxy_route_relation(juju: jubilant.Juju, app_name: str) -> bool:
-    status = juju.status()
-    if app_name not in status.apps:
-        return False
-    return "haproxy-route" in status.apps[app_name].relations
 
 
 def test_get_certificates_action_without_tls_relation(
@@ -686,6 +583,7 @@ def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         )
         juju.wait(jubilant.all_active, timeout=300)
 
+
 def test_http_ingress_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that http-ingress is always present and publishes correct data.
@@ -733,117 +631,336 @@ def test_http_ingress_enabled(juju: jubilant.Juju, bundle: None):
     assert http_data.get("name") == "landscape-server"
 
 
-def test_external_haproxy_setup_lbaas_model(juju: jubilant.Juju, bundle: None):
-    landscape_model = juju.model
-    lbaas_model = "lbaas"
-
-    juju.add_model(lbaas_model)
-    lbaas_juju = jubilant.Juju(model=lbaas_model)
-
-    lbaas_juju.deploy("haproxy", channel="2.8/edge")
-    lbaas_juju.config(
-        "haproxy",
-        values={"external-hostname": "landscape.local", "enable-hsts": "false"},
-    )
-    lbaas_juju.deploy("self-signed-certificates", channel="1/stable")
-    lbaas_juju.wait(jubilant.all_active, timeout=600)
-
-    lbaas_juju.integrate(
-        "haproxy:certificates", "self-signed-certificates:certificates"
-    )
-    lbaas_juju.wait(jubilant.all_active, timeout=300)
-
-    lbaas_juju.offer("haproxy:haproxy-route")
-
-
-def test_external_haproxy_consume_offer(juju: jubilant.Juju, bundle: None):
-    lbaas_model = "lbaas"
-    offer_app_name = "lbaas-haproxy"
-
-    juju.consume(f"admin/{lbaas_model}.haproxy", offer_app_name)
-
-    juju.integrate(f"{offer_app_name}:haproxy-route", "http-ingress:haproxy-route")
-    juju.wait(
-        lambda status: _has_haproxy_route_relation(juju, "http-ingress"), timeout=300
-    )
-
-    juju.integrate(
-        f"{offer_app_name}:haproxy-route",
-        "hostagent-messenger-ingress:haproxy-route",
-    )
-    juju.wait(
-        lambda status: _has_haproxy_route_relation(juju, "hostagent-messenger-ingress"),
-        timeout=300,
-    )
-
-    juju.integrate(
-        f"{offer_app_name}:haproxy-route",
-        "ubuntu-installer-attach-ingress:haproxy-route",
-    )
-    juju.wait(
-        lambda status: _has_haproxy_route_relation(
-            juju, "ubuntu-installer-attach-ingress"
-        ),
-        timeout=300,
-    )
-
-    juju.wait(jubilant.all_active, timeout=600)
-
-
-def test_external_haproxy_http_ingress_has_relation(juju: jubilant.Juju, bundle: None):
-    status = juju.status()
-    if "http-ingress" not in status.apps:
-        pytest.skip("http-ingress not deployed")
-    relations = status.apps["http-ingress"].relations
-    assert "haproxy-route" in relations
-
-
-def test_external_haproxy_hostagent_messenger_ingress_has_relation(
-    juju: jubilant.Juju, bundle: None
+def test_external_haproxy_deployed_and_active(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
 ):
-    status = juju.status()
-    if "hostagent-messenger-ingress" not in status.apps:
-        pytest.skip("hostagent-messenger-ingress not deployed")
-    relations = status.apps["hostagent-messenger-ingress"].relations
-    assert "haproxy-route" in relations
+    """Verify external HAProxy is deployed and all units are active."""
+    external_haproxy.wait(jubilant.all_active, timeout=300)
+
+    status = external_haproxy.status()
+    assert "haproxy" in status.apps
+    assert "self-signed-certificates" in status.apps
+
+    haproxy_app = status.apps["haproxy"]
+    assert len(haproxy_app.units) > 0
+
+    for unit in haproxy_app.units.values():
+        assert unit.workload_status == "active"
 
 
-def test_external_haproxy_ubuntu_installer_attach_ingress_has_relation(
-    juju: jubilant.Juju, bundle: None
+def test_external_haproxy_relations_established(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
 ):
-    status = juju.status()
-    if "ubuntu-installer-attach-ingress" not in status.apps:
-        pytest.skip("ubuntu-installer-attach-ingress not deployed")
-    relations = status.apps["ubuntu-installer-attach-ingress"].relations
-    assert "haproxy-route" in relations
+    """Verify all required relations are established."""
+    status = external_haproxy.status()
+    haproxy_app = status.apps["haproxy"]
+
+    assert "certificates" in haproxy_app.relations
+
+    main_status = juju.status()
+    assert "lbaas-haproxy" in main_status.apps
+
+    for ingress_app in [
+        "http-ingress",
+        "hostagent-messenger-ingress",
+        "ubuntu-installer-attach-ingress",
+    ]:
+        app_status = main_status.apps[ingress_app]
+        assert "haproxy-route" in app_status.relations
 
 
-def test_external_haproxy_traffic_via_haproxy(juju: jubilant.Juju, bundle: None):
-    lbaas_juju = jubilant.Juju(model="lbaas")
-    status = lbaas_juju.status()
+def test_external_haproxy_config_valid(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Verify HAProxy configuration is valid."""
+    status = external_haproxy.status()
+    haproxy_units = list(status.apps["haproxy"].units.keys())
 
-    if "haproxy" not in status.apps:
-        pytest.skip("haproxy not deployed in lbaas model")
+    for unit_name in haproxy_units:
+        try:
+            external_haproxy.ssh(unit_name, "haproxy -c -f /var/lib/haproxy/haproxy.cfg")
+        except Exception as e:
+            pytest.fail(f"HAProxy config validation failed on {unit_name}: {e}")
 
+        try:
+            external_haproxy.ssh(unit_name, "systemctl is-active haproxy")
+        except Exception as e:
+            pytest.fail(f"HAProxy service not active on {unit_name}: {e}")
+
+
+def test_external_haproxy_http_all_routes(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Test HTTP traffic for all routes through external HAProxy."""
+    status = external_haproxy.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
 
-    response = get_session().get(f"http://{host}/ping", timeout=10)
-    assert response.status_code in (200, 301, 302)
+    session = get_session()
+
+    routes = (
+        "about",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    for route in routes:
+        response = session.get(f"http://{host}/{route}", timeout=10)
+        assert response.status_code in (200, 301, 302, 404), (
+            f"Expected valid status for HTTP /{route}, got {response.status_code}"
+        )
 
 
-def test_external_haproxy_metrics_forbidden(juju: jubilant.Juju, bundle: None):
-    lbaas_juju = jubilant.Juju(model="lbaas")
-    status = lbaas_juju.status()
-
-    if "haproxy" not in status.apps:
-        pytest.skip("haproxy not deployed in lbaas model")
-
+def test_external_haproxy_https_all_routes(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Test HTTPS traffic for all routes through external HAProxy."""
+    status = external_haproxy.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
 
-    response = get_session().get(f"http://{host}/metrics", timeout=10)
-    assert response.status_code == 403
+    session = get_session()
+
+    routes = (
+        "about",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    for route in routes:
+        response = session.get(f"https://{host}/{route}", verify=False, timeout=10)
+        assert response.status_code in (200, 404), (
+            f"Expected 200 or 404 for HTTPS /{route}, got {response.status_code}"
+        )
+
+
+def test_external_haproxy_redirect_https_all(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Test that redirect_https=all redirects all HTTP requests to HTTPS through external HAProxy."""
+    juju.config("landscape-server", values={"redirect_https": "all"})
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    redirect_routes = (
+        "about",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    session = get_session()
+    for route in redirect_routes:
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False, timeout=10)
+        assert response.is_redirect, f"Got {response} from {url}"
+
+
+def test_external_haproxy_redirect_https_none(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Test that redirect_https=none does not redirect HTTP requests through external HAProxy."""
+    juju.config("landscape-server", values={"redirect_https": "none"})
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    no_redirect_routes = (
+        "about",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "ping",
+        "message-system",
+        "repository",
+        "upload",
+        "zzz-some-default-route",
+    )
+
+    session = get_session()
+    for route in no_redirect_routes:
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False, timeout=10)
+        assert not response.is_redirect, f"Got {response} from {url}"
+
+
+def test_external_haproxy_redirect_https_default(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    """Test that redirect_https=default redirects correctly through external HAProxy."""
+    juju.config("landscape-server", values={"redirect_https": "default"})
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    no_redirect_routes = (
+        "ping",
+        "repository",
+    )
+
+    session = get_session()
+    for route in no_redirect_routes:
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False, timeout=10)
+        assert not response.is_redirect, f"Got {response} from {url}"
+
+    redirect_routes = (
+        "about",
+        "api/about",
+        "attachment",
+        "hashid-databases",
+        "message-system",
+        "upload",
+        "zzz-some-default-route",
+    )
+    for route in redirect_routes:
+        url = f"http://{host}/{route}"
+        response = session.get(url, allow_redirects=False, timeout=10)
+        assert response.is_redirect, f"Got {response} from {url}"
+
+
+def test_external_haproxy_metrics_acl_all_endpoints(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    session = get_session()
+
+    response = session.get(f"http://{host}/metrics", timeout=10)
+    assert response.status_code == 403, (
+        f"Expected 403 for HTTP /metrics, got {response.status_code}"
+    )
+
+    response = session.get(f"https://{host}/metrics", verify=False, timeout=10)
+    assert response.status_code == 403, (
+        f"Expected 403 for HTTPS /metrics, got {response.status_code}"
+    )
+
+    services = ("message-system", "api", "ping")
+
+    for service in services:
+        for scheme in ("http", "https"):
+            url = f"{scheme}://{host}/{service}/metrics"
+            response = session.get(url, verify=False, timeout=10)
+            assert response.status_code == 403, (
+                f"Expected 403 for {scheme.upper()} /{service}/metrics, "
+                f"got {response.status_code}"
+            )
+
+
+def test_external_haproxy_grpc_hostagent_messenger(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    main_status = juju.status()
+    app_status = main_status.apps["landscape-server"]
+
+    if "hostagent-messenger-ingress" not in app_status.relations:
+        pytest.skip("hostagent-messenger-ingress not configured")
+
+    try:
+        credentials = grpc.ssl_channel_credentials()
+        channel = grpc.secure_channel(
+            f"{host}:6554",
+            credentials,
+            options=[
+                ('grpc.ssl_target_name_override', 'landscape.local'),
+            ]
+        )
+
+        try:
+            grpc.channel_ready_future(channel).result(timeout=10)
+            channel.close()
+        except grpc.FutureTimeoutError:
+            channel.close()
+            pytest.fail(f"gRPC channel to {host}:6554 not ready within timeout")
+
+    except Exception as e:
+        pytest.fail(f"Failed to establish gRPC connection to hostagent-messenger on {host}:6554: {e}")
+
+
+def test_external_haproxy_grpc_ubuntu_installer_attach(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    main_status = juju.status()
+    app_status = main_status.apps["landscape-server"]
+
+    if "ubuntu-installer-attach-ingress" not in app_status.relations:
+        pytest.skip("ubuntu-installer-attach-ingress not configured")
+
+    try:
+        credentials = grpc.ssl_channel_credentials()
+        channel = grpc.secure_channel(
+            f"{host}:50051",
+            credentials,
+            options=[
+                ('grpc.ssl_target_name_override', 'landscape.local'),
+            ]
+        )
+
+        try:
+            grpc.channel_ready_future(channel).result(timeout=10)
+            channel.close()
+        except grpc.FutureTimeoutError:
+            channel.close()
+            pytest.fail(f"gRPC channel to {host}:50051 not ready within timeout")
+
+    except Exception as e:
+        pytest.fail(f"Failed to establish gRPC connection to ubuntu-installer-attach on {host}:50051: {e}")
+
+
+def test_external_haproxy_service_specific_routes(
+    juju: jubilant.Juju, external_haproxy: jubilant.Juju
+):
+    status = external_haproxy.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    host = haproxy_unit.public_address
+
+    session = get_session()
+
+    response = session.get(f"https://{host}/ping", verify=False, timeout=10)
+    assert response.status_code == 200, f"Ping service failed: {response.status_code}"
+
+    response = session.get(f"https://{host}/api/about", verify=False, timeout=10)
+    assert response.status_code == 200, f"API service failed: {response.status_code}"
+
+    response = session.get(f"https://{host}/message-system", verify=False, timeout=10)
+    assert response.status_code in (200, 404), (
+        f"Message-system service routing failed: {response.status_code}"
+    )
 
 
 def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):

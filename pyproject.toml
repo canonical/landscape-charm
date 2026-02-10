@@ -25,6 +25,7 @@ ruff = "0.14.11"
 [tool.poetry.group.integration.dependencies]
 jubilant = "1.6.2"
 requests = "2.32.5"
+grpcio = "^1.60.0"
 
 [build-system]
 requires = ["poetry-core"]
