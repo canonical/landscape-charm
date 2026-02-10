@@ -133,6 +133,9 @@ def lbaas(juju: jubilant.Juju):
     ):
         pytest.skip("Ingress not configured, skipping...")
 
+    juju.config("landscape-server", values={"redirect_https": "none"})
+    juju.wait(jubilant.all_active, timeout=300)
+
     if USE_HOST_LBAAS_MODEL:
         lbaas_model = LBAAS_MODEL_NAME
         lbaas_juju = jubilant.Juju(model=lbaas_model)

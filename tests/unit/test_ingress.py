@@ -8,6 +8,34 @@ from charm import LandscapeServerCharm
 import haproxy
 
 
+def test_http_ingress_always_initialized(
+    monkeypatch,
+    capture_service_conf,
+    apt_fixture,
+    haproxy_install_fixture,
+    haproxy_copy_error_files_fixture,
+):
+    """
+    Verify that http_ingress is always initialized regardless of config.
+    """
+    mock_ingress_cls = MagicMock()
+    monkeypatch.setattr("charm.IngressPerAppRequirer", mock_ingress_cls)
+
+    context = Context(LandscapeServerCharm)
+    state = State(config={})
+
+    with context(context.on.config_changed(), state) as mgr:
+        charm = mgr.charm
+
+        assert hasattr(charm, "http_ingress")
+
+        call_kwargs = [call.kwargs for call in mock_ingress_cls.call_args_list]
+
+        http = next(k for k in call_kwargs if k.get("relation_name") == "http-ingress")
+        assert http["port"] == haproxy.FrontendPort.HTTP
+        assert "scheme" not in http
+
+
 def test_ingress_config_enabled(
     monkeypatch,
     capture_service_conf,
@@ -86,4 +114,4 @@ def test_ingress_config_disabled(
         assert not hasattr(charm, "hostagent_messenger_ingress")
         assert not hasattr(charm, "ubuntu_installer_attach_ingress")
 
-        assert mock_ingress_cls.call_count == 0
+        assert mock_ingress_cls.call_count == 1

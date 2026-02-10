@@ -486,6 +486,53 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "chain" in result.results
 
 
+def test_http_ingress_enabled(juju: jubilant.Juju, bundle: None):
+    """
+    Verify that http-ingress is present and publishes correct data.
+    """
+    juju.wait(jubilant.all_active, timeout=300)
+    status = juju.status()
+    app_status = status.apps["landscape-server"]
+
+    if "http-ingress" not in app_status.relations:
+        pytest.skip("http-ingress relation not present in bundle")
+
+    leader_unit_name = None
+    for name, unit_status in app_status.units.items():
+        if unit_status.leader:
+            leader_unit_name = name
+            break
+
+    if not leader_unit_name:
+        pytest.fail("No leader unit found for landscape-server")
+
+    def get_relation_data(endpoint):
+        ids_stdout = juju.cli(
+            "exec", "--unit", leader_unit_name, "--", f"relation-ids {endpoint}"
+        )
+        ids = ids_stdout.strip().splitlines()
+        if not ids:
+            pytest.fail(f"No relation IDs found for endpoint {endpoint}")
+        rel_id = ids[0]
+        data_stdout = juju.cli(
+            "exec",
+            "--unit",
+            leader_unit_name,
+            "--",
+            f"relation-get --format=json -r {rel_id} --app - {leader_unit_name}",
+        )
+        data = json.loads(data_stdout)
+
+        return {k: v.strip('"') if isinstance(v, str) else v for k, v in data.items()}
+
+    http_data = get_relation_data("http-ingress")
+
+    assert (
+        http_data.get("port") == "80"
+    ), f"Expected port 80, got {http_data.get('port')}"
+    assert http_data.get("name") == "landscape-server"
+
+
 def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that when ingress configs are enabled, the charm creates the ingress
@@ -673,6 +720,10 @@ def test_lbaas_config_valid(juju: jubilant.Juju, lbaas: jubilant.Juju):
 
 def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTP traffic for all routes through external HAProxy."""
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
@@ -703,6 +754,10 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
 
 def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTPS traffic for all routes through external HAProxy."""
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
@@ -827,6 +882,10 @@ def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Ju
 
 
 def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
@@ -843,7 +902,7 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
             f"{host}:6554",
             credentials,
             options=[
-                ("grpc.ssl_target_name_override", "landscape.local"),
+                ("grpc.ssl_target_name_override", hostname),
             ],
         )
 
@@ -862,6 +921,10 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
     host = haproxy_unit.public_address
@@ -878,7 +941,7 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
             f"{host}:50051",
             credentials,
             options=[
-                ("grpc.ssl_target_name_override", "landscape.local"),
+                ("grpc.ssl_target_name_override", hostname),
             ],
         )
 
