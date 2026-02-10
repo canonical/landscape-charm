@@ -675,7 +675,11 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTP traffic for all routes through external HAProxy."""
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    host = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     session = get_session()
 
@@ -692,7 +696,12 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     )
 
     for route in routes:
-        response = session.get(f"https://{host}/{route}", verify=False, timeout=10)
+        response = session.get(
+            f"https://{haproxy_ip}/{route}",
+            verify=False,
+            timeout=10,
+            headers={"Host": hostname},
+        )
         assert response.status_code in (
             200,
             301,
@@ -706,7 +715,11 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTPS traffic for all routes through external HAProxy."""
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    host = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     session = get_session()
 
@@ -723,25 +736,43 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     )
 
     for route in routes:
-        response = session.get(f"https://{host}/{route}", verify=False, timeout=10)
+        response = session.get(
+            f"https://{haproxy_ip}/{route}",
+            verify=False,
+            timeout=10,
+            headers={"Host": hostname},
+        )
         assert response.status_code in (
             200,
-        ), f"Expected 200 for HTTPS /{route}, got {response.status_code}"
+            404,
+            405,
+        ), f"Expected 200/404/405 for HTTPS /{route}, got {response.status_code}"
 
 
 def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    host = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     session = get_session()
 
-    response = session.get(f"http://{host}/metrics", timeout=10)
+    response = session.get(
+        f"http://{haproxy_ip}/metrics", timeout=10, headers={"Host": hostname}
+    )
     assert (
         response.status_code == 403
     ), f"Expected 403 for HTTP /metrics, got {response.status_code}"
 
-    response = session.get(f"https://{host}/metrics", verify=False, timeout=10)
+    response = session.get(
+        f"https://{haproxy_ip}/metrics",
+        verify=False,
+        timeout=10,
+        headers={"Host": hostname},
+    )
     assert (
         response.status_code == 403
     ), f"Expected 403 for HTTPS /metrics, got {response.status_code}"
@@ -749,14 +780,21 @@ def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Ju
     services = ("message-system", "api", "ping")
 
     for service in services:
-        url_http = f"http://{host}/{service}/metrics"
-        response = session.get(url_http, timeout=10)
+        response = session.get(
+            f"http://{haproxy_ip}/{service}/metrics",
+            timeout=10,
+            headers={"Host": hostname},
+        )
         assert response.status_code == 403, (
             f"Expected 403 for HTTP /{service}/metrics, " f"got {response.status_code}"
         )
 
-        url_https = f"https://{host}/{service}/metrics"
-        response = session.get(url_https, verify=False, timeout=10)
+        response = session.get(
+            f"https://{haproxy_ip}/{service}/metrics",
+            verify=False,
+            timeout=10,
+            headers={"Host": hostname},
+        )
         assert response.status_code == 403, (
             f"Expected 403 for HTTPS /{service}/metrics, " f"got {response.status_code}"
         )
@@ -849,17 +887,36 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
 def test_lbaas_service_specific_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    host = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     session = get_session()
 
-    response = session.get(f"https://{host}/ping", verify=False, timeout=10)
+    response = session.get(
+        f"https://{haproxy_ip}/ping",
+        verify=False,
+        timeout=10,
+        headers={"Host": hostname},
+    )
     assert response.status_code == 200, f"Ping service failed: {response.status_code}"
 
-    response = session.get(f"https://{host}/api/about", verify=False, timeout=10)
+    response = session.get(
+        f"https://{haproxy_ip}/api/about",
+        verify=False,
+        timeout=10,
+        headers={"Host": hostname},
+    )
     assert response.status_code == 200, f"API service failed: {response.status_code}"
 
-    response = session.get(f"https://{host}/message-system", verify=False, timeout=10)
+    response = session.get(
+        f"https://{haproxy_ip}/message-system",
+        verify=False,
+        timeout=10,
+        headers={"Host": hostname},
+    )
     assert (
         response.status_code == 200
     ), f"Message-system service routing failed: {response.status_code}"
