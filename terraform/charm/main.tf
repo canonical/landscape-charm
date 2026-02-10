@@ -1,8 +1,8 @@
 # © 2025 Canonical Ltd.
 
 resource "juju_application" "landscape_server" {
-  name  = var.app_name
-  model = var.model
+  name       = var.app_name
+  model_uuid = var.model_uuid
 
   charm {
     name     = "landscape-server"

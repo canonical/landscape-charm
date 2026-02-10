@@ -1,7 +1,7 @@
 # © 2026 Canonical Ltd.
 
-variable "model" {
-  description = "The name of the Juju model to deploy Landscape Server to."
+variable "model_uuid" {
+  description = "UUID of the Juju model to deploy Landscape Server to."
   type        = string
 }
 
