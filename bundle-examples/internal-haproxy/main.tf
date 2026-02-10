@@ -2,9 +2,25 @@ data "juju_model" "landscape_model" {
   name = var.model_name
 }
 
+locals {
+  ssh_key_files = [
+    "~/.ssh/id_ed25519.pub",
+    "~/.ssh/id_rsa.pub",
+    "~/.ssh/id_ecdsa.pub",
+  ]
+  ssh_key_path    = coalesce([for f in local.ssh_key_files : f if fileexists(pathexpand(f))]...)
+  ssh_key_content = trimspace(file(pathexpand(local.ssh_key_path)))
+}
+
 resource "juju_model" "lbaas_model" {
   name = var.lbaas_model_name
 }
+
+resource "juju_ssh_key" "lbaas_ssh_key" {
+  model   = juju_model.lbaas_model.name
+  payload = local.ssh_key_content
+}
+
 
 resource "juju_application" "haproxy" {
   model = juju_model.lbaas_model.name

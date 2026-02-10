@@ -4,10 +4,11 @@ Integration test fixtures.
 
 import os
 import pathlib
+import uuid
 
 import jubilant
-import uuid
 import pytest
+
 from tests.integration.helpers import _has_haproxy_route_relation
 
 BUNDLE_NAME = "bundle.yaml"
@@ -143,7 +144,9 @@ def lbaas(juju: jubilant.Juju):
                 "self-signed-certificates" in lbaas_status.apps
             ), "self-signed-certificates not found in lbaas model"
         except Exception as e:
-            pytest.fail(f"Failed to connect to existing lbaas model '{lbaas_model}': {e}")
+            pytest.fail(
+                f"Failed to connect to existing lbaas model '{lbaas_model}': {e}"
+            )
 
         yield lbaas_juju
     else:
