@@ -47,7 +47,6 @@ applications:
     options:
       external-grpc-port: 6554
       hostname: landscape.local
-      paths: /
       backend-protocol: https
   http-ingress:
     charm: ingress-configurator
@@ -71,7 +70,6 @@ applications:
     options:
       external-grpc-port: 50051
       hostname: landscape.local
-      paths: /
       backend-protocol: https
   lb-certs:
     charm: self-signed-certificates

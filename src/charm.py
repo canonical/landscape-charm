@@ -342,7 +342,6 @@ class LandscapeServerCharm(CharmBase):
                 self,
                 relation_name="hostagent-messenger-ingress",
                 port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
-                scheme="https",
             )
 
         if self.charm_config.enable_ubuntu_installer_attach:
@@ -350,7 +349,6 @@ class LandscapeServerCharm(CharmBase):
                 self,
                 relation_name="ubuntu-installer-attach-ingress",
                 port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH,
-                scheme="https",
             )
 
         self.lb_certificates = TLSCertificatesRequiresV4(
