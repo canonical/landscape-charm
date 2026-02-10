@@ -41,6 +41,9 @@ from charms.operator_libs_linux.v1.systemd import (
     service_running,
     SystemdError,
 )
+from charms.traefik_k8s.v2.ingress import (
+    IngressPerAppRequirer,
+)
 from ops import main
 from ops.charm import (
     ActionEvent,
@@ -316,6 +319,22 @@ class LandscapeServerCharm(CharmBase):
             self.charm_config = DEFAULT_CONFIGURATION
             self.unit.status = BlockedStatus(
                 "Invalid configuration. See `juju debug-log`."
+            )
+
+        if self.charm_config.enable_hostagent_messenger:
+            self.hostagent_messenger_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="hostagent-messenger-ingress",
+                port=haproxy.FrontendPort.HOSTAGENT_MESSENGER,
+                scheme="https",
+            )
+
+        if self.charm_config.enable_ubuntu_installer_attach:
+            self.ubuntu_installer_attach_ingress = IngressPerAppRequirer(
+                self,
+                relation_name="ubuntu-installer-attach-ingress",
+                port=haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH,
+                scheme="https",
             )
 
         self.lb_certificates = TLSCertificatesRequiresV4(
@@ -1653,18 +1672,33 @@ command[check_{service}]=/usr/local/lib/nagios/plugins/check_systemd.py {service
         configuration has not changed.
         """
         currently_enabled = self._stored.enable_ubuntu_installer_attach
+        if currently_enabled and enable:
+            return
         if not currently_enabled and enable:
             self.unit.status = MaintenanceStatus(
                 "Installing `landscape-ubuntu-installer-attach`"
             )
-            apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
-            self._stored.enable_ubuntu_installer_attach = True
+            try:
+                apt.add_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH, update_cache=True)
+                self._stored.enable_ubuntu_installer_attach = True
+            except PackageError as e:
+                logger.error(
+                    f"Failed to install ubuntu installer attach with error: {e}"
+                )
+                raise e
         elif currently_enabled and not enable:
             self.unit.status = MaintenanceStatus(
                 "Removing `landscape-ubuntu-installer-attach`"
             )
-            apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
-            self._stored.enable_ubuntu_installer_attach = False
+            try:
+                apt.remove_package(LANDSCAPE_UBUNTU_INSTALLER_ATTACH)
+                self._stored.enable_ubuntu_installer_attach = False
+            except PackageError as e:
+                logger.error(
+                    f"Failed to remove ubuntu installer attach with error: {e}"
+                )
+                raise e
+        self.unit.status = WaitingStatus("Waiting on relations")
 
 
 if __name__ == "__main__":  # pragma: no cover

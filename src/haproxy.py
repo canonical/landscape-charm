@@ -95,7 +95,7 @@ class FrontendPort(int, Enum):
     HOSTAGENT_MESSENGER = 6554
     HTTP = 80
     HTTPS = 443
-    UBUNTU_INSTALLER_ATTTACH = 50051
+    UBUNTU_INSTALLER_ATTACH = 50051
 
     def __int__(self) -> int:
         return self.value
@@ -217,7 +217,7 @@ HOSTAGENT_MESSENGER_FRONTEND = Frontend(
 
 UBUNTU_INSTALLER_ATTACH_FRONTEND = Frontend(
     frontend_name=str(FrontendName.UBUNTU_INSTALLER_ATTACH),
-    frontend_port=int(FrontendPort.UBUNTU_INSTALLER_ATTTACH),
+    frontend_port=int(FrontendPort.UBUNTU_INSTALLER_ATTACH),
     frontend_options=[
         "mode http",
         # The X-FQDN header is required for multitenant installations
