@@ -17,9 +17,6 @@ test:
 integration-test:
 	poetry run pytest -v --tb native tests/integration
 
-integration-test-existing:
-	LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL=1 poetry run pytest -v --tb native tests/integration
-
 coverage:
 	poetry run coverage run --branch --source=src -m pytest -v --tb native tests/unit
 	poetry run coverage report -m
