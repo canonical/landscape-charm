@@ -76,6 +76,20 @@ resource "juju_integration" "haproxy_certs" {
   }
 }
 
+resource "juju_integration" "haproxy_receive_ca_certs" {
+  model = juju_model.lbaas_model.name
+
+  application {
+    name     = juju_application.haproxy.name
+    endpoint = "receive-ca-certs"
+  }
+
+  application {
+    name     = juju_application.self_signed_certificates.name
+    endpoint = "send-ca-cert"
+  }
+}
+
 resource "juju_offer" "haproxy_route" {
   model            = juju_model.lbaas_model.name
   application_name = juju_application.haproxy.name
@@ -135,5 +149,5 @@ resource "terraform_data" "wait_for_lbaas" {
     }
   }
 
-  depends_on = [juju_offer.haproxy_route, juju_integration.haproxy_certs]
+  depends_on = [juju_offer.haproxy_route, juju_integration.haproxy_certs, juju_integration.haproxy_receive_ca_certs]
 }

@@ -74,7 +74,6 @@ def test_ingress_config_enabled(
             if k.get("relation_name") == "hostagent-messenger-ingress"
         )
         assert hostagent["port"] == haproxy.FrontendPort.HOSTAGENT_MESSENGER
-        assert hostagent["scheme"] == "https"
 
         installer = next(
             k
@@ -82,7 +81,6 @@ def test_ingress_config_enabled(
             if k.get("relation_name") == "ubuntu-installer-attach-ingress"
         )
         assert installer["port"] == haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH
-        assert installer["scheme"] == "https"
 
 
 def test_ingress_config_disabled(

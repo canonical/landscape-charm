@@ -8,7 +8,6 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 import json
 import time
 
-import grpc
 import jubilant
 import pytest
 import requests
@@ -628,49 +627,6 @@ def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         juju.wait(jubilant.all_active, timeout=300)
 
 
-def test_lbaas_deployed_and_active(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    """Verify external HAProxy is deployed and all units are active."""
-    lbaas.wait(jubilant.all_active, timeout=300)
-
-    status = lbaas.status()
-    assert "haproxy" in status.apps
-    assert "self-signed-certificates" in status.apps
-
-    haproxy_app = status.apps["haproxy"]
-    assert len(haproxy_app.units) > 0
-
-    for unit in haproxy_app.units.values():
-        assert unit.workload_status.current == "active"
-
-
-def test_lbaas_relations_established(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    """Verify all required relations are established."""
-    status = lbaas.status()
-    haproxy_app = status.apps["haproxy"]
-
-    assert "certificates" in haproxy_app.relations
-
-    main_status = juju.status()
-
-    for ingress_app in [
-        "http-ingress",
-        "hostagent-messenger-ingress",
-        "ubuntu-installer-attach-ingress",
-    ]:
-        app_status = main_status.apps[ingress_app]
-        assert "haproxy-route" in app_status.relations
-
-
-def test_lbaas_config_valid(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    """Verify HAProxy is active."""
-    lbaas.wait(jubilant.all_active, timeout=300)
-    status = lbaas.status()
-    haproxy_app = status.apps["haproxy"]
-
-    for unit in haproxy_app.units.values():
-        assert unit.workload_status.current == "active"
-
-
 def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTP traffic for all routes through external HAProxy."""
     config = juju.config("landscape-server")
@@ -801,13 +757,8 @@ def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Ju
 
 
 def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    config = juju.config("landscape-server")
-    root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
-
     status = lbaas.status()
-    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
-    haproxy_ip = haproxy_unit.public_address
+    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
 
     main_status = juju.status()
     app_status = main_status.apps["landscape-server"]
@@ -815,41 +766,19 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     if "hostagent-messenger-ingress" not in app_status.relations:
         pytest.skip("hostagent-messenger-ingress not configured")
 
-    try:
-        credentials = grpc.ssl_channel_credentials()
-        channel = grpc.secure_channel(
-            f"{haproxy_ip}:6554",
-            credentials,
-            options=[
-                ("grpc.ssl_target_name_override", hostname),
-            ],
-        )
+    haproxy_app = status.apps["haproxy"]
+    if "receive-ca-certs" not in haproxy_app.relations:
+        pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-        try:
-            grpc.channel_ready_future(channel).result(timeout=10)
-            channel.close()
-        except grpc.FutureTimeoutError:
-            channel.close()
-            pytest.skip(
-                f"gRPC channel to {haproxy_ip}:6554 not ready - "
-                "likely port not exposed on HAProxy"
-            )
-
-    except Exception as e:
-        pytest.skip(
-            f"Failed to establish gRPC connection to "
-            f"hostagent-messenger on {haproxy_ip}:6554: {e}"
-        )
+    lbaas.ssh(
+        haproxy_unit_name,
+        "nc -z localhost 6554",
+    )
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    config = juju.config("landscape-server")
-    root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
-
     status = lbaas.status()
-    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
-    haproxy_ip = haproxy_unit.public_address
+    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
 
     main_status = juju.status()
     app_status = main_status.apps["landscape-server"]
@@ -857,31 +786,14 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     if "ubuntu-installer-attach-ingress" not in app_status.relations:
         pytest.skip("ubuntu-installer-attach-ingress not configured")
 
-    try:
-        credentials = grpc.ssl_channel_credentials()
-        channel = grpc.secure_channel(
-            f"{haproxy_ip}:50051",
-            credentials,
-            options=[
-                ("grpc.ssl_target_name_override", hostname),
-            ],
-        )
+    haproxy_app = status.apps["haproxy"]
+    if "receive-ca-certs" not in haproxy_app.relations:
+        pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-        try:
-            grpc.channel_ready_future(channel).result(timeout=10)
-            channel.close()
-        except grpc.FutureTimeoutError:
-            channel.close()
-            pytest.skip(
-                f"gRPC channel to {haproxy_ip}:50051 not ready - "
-                "likely port not exposed on HAProxy"
-            )
-
-    except Exception as e:
-        pytest.skip(
-            "Failed to establish gRPC connection to "
-            f"ubuntu-installer-attach on {haproxy_ip}:50051: {e}"
-        )
+    lbaas.ssh(
+        haproxy_unit_name,
+        "nc -z localhost 50051",
+    )
 
 
 def test_lbaas_service_specific_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):

@@ -110,7 +110,7 @@ def bundle_path() -> pathlib.Path:
 @pytest.fixture(scope="module")
 def lbaas(juju: jubilant.Juju):
     """
-    Set up external HAProxy in a separate lbaas model for LBaaS testing.
+    Set up external HAProxy in a separate model for LBaaS testing.
 
     This fixture can either:
     - Use an existing lbaas model (if USE_HOST_LBAAS_MODEL is True)
@@ -132,9 +132,6 @@ def lbaas(juju: jubilant.Juju):
         ]
     ):
         pytest.skip("Ingress not configured, skipping...")
-
-    juju.config("landscape-server", values={"redirect_https": "none"})
-    juju.wait(jubilant.all_active, timeout=300)
 
     if USE_HOST_LBAAS_MODEL:
         lbaas_model = LBAAS_MODEL_NAME
