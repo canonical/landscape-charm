@@ -16,17 +16,17 @@ black = "~=24.10.0"
 charmcraftcache = "0.8.0"
 coverage = "7.13.1"
 flake8 = "7.3.0"
+grpcio = "1.78.0"
 isort = "7.0.0"
 ops = { extras = ["testing"], version = "2.23.1" }
 pydantic = "1.10.26"
 pytest = "9.0.2"
 ruff = "0.14.11"
-grpcio = "1.78.0"
 
 [tool.poetry.group.integration.dependencies]
+grpcio = "1.78.0"
 jubilant = "1.6.2"
 requests = "2.32.5"
-grpcio = "1.78.0"
 
 [build-system]
 requires = ["poetry-core"]
