@@ -166,8 +166,7 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
         juju.wait(jubilant.all_active, timeout=300)
 
 
-@pytest.mark.parametrize("route", ["ping", "api/about", "message-system", ""])
-def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
+def test_services_up_over_https(juju: jubilant.Juju, bundle: None):
     """
     Services are responding over HTTPS.
     """
@@ -183,8 +182,14 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
         juju.config("landscape-server", values={"redirect_https": "all"})
         juju.wait(jubilant.all_active, timeout=300)
 
-        response = get_session().get(f"https://{host}/{route}", verify=False)
-        assert response.status_code == 200
+        routes = ("ping", "api/about", "message-system", "")
+
+        session = get_session()
+        for route in routes:
+            response = session.get(f"https://{host}/{route}", verify=False)
+            assert (
+                response.status_code == 200
+            ), f"Expected 200 status code for /{route} over HTTPS, got {response.status_code}"
     finally:
         juju.config("landscape-server", values={"redirect_https": original})
         juju.wait(jubilant.all_active, timeout=300)
@@ -772,15 +777,12 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     cert_pem = cert_result.results["certificate"].encode()
 
     credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
-    channel = grpc.secure_channel(
+    with grpc.secure_channel(
         f"{haproxy_ip}:6554",
         credentials,
         options=[("grpc.ssl_target_name_override", hostname)],
-    )
-    try:
+    ) as channel:
         grpc.channel_ready_future(channel).result(timeout=5)
-    finally:
-        channel.close()
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -811,12 +813,9 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     cert_pem = cert_result.results["certificate"].encode()
 
     credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
-    channel = grpc.secure_channel(
+    with grpc.secure_channel(
         f"{haproxy_ip}:50051",
         credentials,
         options=[("grpc.ssl_target_name_override", hostname)],
-    )
-    try:
+    ) as channel:
         grpc.channel_ready_future(channel).result(timeout=5)
-    finally:
-        channel.close()
