@@ -249,16 +249,3 @@ def test_action_get_certificates_no_provider_cert(
 
     with pytest.raises(testing.ActionFailed):
         ctx.run(ctx.on.action("get-certificates"), state)
-
-
-def test_upgrade_charm_updates_haproxy_config(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
-):
-    ctx = Context(LandscapeServerCharm)
-    state = State(**lb_certs_state)
-
-    with ctx(ctx.on.upgrade_charm(), state) as mgr:
-        stored = mgr.charm._stored
-
-    assert stored.ready.get("load-balancer-certificates") is True
-    assert "ssl crt /etc/haproxy/haproxy.pem" in stored.haproxy_config

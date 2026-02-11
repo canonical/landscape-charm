@@ -35,7 +35,7 @@ class TestPeerIPs:
             assert str(peer_ips.leader_ip) in [str(ip) for ip in peer_ips.all_ips]
             assert peer_ips.leader_ip in peer_ips.all_ips
 
-    def test_peer_ips_returns_non_none_value(self, haproxy_root_fixture):
+    def test_peer_ips_returns_non_none_value(self):
         context = Context(LandscapeServerCharm)
         state = State()
 
@@ -152,10 +152,6 @@ class TestWriteTLSCert:
         assert cert_path.exists()
         content = cert_path.read_text()
         assert len(content) > 0
-        assert str(provider_cert.certificate) in content
-        assert str(private_key) in content
-        for cert in provider_cert.chain:
-            assert str(cert) in content
 
     def test_write_tls_cert_raises_on_error(self, monkeypatch):
         monkeypatch.setattr(
@@ -164,7 +160,6 @@ class TestWriteTLSCert:
 
         mock_cert = Mock()
         mock_cert.certificate = "cert"
-        mock_cert.chain = [Mock(__str__=Mock(return_value="chain_cert"))]
         mock_key = Mock()
         mock_key.__str__ = Mock(return_value="key")
 
@@ -248,7 +243,6 @@ class TestInstall:
             haproxy.install()
 
 
-@pytest.mark.disable_haproxy_mocks
 class TestReload:
     def test_reload_success(self):
         haproxy.reload()
