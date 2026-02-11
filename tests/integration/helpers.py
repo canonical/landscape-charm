@@ -50,23 +50,50 @@ def get_session(
     return session
 
 
-def _has_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
+def has_legacy_pg(juju: jubilant.Juju) -> bool:
+    """
+    Checks if PostgreSQL is in the current model
+    and it's related over the `db-admin` endpoint
+    (i.e., it's using the legacy PG interface).
+    """
+    pg = juju.status().apps.get("postgresql")
+    if not pg:
+        return False
+
     return "db-admin" in pg.relations
 
 
-def _has_modern_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
+def has_modern_pg(juju: jubilant.Juju) -> bool:
+    """
+    Checks if PostgreSQL is in the current model
+    and it's related over the `database` endpoint
+    (i.e., it's using the modern PG interface).
+    """
+    pg = juju.status().apps.get("postgresql")
+    if not pg:
+        return False
+
     return "database" in pg.relations
 
 
-def _supports_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    # '14/x' and 'latest/x' tracks support legacy
+def supports_legacy_pg(juju: jubilant.Juju) -> bool:
+    """
+    Checks if PostgreSQL is in the current model
+    and it supports the legacy PG interface
+    (i.e., the channel is 14/x or latest/x).
+    """
+    pg = juju.status().apps.get("postgresql")
+    if not pg:
+        return False
+
     return "14" in pg.charm_channel or "latest" in pg.charm_channel
 
 
-def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
+def restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
+    """
+    Restores the relation between Landscape Server and PostgreSQL
+    that may have been altered when testing the legacy/modern interfaces.
+    """
     relations = set(juju.status().apps["landscape-server"].relations)
 
     # Used to have modern, needs it back
@@ -76,7 +103,7 @@ def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
             juju.remove_relation(
                 "landscape-server:db", "postgresql:db-admin", force=True
             )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
+            juju.wait(lambda status: not has_legacy_pg(juju), timeout=120)
 
         juju.integrate("landscape-server:database", "postgresql:database")
 
@@ -84,13 +111,13 @@ def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
         juju.remove_relation(
             "landscape-server:database", "postgresql:database", force=True
         )
-        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+        juju.wait(lambda status: not has_modern_pg(juju), timeout=120)
 
     # Refresh after they might have changed
     relations = set(juju.status().apps["landscape-server"].relations)
 
     # Supports for legacy was dropped in PG 16+
-    if _supports_legacy_pg(juju):
+    if supports_legacy_pg(juju):
         # Used to have legacy, needs it back
         if "db" in expected and "db" not in relations:
             # Will error if both are integrated at the same time
@@ -98,7 +125,7 @@ def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
                 juju.remove_relation(
                     "landscape-server:database", "postgresql:database", force=True
                 )
-                juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+                juju.wait(lambda status: not has_modern_pg(juju), timeout=120)
 
             juju.integrate("landscape-server:db", "postgresql:db-admin")
 
@@ -106,13 +133,28 @@ def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
             juju.remove_relation(
                 "landscape-server:db", "postgresql:db-admin", force=True
             )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
+            juju.wait(lambda status: not has_legacy_pg(juju), timeout=120)
 
 
-def _has_haproxy_route_relation(juju: jubilant.Juju, app_name: str) -> bool:
-    """Check if an app has haproxy-route relation established."""
+def has_haproxy_route_provider(juju: jubilant.Juju, app: str) -> bool:
+    """
+    Check if an app has haproxy-route relation established.
+    """
     status = juju.status()
-    app = status.apps.get(app_name)
-    if not app:
-        return False
-    return "haproxy-route" in app.relations
+    return any(
+        rel.interface == "haproxy-route"
+        for rels in status.apps[app].relations.values()
+        for rel in rels
+    )
+
+
+def has_tls_certs_provider(juju: jubilant.Juju, app: str = "landscape-server") -> bool:
+    """
+    Check if an app has tls-certificates relation established.
+    """
+    status = juju.status()
+    return any(
+        rel.interface == "tls-certificates"
+        for rels in status.apps[app].relations.values()
+        for rel in rels
+    )

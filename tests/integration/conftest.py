@@ -9,7 +9,7 @@ import uuid
 import jubilant
 import pytest
 
-from tests.integration.helpers import _has_haproxy_route_relation
+from tests.integration.helpers import has_haproxy_route_provider, has_tls_certs_provider
 
 BUNDLE_NAME = "bundle.yaml"
 """
@@ -140,9 +140,9 @@ def lbaas(juju: jubilant.Juju):
         try:
             lbaas_status = lbaas_juju.status()
             assert "haproxy" in lbaas_status.apps, "haproxy not found in lbaas model"
-            assert (
-                "self-signed-certificates" in lbaas_status.apps
-            ), "self-signed-certificates not found in lbaas model"
+            assert has_tls_certs_provider(
+                lbaas_juju, "haproxy"
+            ), "haproxy not integrated with a TLS certs provider"
         except Exception as e:
             pytest.fail(
                 f"Failed to connect to existing lbaas model '{lbaas_model}': {e}"
@@ -178,7 +178,7 @@ def lbaas(juju: jubilant.Juju):
                 f"{offer_app_name}:haproxy-route", "http-ingress:haproxy-route"
             )
             juju.wait(
-                lambda status: _has_haproxy_route_relation(juju, "http-ingress"),
+                lambda status: has_haproxy_route_provider(juju, "http-ingress"),
                 timeout=300,
             )
 
@@ -187,7 +187,7 @@ def lbaas(juju: jubilant.Juju):
                 "hostagent-messenger-ingress:haproxy-route",
             )
             juju.wait(
-                lambda status: _has_haproxy_route_relation(
+                lambda status: has_haproxy_route_provider(
                     juju, "hostagent-messenger-ingress"
                 ),
                 timeout=300,
@@ -198,7 +198,7 @@ def lbaas(juju: jubilant.Juju):
                 "ubuntu-installer-attach-ingress:haproxy-route",
             )
             juju.wait(
-                lambda status: _has_haproxy_route_relation(
+                lambda status: has_haproxy_route_provider(
                     juju, "ubuntu-installer-attach-ingress"
                 ),
                 timeout=300,

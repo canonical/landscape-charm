@@ -13,11 +13,12 @@ import requests
 
 from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
 from tests.integration.helpers import (
-    _has_legacy_pg,
-    _has_modern_pg,
-    _restore_db_relations,
-    _supports_legacy_pg,
     get_session,
+    has_legacy_pg,
+    has_modern_pg,
+    has_tls_certs_provider,
+    restore_db_relations,
+    supports_legacy_pg,
 )
 
 
@@ -205,26 +206,26 @@ def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
 
     if "db" in initial_relations:
         juju.remove_relation("landscape-server:db", "postgresql:db-admin", force=True)
-        juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
+        juju.wait(lambda status: not has_legacy_pg(juju), timeout=120)
 
         juju.integrate("landscape-server:database", "postgresql:database")
 
     elif "database" not in initial_relations:
         juju.integrate("landscape-server:database", "postgresql:database")
-        juju.wait(lambda status: _has_modern_pg(juju), timeout=120)
+        juju.wait(lambda status: has_modern_pg(juju), timeout=120)
 
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "database" in relations
 
-    _restore_db_relations(juju, initial_relations)
+    restore_db_relations(juju, initial_relations)
 
 
 def test_legacy_db_relation(juju: jubilant.Juju, bundle: None):
     """
     Test the legacy `db` interface.
     """
-    if not _supports_legacy_pg(juju):
+    if not supports_legacy_pg(juju):
         pytest.skip("Legacy pgsql relation not available on this PostgreSQL charm")
 
     status = juju.status()
@@ -234,18 +235,18 @@ def test_legacy_db_relation(juju: jubilant.Juju, bundle: None):
         juju.remove_relation(
             "landscape-server:database", "postgresql:database", force=True
         )
-        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+        juju.wait(lambda status: not has_modern_pg(juju), timeout=120)
         juju.integrate("landscape-server:db", "postgresql:db-admin")
 
     elif "db" not in initial_relations:
         juju.integrate("landscape-server:db", "postgresql:db-admin")
-        juju.wait(lambda status: _has_legacy_pg(juju), timeout=120)
+        juju.wait(lambda status: has_legacy_pg(juju), timeout=120)
 
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "db" in relations
 
-    _restore_db_relations(juju, initial_relations)
+    restore_db_relations(juju, initial_relations)
 
 
 def test_all_services_up(juju: jubilant.Juju, bundle: None):
@@ -386,22 +387,13 @@ def test_non_leader_unit_redirects_leader_only_services(
             )
 
 
-def _has_tls_certs_provider(juju: jubilant.Juju) -> bool:
-    status = juju.status()
-
-    return any(
-        any(rel.interface == "tls-certificates" for rel in rels)
-        for rels in status.apps["landscape-server"].relations.values()
-    )
-
-
 def test_get_certificates_action_without_tls_relation(
     juju: jubilant.Juju, bundle: None
 ):
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    has_tls_cert_relation = _has_tls_certs_provider(juju)
+    has_tls_cert_relation = has_tls_certs_provider(juju)
     original_cert_provider = None
 
     if has_tls_cert_relation:
@@ -425,7 +417,7 @@ def test_get_certificates_action_without_tls_relation(
             f"{cert_provider}:certificates",
             force=True,
         )
-        juju.wait(lambda status: not _has_tls_certs_provider(juju), timeout=120)
+        juju.wait(lambda status: not has_tls_certs_provider(juju), timeout=120)
 
     with pytest.raises(jubilant.TaskError) as e:
         juju.run("landscape-server/0", "get-certificates")
@@ -438,14 +430,14 @@ def test_get_certificates_action_without_tls_relation(
             "landscape-server:load-balancer-certificates",
             f"{original_cert_provider}:certificates",
         )
-        juju.wait(lambda status: _has_tls_certs_provider(juju), timeout=120)
+        juju.wait(lambda status: has_tls_certs_provider(juju), timeout=120)
 
 
 def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    if not _has_tls_certs_provider(juju):
+    if not has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
@@ -470,7 +462,7 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    if not _has_tls_certs_provider(juju):
+    if not has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
