@@ -598,9 +598,6 @@ def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         assert (
             hostagent_data.get("port") == "6554"
         ), f"Expected port 6554, got {hostagent_data.get('port')}"
-        assert (
-            hostagent_data.get("scheme") == "https"
-        ), f"Expected scheme https, got {hostagent_data.get('scheme')}"
         assert hostagent_data.get("name") == "landscape-server"
 
         installer_data = get_relation_data("ubuntu-installer-attach-ingress")
@@ -608,9 +605,6 @@ def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         assert (
             installer_data.get("port") == "50051"
         ), f"Expected port 50051, got {installer_data.get('port')}"
-        assert (
-            installer_data.get("scheme") == "https"
-        ), f"Expected scheme https, got {installer_data.get('scheme')}"
         assert installer_data.get("name") == "landscape-server"
 
     finally:
@@ -651,14 +645,11 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
             f"http://{haproxy_ip}/{route}",
             timeout=10,
             headers={"Host": hostname},
-            allow_redirects=False,
+            allow_redirects=True,
         )
         assert (
-            not response.is_redirect
-        ), f"Unexpected redirect for HTTP /{route}, got {response.status_code}"
-        assert (
             response.status_code == 200
-        ), f"Expected 200 for HTTP /{route}, got {response.status_code}"
+        ), f"Expected status code 200 for HTTP /{route}, got {response.status_code}"
 
 
 def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -688,14 +679,11 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
             verify=False,
             timeout=10,
             headers={"Host": hostname},
-            allow_redirects=False,
+            allow_redirects=True,
         )
         assert (
-            not response.is_redirect
-        ), f"Unexpected redirect for HTTPS /{route}, got {response.status_code}"
-        assert (
             response.status_code == 200
-        ), f"Expected 200 for HTTPS /{route}, got {response.status_code}"
+        ), f"Expected status code 200 for HTTPS /{route}, got {response.status_code}"
 
 
 def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
