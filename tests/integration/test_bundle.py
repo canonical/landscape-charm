@@ -762,19 +762,32 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
-    cert_result = lbaas.run(
-        haproxy_unit_name, "get-certificate", {"hostname": hostname}
-    )
-    cert_pem = cert_result.results["certificate"].encode()
+    original_hostagent = config.get("enable_hostagent_messenger")
+    try:
+        juju.config(
+            "landscape-server", values={"enable_hostagent_messenger": "true"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
 
-    credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
-    with grpc.secure_channel(
-        f"{haproxy_ip}:6554",
-        credentials,
-        options=[("grpc.ssl_target_name_override", hostname)],
-    ) as channel:
-        grpc.channel_ready_future(channel).result(timeout=5)
+        haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
+        cert_result = lbaas.run(
+            haproxy_unit_name, "get-certificate", {"hostname": hostname}
+        )
+        cert_pem = cert_result.results["certificate"].encode()
+
+        credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+        with grpc.secure_channel(
+            f"{haproxy_ip}:6554",
+            credentials,
+            options=[("grpc.ssl_target_name_override", hostname)],
+        ) as channel:
+            grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        juju.config(
+            "landscape-server",
+            values={"enable_hostagent_messenger": "true" if original_hostagent else "false"},
+        )
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -800,16 +813,29 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
-    cert_result = lbaas.run(
-        haproxy_unit_name, "get-certificate", {"hostname": hostname}
-    )
-    cert_pem = cert_result.results["certificate"].encode()
+    original_installer = config.get("enable_ubuntu_installer_attach")
+    try:
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "true"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
 
-    credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
-    with grpc.secure_channel(
-        f"{haproxy_ip}:50051",
-        credentials,
-        options=[("grpc.ssl_target_name_override", hostname)],
-    ) as channel:
-        grpc.channel_ready_future(channel).result(timeout=5)
+        haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
+        cert_result = lbaas.run(
+            haproxy_unit_name, "get-certificate", {"hostname": hostname}
+        )
+        cert_pem = cert_result.results["certificate"].encode()
+
+        credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+        with grpc.secure_channel(
+            f"{haproxy_ip}:50051",
+            credentials,
+            options=[("grpc.ssl_target_name_override", hostname)],
+        ) as channel:
+            grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        juju.config(
+            "landscape-server",
+            values={"enable_ubuntu_installer_attach": "true" if original_installer else "false"},
+        )
+        juju.wait(jubilant.all_active, timeout=300)
