@@ -6,7 +6,6 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
-import time
 
 import jubilant
 import pytest
@@ -179,8 +178,16 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
         .public_address
     )
 
-    response = get_session().get(f"https://{host}/{route}", verify=False)
-    assert response.status_code == 200
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "all"})
+        juju.wait(jubilant.all_active, timeout=300)
+
+        response = get_session().get(f"https://{host}/{route}", verify=False)
+        assert response.status_code == 200
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
@@ -429,6 +436,7 @@ def test_get_certificates_action_without_tls_relation(
 
 
 def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
+    status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
     if not _has_tls_certs_provider(juju):
@@ -436,7 +444,6 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
 
     juju.wait(jubilant.all_active, timeout=300)
 
-    status = juju.status()
     leader_unit = None
     for unit_name, unit_status in status.apps["landscape-server"].units.items():
         if unit_status.leader:
@@ -445,27 +452,8 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
 
     assert leader_unit is not None
 
-    max_attempts = 12
-    result = None
-    for attempt in range(max_attempts):
-        try:
-            result = juju.run(leader_unit, "get-certificates")
-            if result.status == "completed":
-                break
-        except Exception:
-            if attempt < max_attempts - 1:
-                time.sleep(5)
-                status = juju.status()
-                for unit_name, unit_status in status.apps[
-                    "landscape-server"
-                ].units.items():
-                    if unit_status.leader:
-                        leader_unit = unit_name
-                        break
-            else:
-                raise
+    result = juju.run(leader_unit, "get-certificates")
 
-    assert result is not None
     assert result.status == "completed"
     assert "certificate" in result.results
     assert "ca" in result.results
@@ -479,6 +467,8 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     if not _has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
+    juju.wait(jubilant.all_active, timeout=300)
+
     status = juju.status()
     non_leader_units = [
         unit_name
@@ -488,8 +478,6 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
 
     if not non_leader_units:
         pytest.skip("No non-leader units found")
-
-    juju.wait(jubilant.all_active, timeout=300)
 
     result = juju.run(non_leader_units[0], "get-certificates")
 

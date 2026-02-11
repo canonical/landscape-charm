@@ -7,8 +7,10 @@ CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
-.PHONY: build deploy lbaas clean clean-lbaas test integration-test integration-test-existing coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
+.PHONY: build deploy lbaas clean clean-lbaas test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
+
+# Python testing and linting
 test:
 	poetry run pytest --tb native tests/unit
 
@@ -33,8 +35,8 @@ fmt:
 	poetry run black src tests
 	poetry run ruff check --fix src tests
 
+# Charm building and deployment
 build:
-	poetry lock
 	poetry run ccc pack --platform $(PLATFORM)
 
 deploy:
@@ -42,10 +44,6 @@ deploy:
 	@if [ "$(SKIP_BUILD)" != "true" ]; then $(MAKE) build; else echo "skipping build..."; fi
 	juju add-model $(MODEL_NAME)
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
-
-clean:
-	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
-	-juju destroy-model --no-prompt $(MODEL_NAME) --force --no-wait --destroy-storage
 
 clean-lbaas:
 	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
@@ -64,10 +62,14 @@ lbaas: clean-lbaas deploy
 
 
 terraform-test:
-	cd terraform && terraform init -backend=false && terraform test
+	cd terraform && \
+	terraform init -backend=false && \
+	terraform test
 
 fmt-check:
-	cd terraform && terraform init -backend=false && terraform fmt -check -recursive
+	cd terraform && \
+	terraform init -backend=false && \
+	terraform fmt -check -recursive
 
 tflint-check:
 	cd terraform && tflint --init && tflint --recursive
@@ -75,9 +77,16 @@ tflint-check:
 terraform-check: fmt-check tflint-check
 
 fmt-fix:
-	cd terraform && terraform init -backend=false && terraform fmt -recursive
+	cd terraform && \
+	terraform init -backend=false && \
+	terraform fmt -recursive
 
 tflint-fix:
 	cd terraform && tflint --init && tflint --recursive --fix
 
 terraform-fix: fmt-fix tflint-fix
+
+clean:
+	-rm -f landscape-server_$(CLEAN_PLATFORM).charm
+	-juju destroy-model --no-prompt $(MODEL_NAME) \
+		--force --no-wait --destroy-storage
