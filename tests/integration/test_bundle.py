@@ -187,9 +187,10 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None):
         session = get_session()
         for route in routes:
             response = session.get(f"https://{host}/{route}", verify=False)
-            assert (
-                response.status_code == 200
-            ), f"Expected 200 status code for /{route} over HTTPS, got {response.status_code}"
+            assert response.status_code == 200, (
+                f"Expected 200 status code for /{route} over HTTPS, "
+                f"got {response.status_code}"
+            )
     finally:
         juju.config("landscape-server", values={"redirect_https": original})
         juju.wait(jubilant.all_active, timeout=300)
