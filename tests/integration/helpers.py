@@ -5,7 +5,7 @@ from urllib3.util import Retry
 
 
 def get_session(
-    retries: int = 5,
+    retries: int = 10,
     backoff_factor: float = 0.3,
     status_forcelist: tuple[int, ...] = (503,),
 ) -> requests.Session:

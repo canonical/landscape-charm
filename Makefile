@@ -43,7 +43,7 @@ deploy:
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
 install-terraform:
-	@if command -v terraform >/dev/null; then \
+	@if command -v terraform >/dev/null 2>&1; then \
 		echo "Terraform is already installed, skipping install..."; \
 	else \
 		echo "Installing Terraform..."; \
