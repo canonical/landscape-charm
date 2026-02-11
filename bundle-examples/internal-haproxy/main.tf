@@ -14,15 +14,9 @@ resource "terraform_data" "wait_for_landscape" {
 }
 
 locals {
-  ssh_key_files = [
-    "~/.ssh/id_ed25519.pub",
-    "~/.ssh/id_rsa.pub",
-    "~/.ssh/id_ecdsa.pub",
-    "~/.ssh/id_ed25519_sk.pub"
-  ]
-  existing_keys   = [for f in local.ssh_key_files : f if fileexists(pathexpand(f))]
-  ssh_key_path    = length(local.existing_keys) > 0 ? local.existing_keys[0] : null
-  ssh_key_content = local.ssh_key_path != null ? trimspace(file(pathexpand(local.ssh_key_path))) : null
+  ssh_key_files   = fileset(pathexpand("~/.ssh"), "*.pub")
+  ssh_key_path    = length(local.ssh_key_files) > 0 ? pathexpand("~/.ssh/${sort(local.ssh_key_files)[0]}") : null
+  ssh_key_content = local.ssh_key_path != null ? trimspace(file(local.ssh_key_path)) : null
 }
 
 resource "terraform_data" "check_ssh_key" {
