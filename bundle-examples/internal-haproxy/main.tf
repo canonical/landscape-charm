@@ -19,8 +19,18 @@ locals {
     "~/.ssh/id_rsa.pub",
     "~/.ssh/id_ecdsa.pub",
   ]
-  ssh_key_path    = coalesce([for f in local.ssh_key_files : f if fileexists(pathexpand(f))]...)
-  ssh_key_content = trimspace(file(pathexpand(local.ssh_key_path)))
+  existing_keys   = [for f in local.ssh_key_files : f if fileexists(pathexpand(f))]
+  ssh_key_path    = length(local.existing_keys) > 0 ? local.existing_keys[0] : null
+  ssh_key_content = local.ssh_key_path != null ? trimspace(file(pathexpand(local.ssh_key_path))) : null
+}
+
+resource "terraform_data" "check_ssh_key" {
+  lifecycle {
+    precondition {
+      condition     = local.ssh_key_path != null
+      error_message = "No SSH public key found in ~/.ssh/. Please generate one with: ssh-keygen -t ed25519"
+    }
+  }
 }
 
 resource "juju_model" "lbaas_model" {

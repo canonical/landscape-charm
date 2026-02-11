@@ -42,6 +42,14 @@ deploy:
 	juju add-model $(MODEL_NAME)
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
+install-terraform:
+	@if command -v terraform >/dev/null; then \
+		echo "Terraform is already installed, skipping install..."; \
+	else \
+		echo "Installing Terraform..."; \
+		snap install terraform --classic; \
+	fi
+
 clean-lbaas:
 	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
 		--force --no-wait --destroy-storage
@@ -50,7 +58,7 @@ clean-lbaas:
 	cd ../..
 
 
-lbaas: clean-lbaas deploy
+lbaas: clean-lbaas install-terraform deploy
 	cd bundle-examples/internal-haproxy && \
 	terraform init && \
 	terraform apply -auto-approve \
@@ -58,17 +66,17 @@ lbaas: clean-lbaas deploy
 		-var lbaas_model_name=$(LBAAS_MODEL_NAME)
 
 
-terraform-test:
+terraform-test: install-terraform
 	cd terraform && \
 	terraform init -backend=false && \
 	terraform test
 
-fmt-check:
+fmt-check: install-terraform
 	cd terraform && \
 	terraform init -backend=false && \
 	terraform fmt -check -recursive
 
-tflint-check:
+tflint-check: install-terraform
 	cd terraform && tflint --init && tflint --recursive
 
 terraform-check: fmt-check tflint-check
@@ -78,7 +86,7 @@ fmt-fix:
 	terraform init -backend=false && \
 	terraform fmt -recursive
 
-tflint-fix:
+tflint-fix: install-terraform
 	cd terraform && tflint --init && tflint --recursive --fix
 
 terraform-fix: fmt-fix tflint-fix
