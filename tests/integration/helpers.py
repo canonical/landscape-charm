@@ -53,7 +53,7 @@ def get_session(
 def has_legacy_pg(juju: jubilant.Juju) -> bool:
     """
     Checks if PostgreSQL is in the current model
-    and it's related over the `db-admin` endpoint
+    and it's related using the `db-admin` endpoint
     (i.e., it's using the legacy PG interface).
     """
     pg = juju.status().apps.get("postgresql")
@@ -66,7 +66,7 @@ def has_legacy_pg(juju: jubilant.Juju) -> bool:
 def has_modern_pg(juju: jubilant.Juju) -> bool:
     """
     Checks if PostgreSQL is in the current model
-    and it's related over the `database` endpoint
+    and it's related using the `database` endpoint
     (i.e., it's using the modern PG interface).
     """
     pg = juju.status().apps.get("postgresql")
@@ -138,7 +138,8 @@ def restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
 
 def has_haproxy_route_provider(juju: jubilant.Juju, app: str) -> bool:
     """
-    Check if an app has haproxy-route relation established.
+    Check if an app in the given model
+    has an `haproxy-route` relation established.
     """
     status = juju.status()
     return any(
@@ -150,7 +151,8 @@ def has_haproxy_route_provider(juju: jubilant.Juju, app: str) -> bool:
 
 def has_tls_certs_provider(juju: jubilant.Juju, app: str = "landscape-server") -> bool:
     """
-    Check if an app has tls-certificates relation established.
+    Check if an app in the given model
+    has a `tls-certificates` relation established.
     """
     status = juju.status()
     return any(
