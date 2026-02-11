@@ -167,6 +167,9 @@ def lbaas(juju: jubilant.Juju):
             lbaas_juju.integrate(
                 "haproxy:certificates", "self-signed-certificates:certificates"
             )
+            lbaas_juju.integrate(
+                "haproxy:receive-ca-certs", "self-signed-certificates:send-ca-cert"
+            )
             lbaas_juju.wait(jubilant.all_active, timeout=300)
 
             lbaas_juju.offer(endpoint="haproxy:haproxy-route")
