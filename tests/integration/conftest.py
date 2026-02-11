@@ -20,21 +20,21 @@ The name of the bundle used for integration testing.
 WAIT_TIMEOUT_SECONDS = 60 * 20  # Landscape takes a long time to deploy.
 
 
-USE_HOST_JUJU_MODEL = os.getenv("LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL") or False
+USE_HOST_JUJU_MODEL = os.getenv("LANDSCAPE_CHARM_USE_HOST_JUJU_MODEL", False)
 """
 If `True`, return a reference the current Juju model on the host instead of a temporary
 model.
 """
 
-USE_HOST_LBAAS_MODEL = os.getenv("LANDSCAPE_CHARM_USE_HOST_LBAAS_MODEL") or False
+USE_HOST_LBAAS_MODEL = os.getenv("LANDSCAPE_CHARM_USE_HOST_LBAAS_MODEL", False)
 """
-If `True`, use existing lbaas model instead of creating a temporary one.
-The model name should be set in LBAAS_MODEL_NAME environment variable.
+If `True`, use existing LBaaS model instead of creating a temporary one.
+The model name should be set in `LBAAS_MODEL_NAME` environment variable.
 """
 
 LBAAS_MODEL_NAME = os.getenv("LBAAS_MODEL_NAME", "lbaas")
 """
-Name of the lbaas model to use when USE_HOST_LBAAS_MODEL is True.
+Name of the LBaaS model to use when `USE_HOST_LBAAS_MODEL` is `True`.
 """
 
 
