@@ -57,26 +57,31 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "all"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "all"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "ping",
-        "message-system",
-        "repository",
-        "upload",
-        "zzz-some-default-route",
-    )
+        redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "ping",
+            "message-system",
+            "repository",
+            "upload",
+            "zzz-some-default-route",
+        )
 
-    session = get_session()
-    for route in redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
@@ -90,26 +95,31 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "none"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "none"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    no_redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "ping",
-        "message-system",
-        "repository",
-        "upload",
-        "zzz-some-default-route",
-    )
+        no_redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "ping",
+            "message-system",
+            "repository",
+            "upload",
+            "zzz-some-default-route",
+        )
 
-    session = get_session()
-    for route in no_redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert not response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in no_redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert not response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
@@ -123,33 +133,38 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "default"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "default"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    no_redirect_routes = (
-        "ping",
-        "repository",
-    )
+        no_redirect_routes = (
+            "ping",
+            "repository",
+        )
 
-    session = get_session()
-    for route in no_redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert not response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in no_redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert not response.is_redirect, f"Got {response} from {url}"
 
-    redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "message-system",
-        "upload",
-        "zzz-some-default-route",
-    )
-    for route in redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert response.is_redirect, f"Got {response} from {url}"
+        redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "message-system",
+            "upload",
+            "zzz-some-default-route",
+        )
+        for route in redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 @pytest.mark.parametrize("route", ["ping", "api/about", "message-system", ""])
