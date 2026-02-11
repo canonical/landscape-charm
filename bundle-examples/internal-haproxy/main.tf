@@ -18,6 +18,7 @@ locals {
     "~/.ssh/id_ed25519.pub",
     "~/.ssh/id_rsa.pub",
     "~/.ssh/id_ecdsa.pub",
+    "~/.ssh/id_ed25519_sk.pub"
   ]
   existing_keys   = [for f in local.ssh_key_files : f if fileexists(pathexpand(f))]
   ssh_key_path    = length(local.existing_keys) > 0 ? local.existing_keys[0] : null
