@@ -6,6 +6,7 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
+from urllib.parse import urlparse
 
 import jubilant
 import pytest
@@ -625,7 +626,7 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTP traffic for all routes through external HAProxy."""
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = urlparse(root_url).hostname
 
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
@@ -657,7 +658,7 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     """Test HTTPS traffic for all routes through external HAProxy."""
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = urlparse(root_url).hostname
 
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
@@ -690,7 +691,7 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
 def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = urlparse(root_url).hostname
 
     status = lbaas.status()
     haproxy_unit = list(status.apps["haproxy"].units.values())[0]
@@ -739,14 +740,16 @@ def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Ju
 
 
 def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    # NOTE: We do an inline import to avoid making `grpcio`
+    # a build dependency.
     import grpc
 
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = urlparse(root_url).hostname
 
-    status = lbaas.status()
-    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    lbaas_status = lbaas.status()
+    haproxy_unit = list(lbaas_status.apps["haproxy"].units.values())[0]
     haproxy_ip = haproxy_unit.public_address
 
     main_status = juju.status()
@@ -755,15 +758,11 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     if "hostagent-messenger-ingress" not in app_status.relations:
         pytest.skip("hostagent-messenger-ingress not configured")
 
-    haproxy_app = status.apps["haproxy"]
+    haproxy_app = lbaas_status.apps["haproxy"]
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    config = juju.config("landscape-server")
-    root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
-
-    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
     cert_result = lbaas.run(
         haproxy_unit_name, "get-certificate", {"hostname": hostname}
     )
@@ -779,14 +778,16 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    # NOTE: We do an inline import to avoid making `grpcio`
+    # a build dependency.
     import grpc
 
     config = juju.config("landscape-server")
     root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+    hostname = urlparse(root_url).hostname
 
-    status = lbaas.status()
-    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    lbaas_status = lbaas.status()
+    haproxy_unit = list(lbaas_status.apps["haproxy"].units.values())[0]
     haproxy_ip = haproxy_unit.public_address
 
     main_status = juju.status()
@@ -795,11 +796,11 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     if "ubuntu-installer-attach-ingress" not in app_status.relations:
         pytest.skip("ubuntu-installer-attach-ingress not configured")
 
-    haproxy_app = status.apps["haproxy"]
+    haproxy_app = lbaas_status.apps["haproxy"]
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
     cert_result = lbaas.run(
         haproxy_unit_name, "get-certificate", {"hostname": hostname}
     )
