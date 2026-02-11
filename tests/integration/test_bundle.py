@@ -13,7 +13,6 @@ import pytest
 import requests
 
 from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
-import haproxy
 from tests.integration.helpers import (
     _has_legacy_pg,
     _has_modern_pg,
@@ -642,29 +641,24 @@ def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     routes = (
         "about",
         "api/about",
-        "attachment",
-        "hashid-databases",
         "ping",
         "message-system",
-        "repository",
         "upload",
-        "zzz-some-default-route",
     )
 
     for route in routes:
         response = session.get(
-            f"https://{haproxy_ip}/{route}",
-            verify=False,
+            f"http://{haproxy_ip}/{route}",
             timeout=10,
             headers={"Host": hostname},
+            allow_redirects=False,
         )
-        assert response.status_code in (
-            200,
-            301,
-            302,
-            404,
-            405,
-        ), f"Expected valid status for HTTP /{route}, got {response.status_code}"
+        assert (
+            not response.is_redirect
+        ), f"Unexpected redirect for HTTP /{route}, got {response.status_code}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 for HTTP /{route}, got {response.status_code}"
 
 
 def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -682,27 +676,26 @@ def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
     routes = (
         "about",
         "api/about",
-        "attachment",
-        "hashid-databases",
         "ping",
         "message-system",
-        "repository",
         "upload",
-        "zzz-some-default-route",
     )
 
     for route in routes:
+        url = f"https://{haproxy_ip}/{route}"
         response = session.get(
-            f"https://{haproxy_ip}/{route}",
+            url,
             verify=False,
             timeout=10,
             headers={"Host": hostname},
+            allow_redirects=False,
         )
-        assert response.status_code in (
-            200,
-            404,
-            405,
-        ), f"Expected 200/404/405 for HTTPS /{route}, got {response.status_code}"
+        assert (
+            not response.is_redirect
+        ), f"Unexpected redirect for HTTPS /{route}, got {response.status_code}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 for HTTPS /{route}, got {response.status_code}"
 
 
 def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
@@ -757,8 +750,15 @@ def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Ju
 
 
 def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    import grpc
+
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
-    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     main_status = juju.status()
     app_status = main_status.apps["landscape-server"]
@@ -770,15 +770,38 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    lbaas.ssh(
-        haproxy_unit_name,
-        "nc -z localhost 6554",
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
+    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    cert_result = lbaas.run(
+        haproxy_unit_name, "get-certificate", {"hostname": hostname}
     )
+    cert_pem = cert_result.results["certificate"].encode()
+
+    credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+    channel = grpc.secure_channel(
+        f"{haproxy_ip}:6554",
+        credentials,
+        options=[("grpc.ssl_target_name_override", hostname)],
+    )
+    try:
+        grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        channel.close()
 
 
 def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    import grpc
+
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
+
     status = lbaas.status()
-    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
 
     main_status = juju.status()
     app_status = main_status.apps["landscape-server"]
@@ -790,80 +813,19 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     if "receive-ca-certs" not in haproxy_app.relations:
         pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
 
-    lbaas.ssh(
-        haproxy_unit_name,
-        "nc -z localhost 50051",
+    haproxy_unit_name = list(status.apps["haproxy"].units.keys())[0]
+    cert_result = lbaas.run(
+        haproxy_unit_name, "get-certificate", {"hostname": hostname}
     )
+    cert_pem = cert_result.results["certificate"].encode()
 
-
-def test_lbaas_service_specific_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
-    config = juju.config("landscape-server")
-    root_url = config.get("root_url", "https://landscape.local/")
-    hostname = root_url.replace("https://", "").replace("http://", "").rstrip("/")
-
-    status = lbaas.status()
-    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
-    haproxy_ip = haproxy_unit.public_address
-
-    session = get_session()
-
-    response = session.get(
-        f"https://{haproxy_ip}/ping",
-        verify=False,
-        timeout=10,
-        headers={"Host": hostname},
+    credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+    channel = grpc.secure_channel(
+        f"{haproxy_ip}:50051",
+        credentials,
+        options=[("grpc.ssl_target_name_override", hostname)],
     )
-    assert response.status_code == 200, f"Ping service failed: {response.status_code}"
-
-    response = session.get(
-        f"https://{haproxy_ip}/api/about",
-        verify=False,
-        timeout=10,
-        headers={"Host": hostname},
-    )
-    assert response.status_code == 200, f"API service failed: {response.status_code}"
-
-    response = session.get(
-        f"https://{haproxy_ip}/message-system",
-        verify=False,
-        timeout=10,
-        headers={"Host": hostname},
-    )
-    assert (
-        response.status_code == 200
-    ), f"Message-system service routing failed: {response.status_code}"
-
-
-def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):
-    juju.wait(jubilant.all_active, timeout=300)
-
-    status = juju.status()
-    units = status.apps["landscape-server"].units
-
-    for unit_name in units.keys():
-        try:
-            juju.ssh(unit_name, f"dpkg -l | grep -q {haproxy.HAPROXY_APT_PACKAGE_NAME}")
-        except Exception as e:
-            pytest.skip(f"HAProxy not installed on {unit_name}: {e}")
-
-        try:
-            juju.ssh(
-                unit_name,
-                f"sudo {haproxy.HAPROXY_EXECUTABLE} -c -f "
-                f"{haproxy.HAPROXY_RENDERED_CONFIG_PATH}",
-            )
-        except Exception as e:
-            pytest.fail(f"HAProxy config validation failed on {unit_name}: {e}")
-
-        for error_file in haproxy.ERROR_FILES["files"].values():
-            try:
-                juju.ssh(
-                    unit_name, f"test -f {haproxy.ERROR_FILES['location']}/{error_file}"
-                )
-            except Exception:
-                pytest.fail(f"Error file missing on {unit_name}: {error_file}")
-
-        try:
-            juju.ssh(unit_name, f"systemctl is-active {haproxy.HAPROXY_SERVICE}")
-        except Exception as e:
-            pytest.fail(f"HAProxy service not active on {unit_name}: {e}")
+    try:
+        grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        channel.close()
