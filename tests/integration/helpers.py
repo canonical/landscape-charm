@@ -40,7 +40,7 @@ def get_session(
         total=retries,
         backoff_factor=backoff_factor,
         status_forcelist=status_forcelist,
-        allowed_methods=("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"),
+        allowed_methods={"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
         raise_on_status=False,
     )
 
