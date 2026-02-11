@@ -21,12 +21,12 @@ ops = { extras = ["testing"], version = "2.23.1" }
 pydantic = "1.10.26"
 pytest = "9.0.2"
 ruff = "0.14.11"
-grpcio = "^1.78.0"
+grpcio = "1.78.0"
 
 [tool.poetry.group.integration.dependencies]
 jubilant = "1.6.2"
 requests = "2.32.5"
-grpcio = "^1.60.0"
+grpcio = "1.78.0"
 
 [build-system]
 requires = ["poetry-core"]
