@@ -764,9 +764,7 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
 
     original_hostagent = config.get("enable_hostagent_messenger")
     try:
-        juju.config(
-            "landscape-server", values={"enable_hostagent_messenger": "true"}
-        )
+        juju.config("landscape-server", values={"enable_hostagent_messenger": "true"})
         juju.wait(jubilant.all_active, timeout=300)
 
         haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
@@ -785,7 +783,9 @@ def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juj
     finally:
         juju.config(
             "landscape-server",
-            values={"enable_hostagent_messenger": "true" if original_hostagent else "false"},
+            values={
+                "enable_hostagent_messenger": "true" if original_hostagent else "false"
+            },
         )
         juju.wait(jubilant.all_active, timeout=300)
 
@@ -836,6 +836,10 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
     finally:
         juju.config(
             "landscape-server",
-            values={"enable_ubuntu_installer_attach": "true" if original_installer else "false"},
+            values={
+                "enable_ubuntu_installer_attach": (
+                    "true" if original_installer else "false"
+                )
+            },
         )
         juju.wait(jubilant.all_active, timeout=300)
