@@ -1,13 +1,14 @@
 DIR_NAME := $(notdir $(shell pwd))
-BUNDLE_PATH ?= ./bundle-examples/internal-haproxy.bundle.yaml
+BUNDLE_PATH ?= ./bundle-examples/internal-haproxy/internal-haproxy.bundle.yaml
 PLATFORM ?= ubuntu@24.04:amd64
 MODEL_NAME ?= $(DIR_NAME)-build
+LBAAS_MODEL_NAME ?= lbaas
 CLEAN_PLATFORM := $(subst :,-,$(PLATFORM))
 SKIP_BUILD ?= false
 SKIP_CLEAN ?= false
 
 
-.PHONY: build deploy clean test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
+.PHONY: build deploy lbaas clean clean-lbaas test integration-test coverage lint fmt terraform-test fmt-check tflint-check terraform-check fmt-fix tflint-fix terraform-fix
 
 # Python testing and linting
 test:
@@ -41,17 +42,41 @@ deploy:
 	juju add-model $(MODEL_NAME)
 	juju deploy -m $(MODEL_NAME) $(BUNDLE_PATH)
 
-terraform-test:
+install-terraform:
+	@if command -v terraform >/dev/null 2>&1; then \
+		echo "Terraform is already installed, skipping install..."; \
+	else \
+		echo "Installing Terraform..."; \
+		snap install terraform --classic; \
+	fi
+
+clean-lbaas:
+	-juju destroy-model --no-prompt $(LBAAS_MODEL_NAME) \
+		--force --no-wait --destroy-storage
+	-cd bundle-examples/internal-haproxy && \
+	rm -rf *.tfstate && \
+	cd ../..
+
+
+lbaas: clean-lbaas install-terraform deploy
+	cd bundle-examples/internal-haproxy && \
+	terraform init && \
+	terraform apply -auto-approve \
+		-var model_name=$(MODEL_NAME) \
+		-var lbaas_model_name=$(LBAAS_MODEL_NAME)
+
+
+terraform-test: install-terraform
 	cd terraform && \
 	terraform init -backend=false && \
 	terraform test
 
-fmt-check:
+fmt-check: install-terraform
 	cd terraform && \
 	terraform init -backend=false && \
 	terraform fmt -check -recursive
 
-tflint-check:
+tflint-check: install-terraform
 	cd terraform && tflint --init && tflint --recursive
 
 terraform-check: fmt-check tflint-check
@@ -61,7 +86,7 @@ fmt-fix:
 	terraform init -backend=false && \
 	terraform fmt -recursive
 
-tflint-fix:
+tflint-fix: install-terraform
 	cd terraform && tflint --init && tflint --recursive --fix
 
 terraform-fix: fmt-fix tflint-fix
