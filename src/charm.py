@@ -602,21 +602,22 @@ class LandscapeServerCharm(CharmBase):
         try:
             apt.DebianPackage.from_installed_package(haproxy.HAPROXY_APT_PACKAGE_NAME)
             logger.debug("HAProxy is already installed")
+            return
         except PackageNotFoundError:
             logger.info("HAProxy not installed, installing...")
 
-            try:
-                haproxy.install()
-            except haproxy.HAProxyError as e:
-                logger.error("Failed to install HAProxy: %s", str(e))
-                raise e
+        try:
+            haproxy.install()
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to install HAProxy: %s", str(e))
+            raise
 
-            try:
-                haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
-                logger.debug("HAProxy error files copied")
-            except haproxy.HAProxyError as e:
-                logger.error("Failed to copy HAProxy error files: %s", str(e))
-                raise e
+        try:
+            haproxy.copy_error_files_from_source(LANDSCAPE_ERROR_FILES_DIR)
+            logger.debug("HAProxy error files copied")
+        except haproxy.HAProxyError as e:
+            logger.error("Failed to copy HAProxy error files: %s", str(e))
+            raise
 
     def _on_lb_certs_changed(
         self, _: RelationChangedEvent | RelationJoinedEvent

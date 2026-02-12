@@ -12,6 +12,7 @@ from charmlibs.interfaces.tls_certificates import (
     CertificateSigningRequest,
     PrivateKey,
 )
+from charms.operator_libs_linux.v0.apt import PackageNotFoundError
 import pytest
 import scenario
 
@@ -305,6 +306,14 @@ def apt_fixture(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture(name="check_haproxy_installed")
 def check_haproxy_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
     check_mock = Mock(return_value=Mock(name="haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+
+    return check_mock
+
+
+@pytest.fixture(name="check_haproxy_not_installed")
+def check_haproxy_not_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(side_effect=PackageNotFoundError("haproxy"))
     monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
 
     return check_mock

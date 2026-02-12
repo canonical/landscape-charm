@@ -12,8 +12,6 @@ def test_http_ingress_always_initialized(
     monkeypatch,
     capture_service_conf,
     apt_fixture,
-    haproxy_install_fixture,
-    haproxy_copy_error_files_fixture,
 ):
     """
     Verify that http_ingress is always initialized regardless of config.
@@ -40,8 +38,6 @@ def test_ingress_config_enabled(
     monkeypatch,
     capture_service_conf,
     apt_fixture,
-    haproxy_install_fixture,
-    haproxy_copy_error_files_fixture,
 ):
     """
     Verify that when config is enabled, the charm initializes the ingress
@@ -49,8 +45,6 @@ def test_ingress_config_enabled(
     """
     mock_ingress_cls = MagicMock()
     monkeypatch.setattr("charm.IngressPerAppRequirer", mock_ingress_cls)
-    monkeypatch.setattr("charm.prepend_default_settings", MagicMock())
-    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", MagicMock())
 
     context = Context(LandscapeServerCharm)
     state = State(
@@ -87,16 +81,12 @@ def test_ingress_config_disabled(
     monkeypatch,
     capture_service_conf,
     apt_fixture,
-    haproxy_install_fixture,
-    haproxy_copy_error_files_fixture,
 ):
     """
     Verify that when config is disabled, the charm does NOT create the attributes.
     """
     mock_ingress_cls = MagicMock()
     monkeypatch.setattr("charm.IngressPerAppRequirer", mock_ingress_cls)
-    monkeypatch.setattr("charm.prepend_default_settings", MagicMock())
-    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", MagicMock())
 
     context = Context(LandscapeServerCharm)
     state = State(

@@ -27,6 +27,7 @@ from ops.testing import (
     StoredState,
 )
 import pytest
+from scenario.errors import UncaughtCharmError
 
 from charm import (
     DEFAULT_SERVICES,
@@ -1892,12 +1893,9 @@ class TestEnsureHAProxyInstalled:
         apt_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
         monkeypatch,
     ):
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
 
         context = Context(LandscapeServerCharm)
@@ -1913,12 +1911,9 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
+        check_haproxy_installed,
         monkeypatch,
     ):
-        mock_check = Mock(return_value=Mock())
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
 
         context = Context(LandscapeServerCharm)
@@ -1934,13 +1929,10 @@ class TestEnsureHAProxyInstalled:
         apt_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
         monkeypatch,
     ):
         """Error files are copied when HAProxy is installed."""
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
 
         context = Context(LandscapeServerCharm)
@@ -1958,12 +1950,9 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
+        check_haproxy_not_installed,
         monkeypatch,
     ):
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
         haproxy_install_fixture.side_effect = haproxy.HAProxyError(
             "Installation failed"
@@ -1971,8 +1960,6 @@ class TestEnsureHAProxyInstalled:
 
         context = Context(LandscapeServerCharm)
         state = State()
-
-        from scenario.errors import UncaughtCharmError
 
         with pytest.raises(UncaughtCharmError):
             context.run(context.on.install(), state)
@@ -1982,12 +1969,9 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
         monkeypatch,
     ):
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
         haproxy_copy_error_files_fixture.side_effect = haproxy.HAProxyError(
             "Copy failed"
@@ -1995,8 +1979,6 @@ class TestEnsureHAProxyInstalled:
 
         context = Context(LandscapeServerCharm)
         state = State()
-
-        from scenario.errors import UncaughtCharmError
 
         with pytest.raises(UncaughtCharmError):
             context.run(context.on.install(), state)
@@ -2006,12 +1988,9 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
+        check_haproxy_not_installed,
         monkeypatch,
     ):
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
         monkeypatch.setattr("charm.prepend_default_settings", Mock())
 
         context = Context(LandscapeServerCharm)
@@ -2029,13 +2008,8 @@ class TestOnUpgradeCharm:
         certificate_and_key_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
-        monkeypatch,
+        check_haproxy_not_installed,
     ):
-        mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
-
         context = Context(LandscapeServerCharm)
         state = State(**lb_certs_state)
 
@@ -2051,13 +2025,7 @@ class TestOnUpgradeCharm:
         lb_certs_state,
         haproxy_install_fixture,
         certificate_and_key_fixture,
-        monkeypatch,
     ):
-        mock_check = Mock(return_value=Mock())
-        monkeypatch.setattr(
-            "charm.apt.DebianPackage.from_installed_package", mock_check
-        )
-
         context = Context(LandscapeServerCharm)
         state = State(**lb_certs_state)
 
