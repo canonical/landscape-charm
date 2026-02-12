@@ -8,10 +8,7 @@ from charm import LandscapeServerCharm
 import haproxy
 
 
-def test_http_ingress_always_initialized(
-    monkeypatch,
-    apt_fixture,
-):
+def test_http_ingress_always_initialized(monkeypatch, apt_fixture):
     """
     Verify that http_ingress is always initialized regardless of config.
     """
@@ -33,10 +30,7 @@ def test_http_ingress_always_initialized(
         assert "scheme" not in http
 
 
-def test_ingress_config_enabled(
-    monkeypatch,
-    apt_fixture,
-):
+def test_ingress_config_enabled(monkeypatch, apt_fixture):
     """
     Verify that when config is enabled, the charm initializes the ingress
     attributes correctly.
@@ -75,10 +69,7 @@ def test_ingress_config_enabled(
         assert installer["port"] == haproxy.FrontendPort.UBUNTU_INSTALLER_ATTACH
 
 
-def test_ingress_config_disabled(
-    monkeypatch,
-    apt_fixture,
-):
+def test_ingress_config_disabled(monkeypatch, apt_fixture):
     """
     Verify that when config is disabled, the charm does NOT create the attributes.
     """
