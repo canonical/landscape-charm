@@ -316,12 +316,10 @@ def write_tls_cert(
     :param cert_path: Path where the combined PEM file will be written
     :raises HAProxyError: Failed to write TLS certificate for HAProxy!
     """
-    combined_pem = "".join(
+    combined_pem = "\n".join(
         [
             str(provider_certificate.certificate),
-            "\n",
             "\n".join(str(cert) for cert in provider_certificate.chain),
-            "\n",
             str(private_key),
         ]
     )
