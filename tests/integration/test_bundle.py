@@ -6,8 +6,8 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
-from urllib.parse import urlparse
 import time
+from urllib.parse import urlparse
 
 import jubilant
 import pytest
