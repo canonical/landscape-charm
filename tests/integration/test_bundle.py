@@ -507,7 +507,7 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     assert "chain" in result.results
 
 
-def test_http_grpc_ingress_enabled(juju: jubilant.Juju, bundle: None):
+def test_http_ingress_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that http-ingress is present and publishes correct data.
     """
