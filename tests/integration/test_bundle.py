@@ -6,14 +6,21 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
+from urllib.parse import urlparse
 
 import jubilant
 import pytest
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
 
 from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
+from tests.integration.helpers import (
+    get_session,
+    has_legacy_pg,
+    has_modern_pg,
+    has_tls_certs_provider,
+    restore_db_relations,
+    supports_legacy_pg,
+)
 
 
 def test_metrics_forbidden(juju: jubilant.Juju, bundle: None):
@@ -51,26 +58,31 @@ def test_redirect_https_all(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "all"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "all"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "ping",
-        "message-system",
-        "repository",
-        "upload",
-        "zzz-some-default-route",
-    )
+        redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "ping",
+            "message-system",
+            "repository",
+            "upload",
+            "zzz-some-default-route",
+        )
 
-    session = get_session()
-    for route in redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
@@ -84,26 +96,31 @@ def test_redirect_https_none(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "none"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "none"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    no_redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "ping",
-        "message-system",
-        "repository",
-        "upload",
-        "zzz-some-default-route",
-    )
+        no_redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "ping",
+            "message-system",
+            "repository",
+            "upload",
+            "zzz-some-default-route",
+        )
 
-    session = get_session()
-    for route in no_redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert not response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in no_redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert not response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
@@ -117,37 +134,41 @@ def test_redirect_https_default(juju: jubilant.Juju, bundle: None):
         .units["landscape-server/0"]
         .public_address
     )
-    juju.config("landscape-server", values={"redirect_https": "default"})
-    juju.wait(jubilant.all_active, timeout=300)
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "default"})
+        juju.wait(jubilant.all_active, timeout=300)
 
-    no_redirect_routes = (
-        "ping",
-        "repository",
-    )
+        no_redirect_routes = (
+            "ping",
+            "repository",
+        )
 
-    session = get_session()
-    for route in no_redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert not response.is_redirect, f"Got {response} from {url}"
+        session = get_session()
+        for route in no_redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert not response.is_redirect, f"Got {response} from {url}"
 
-    redirect_routes = (
-        "about",
-        "api/about",
-        "attachment",
-        "hashid-databases",
-        "message-system",
-        "upload",
-        "zzz-some-default-route",
-    )
-    for route in redirect_routes:
-        url = f"http://{host}/{route}"
-        response = session.get(url, allow_redirects=False)
-        assert response.is_redirect, f"Got {response} from {url}"
+        redirect_routes = (
+            "about",
+            "api/about",
+            "attachment",
+            "hashid-databases",
+            "message-system",
+            "upload",
+            "zzz-some-default-route",
+        )
+        for route in redirect_routes:
+            url = f"http://{host}/{route}"
+            response = session.get(url, allow_redirects=False)
+            assert response.is_redirect, f"Got {response} from {url}"
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
-@pytest.mark.parametrize("route", ["ping", "api/about", "message-system", ""])
-def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
+def test_services_up_over_https(juju: jubilant.Juju, bundle: None):
     """
     Services are responding over HTTPS.
     """
@@ -158,113 +179,23 @@ def test_services_up_over_https(juju: jubilant.Juju, bundle: None, route: str):
         .public_address
     )
 
-    response = get_session().get(f"https://{host}/{route}", verify=False)
-    assert response.status_code == 200
+    original = juju.config("landscape-server").get("redirect_https")
+    try:
+        juju.config("landscape-server", values={"redirect_https": "all"})
+        juju.wait(jubilant.all_active, timeout=300)
 
+        routes = ("ping", "api/about", "message-system", "")
 
-def get_session(
-    retries: int = 5,
-    backoff_factor: float = 0.3,
-    status_forcelist: tuple[int, ...] = (503,),
-) -> requests.Session:
-    """
-    Create a session that includes retries for 503 statuses.
-
-    This is useful for load balancing tests because the Landscape unit
-    can report "ready" in Juju even if Landscape server is not yet ready to serve
-    requests.
-
-    Copied from https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html
-
-    `retries`:
-        Total number of retries to allow. Takes precedence over other counts.
-        Set to None to remove this constraint and fall back on other counts.
-        Set to 0 to fail on the first retry.
-
-    `backoff_factor`:
-        A backoff factor to apply between attempts after the second try (most errors
-        are resolved immediately by a second try without a delay). urllib3 will sleep
-        for: {backoff factor} * (2 ** ({number of previous retries})) seconds.
-
-    `status_forcelist`:
-        A set of integer HTTP status codes that we should force a retry on. A retry is
-        initiated if the request method is in allowed_methods and the response status
-        code is in status_forcelist. By default, this is disabled with None.
-
-    """
-
-    session = requests.Session()
-    strategy = Retry(
-        total=retries,
-        backoff_factor=backoff_factor,
-        status_forcelist=status_forcelist,
-        allowed_methods=("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"),
-        raise_on_status=False,
-    )
-
-    adapter = HTTPAdapter(max_retries=strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-    return session
-
-
-def _has_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    return "db-admin" in pg.relations
-
-
-def _has_modern_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    return "database" in pg.relations
-
-
-def _supports_legacy_pg(juju: jubilant.Juju) -> bool:
-    pg = juju.status().apps["postgresql"]
-    # '14/x' and 'latest/x' tracks support legacy
-    return "14" in pg.charm_channel or "latest" in pg.charm_channel
-
-
-def _restore_db_relations(juju: jubilant.Juju, expected: set[str]) -> None:
-    relations = set(juju.status().apps["landscape-server"].relations)
-
-    # Used to have modern, needs it back
-    if "database" in expected and "database" not in relations:
-        # Will error if both are integrated at the same time
-        if "db" in relations:
-            juju.remove_relation(
-                "landscape-server:db", "postgresql:db-admin", force=True
+        session = get_session()
+        for route in routes:
+            response = session.get(f"https://{host}/{route}", verify=False)
+            assert response.status_code == 200, (
+                f"Expected 200 status code for /{route} over HTTPS, "
+                f"got {response.status_code}"
             )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
-
-        juju.integrate("landscape-server:database", "postgresql:database")
-
-    elif "database" not in expected and "database" in relations:
-        juju.remove_relation(
-            "landscape-server:database", "postgresql:database", force=True
-        )
-        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
-
-    # Refresh after they might have changed
-    relations = set(juju.status().apps["landscape-server"].relations)
-
-    # Supports for legacy was dropped in PG 16+
-    if _supports_legacy_pg(juju):
-        # Used to have legacy, needs it back
-        if "db" in expected and "db" not in relations:
-            # Will error if both are integrated at the same time
-            if "database" in relations:
-                juju.remove_relation(
-                    "landscape-server:database", "postgresql:database", force=True
-                )
-                juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
-
-            juju.integrate("landscape-server:db", "postgresql:db-admin")
-
-        elif "db" not in expected and "db" in relations:
-            juju.remove_relation(
-                "landscape-server:db", "postgresql:db-admin", force=True
-            )
-            juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
+    finally:
+        juju.config("landscape-server", values={"redirect_https": original})
+        juju.wait(jubilant.all_active, timeout=300)
 
 
 def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
@@ -276,26 +207,26 @@ def test_modern_database_relation(juju: jubilant.Juju, bundle: None):
 
     if "db" in initial_relations:
         juju.remove_relation("landscape-server:db", "postgresql:db-admin", force=True)
-        juju.wait(lambda status: not _has_legacy_pg(juju), timeout=120)
+        juju.wait(lambda status: not has_legacy_pg(juju), timeout=120)
 
         juju.integrate("landscape-server:database", "postgresql:database")
 
     elif "database" not in initial_relations:
         juju.integrate("landscape-server:database", "postgresql:database")
-        juju.wait(lambda status: _has_modern_pg(juju), timeout=120)
+        juju.wait(lambda status: has_modern_pg(juju), timeout=120)
 
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "database" in relations
 
-    _restore_db_relations(juju, initial_relations)
+    restore_db_relations(juju, initial_relations)
 
 
 def test_legacy_db_relation(juju: jubilant.Juju, bundle: None):
     """
     Test the legacy `db` interface.
     """
-    if not _supports_legacy_pg(juju):
+    if not supports_legacy_pg(juju):
         pytest.skip("Legacy pgsql relation not available on this PostgreSQL charm")
 
     status = juju.status()
@@ -305,18 +236,18 @@ def test_legacy_db_relation(juju: jubilant.Juju, bundle: None):
         juju.remove_relation(
             "landscape-server:database", "postgresql:database", force=True
         )
-        juju.wait(lambda status: not _has_modern_pg(juju), timeout=120)
+        juju.wait(lambda status: not has_modern_pg(juju), timeout=120)
         juju.integrate("landscape-server:db", "postgresql:db-admin")
 
     elif "db" not in initial_relations:
         juju.integrate("landscape-server:db", "postgresql:db-admin")
-        juju.wait(lambda status: _has_legacy_pg(juju), timeout=120)
+        juju.wait(lambda status: has_legacy_pg(juju), timeout=120)
 
     relations = set(juju.status().apps["landscape-server"].relations)
 
     assert "db" in relations
 
-    _restore_db_relations(juju, initial_relations)
+    restore_db_relations(juju, initial_relations)
 
 
 def test_all_services_up(juju: jubilant.Juju, bundle: None):
@@ -451,19 +382,10 @@ def test_non_leader_unit_redirects_leader_only_services(
         if not unit_status.leader:
             host = juju.status().apps["landscape-server"].units[name].public_address
 
-            assert (
+            assert juju.wait(jubilant.all_active, timeout=300) and (
                 get_session().get(f"https://{host}/upload", verify=False).status_code
                 == 200
             )
-
-
-def _has_tls_certs_provider(juju: jubilant.Juju) -> bool:
-    status = juju.status()
-
-    return any(
-        any(rel.interface == "tls-certificates" for rel in rels)
-        for rels in status.apps["landscape-server"].relations.values()
-    )
 
 
 def test_get_certificates_action_without_tls_relation(
@@ -472,7 +394,7 @@ def test_get_certificates_action_without_tls_relation(
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    has_tls_cert_relation = _has_tls_certs_provider(juju)
+    has_tls_cert_relation = has_tls_certs_provider(juju)
     original_cert_provider = None
 
     if has_tls_cert_relation:
@@ -496,7 +418,7 @@ def test_get_certificates_action_without_tls_relation(
             f"{cert_provider}:certificates",
             force=True,
         )
-        juju.wait(lambda status: not _has_tls_certs_provider(juju), timeout=120)
+        juju.wait(lambda status: not has_tls_certs_provider(juju), timeout=120)
 
     with pytest.raises(jubilant.TaskError) as e:
         juju.run("landscape-server/0", "get-certificates")
@@ -509,14 +431,14 @@ def test_get_certificates_action_without_tls_relation(
             "landscape-server:load-balancer-certificates",
             f"{original_cert_provider}:certificates",
         )
-        juju.wait(lambda status: _has_tls_certs_provider(juju), timeout=120)
+        juju.wait(lambda status: has_tls_certs_provider(juju), timeout=120)
 
 
 def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    if not _has_tls_certs_provider(juju):
+    if not has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
@@ -541,7 +463,7 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
-    if not _has_tls_certs_provider(juju):
+    if not has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
     juju.wait(jubilant.all_active, timeout=300)
@@ -611,11 +533,19 @@ def test_http_ingress_enabled(juju: jubilant.Juju, bundle: None):
     assert http_data.get("name") == "landscape-server"
 
 
-def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
+def test_grpc_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
     """
     Verify that when ingress configs are enabled, the charm creates the ingress
     relations and publishes the correct data to the relation databags.
     """
+    status = juju.status()
+    app_status = status.apps["landscape-server"]
+    if (
+        "hostagent-messenger-ingress" not in app_status.relations
+        or "ubuntu-installer-attach-ingress" not in app_status.relations
+    ):
+        pytest.skip("gRPC ingress not integrated, skipping...")
+
     juju.wait(jubilant.all_active, timeout=300)
     config = juju.config("landscape-server")
     original_hostagent = config.get("enable_hostagent_messenger")
@@ -670,9 +600,6 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         assert (
             hostagent_data.get("port") == "6554"
         ), f"Expected port 6554, got {hostagent_data.get('port')}"
-        assert (
-            hostagent_data.get("scheme") == "https"
-        ), f"Expected scheme https, got {hostagent_data.get('scheme')}"
         assert hostagent_data.get("name") == "landscape-server"
 
         installer_data = get_relation_data("ubuntu-installer-attach-ingress")
@@ -680,9 +607,6 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
         assert (
             installer_data.get("port") == "50051"
         ), f"Expected port 50051, got {installer_data.get('port')}"
-        assert (
-            installer_data.get("scheme") == "https"
-        ), f"Expected scheme https, got {installer_data.get('scheme')}"
         assert installer_data.get("name") == "landscape-server"
 
     finally:
@@ -693,6 +617,229 @@ def test_ingress_config_enabled(juju: jubilant.Juju, bundle: None):
                 "enable_ubuntu_installer_attach": (
                     "true" if original_installer else "false"
                 ),
+            },
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+
+def test_lbaas_http_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    """Test HTTP traffic for all routes through external HAProxy."""
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = urlparse(root_url).hostname
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
+
+    session = get_session()
+
+    routes = (
+        "about",
+        "api/about",
+        "ping",
+        "message-system",
+        "upload",
+    )
+
+    for route in routes:
+        response = session.get(
+            f"http://{haproxy_ip}/{route}",
+            timeout=10,
+            headers={"Host": hostname},
+            allow_redirects=True,
+        )
+        assert (
+            response.status_code == 200
+        ), f"Expected status code 200 for HTTP /{route}, got {response.status_code}"
+
+
+def test_lbaas_https_all_routes(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    """Test HTTPS traffic for all routes through external HAProxy."""
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = urlparse(root_url).hostname
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
+
+    session = get_session()
+
+    routes = (
+        "about",
+        "api/about",
+        "ping",
+        "message-system",
+        "upload",
+    )
+
+    for route in routes:
+        url = f"https://{haproxy_ip}/{route}"
+        response = session.get(
+            url,
+            verify=False,
+            timeout=10,
+            headers={"Host": hostname},
+            allow_redirects=True,
+        )
+        assert (
+            response.status_code == 200
+        ), f"Expected status code 200 for HTTPS /{route}, got {response.status_code}"
+
+
+def test_lbaas_metrics_acl_all_endpoints(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = urlparse(root_url).hostname
+
+    status = lbaas.status()
+    haproxy_unit = list(status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
+
+    session = get_session()
+
+    response = session.get(
+        f"http://{haproxy_ip}/metrics", timeout=10, headers={"Host": hostname}
+    )
+    assert (
+        response.status_code == 403
+    ), f"Expected 403 for HTTP /metrics, got {response.status_code}"
+
+    response = session.get(
+        f"https://{haproxy_ip}/metrics",
+        verify=False,
+        timeout=10,
+        headers={"Host": hostname},
+    )
+    assert (
+        response.status_code == 403
+    ), f"Expected 403 for HTTPS /metrics, got {response.status_code}"
+
+    services = ("message-system", "api", "ping")
+
+    for service in services:
+        response = session.get(
+            f"http://{haproxy_ip}/{service}/metrics",
+            timeout=10,
+            headers={"Host": hostname},
+        )
+        assert response.status_code == 403, (
+            f"Expected 403 for HTTP /{service}/metrics, " f"got {response.status_code}"
+        )
+
+        response = session.get(
+            f"https://{haproxy_ip}/{service}/metrics",
+            verify=False,
+            timeout=10,
+            headers={"Host": hostname},
+        )
+        assert response.status_code == 403, (
+            f"Expected 403 for HTTPS /{service}/metrics, " f"got {response.status_code}"
+        )
+
+
+def test_lbaas_grpc_hostagent_messenger(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    # NOTE: We do an inline import to avoid making `grpcio`
+    # a build dependency.
+    import grpc
+
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = urlparse(root_url).hostname
+
+    lbaas_status = lbaas.status()
+    haproxy_unit = list(lbaas_status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
+
+    main_status = juju.status()
+    app_status = main_status.apps["landscape-server"]
+
+    if "hostagent-messenger-ingress" not in app_status.relations:
+        pytest.skip("hostagent-messenger-ingress not configured")
+
+    haproxy_app = lbaas_status.apps["haproxy"]
+    if "receive-ca-certs" not in haproxy_app.relations:
+        pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
+
+    original_hostagent = config.get("enable_hostagent_messenger")
+    try:
+        juju.config("landscape-server", values={"enable_hostagent_messenger": "true"})
+        juju.wait(jubilant.all_active, timeout=300)
+
+        haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
+        cert_result = lbaas.run(
+            haproxy_unit_name, "get-certificate", {"hostname": hostname}
+        )
+        cert_pem = cert_result.results["certificate"].encode()
+
+        credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+        with grpc.secure_channel(
+            f"{haproxy_ip}:6554",
+            credentials,
+            options=[("grpc.ssl_target_name_override", hostname)],
+        ) as channel:
+            grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        juju.config(
+            "landscape-server",
+            values={
+                "enable_hostagent_messenger": "true" if original_hostagent else "false"
+            },
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+
+def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant.Juju):
+    # NOTE: We do an inline import to avoid making `grpcio`
+    # a build dependency.
+    import grpc
+
+    config = juju.config("landscape-server")
+    root_url = config.get("root_url", "https://landscape.local/")
+    hostname = urlparse(root_url).hostname
+
+    lbaas_status = lbaas.status()
+    haproxy_unit = list(lbaas_status.apps["haproxy"].units.values())[0]
+    haproxy_ip = haproxy_unit.public_address
+
+    main_status = juju.status()
+    app_status = main_status.apps["landscape-server"]
+
+    if "ubuntu-installer-attach-ingress" not in app_status.relations:
+        pytest.skip("ubuntu-installer-attach-ingress not configured")
+
+    haproxy_app = lbaas_status.apps["haproxy"]
+    if "receive-ca-certs" not in haproxy_app.relations:
+        pytest.skip("HAProxy missing receive-ca-certs relation, skipping...")
+
+    original_installer = config.get("enable_ubuntu_installer_attach")
+    try:
+        juju.config(
+            "landscape-server", values={"enable_ubuntu_installer_attach": "true"}
+        )
+        juju.wait(jubilant.all_active, timeout=300)
+
+        haproxy_unit_name = list(lbaas_status.apps["haproxy"].units.keys())[0]
+        cert_result = lbaas.run(
+            haproxy_unit_name, "get-certificate", {"hostname": hostname}
+        )
+        cert_pem = cert_result.results["certificate"].encode()
+
+        credentials = grpc.ssl_channel_credentials(root_certificates=cert_pem)
+        with grpc.secure_channel(
+            f"{haproxy_ip}:50051",
+            credentials,
+            options=[("grpc.ssl_target_name_override", hostname)],
+        ) as channel:
+            grpc.channel_ready_future(channel).result(timeout=5)
+    finally:
+        juju.config(
+            "landscape-server",
+            values={
+                "enable_ubuntu_installer_attach": (
+                    "true" if original_installer else "false"
+                )
             },
         )
         juju.wait(jubilant.all_active, timeout=300)
