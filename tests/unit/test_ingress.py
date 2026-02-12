@@ -10,7 +10,6 @@ import haproxy
 
 def test_http_ingress_always_initialized(
     monkeypatch,
-    capture_service_conf,
     apt_fixture,
 ):
     """
@@ -36,7 +35,6 @@ def test_http_ingress_always_initialized(
 
 def test_ingress_config_enabled(
     monkeypatch,
-    capture_service_conf,
     apt_fixture,
 ):
     """
@@ -79,7 +77,6 @@ def test_ingress_config_enabled(
 
 def test_ingress_config_disabled(
     monkeypatch,
-    capture_service_conf,
     apt_fixture,
 ):
     """
