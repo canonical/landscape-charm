@@ -152,7 +152,7 @@ class TestOnConfigChanged:
         assert config["api"]["root-url"] == root_url
         assert config["package-upload"]["root-url"] == root_url
 
-    def test_worker_counts(self, capture_service_conf, haproxy_root_fixture):
+    def test_worker_counts(self, capture_service_conf):
         """
         If the `worker_counts` are provided, update the landscape, api, message-server,
         and pingserver sections.
@@ -172,7 +172,6 @@ class TestOnConfigChanged:
     def test_hostagent_services_default(
         self,
         lb_certs_state,
-        haproxy_root_fixture,
         certificate_and_key_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
@@ -195,7 +194,6 @@ class TestOnConfigChanged:
     def test_hostagent_services_when_enabled(
         self,
         lb_certs_state,
-        haproxy_root_fixture,
         certificate_and_key_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
@@ -381,7 +379,7 @@ class TestGetSecretToken:
     Tests for `on.config_changed` hooks that affect the `secret-token` configuration.
     """
 
-    def test_provided_in_config(self, capture_service_conf, haproxy_root_fixture):
+    def test_provided_in_config(self, capture_service_conf):
         """
         If the `secret_token` is provided in the configuration for this unit,
         return it.
@@ -394,7 +392,7 @@ class TestGetSecretToken:
         config = capture_service_conf.get_config()
         assert config["landscape"]["secret-token"] == secret_token
 
-    def test_provided_in_replica(self, capture_service_conf, haproxy_root_fixture):
+    def test_provided_in_replica(self, capture_service_conf):
         """
         If the `secret_token` is not provided in the configuration for this unit and
         there is a replica, return the secret token from it.
@@ -411,7 +409,7 @@ class TestGetSecretToken:
         config = capture_service_conf.get_config()
         assert config["landscape"]["secret-token"] == secret_token
 
-    def test_prefer_local_config(self, capture_service_conf, haproxy_root_fixture):
+    def test_prefer_local_config(self, capture_service_conf):
         """
         If the `secret_token` is provided in a replica but also locally, prefer the
         local version and return it.
@@ -429,9 +427,7 @@ class TestGetSecretToken:
         config = capture_service_conf.get_config()
         assert config["landscape"]["secret-token"] == local_secret_token
 
-    def test_leader_generates_if_not_provided(
-        self, capture_service_conf, haproxy_root_fixture
-    ):
+    def test_leader_generates_if_not_provided(self, capture_service_conf):
         """
         If the `secret_token` is not provided locally nor in a replica and we are the
         leader unit, generate a new token and put it into the peer app relation databag.
@@ -453,9 +449,7 @@ class TestGetSecretToken:
         after_config = capture_service_conf.get_config()
         assert after_config["landscape"].get("secret-token") == token
 
-    def test_follower_waits_if_not_provided(
-        self, capture_service_conf, haproxy_root_fixture
-    ):
+    def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
         If the `secret_token` is not provided locally nor in a replica and we
         are not the leader unit, do nothing. We wait for the leader to generate
@@ -480,7 +474,7 @@ class TestGetCookieEncryptionKey:
     configuration.
     """
 
-    def test_provided_in_config(self, capture_service_conf, haproxy_root_fixture):
+    def test_provided_in_config(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is provided in the configuration for this unit,
         return it.
@@ -493,7 +487,7 @@ class TestGetCookieEncryptionKey:
         config = capture_service_conf.get_config()
         assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
 
-    def test_provided_in_replica(self, capture_service_conf, haproxy_root_fixture):
+    def test_provided_in_replica(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is not provided in the configuration
         for this unit and there is a replica, return the encryption key from
@@ -511,7 +505,7 @@ class TestGetCookieEncryptionKey:
         config = capture_service_conf.get_config()
         assert config["api"]["cookie-encryption-key"] == cookie_encryption_key
 
-    def test_prefer_local_config(self, capture_service_conf, haproxy_root_fixture):
+    def test_prefer_local_config(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is provided in a replica but also
         locally, prefer the local version and return it.
@@ -533,9 +527,7 @@ class TestGetCookieEncryptionKey:
         config = capture_service_conf.get_config()
         assert config["api"]["cookie-encryption-key"] == local_cookie_encryption_key
 
-    def test_leader_generates_if_not_provided(
-        self, capture_service_conf, haproxy_root_fixture
-    ):
+    def test_leader_generates_if_not_provided(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is not provided locally nor in a replica
         and we are the leader unit, generate a new cookie encryption key and
@@ -561,9 +553,7 @@ class TestGetCookieEncryptionKey:
         after_config = capture_service_conf.get_config()
         assert after_config["api"].get("cookie-encryption-key") == cookie_encryption_key
 
-    def test_follower_waits_if_not_provided(
-        self, capture_service_conf, haproxy_root_fixture
-    ):
+    def test_follower_waits_if_not_provided(self, capture_service_conf):
         """
         If the `cookie_encryption_key` is not provided locally nor in a replica
         and we are not the leader unit, do nothing. We wait for the leader to
@@ -600,8 +590,6 @@ class TestCharm(unittest.TestCase):
         patch("charm.service_resume").start()
         patch("charm.service_running").start()
         patch("charm.service_running").start()
-        patch("haproxy.install").start()
-        patch("haproxy.copy_error_files_from_source").start()
         self.harness.model.get_binding = Mock(
             return_value=Mock(bind_address="192.0.2.0")
         )
@@ -1970,7 +1958,6 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
-        haproxy_copy_error_files_fixture,
         monkeypatch,
     ):
         mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
@@ -1994,7 +1981,6 @@ class TestEnsureHAProxyInstalled:
         self,
         capture_service_conf,
         apt_fixture,
-        haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
         monkeypatch,
     ):
@@ -2020,7 +2006,6 @@ class TestEnsureHAProxyInstalled:
         capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
-        haproxy_copy_error_files_fixture,
         monkeypatch,
     ):
         mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))
@@ -2041,9 +2026,9 @@ class TestOnUpgradeCharm:
     def test_upgrade_charm_installs_haproxy_if_missing(
         self,
         lb_certs_state,
+        certificate_and_key_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
-        certificate_and_key_fixture,
         monkeypatch,
     ):
         mock_check = Mock(side_effect=PackageNotFoundError("haproxy"))

@@ -109,6 +109,7 @@ class TestUnitIP:
             assert unit_ip in [str(ip) for ip in peer_ips.all_ips]
 
 
+@pytest.mark.disable_haproxy_mocks
 class TestWriteFile:
     def test_write_file_creates_directory(
         self, tmp_path, ownership_fixture, haproxy_user_fixture
@@ -136,6 +137,7 @@ class TestWriteFile:
         assert file_path.exists()
 
 
+@pytest.mark.disable_haproxy_mocks
 class TestWriteTLSCert:
     def test_write_tls_cert_success(
         self,
@@ -167,6 +169,7 @@ class TestWriteTLSCert:
             haproxy.write_tls_cert(mock_cert, mock_key)
 
 
+@pytest.mark.disable_haproxy_mocks
 class TestCopyErrorFilesFromSource:
     def test_copy_error_files_success(self, tmp_path, ownership_fixture):
         src_dir = tmp_path / "src"
@@ -225,6 +228,7 @@ class TestGetRedirectDirective:
         assert directive is None
 
 
+@pytest.mark.disable_haproxy_mocks
 class TestInstall:
     def test_install_success(self, apt_fixture):
         add_package_mock, _ = apt_fixture
@@ -394,6 +398,7 @@ class TestValidateConfig:
             haproxy.validate_config(str(tmp_path / "haproxy.cfg"))
 
 
+@pytest.mark.disable_haproxy_mocks
 class TestRenderConfig:
     def test_render_config_basic(
         self, tmp_path, monkeypatch, ownership_fixture, haproxy_user_fixture

@@ -63,5 +63,8 @@ case-sensitive = false
 
 [tool.pytest.ini_options]
 filterwarnings = ["once:.*Harness is deprecated.*:PendingDeprecationWarning"]
+markers = [
+    "disable_haproxy_mocks: disable automatic HAProxy mocking for tests that need real implementations"
+]
 pythonpath = [".", "lib", "src"]
 testpaths = ["tests"]

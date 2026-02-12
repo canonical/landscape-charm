@@ -690,7 +690,7 @@ def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):
         try:
             juju.ssh(unit_name, f"dpkg -l | grep -q {haproxy.HAPROXY_APT_PACKAGE_NAME}")
         except Exception as e:
-            pytest.skip(f"HAProxy not installed on {unit_name}: {e}")
+            pytest.fail(f"HAProxy not installed on {unit_name}: {e}")
 
         try:
             juju.ssh(
