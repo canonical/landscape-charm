@@ -35,7 +35,7 @@ class TestPeerIPs:
             assert str(peer_ips.leader_ip) in [str(ip) for ip in peer_ips.all_ips]
             assert peer_ips.leader_ip in peer_ips.all_ips
 
-    def test_peer_ips_returns_non_none_value(self, haproxy_root_fixture):
+    def test_peer_ips_returns_non_none_value(self):
         context = Context(LandscapeServerCharm)
         state = State()
 
