@@ -3,7 +3,6 @@ from datetime import timedelta
 import json
 import pwd
 import subprocess
-from typing import Any
 from unittest.mock import MagicMock, Mock
 
 from charmlibs.interfaces.tls_certificates import (
@@ -12,7 +11,6 @@ from charmlibs.interfaces.tls_certificates import (
     CertificateSigningRequest,
     PrivateKey,
 )
-from charms.operator_libs_linux.v0.apt import PackageNotFoundError
 import pytest
 import scenario
 
