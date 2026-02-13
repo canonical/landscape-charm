@@ -6,6 +6,7 @@ NOTE: These tests assume an IPv4 public address for the Landscape Server charm.
 """
 
 import json
+import time
 from urllib.parse import urlparse
 
 import jubilant
@@ -13,6 +14,7 @@ import pytest
 import requests
 
 from charm import DEFAULT_SERVICES, LANDSCAPE_UBUNTU_INSTALLER_ATTACH, LEADER_SERVICES
+import haproxy
 from tests.integration.helpers import (
     get_session,
     has_legacy_pg,
@@ -435,7 +437,6 @@ def test_get_certificates_action_without_tls_relation(
 
 
 def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: None):
-    status = juju.status()
     juju.wait(jubilant.all_active, timeout=300)
 
     if not has_tls_certs_provider(juju):
@@ -443,6 +444,7 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
 
     juju.wait(jubilant.all_active, timeout=300)
 
+    status = juju.status()
     leader_unit = None
     for unit_name, unit_status in status.apps["landscape-server"].units.items():
         if unit_status.leader:
@@ -451,8 +453,27 @@ def test_get_certificates_action_with_tls_relation(juju: jubilant.Juju, bundle: 
 
     assert leader_unit is not None
 
-    result = juju.run(leader_unit, "get-certificates")
+    max_attempts = 12
+    result = None
+    for attempt in range(max_attempts):
+        try:
+            result = juju.run(leader_unit, "get-certificates")
+            if result.status == "completed":
+                break
+        except Exception:
+            if attempt < max_attempts - 1:
+                time.sleep(5)
+                status = juju.status()
+                for unit_name, unit_status in status.apps[
+                    "landscape-server"
+                ].units.items():
+                    if unit_status.leader:
+                        leader_unit = unit_name
+                        break
+            else:
+                raise
 
+    assert result is not None
     assert result.status == "completed"
     assert "certificate" in result.results
     assert "ca" in result.results
@@ -466,8 +487,6 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
     if not has_tls_certs_provider(juju):
         pytest.skip("No TLS certificate relation found in bundle")
 
-    juju.wait(jubilant.all_active, timeout=300)
-
     status = juju.status()
     non_leader_units = [
         unit_name
@@ -477,6 +496,8 @@ def test_get_certificates_action_on_non_leader_unit(juju: jubilant.Juju, bundle:
 
     if not non_leader_units:
         pytest.skip("No non-leader units found")
+
+    juju.wait(jubilant.all_active, timeout=300)
 
     result = juju.run(non_leader_units[0], "get-certificates")
 
@@ -843,3 +864,38 @@ def test_lbaas_grpc_ubuntu_installer_attach(juju: jubilant.Juju, lbaas: jubilant
             },
         )
         juju.wait(jubilant.all_active, timeout=300)
+
+
+def test_haproxy_installed_and_configured(juju: jubilant.Juju, bundle: None):
+    juju.wait(jubilant.all_active, timeout=300)
+
+    status = juju.status()
+    units = status.apps["landscape-server"].units
+
+    for unit_name in units.keys():
+        try:
+            juju.ssh(unit_name, f"dpkg -l | grep -q {haproxy.HAPROXY_APT_PACKAGE_NAME}")
+        except Exception as e:
+            pytest.fail(f"HAProxy not installed on {unit_name}: {e}")
+
+        try:
+            juju.ssh(
+                unit_name,
+                f"sudo {haproxy.HAPROXY_EXECUTABLE} -c -f "
+                f"{haproxy.HAPROXY_RENDERED_CONFIG_PATH}",
+            )
+        except Exception as e:
+            pytest.fail(f"HAProxy config validation failed on {unit_name}: {e}")
+
+        for error_file in haproxy.ERROR_FILES["files"].values():
+            try:
+                juju.ssh(
+                    unit_name, f"test -f {haproxy.ERROR_FILES['location']}/{error_file}"
+                )
+            except Exception:
+                pytest.fail(f"Error file missing on {unit_name}: {error_file}")
+
+        try:
+            juju.ssh(unit_name, f"systemctl is-active {haproxy.HAPROXY_SERVICE}")
+        except Exception as e:
+            pytest.fail(f"HAProxy service not active on {unit_name}: {e}")

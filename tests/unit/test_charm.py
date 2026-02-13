@@ -26,6 +26,8 @@ from ops.testing import (
     State,
     StoredState,
 )
+import pytest
+from scenario.errors import UncaughtCharmError
 
 from charm import (
     DEFAULT_SERVICES,
@@ -172,8 +174,6 @@ class TestOnConfigChanged:
         self,
         lb_certs_state,
         certificate_and_key_fixture,
-        haproxy_write_file_fixture,
-        systemd_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
         state = State(**lb_certs_state)
@@ -196,8 +196,6 @@ class TestOnConfigChanged:
         self,
         lb_certs_state,
         certificate_and_key_fixture,
-        haproxy_write_file_fixture,
-        systemd_fixture,
     ):
         ctx = Context(LandscapeServerCharm)
         state = State(**lb_certs_state, config={"enable_hostagent_messenger": True})
@@ -1886,3 +1884,162 @@ class TestGetModifiedEnvVars(unittest.TestCase):
         self.assertNotIn("/var/lib/juju/python3", modified)
         self.assertNotIn("/usr/lib/juju/python3.10", modified)
         self.assertIn("/usr/lib/python3", modified)
+
+
+@pytest.fixture(name="check_haproxy_installed")
+def check_haproxy_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(return_value=Mock(name="haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+    return check_mock
+
+
+@pytest.fixture(name="check_haproxy_not_installed")
+def check_haproxy_not_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(side_effect=PackageNotFoundError("haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+    return check_mock
+
+
+class TestEnsureHAProxyInstalled:
+    def test_installs_haproxy_when_not_present(
+        self,
+        apt_fixture,
+        haproxy_install_fixture,
+        haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        context.run(context.on.install(), state)
+
+        haproxy_install_fixture.assert_called_once()
+        haproxy_copy_error_files_fixture.assert_called_once()
+
+    def test_skips_install_when_already_present(
+        self,
+        apt_fixture,
+        haproxy_install_fixture,
+        check_haproxy_installed,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        context.run(context.on.install(), state)
+
+        haproxy_install_fixture.assert_not_called()
+
+    def test_always_copies_error_files(
+        self,
+        apt_fixture,
+        haproxy_install_fixture,
+        haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
+        monkeypatch,
+    ):
+        """Error files are copied when HAProxy is installed."""
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        context.run(context.on.install(), state)
+
+        haproxy_install_fixture.assert_called_once()
+        haproxy_copy_error_files_fixture.assert_called_once_with(
+            "/opt/canonical/landscape/canonical/landscape/offline"
+        )
+
+    def test_raises_on_install_failure(
+        self,
+        apt_fixture,
+        haproxy_install_fixture,
+        check_haproxy_not_installed,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+        haproxy_install_fixture.side_effect = haproxy.HAProxyError(
+            "Installation failed"
+        )
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        with pytest.raises(UncaughtCharmError):
+            context.run(context.on.install(), state)
+
+    def test_raises_on_error_files_copy_failure(
+        self,
+        apt_fixture,
+        haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+        haproxy_copy_error_files_fixture.side_effect = haproxy.HAProxyError(
+            "Copy failed"
+        )
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        with pytest.raises(UncaughtCharmError):
+            context.run(context.on.install(), state)
+
+    def test_sets_maintenance_status_during_install(
+        self,
+        apt_fixture,
+        haproxy_install_fixture,
+        check_haproxy_not_installed,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("charm.prepend_default_settings", Mock())
+
+        context = Context(LandscapeServerCharm)
+        state = State()
+
+        context.run(context.on.install(), state)
+
+        haproxy_install_fixture.assert_called_once()
+
+
+class TestOnUpgradeCharm:
+    def test_upgrade_charm_installs_haproxy_if_missing(
+        self,
+        lb_certs_state,
+        certificate_and_key_fixture,
+        haproxy_install_fixture,
+        haproxy_copy_error_files_fixture,
+        check_haproxy_not_installed,
+    ):
+        context = Context(LandscapeServerCharm)
+        state = State(**lb_certs_state)
+
+        with context(context.on.upgrade_charm(), state) as mgr:
+            stored = mgr.charm._stored
+
+        haproxy_install_fixture.assert_called_once()
+        haproxy_copy_error_files_fixture.assert_called_once()
+        assert stored.ready.get("load-balancer-certificates") is True
+
+    def test_upgrade_charm_skips_install_if_haproxy_present(
+        self,
+        lb_certs_state,
+        haproxy_install_fixture,
+        certificate_and_key_fixture,
+        check_haproxy_installed,
+    ):
+        context = Context(LandscapeServerCharm)
+        state = State(**lb_certs_state)
+
+        with context(context.on.upgrade_charm(), state) as mgr:
+            stored = mgr.charm._stored
+
+        haproxy_install_fixture.assert_not_called()
+        assert stored.ready.get("load-balancer-certificates") is True

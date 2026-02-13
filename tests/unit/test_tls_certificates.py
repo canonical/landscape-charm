@@ -56,11 +56,10 @@ def test_get_certificate_request_attributes_root_url(lb_certs_state):
 
 
 def test_haproxy_update_calls_get_cert_req_attr(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
+    lb_certs_state, certificate_and_key_fixture, haproxy_write_tls_cert_fixture
 ):
     ctx = Context(LandscapeServerCharm)
     state = State(**lb_certs_state)
-    tls_mock = haproxy_root_fixture[3]
 
     with ctx(ctx.on.config_changed(), state) as mgr:
         provider_cert, private_key = certificate_and_key_fixture
@@ -68,7 +67,7 @@ def test_haproxy_update_calls_get_cert_req_attr(
         stored = mgr.charm._stored
         assert provider_cert is not None and private_key is not None
 
-    tls_mock.assert_called_once_with(
+    haproxy_write_tls_cert_fixture.assert_called_once_with(
         provider_certificate=provider_cert, private_key=private_key
     )
 
@@ -123,7 +122,7 @@ def test_get_certificate_request_attributes_ipv6_in_url(lb_certs_state):
 
 
 def test_update_haproxy_returns_early_when_no_cert_attrs(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture, monkeypatch
+    lb_certs_state, certificate_and_key_fixture, monkeypatch
 ):
     """Test that _update_haproxy returns early when cert attributes
     cannot be generated.
@@ -142,7 +141,7 @@ def test_update_haproxy_returns_early_when_no_cert_attrs(
 
 
 def test_update_haproxy_sets_default_root_url(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
+    lb_certs_state, certificate_and_key_fixture
 ):
     """Test that _update_haproxy sets default root_url when not configured."""
     ctx = Context(LandscapeServerCharm)
@@ -158,7 +157,7 @@ def test_update_haproxy_sets_default_root_url(
 
 
 def test_update_haproxy_does_not_override_configured_root_url(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
+    lb_certs_state, certificate_and_key_fixture
 ):
     """Test that _update_haproxy doesn't set default_root_url when
     root_url is configured.
@@ -174,7 +173,7 @@ def test_update_haproxy_does_not_override_configured_root_url(
 
 
 def test_update_haproxy_marks_ready_on_success(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
+    lb_certs_state, certificate_and_key_fixture
 ):
     """Test that _update_haproxy marks load-balancer-certificates as ready
     on success.
@@ -205,9 +204,7 @@ def test_tls_certificates_refresh_events(lb_certs_state):
             assert cert_attrs.sans_ip is not None
 
 
-def test_action_get_certificates_success(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture
-):
+def test_action_get_certificates_success(lb_certs_state, certificate_and_key_fixture):
     """Test get-certificates action returns cert data when available."""
     ctx = Context(LandscapeServerCharm)
     state = State(**lb_certs_state)
@@ -221,7 +218,7 @@ def test_action_get_certificates_success(
 
 
 def test_action_get_certificates_no_attrs(
-    lb_certs_state, certificate_and_key_fixture, haproxy_root_fixture, monkeypatch
+    lb_certs_state, certificate_and_key_fixture, monkeypatch
 ):
     """Test get-certificates action fails when cert attrs unavailable."""
     ctx = Context(LandscapeServerCharm)
@@ -235,9 +232,7 @@ def test_action_get_certificates_no_attrs(
         ctx.run(ctx.on.action("get-certificates"), state)
 
 
-def test_action_get_certificates_no_provider_cert(
-    lb_certs_state, haproxy_root_fixture, monkeypatch
-):
+def test_action_get_certificates_no_provider_cert(lb_certs_state, monkeypatch):
     """Test get-certificates action fails when provider certificate is unavailable."""
     ctx = Context(LandscapeServerCharm)
     state = State(**lb_certs_state)
@@ -249,3 +244,16 @@ def test_action_get_certificates_no_provider_cert(
 
     with pytest.raises(testing.ActionFailed):
         ctx.run(ctx.on.action("get-certificates"), state)
+
+
+def test_upgrade_charm_updates_haproxy_config(
+    lb_certs_state, certificate_and_key_fixture
+):
+    ctx = Context(LandscapeServerCharm)
+    state = State(**lb_certs_state)
+
+    with ctx(ctx.on.upgrade_charm(), state) as mgr:
+        stored = mgr.charm._stored
+
+    assert stored.ready.get("load-balancer-certificates") is True
+    assert "ssl crt /etc/haproxy/haproxy.pem" in stored.haproxy_config
