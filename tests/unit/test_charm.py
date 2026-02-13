@@ -1886,10 +1886,23 @@ class TestGetModifiedEnvVars(unittest.TestCase):
         self.assertIn("/usr/lib/python3", modified)
 
 
+@pytest.fixture(name="check_haproxy_installed")
+def check_haproxy_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(return_value=Mock(name="haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+    return check_mock
+
+
+@pytest.fixture(name="check_haproxy_not_installed")
+def check_haproxy_not_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
+    check_mock = Mock(side_effect=PackageNotFoundError("haproxy"))
+    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
+    return check_mock
+
+
 class TestEnsureHAProxyInstalled:
     def test_installs_haproxy_when_not_present(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
@@ -1908,7 +1921,6 @@ class TestEnsureHAProxyInstalled:
 
     def test_skips_install_when_already_present(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
         check_haproxy_installed,
@@ -1925,7 +1937,6 @@ class TestEnsureHAProxyInstalled:
 
     def test_always_copies_error_files(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
         haproxy_copy_error_files_fixture,
@@ -1947,7 +1958,6 @@ class TestEnsureHAProxyInstalled:
 
     def test_raises_on_install_failure(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
         check_haproxy_not_installed,
@@ -1966,7 +1976,6 @@ class TestEnsureHAProxyInstalled:
 
     def test_raises_on_error_files_copy_failure(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_copy_error_files_fixture,
         check_haproxy_not_installed,
@@ -1985,7 +1994,6 @@ class TestEnsureHAProxyInstalled:
 
     def test_sets_maintenance_status_during_install(
         self,
-        capture_service_conf,
         apt_fixture,
         haproxy_install_fixture,
         check_haproxy_not_installed,
@@ -2025,6 +2033,7 @@ class TestOnUpgradeCharm:
         lb_certs_state,
         haproxy_install_fixture,
         certificate_and_key_fixture,
+        check_haproxy_installed,
     ):
         context = Context(LandscapeServerCharm)
         state = State(**lb_certs_state)

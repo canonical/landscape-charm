@@ -158,12 +158,12 @@ def certificate_and_key_fixture(
     return provider_cert_mock, private_key
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def haproxy_user_fixture(monkeypatch):
     monkeypatch.setattr(pwd, "getpwnam", Mock())
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def haproxy_paths_fixture(tmp_path, monkeypatch):
     """Mock HAProxy file paths to use tmp_path fixture."""
     monkeypatch.setattr(haproxy, "HAPROXY_CERT_PATH", str(tmp_path / "haproxy.pem"))
@@ -172,52 +172,21 @@ def haproxy_paths_fixture(tmp_path, monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def haproxy_write_tls_cert_fixture(request, monkeypatch) -> Mock:
     mock_write_tls = Mock()
     if not request.node.get_closest_marker("disable_haproxy_mocks"):
         monkeypatch.setattr("haproxy.write_tls_cert", mock_write_tls)
-
     return mock_write_tls
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def haproxy_write_file_fixture(request, monkeypatch):
-    """
-    Mock HAProxy file ownership operations that require root permissions.
-    """
     if not request.node.get_closest_marker("disable_haproxy_mocks"):
         monkeypatch.setattr("haproxy.write_file", lambda *args, **kwargs: None)
 
 
 @pytest.fixture(autouse=True)
-def haproxy_root_fixture(
-    haproxy_paths_fixture,
-    haproxy_user_fixture,
-    haproxy_write_file_fixture,
-    haproxy_write_tls_cert_fixture,
-    ownership_fixture,
-    check_haproxy_installed,
-    haproxy_install_fixture,
-    haproxy_copy_error_files_fixture,
-) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
-    """
-    Uses all the given fixtures automatically for all tests.
-    Returns the mocks as a tuple for tests that need to access them directly.
-    """
-    return (
-        haproxy_paths_fixture,
-        haproxy_user_fixture,
-        haproxy_write_file_fixture,
-        haproxy_write_tls_cert_fixture,
-        ownership_fixture,
-        check_haproxy_installed,
-        haproxy_install_fixture,
-        haproxy_copy_error_files_fixture,
-    )
-
-
-@pytest.fixture()
 def ownership_fixture(monkeypatch) -> tuple[Mock, Mock, Mock]:
     """
     Mock os.chown, os.chmod, and shutil.chown
@@ -266,9 +235,7 @@ def lb_certs_state_fixture(
     certificates_integration,
     replicas,
     replicas_networks,
-    haproxy_root_fixture,
 ) -> dict:
-
     return {
         "relations": [certificates_integration, replicas],
         "networks": [replicas_networks],
@@ -303,23 +270,7 @@ def apt_fixture(monkeypatch: pytest.MonkeyPatch):
     return add_package_mock, remove_package_mock
 
 
-@pytest.fixture(name="check_haproxy_installed")
-def check_haproxy_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    check_mock = Mock(return_value=Mock(name="haproxy"))
-    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
-
-    return check_mock
-
-
-@pytest.fixture(name="check_haproxy_not_installed")
-def check_haproxy_not_installed_fixture(monkeypatch: pytest.MonkeyPatch) -> Mock:
-    check_mock = Mock(side_effect=PackageNotFoundError("haproxy"))
-    monkeypatch.setattr("charm.apt.DebianPackage.from_installed_package", check_mock)
-
-    return check_mock
-
-
-@pytest.fixture(name="haproxy_install_fixture")
+@pytest.fixture(autouse=True, name="haproxy_install_fixture")
 def haproxy_install_fixture(request, monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock_install = Mock()
     if not request.node.get_closest_marker("disable_haproxy_mocks"):
@@ -327,7 +278,7 @@ def haproxy_install_fixture(request, monkeypatch: pytest.MonkeyPatch) -> Mock:
     return mock_install
 
 
-@pytest.fixture(name="haproxy_copy_error_files_fixture")
+@pytest.fixture(autouse=True, name="haproxy_copy_error_files_fixture")
 def haproxy_copy_error_files_fixture(request, monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock_copy = Mock(return_value=[])
     if not request.node.get_closest_marker("disable_haproxy_mocks"):
